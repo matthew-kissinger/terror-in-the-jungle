@@ -31,6 +31,29 @@ vi.mock('../assets/modelPaths', () => ({
     AH1_COBRA: 'vehicles/aircraft/ah1-cobra.glb',
     A1_SKYRAIDER: 'vehicles/aircraft/a1-skyraider.glb',
   },
+  // FixedWingConfigs reads the catalog at module-init for prop joints + dims.
+  warAssetCatalog: {
+    'a1-skyraider': {
+      slug: 'a1-skyraider', class: 'aircraft', path: 'vehicles/aircraft/a1-skyraider.glb',
+      forward: 'pos-z', dims: [14.1, 3.87, 12.51], tris: 3472, sizeKB: 98.9, materials: 9,
+      minY: -0.24, budgetStatus: 'PASS', action: 'replace',
+      joints: [{ name: 'Joint_Propeller', type: 'mainBlades', spinAxis: 'x', meshCount: 10 }],
+    },
+    'ac47-spooky': {
+      slug: 'ac47-spooky', class: 'aircraft', path: 'vehicles/aircraft/ac47-spooky.glb',
+      forward: 'pos-z', dims: [26.3, 7.64, 20.21], tris: 2240, sizeKB: 75.2, materials: 9,
+      minY: -2.35, budgetStatus: 'PASS', action: 'replace',
+      joints: [
+        { name: 'Joint_PropellerR', type: 'mainBlades', spinAxis: 'x', meshCount: 5 },
+        { name: 'Joint_PropellerL', type: 'mainBlades', spinAxis: 'x', meshCount: 5 },
+      ],
+    },
+    'f4-phantom': {
+      slug: 'f4-phantom', class: 'aircraft', path: 'vehicles/aircraft/f4-phantom.glb',
+      forward: 'pos-z', dims: [12, 4.19, 18.82], tris: 1580, sizeKB: 63, materials: 10,
+      minY: -0.1, budgetStatus: 'PASS', action: 'replace',
+    },
+  },
 }));
 
 function createMockScene(): THREE.Scene {

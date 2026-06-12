@@ -46,7 +46,7 @@ import {
 } from './FixedWingConfigs';
 import type { FixedWingDisplayInfo } from './FixedWingConfigs';
 import type { VehicleExitOptions, VehicleExitPlan, VehicleExitResult } from './PlayerVehicleAdapter';
-import { ModelLoader } from '../assets/ModelLoader';
+import { modelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
 import type { CombatantSystem } from '../combat/CombatantSystem';
@@ -174,7 +174,6 @@ function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingComm
 export class FixedWingModel implements GameSystem {
   private static readonly IDLE_SIMULATION_SPEED = 0.5;
   private scene: THREE.Scene;
-  private modelLoader = new ModelLoader();
   private animation = new FixedWingAnimation();
   private interaction: FixedWingInteraction;
 
@@ -487,7 +486,7 @@ export class FixedWingModel implements GameSystem {
     if (!display) return false;
 
     try {
-      const { scene: innerModel, animations } = await this.modelLoader.loadAnimatedModel(modelPath);
+      const { scene: innerModel, animations } = await modelLoader.loadAnimatedModel(modelPath);
       // Most GLBs face +Z but physics forward is -Z, so default to a 180° Y flip.
       // Per-aircraft override (`modelYawOffset` on FixedWingDisplayInfo) handles
       // GLBs authored facing -Z (e.g. A-1 Skyraider) — they override to 0.

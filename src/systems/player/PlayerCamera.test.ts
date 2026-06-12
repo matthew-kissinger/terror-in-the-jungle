@@ -8,6 +8,7 @@ import type { PlayerState } from '../../types';
 import type { PlayerInput } from './PlayerInput';
 import type { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import type { IHelicopterModel } from '../../types/SystemInterfaces';
+import { getFixedWingCameraFit } from '../vehicle/FixedWingArmament';
 
 // Mock Logger
 vi.mock('../../utils/Logger', () => ({
@@ -493,15 +494,19 @@ describe('PlayerCamera', () => {
       const fixedWingModel = createFixedWingModel(aircraftPosition);
       enterFixedWing(fixedWingModel);
 
+      // On first entry the camera snaps to the airframe's chase pose (behind +
+      // above the nose), sourced from the per-airframe camera-fit table so the
+      // assertion follows a re-band of the chase distance/height.
+      const fit = getFixedWingCameraFit('A1_SKYRAIDER');
       playerCamera.updateCamera(mockInput, 1 / 60);
       expect(camera.position.x).toBeCloseTo(0, 5);
-      expect(camera.position.y).toBeCloseTo(8, 5);
-      expect(camera.position.z).toBeCloseTo(30, 5);
+      expect(camera.position.y).toBeCloseTo(fit.chaseHeight, 5);
+      expect(camera.position.z).toBeCloseTo(fit.chaseDistance, 5);
 
       aircraftPosition.set(0, 0, -100);
       playerCamera.updateCamera(mockInput, 1 / 60);
 
-      expect(camera.position.z).toBeLessThan(30);
+      expect(camera.position.z).toBeLessThan(fit.chaseDistance);
       expect(camera.position.z).toBeGreaterThan(-70);
     });
 

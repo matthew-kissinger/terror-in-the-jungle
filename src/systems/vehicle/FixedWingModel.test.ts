@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { FixedWingModel } from './FixedWingModel';
+import { FIXED_WING_CONFIGS } from './FixedWingConfigs';
 import { AircraftModels } from '../assets/modelPaths';
 import { Faction } from '../combat/types';
 import type { CombatantSystem } from '../combat/CombatantSystem';
@@ -18,28 +19,29 @@ vi.mock('../effects/TracerPool', () => ({
   },
 }));
 
-// Mock ModelLoader
-vi.mock('../assets/ModelLoader', () => ({
-  ModelLoader: class {
-    private createMockAircraft(): THREE.Group {
-      const group = new THREE.Group();
-      group.name = 'mock-aircraft';
-      // Add a propeller node for animation testing
-      const prop = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
-      prop.name = 'propeller';
-      group.add(prop);
-      return group;
-    }
+// Mock the shared ModelLoader singleton. The mock aircraft carries a grafted
+// propeller hub node (`Joint_Propeller`, matching the war-asset catalog) so the
+// animation wiring finds it.
+function createMockAircraft(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'mock-aircraft';
+  const prop = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  prop.name = 'Joint_Propeller';
+  group.add(prop);
+  return group;
+}
 
+vi.mock('../assets/ModelLoader', () => {
+  const loader = {
     async loadModel(_path: string): Promise<THREE.Group> {
-      return this.createMockAircraft();
-    }
-
+      return createMockAircraft();
+    },
     async loadAnimatedModel(_path: string): Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }> {
-      return { scene: this.createMockAircraft(), animations: [] };
-    }
-  },
-}));
+      return { scene: createMockAircraft(), animations: [] };
+    },
+  };
+  return { ModelLoader: class {}, modelLoader: loader };
+});
 
 function createScene(): THREE.Scene {
   return new THREE.Scene();
@@ -189,7 +191,10 @@ describe('FixedWingModel', () => {
       expect(model.getAircraftPositionTo('fw1', target)).toBe(true);
       expect(target.x).toBeCloseTo(metadata.runwayStart!.position.x, 4);
       expect(target.z).toBeCloseTo(metadata.runwayStart!.position.z, 4);
-      expect(target.y).toBeCloseTo(10.5, 4);
+      // Mock terrain returns height 10; the aircraft seats its gear at
+      // terrain + gearClearance (measured per airframe from the catalog).
+      const a1GearClearance = FIXED_WING_CONFIGS.A1_SKYRAIDER.physics.gearClearance;
+      expect(target.y).toBeCloseTo(10 + a1GearClearance, 4);
       expect(model.getFlightData('fw1')?.operationState).toBe('lineup');
     });
 

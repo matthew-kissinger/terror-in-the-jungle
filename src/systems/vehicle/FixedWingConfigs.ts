@@ -9,7 +9,8 @@
  * a few overloaded lift/turn-rate constants.
  */
 
-import { AircraftModels } from '../assets/modelPaths';
+import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
+import type { WarAssetEntry } from '../assets/modelPaths';
 
 export interface FixedWingPhysicsConfig {
   mass: number; // kg
@@ -87,10 +88,24 @@ export interface FixedWingConfig {
   operation: FixedWingOperationInfo;
 }
 
+export type PropellerSpinAxis = 'x' | 'y' | 'z';
+
 export interface FixedWingDisplayInfo {
   displayName: string;
   hasPropellers: boolean;
+  /**
+   * Names of the propeller hub nodes to spin. For the repaint fleet these are
+   * the importer-grafted `Joint_Propeller*` hub joints sourced from the war
+   * asset catalog (the upstream prop/rotor animation clips were stripped, so
+   * spin is procedural off the named hub, never an animation track).
+   */
   propellerNodes: string[];
+  /**
+   * Local spin axis for the propeller hub joints (catalog-measured). The
+   * repaint A-1 and AC-47 props spin around their local X. Defaults to 'z' for
+   * any airframe whose catalog entry omits the axis.
+   */
+  propellerSpinAxis: PropellerSpinAxis;
   autoLevelDefault: boolean;
   cameraDistance: number;
   cameraHeight: number;
@@ -99,32 +114,65 @@ export interface FixedWingDisplayInfo {
   /**
    * Per-aircraft visual yaw offset (radians) applied to the inner GLB model so
    * it visually aligns with the physics forward direction. Defaults to Math.PI
-   * for GLBs authored facing +Z (the convention for the F-4 and AC-47). The
-   * A-1 Skyraider GLB is authored facing -Z and overrides this to 0 to avoid
-   * the universal flip rotating it tail-first.
+   * for GLBs authored facing +Z. The repaint fleet (cycle-2026-06-11) is
+   * uniformly +Z-forward per the war-asset catalog, so no airframe overrides
+   * this — the universal flip applies to all three.
    */
   modelYawOffset?: number;
 }
+
+/** Config key -> war-asset catalog slug (the catalog owns measured dims + joints). */
+const FIXED_WING_CATALOG_SLUG: Record<string, string> = {
+  A1_SKYRAIDER: 'a1-skyraider',
+  AC47_SPOOKY: 'ac47-spooky',
+  F4_PHANTOM: 'f4-phantom',
+};
+
+/** Resolve the war-asset catalog entry for a fixed-wing config key. */
+export function getFixedWingCatalogEntry(key: string): WarAssetEntry | null {
+  const slug = FIXED_WING_CATALOG_SLUG[key];
+  return slug ? warAssetCatalog[slug] ?? null : null;
+}
+
+/**
+ * Pull the grafted propeller hub joint names + their spin axis from the
+ * catalog. The importer grafts a single hub joint per propeller (the repaint
+ * A-1 has per-blade `Joint_Blade0..3` collapsed under one `Joint_Propeller`),
+ * recording the spin axis as metadata. Returns empty when the airframe carries
+ * no propeller joints (jets).
+ */
+function catalogPropellers(key: string): { nodes: string[]; axis: PropellerSpinAxis } {
+  const entry = getFixedWingCatalogEntry(key);
+  const propJoints = (entry?.joints ?? []).filter((j) => j.name.startsWith('Joint_Propeller'));
+  const nodes = propJoints.map((j) => j.name);
+  const axis = (propJoints[0]?.spinAxis ?? 'z') as PropellerSpinAxis;
+  return { nodes, axis };
+}
+
+const A1_PROPS = catalogPropellers('A1_SKYRAIDER');
+const AC47_PROPS = catalogPropellers('AC47_SPOOKY');
 
 const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
   A1_SKYRAIDER: {
     displayName: 'A-1 Skyraider',
     hasPropellers: true,
-    propellerNodes: ['propeller'],
+    propellerNodes: A1_PROPS.nodes,
+    propellerSpinAxis: A1_PROPS.axis,
     autoLevelDefault: true,
-    cameraDistance: 30,
+    // Camera distances kept in step with the re-banded FixedWingCameraFit table.
+    cameraDistance: 32,
     cameraHeight: 8,
     fovWidenEnabled: false,
     seats: 1,
-    modelYawOffset: 0,
   },
   AC47_SPOOKY: {
     displayName: 'AC-47 Spooky',
     hasPropellers: true,
-    propellerNodes: ['propLeft', 'propRight'],
+    propellerNodes: AC47_PROPS.nodes,
+    propellerSpinAxis: AC47_PROPS.axis,
     autoLevelDefault: true,
-    cameraDistance: 40,
-    cameraHeight: 12,
+    cameraDistance: 48,
+    cameraHeight: 13,
     fovWidenEnabled: false,
     seats: 2,
   },
@@ -132,9 +180,10 @@ const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     displayName: 'F-4 Phantom',
     hasPropellers: false,
     propellerNodes: [],
+    propellerSpinAxis: 'z',
     autoLevelDefault: true,
-    cameraDistance: 35,
-    cameraHeight: 8,
+    cameraDistance: 40,
+    cameraHeight: 9,
     fovWidenEnabled: true,
     seats: 1,
   },
@@ -193,7 +242,11 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 8.0,
       rollingResistance: 0.017,
       brakeDeceleration: 12,
-      gearClearance: 0.5,
+      // Re-banded to the repaint AC-47 catalog dims (cycle-2026-06-11): the
+      // measured GLB bottoms out 2.35 m below model origin (minY -2.35; tall
+      // taildragger stance), so the parked origin sits 2.35 m over the ground
+      // to seat the gear/belly. The old 0.5 was tuned to the undersized model.
+      gearClearance: 2.35,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 11,
       groundEffectStrength: 0.22,
@@ -254,7 +307,10 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 8.8,
       rollingResistance: 0.015,
       brakeDeceleration: 18,
-      gearClearance: 0.5,
+      // Re-banded to the repaint F-4 catalog dims (cycle-2026-06-11): the
+      // longer 18.82 m airframe seats its gear 0.1 m below model origin
+      // (minY -0.1). The old 0.5 was tuned to the 14.2 m undersized model.
+      gearClearance: 0.1,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 10,
       groundEffectStrength: 0.14,
@@ -324,7 +380,11 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 7.4,
       rollingResistance: 0.014,
       brakeDeceleration: 14,
-      gearClearance: 0.5,
+      // Re-banded to the repaint A-1 catalog dims (cycle-2026-06-11): the GLB
+      // bottoms out 0.24 m below model origin (minY -0.24), so the parked
+      // origin sits 0.24 m over the ground to seat the gear. The prop tips
+      // clear: the 12.51 m-long airframe's hub is well above this offset.
+      gearClearance: 0.24,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 14,
       groundEffectStrength: 0.35,
@@ -360,6 +420,47 @@ const FIXED_WING_MODEL_TO_KEY: Record<string, string> = {
   [AircraftModels.F4_PHANTOM]: 'F4_PHANTOM',
   [AircraftModels.AC47_SPOOKY]: 'AC47_SPOOKY',
 };
+
+/**
+ * Dormant fixed-wing registrations (cycle-2026-06-11-war-asset-repaint).
+ *
+ * These net-new repaint airframes ship in the war-asset catalog but carry no
+ * flight config yet, so they are NOT runway-enterable / spawnable as flyable
+ * aircraft. They are catalogued here so the gallery review route and follow-up
+ * tasks can enumerate them with display names + measured dims without re-deriving
+ * the slug mapping:
+ *
+ *  - B-52 Stratofortress — arclight bomber. Its high-altitude flight profile is
+ *    added by the air-support / arclight task, not here.
+ *  - C-130 Hercules, OV-10 Bronco, MiG-17 (NVA) — role systems pending; static /
+ *    scenery + future cycles.
+ *  - A-37 Dragonfly — flagged as a scale re-roll advisory (catalog 5.48 m long
+ *    vs real ~8.6 m); cataloged dormant until re-rolled.
+ */
+export interface DormantFixedWingInfo {
+  readonly displayName: string;
+  readonly slug: string;
+  /** True when the airframe is flagged for an asset scale re-roll. */
+  readonly scaleRerollAdvisory: boolean;
+}
+
+const FIXED_WING_DORMANT: Record<string, DormantFixedWingInfo> = {
+  B52_STRATOFORTRESS: { displayName: 'B-52 Stratofortress', slug: 'b52-stratofortress', scaleRerollAdvisory: false },
+  C130_HERCULES: { displayName: 'C-130 Hercules', slug: 'c130-hercules', scaleRerollAdvisory: false },
+  OV10_BRONCO: { displayName: 'OV-10 Bronco', slug: 'ov10-bronco', scaleRerollAdvisory: false },
+  A37_DRAGONFLY: { displayName: 'A-37 Dragonfly', slug: 'a37-dragonfly', scaleRerollAdvisory: true },
+  MIG17_NVA: { displayName: 'MiG-17 (NVA)', slug: 'mig17-nva', scaleRerollAdvisory: false },
+};
+
+/** Dormant (cataloged, not-yet-flyable) fixed-wing airframe keys. */
+export function getDormantFixedWingKeys(): string[] {
+  return Object.keys(FIXED_WING_DORMANT);
+}
+
+/** Resolve dormant-airframe display info for a registry key (null if unknown). */
+export function getDormantFixedWingInfo(key: string): DormantFixedWingInfo | null {
+  return FIXED_WING_DORMANT[key] ?? null;
+}
 
 export function isFixedWingRunwayEnterable(key: string): boolean {
   return Boolean(FIXED_WING_CONFIGS[key]);
