@@ -9,6 +9,7 @@ import {
   spawnScenarioM2HBEmplacements,
   M2HB_SCENARIO_SPAWNS,
   createM2HBEmplacement,
+  buildM2HBTripod,
 } from './M2HBEmplacementSpawn';
 import { Emplacement } from '../../vehicle/Emplacement';
 import { VehicleManager } from '../../vehicle/VehicleManager';
@@ -330,6 +331,42 @@ describe('createM2HBEmplacement + spawnScenarioM2HBEmplacements', () => {
 
     const emp = vm.getVehiclesByCategory('emplacement')[0];
     expect(emp.getPosition().toArray()).toEqual(snapped.toArray());
+  });
+});
+
+// ───────────────────────── Procedural gun visual ─────────────────────────
+
+describe('buildM2HBTripod gun visual (real-scale m2-browning re-proportion)', () => {
+  function gunBoundsZ(pitchNode: THREE.Object3D): { minZ: number; maxZ: number } {
+    pitchNode.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(pitchNode);
+    return { minZ: box.min.z, maxZ: box.max.z };
+  }
+
+  it('extends the barrel ahead of the analytic tracer origin so tracers leave the muzzle', () => {
+    const { pitchNode } = buildM2HBTripod();
+    const { minZ } = gunBoundsZ(pitchNode);
+    // Forward is -Z; the analytic muzzle origin is 0.6 m forward of the pintle
+    // (M2HBEmplacement.computeMuzzleOrigin). The visible barrel tip must reach
+    // further forward than that so the muzzle reads ahead of the shot origin.
+    expect(minZ).toBeLessThan(-0.6);
+  });
+
+  it('reads at the larger real-scale gun length (~2 m receiver-to-muzzle)', () => {
+    const { pitchNode } = buildM2HBTripod();
+    const { minZ, maxZ } = gunBoundsZ(pitchNode);
+    // The doubled GLB scale puts the gun near ~2 m end to end; the procedural
+    // stand-in should be in that ballpark, not the old ~1.4 m silhouette.
+    expect(maxZ - minZ).toBeGreaterThan(1.8);
+  });
+
+  it('keeps yaw/pitch articulation nodes intact for the Emplacement to drive', () => {
+    const { root, yawNode, pitchNode } = buildM2HBTripod();
+    expect(root.name).toBe('m2hb_tripod_root');
+    expect(yawNode.name).toBe('m2hb_yaw');
+    expect(pitchNode.name).toBe('m2hb_pitch');
+    // Pitch node is a descendant of the yaw node so recoil-z and pitch compose.
+    expect(pitchNode.parent).toBe(yawNode);
   });
 });
 

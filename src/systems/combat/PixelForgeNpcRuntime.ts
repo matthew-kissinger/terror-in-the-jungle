@@ -144,15 +144,25 @@ export const PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION = 4;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH = 2;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG = '__TIJ_ALLOW_NPC_CLOSE_MODEL_LAZY_LOAD__';
 
+// Grip / support / muzzle / stock node names re-derived from the normalized
+// repaint weapon GLB node vocabularies (R1 import pipeline). The earlier names
+// (Joint_PistolGrip, Mesh_HandguardBotL, Mesh_StockButt, Mesh_TriggerGuardBot,
+// Mesh_ButtPad, Mesh_Receiver, …) matched the pre-repaint models and resolve to
+// nothing in the new GLBs — findNamed then fell through to defaults, mis-seating
+// the NPC hold. These lists name real meshes in the shipped m16a1.glb /
+// ak47.glb so the close model grips at the pistol grip, supports at the
+// handguard, points the muzzle down the barrel, and anchors the stock in the
+// shoulder pocket. findNamed takes the first hit, so each list is ordered
+// best-anchor-first with a coarser fallback behind it.
 export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig> = {
   m16a1: {
     id: 'm16a1',
     modelPath: 'weapons/m16a1.glb',
     lengthMeters: 0.99,
-    gripNames: ['Joint_PistolGrip', 'Mesh_GripBody', 'Mesh_TriggerGuardBottom', 'Mesh_LowerReceiver'],
-    supportNames: ['Mesh_HandguardBotL', 'Mesh_HandguardBotR', 'Mesh_HandguardTop', 'Mesh_DeltaRing'],
-    muzzleNames: ['Mesh_FlashHider', 'Mesh_Barrel', 'Mesh_FrontSightPost'],
-    stockNames: ['Mesh_StockButt', 'Mesh_Buttplate', 'Mesh_StockTube'],
+    gripNames: ['Mesh_PistolGrip', 'Mesh_PistolGripBase', 'Mesh_LowerReceiver', 'Mesh_TriggerGuardBottom'],
+    supportNames: ['Mesh_HandguardBody', 'Mesh_DeltaRing', 'Mesh_HandguardCap'],
+    muzzleNames: ['Mesh_FlashHiderBore', 'Mesh_FlashHiderBirdcage', 'Mesh_FrontSightPost', 'Mesh_Barrel'],
+    stockNames: ['Mesh_Stock', 'Mesh_Buttplate'],
     pitchTrimDeg: 5,
     forwardHold: 0.11,
     gripOffset: 0,
@@ -162,10 +172,10 @@ export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNp
     id: 'ak47',
     modelPath: 'weapons/ak47.glb',
     lengthMeters: 0.9,
-    gripNames: ['Mesh_PistolGrip', 'Mesh_TriggerGuardBot', 'Mesh_Receiver'],
+    gripNames: ['Mesh_PistolGrip', 'Mesh_GripPlate', 'Mesh_ReceiverMain', 'Mesh_GuardBottom'],
     supportNames: ['Mesh_LowerHandguard', 'Mesh_UpperHandguard', 'Mesh_Barrel'],
     muzzleNames: ['Mesh_MuzzleBrake', 'Mesh_FrontSightPost', 'Mesh_Barrel'],
-    stockNames: ['Mesh_ButtPad', 'Mesh_Stock', 'Mesh_StockComb'],
+    stockNames: ['Mesh_Buttplate', 'Mesh_StockMain', 'Mesh_StockMount'],
     pitchTrimDeg: 5,
     forwardHold: 0.11,
     gripOffset: 0,

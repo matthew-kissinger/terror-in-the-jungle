@@ -117,6 +117,28 @@ vi.mock('../../assets/modelPaths', () => ({
     ITHACA37: 'weapons/ithaca37.glb',
     M3_GREASE_GUN: 'weapons/m3-grease-gun.glb',
     M1911: 'weapons/m1911.glb',
+    M60: 'weapons/m60.glb',
+    M79: 'weapons/m79.glb',
+  },
+  // Minimal catalog slice mirroring the magazine/muzzle node metadata the rig
+  // reads. Mirrors the shape of the generated warAssetCatalog without pulling
+  // the full table into the mock.
+  warAssetCatalog: {
+    m16a1: {
+      slug: 'm16a1',
+      magazineNodes: ['Mesh_MagSeg1', 'Mesh_MagSeg2', 'Mesh_MagSeg3', 'Mesh_MagFloor'],
+      muzzleNodes: ['Mesh_FlashHiderBore'],
+    },
+    ak47: {
+      slug: 'ak47',
+      magazineNodes: ['Mesh_MagSeg1', 'Mesh_MagSeg2', 'Mesh_MagSeg3', 'Mesh_MagFloor'],
+      muzzleNodes: ['Mesh_MuzzleBrake'],
+    },
+    ithaca37: { slug: 'ithaca37' },
+    'm3-grease-gun': { slug: 'm3-grease-gun' },
+    m1911: { slug: 'm1911' },
+    m60: { slug: 'm60', muzzleNodes: ['Mesh_FlashHiderBase', 'Mesh_FlashHiderFlare'] },
+    m79: { slug: 'm79' },
   },
 }))
 

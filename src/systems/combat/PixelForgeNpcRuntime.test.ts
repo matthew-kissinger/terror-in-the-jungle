@@ -10,10 +10,32 @@ import {
   getPixelForgeNpcRuntimeClip,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
   PIXEL_FORGE_NPC_RUNTIME_FACTIONS,
+  PIXEL_FORGE_NPC_WEAPONS,
   PixelForgeNpcDistanceConfig,
   sanitizePixelForgeNpcAnimationClip,
 } from './PixelForgeNpcRuntime';
 import { Combatant, CombatantState, Faction } from './types';
+
+// Mesh node names present in the shipped repaint NPC weapon GLBs, verified by
+// parsing each GLB JSON chunk. The NPC hold derivation (CombatantRenderer
+// findNamed) takes the FIRST matching name in each list; if none match it falls
+// through to a hardcoded default offset and the gun floats. These fixtures let
+// us assert every configured anchor list resolves against the real model.
+const NPC_WEAPON_GLB_NODES: Record<'m16a1' | 'ak47', ReadonlySet<string>> = {
+  m16a1: new Set([
+    'Mesh_UpperReceiver', 'Mesh_LowerReceiver', 'Mesh_Magwell', 'Mesh_PistolGrip',
+    'Mesh_PistolGripBase', 'Mesh_HandguardBody', 'Mesh_DeltaRing', 'Mesh_HandguardCap',
+    'Mesh_Barrel', 'Mesh_FrontSightPost', 'Mesh_FlashHiderBase', 'Mesh_FlashHiderBirdcage',
+    'Mesh_FlashHiderBore', 'Mesh_MagSeg1', 'Mesh_MagFloor', 'Mesh_TriggerGuardBottom',
+    'Mesh_Stock', 'Mesh_Buttplate',
+  ]),
+  ak47: new Set([
+    'Mesh_ReceiverMain', 'Mesh_PistolGrip', 'Mesh_GripPlate', 'Mesh_GuardBottom',
+    'Mesh_LowerHandguard', 'Mesh_UpperHandguard', 'Mesh_Barrel', 'Mesh_MuzzleBrake',
+    'Mesh_FrontSightPost', 'Mesh_MagSeg1', 'Mesh_MagFloor', 'Mesh_StockMain',
+    'Mesh_StockMount', 'Mesh_Buttplate',
+  ]),
+};
 
 function createCombatant(state: CombatantState): Combatant {
   return {
@@ -129,5 +151,30 @@ describe('PixelForgeNpcRuntime', () => {
 
     const sanitized = sanitizePixelForgeNpcAnimationClip(clip);
     expect(getPixelForgeClipHorizontalNetDisplacement(sanitized).length()).toBe(4);
+  });
+
+  describe('NPC weapon hold anchors resolve against the shipped GLB vocabulary', () => {
+    // Each anchor list must contain at least one node that exists in the GLB so
+    // findNamed lands a real attachment point instead of falling through to the
+    // default float offset. A regression here = the gun detaching from the hand.
+    for (const id of ['m16a1', 'ak47'] as const) {
+      const weapon = PIXEL_FORGE_NPC_WEAPONS[id];
+      const nodes = NPC_WEAPON_GLB_NODES[id];
+
+      it(`${id} grip / support / muzzle / stock each name a real GLB node`, () => {
+        for (const list of [weapon.gripNames, weapon.supportNames, weapon.muzzleNames, weapon.stockNames]) {
+          expect(list.length).toBeGreaterThan(0);
+          expect(list.some((name) => nodes.has(name))).toBe(true);
+        }
+      });
+
+      it(`${id} muzzle anchor reaches the barrel/muzzle, not the receiver`, () => {
+        // The first resolvable muzzle name must be a barrel-end node so the
+        // muzzle-direction vector points down the bore.
+        const firstHit = weapon.muzzleNames.find((name) => nodes.has(name));
+        expect(firstHit).toBeDefined();
+        expect(firstHit).toMatch(/Barrel|Muzzle|FlashHider|FrontSight/);
+      });
+    }
   });
 });

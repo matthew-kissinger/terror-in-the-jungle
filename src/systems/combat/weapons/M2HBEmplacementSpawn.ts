@@ -64,27 +64,38 @@ export function buildM2HBTripod(): {
   pitchNode.name = 'm2hb_pitch';
   yawNode.add(pitchNode);
 
-  // Receiver block (the M2HB's box body).
-  const receiverGeom = new THREE.BoxGeometry(0.18, 0.18, 0.5);
+  // Receiver block (the M2HB's box body). Re-proportioned to the real-scale
+  // repaint m2-browning silhouette (warAssetCatalog dims ~2.0 m long, 0.69 m
+  // tall): the Ma Deuce has a heavy boxy receiver, so the procedural stand-in
+  // is widened/heightened to ~0.26 wide × 0.30 tall × 0.70 deep. The old block
+  // (0.18 × 0.18 × 0.50) read undersized next to the doubled GLB scale.
+  const receiverGeom = new THREE.BoxGeometry(0.26, 0.3, 0.7);
   const receiverMat = new THREE.MeshStandardMaterial({ color: 0x2a2a26, flatShading: true });
   const receiver = new THREE.Mesh(receiverGeom, receiverMat);
-  receiver.position.z = -0.05;
+  receiver.position.z = 0;
   pitchNode.add(receiver);
 
-  // Barrel (forward of receiver). Cylinder default axis is Y; rotate
-  // so it lies along -Z (barrel forward).
-  const barrelGeom = new THREE.CylinderGeometry(0.025, 0.03, 1.15, 8);
+  // Barrel + perforated jacket (forward of receiver). Cylinder default axis is
+  // Y; rotate so it lies along -Z (barrel forward). Lengthened to 1.5 m and
+  // thickened for the heavier real-scale gun. Centred at z=-1.0, the barrel
+  // spans z=-0.25..-1.75; its muzzle tip (z=-1.75) sits ahead of the analytic
+  // tracer origin (0.6 m forward of the pintle, see
+  // M2HBEmplacement.computeMuzzleOrigin), so tracers read as leaving the barrel
+  // mouth rather than mid-jacket. Receiver-back (z=0.35) to muzzle tip is ~2.1 m,
+  // matching the catalog's ~2.0 m gun length.
+  const barrelGeom = new THREE.CylinderGeometry(0.045, 0.055, 1.5, 10);
   const barrelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a18, flatShading: true });
   const barrel = new THREE.Mesh(barrelGeom, barrelMat);
   barrel.rotation.x = Math.PI * 0.5;
-  barrel.position.z = -0.75;
+  barrel.position.z = -1.0;
   pitchNode.add(barrel);
 
-  // Spade-grips (the gunner's handles, behind receiver).
-  const gripGeom = new THREE.BoxGeometry(0.18, 0.22, 0.04);
+  // Spade-grips (the gunner's handles, behind receiver). Scaled with the
+  // larger receiver so the gunner's hands read at the back of the gun.
+  const gripGeom = new THREE.BoxGeometry(0.26, 0.3, 0.05);
   const gripMat = new THREE.MeshStandardMaterial({ color: 0x141414, flatShading: true });
   const grip = new THREE.Mesh(gripGeom, gripMat);
-  grip.position.z = 0.28;
+  grip.position.z = 0.4;
   pitchNode.add(grip);
 
   return { root, yawNode, pitchNode };
