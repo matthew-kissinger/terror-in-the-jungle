@@ -250,11 +250,18 @@ For each round, in a single orchestrator turn:
 4. When an executor returns:
    - Read the structured report.
    - If `fence_change: yes` → stop; surface to human.
-   - If `pr_url: blocked-by-sandbox` → the executor hit the sandbox
-     `ask`-list on `git push` (`.claude/settings.local.json` keeps
-     `Bash(git push:*)` under `ask` for safety, and agent sessions
-     cannot answer the prompt). The orchestrator pushes from the main
-     session and opens the PR on the executor's behalf:
+   - If `pr_url: blocked-by-sandbox` → the executor hit a sandbox
+     `ask`-list rule, and agent sessions cannot answer the prompt.
+     **Policy change 2026-06-12 (owner directive — approval prompts were
+     stalling overnight cycles):** `git commit` / `git push` /
+     `git checkout` / `git switch` / `git merge` / `gh pr merge` /
+     `gh pr create` are on the `allow` list in `.claude/settings.local.json`
+     on the primary workstation, so executors commit, push, and open PRs
+     unattended; only `git tag` and `gh repo edit` still ask.
+     `settings.local.json` is intentionally untracked — replicate the
+     allow-list on a new machine or this fallback fires again. If it does
+     fire, the orchestrator finishes from the main session on the
+     executor's behalf:
      1. `git -C .claude/worktrees/<agent-dir> push -u origin task/<slug>`
         (or `git push origin task/<slug>:task/<slug>` from the main
         worktree if the branch is already visible).

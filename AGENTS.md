@@ -43,9 +43,8 @@ npm run check:culling-proof      # Headed deterministic renderer/category proof
 npm run check:culling-baseline   # Culling owner-path before packet
 npm run check:terrain-baseline   # Elevated terrain horizon before proof
 npm run check:terrain-visual     # Terrain visual review
-npm run check:water-system       # Water system audit
-npm run check:water-runtime      # Water runtime proof
-npm run check:visual-integrity   # Visual integrity audit
+npm run check:visual-integrity   # Visual integrity audit (incl. rotor contract)
+npm run check:tod-coherence      # Lighting-rig TOD acceptance gate (pre-deploy tier)
 npm run check:route-quality      # NPC route quality audit
 npm run check:helicopter-parity  # Helicopter Vehicle/Player adapter parity
 npm run check:platform-capabilities # Platform capability probe
@@ -68,10 +67,21 @@ npm run perf:update-baseline        # (Re)establish a tracked baseline from the 
 npm run evidence:atmosphere         # All-mode ground/sky/aircraft atmosphere + terrain visibility evidence
 
 # Asset import and validation
-npm run assets:import-pixel-forge-aircraft  # Normalize/copy Pixel Forge aircraft GLBs + provenance
+npm run assets:import-war-catalog            # GENERAL GLB import path (2026-06 repaint+): per-class axis wrap,
+                                             #   joint grafts, index/vertex canonicalization, budget triage,
+                                             #   generated src/config/generated/warAssetCatalog.ts. NEVER hand-copy GLBs.
+npm run check:asset-gallery                  # Render every catalog entry on the /gallery dev route (owner re-roll review surface)
+npm run assets:import-pixel-forge-aircraft   # Legacy aircraft-only importer (superseded by import-war-catalog; kept for provenance)
 npm run assets:generate-npc-crops            # Regenerate Pixel Forge NPC per-tile imposter crop map
 npm run check:pixel-forge-npc-crops          # Verify generated NPC crop map is current
 ```
+
+GLB re-parenting rule (shipped twice as a defect — m48 turret, viewmodel
+magazine): nodes inside the importer's `TIJ_AxisNormalize` wrapper must be
+re-parented with `Object3D.attach()` (preserves world transform), never
+`removeFromParent()` + position arithmetic; tests for such code must use
+wrapper-bearing fixtures. Full policy in
+[docs/ASSET_ACCEPTANCE_STANDARD.md](docs/ASSET_ACCEPTANCE_STANDARD.md).
 
 ## Daily loop
 
@@ -122,6 +132,9 @@ For perf-sensitive work, add `npm run validate:full` before push.
 - Terrain: `src/systems/terrain/*`
 - Vehicles: `src/systems/vehicle/*` (VehicleStateManager, FixedWingPlayerAdapter, HelicopterPlayerAdapter, FixedWingModel, `airframe/*`, VehicleManager), `src/systems/helicopter/*`
 - World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
+- Air support: `src/systems/airsupport/*` (AirSupportManager, radio catalog, napalm/spooky/arclight missions, NPCFlightController)
+- Wildlife: `src/systems/wildlife/*` + `src/config/WildlifeConfig.ts` (ambient ground animals, OF + A Shau only; combat120 stays animal-free)
+- Asset catalog: `src/config/generated/warAssetCatalog.ts` (generated — never hand-edit) re-exported via `src/systems/assets/modelPaths.ts`; `/gallery` dev route at `src/dev/assetGallery/*`
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`, `scripts/preview-server.ts`
 - UI: `src/ui/hud/`, `src/ui/controls/`, `src/ui/icons/`, `src/ui/screens/`, `src/ui/loading/`, `src/ui/engine/`
 - Tests: `src/integration/`, `src/test-utils/`
@@ -150,8 +163,8 @@ For perf-sensitive work, add `npm run validate:full` before push.
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Vision and phase plan |
 | [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md) | Multi-agent DAG (active when orchestrating) |
 | [docs/REARCHITECTURE.md](docs/REARCHITECTURE.md) | Phase E paradigm questions |
-| `docs/rearch/E[1-6]*.md` | Phase E evaluation memos (E1 evaluation is on master; E2-E6 explorations live on `spike/E*` branches) |
-| [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 153 GLBs, integration status |
+| `docs/rearch/E[1-6]*.md` | Phase E evaluation memos (E1 evaluation is on master; E2-E6 explorations preserved as immutable tags `spike-E*-archive` — the `spike/E*` branches were pruned 2026-05-20) |
+| [docs/ASSET_MANIFEST.md](docs/ASSET_MANIFEST.md) | 191 GLBs, integration status, art direction, import pipeline |
 | [docs/UI_ICON_MANIFEST.md](docs/UI_ICON_MANIFEST.md) | Pixel-art UI icons |
 
 ## Agent skills and rules

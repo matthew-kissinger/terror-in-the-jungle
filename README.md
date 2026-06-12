@@ -33,13 +33,22 @@ Underneath the game is the real ambition: a **war-simulation engine**, not a sin
 
 - **Combined arms, one runtime.** Infantry, squads, and crew-served emplacements
   fight alongside helicopters (UH-1 Huey, UH-1C Gunship, AH-1 Cobra), fixed-wing
-  aircraft (A-1 Skyraider, F-4 Phantom, AC-47 Spooky), armor (M48 Patton),
-  ground transport (M151 jeep), and watercraft (Sampan, PBR gunboat) — with
-  boarding, crews, enter/exit/eject, objectives, tickets, suppression, and
-  grenades. All of it ships to production.
+  aircraft (A-1 Skyraider, F-4 Phantom, AC-47 Spooky), armor (M48 Patton), and
+  ground transport (M151 jeep) — with boarding, crews, enter/exit/eject,
+  objectives, tickets, suppression, and grenades. All of it ships to production.
+  (Watercraft are dormant pending the water-system rework.)
 - **Command under fire.** RTS-style direct orders — Hold, Patrol, Attack Here,
   Fall Back, Stand Down — issued from minimap taps or the keyboard and
-  dispatched to terrain-aware AI states. No time-stop; the war doesn't wait.
+  dispatched to terrain-aware AI states. Plus an air-support radio: mark a
+  target and call in napalm, a Spooky gunship orbit, a rocket run, or a B-52
+  Arc Light strike that walks a twelve-bomb stick across the line. No
+  time-stop; the war doesn't wait.
+- **A living asset catalog.** 191 first-party low-poly models (weapons,
+  aircraft, armor, buildings, animals) flow through a generated import
+  pipeline — axis normalization, rig-joint grafts, triangle budgets — into a
+  single catalog the whole engine consumes, with an in-engine `/gallery`
+  review surface. Ambient wildlife (tiger, water buffalo, wild boar, macaque)
+  wanders the jungle and flees on approach.
 - **Real terrain.** A Shau Valley is built on real DEM elevation across a 21 km
   map, delivered through a Cloudflare R2 manifest with an explicit terrain/nav
   startup gate. If the data can't load, the mode says so — no silent fallback.
@@ -47,9 +56,10 @@ Underneath the game is the real ambition: a **war-simulation engine**, not a sin
   TSL node materials across terrain, vegetation and NPC impostors, and a
   LUT-driven Hosek-Wilkie sky — with automatic WebGL2 fallback for browsers
   without WebGPU, and a strict WebGPU mode kept as the renderer-acceptance proof.
-- **Atmosphere that holds its budget.** Day/night-capable sky, fog, clouds, and
-  hydrology-driven river surfaces, with total atmosphere CPU cost held under
-  ~1 ms across all five modes.
+- **Atmosphere that holds its budget.** A unified day/night lighting rig drives
+  sky, fog, clouds, terrain, foliage, and NPC impostors coherently through the
+  full time-of-day cycle (gated by a standing coherence check), with total
+  atmosphere CPU cost held under ~1 ms across all five modes.
 - **Built to resist drift.** Fenced interfaces, a directive registry, and a
   CI doc-drift gate let one human and a fleet of coding agents collaborate
   without inventing duplicate authorities. Tests and docs are sensors, not truth
@@ -157,7 +167,7 @@ command ergonomics, or UI feel is *good*.
 ## Tech stack
 
 - [Three.js](https://threejs.org/) r184 — `WebGPURenderer` + TSL, WebGL2 fallback
-- TypeScript 6.0 · Vite 8 · Vitest 4 (5,260+ tests across 370+ files)
+- TypeScript 6.0 · Vite 8 · Vitest 4 (5,900+ tests across 396 files)
 - Playwright 1.59 for browser-level probes
 - [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js) (WASM) for navmesh
 - Tweakpane 4 (dev-only live tuning)
@@ -179,8 +189,11 @@ service-worker freshness control, and an explicit fenced-interface boundary at
 | [src/systems/terrain](src/systems/terrain) | CDLOD terrain runtime, streamed height queries, terrain evidence. |
 | [src/systems/vehicle](src/systems/vehicle) | Vehicle session authority, fixed-wing + ground models, adapters, airframe. |
 | [src/systems/helicopter](src/systems/helicopter) | Helicopter models, physics, rotors, deployment. |
-| [src/systems/environment](src/systems/environment) | Atmosphere, sky, clouds, weather, water, hydrology. |
-| [src/systems/player](src/systems/player) | Player controller, respawn manager, deploy flow, swim state. |
+| [src/systems/environment](src/systems/environment) | Atmosphere, sky, clouds, weather, unified lighting rig. |
+| [src/systems/airsupport](src/systems/airsupport) | Air-support radio call-ins: napalm, Spooky, rocket run, B-52 Arc Light. |
+| [src/systems/world](src/systems/world) | World feature placement: firebases, airfields, settlements, parked armor. |
+| [src/systems/wildlife](src/systems/wildlife) | Ambient ground wildlife (wander + flee). |
+| [src/systems/player](src/systems/player) | Player controller, weapon rig, respawn manager, deploy flow. |
 | [src/ui](src/ui) | HUD, controls, screens, icons, loading, deploy/respawn UI, tactical map. |
 | [scripts](scripts) | Probes, perf capture, deploy helpers, evidence generation, `check:*` audit gates. |
 | [docs](docs) | Vision, current state, directives, architecture, testing, deployment. |

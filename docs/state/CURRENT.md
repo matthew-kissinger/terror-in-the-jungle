@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-08 (land-vehicle proof refresh: Open Frontier and A Shau M151/M48 board, drive, use elevated third-person camera, exit cleanly, and suppress first-person weapon overlay with zero renderable weapon meshes while seated; ground-vehicle input/UI hints now align on `F board / exit / seat`; basin-water proof remains current; live proof must be refreshed per deployed HEAD; owner visual acceptance remains open)
+Last verified: 2026-06-12 (war-asset repaint cycle close: 191-GLB generated catalog live across all five consumer classes, `check:live-release` ALL PASS on the close deploy, combat120 steady-state p99 33.40ms vs the 35.39 halt line; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,7 +26,32 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-06-01)
+## Current focus (2026-06-12)
+
+The most recent shipped work, newest first:
+
+- **2026-06-12 — war-asset repaint integration** (`cycle-2026-06-11-war-asset-repaint`,
+  12 PRs #383-#394, deployed `9c64c0bf`): the 108-asset Pixel Forge repaint
+  flows through a generalized importer (`npm run assets:import-war-catalog` —
+  per-class axis wrap, rig-joint grafts, index/vertex canonicalization, budget
+  triage) into the generated `src/config/generated/warAssetCatalog.ts`, with
+  all five consumer classes cut over (weapons rig, helicopters, fixed-wing,
+  ground vehicles, world placements), an in-engine `/gallery` review route,
+  ambient wildlife (OF + A Shau), and the B-52 Arc Light air-support call-in.
+  8 over-budget structures keep their prior GLBs pending re-rolls
+  (`docs/asset-provenance/repaint-2026-06/REROLL_REQUESTS.md`). KATALOG-1 is
+  code-complete; the owner walk gates close. Post-close owner-reported fixes:
+  viewmodel magazine seating (#394) and sustained-fire recoil plateau (#395).
+- **2026-06-10 — unified lighting rig default** (campaign #363-#381): legacy
+  lighting deleted; `check:tod-coherence` is a standing pre-deploy gate;
+  one-release kill-switch `window.__lightingRig.enabled=false` (removal due).
+  Same day: A Shau cold-load freeze root-caused and fixed (`StampSpatialIndex`).
+- **2026-06-09 — water scorched to first principles**: hydrology and ALL water
+  (rendering, query/physics, swimming, authored basins) removed; boats dormant;
+  the water narrative in the section below is retained as engineering history
+  only. Rework lands in a future terrain/world-gen cycle.
+
+## Prior focus (2026-06-01, partially superseded above)
 
 2026-06-07 correction: the next long-horizon objective is
 `terrain-vehicle-water-foundation-reset`. Treat VODA / VEKHIKL / DEFEKT-7
