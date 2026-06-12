@@ -1,0 +1,16 @@
+{
+  "slug": "burmese-python",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/burmese-python.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:12:05.032Z",
+  "sourcePrompt": "A Burmese python at rest, a thick-bodied constrictor some four meters long gathered into a low mound of overlapping coils about a meter across. The body is as thick as a man's leg at the middle, the head resting on the top coil with a flicked forked tongue. Tan and gold scales patterned with big dark-brown blotches edged in black. Heavy, settled and still.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

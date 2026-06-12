@@ -1,0 +1,16 @@
+{
+  "slug": "shophouse-damaged",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/shophouse-damaged.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:30:58.059Z",
+  "sourcePrompt": "A battle-damaged Vietnamese shophouse - the same narrow two-story colonial building, shelled. A ragged hole has collapsed one upper corner, exposing floor edges and interior wall; shutters hang skewed, the balcony rail is bent, scorch marks streak up the stucco above the openings, and rubble piles against the shopfront. The far half still stands straight. Cracked pastel stucco and gray debris, ruined.",
+  "handEdit": "gable slabs shrunk 0.8 to 0.4 and tucked under roof slopes (were poking through apex in an X); offline rebake",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

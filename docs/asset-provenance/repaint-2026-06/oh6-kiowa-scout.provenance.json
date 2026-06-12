@@ -1,0 +1,29 @@
+{
+  "slug": "oh6-kiowa-scout",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/oh6-kiowa-scout.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T21:03:51.086Z",
+  "sourcePrompt": "An OH-6 Cayuse \"Loach\" light observation helicopter, tiny at about seven meters, perched on slender skids. An egg-shaped cabin with a big rounded glass front takes up barely a third of the length; a thin tail boom runs back to a small tail rotor beside an upswept V-tail. A four-bladed main rotor rides close above the rounded roof. The whole machine looks light enough to dart sideways. Olive-drab, compact and nimble.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 5
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 3
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

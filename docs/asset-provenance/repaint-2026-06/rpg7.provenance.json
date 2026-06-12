@@ -1,0 +1,16 @@
+{
+  "slug": "rpg7",
+  "class": "weapons",
+  "action": "replace",
+  "tijTarget": "weapons/rpg7.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:04:11.139Z",
+  "sourcePrompt": "An RPG-7, the NVA and VC shoulder-fired anti-armor launcher, about a meter of tube with a pointed rocket adding another third. A straight launch tube flaring into a wide blast cone at the rear, a bulbous wooden heat shield wrapping the middle, a pistol grip and trigger underneath, iron sights on top, and a teardrop-shaped rocket grenade seated in the muzzle. Olive-green tube, brown wood, dark warhead.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

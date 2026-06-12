@@ -1,0 +1,16 @@
+{
+  "slug": "supply-crate",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/supply-crate.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:16:23.698Z",
+  "sourcePrompt": "A wooden supply crate about a meter long. A plain rectangular shipping box of rough sawn planks with batten strips reinforcing the corners and edges, faint stenciled markings across one side, and small gaps between slats. Pale weathered raw wood, plain, square and stackable.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

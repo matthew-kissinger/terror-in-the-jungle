@@ -1,0 +1,18 @@
+{
+  "slug": "french-villa",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/french-villa.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T18:40:06.703Z",
+  "sourcePrompt": "A French-colonial villa of 1930s Vietnam, an elegant two-story house roughly twelve meters wide. Whitewashed walls with tall louvered shutters on every window, a columned veranda wrapping the ground floor with a balustraded balcony above, arched openings at the entrance, and a red clay-tile hipped roof with wide eaves. Whitewash, dark green shutters and red tile - faded tropical grandeur.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "12416 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

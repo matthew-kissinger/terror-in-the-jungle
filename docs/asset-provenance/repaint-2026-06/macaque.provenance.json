@@ -1,0 +1,16 @@
+{
+  "slug": "macaque",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/macaque.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:05:27.460Z",
+  "sourcePrompt": "A long-tailed macaque sitting on its haunches, about half a meter tall seated, with a tail longer than its body curling behind. A small monkey leaning slightly forward, hands resting in front, with a round expressive pinkish face under a cap of swept fur and close-set watchful eyes. Short tan-brown fur shading paler at the chest, compact and inquisitive.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "m60",
+  "class": "weapons",
+  "action": "replace",
+  "tijTarget": "weapons/m60.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T18:50:40.780Z",
+  "sourcePrompt": "An M60 \"The Pig\" general-purpose machine gun, about one point one meters long and heavy in profile. A long machine gun with a perforated barrel shroud, a folding bipod spread at the front, a flat top-mounted feed cover, a carry handle, a pistol grip and a fixed shoulder stock; a short belt of linked brass ammunition drapes from the open feed tray. Black and gunmetal, businesslike and burly.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "1896 tris over 1,500 weapon budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

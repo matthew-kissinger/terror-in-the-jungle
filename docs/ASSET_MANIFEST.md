@@ -1,22 +1,39 @@
 # Asset Manifest
 
-## 3D Models (153 GLBs)
+## 3D Models (191 GLBs)
 
 Shipped path: `public/models/**` (Vite static assets).
 
 | Category | Count | Examples |
 |----------|------:|---------|
-| Weapons | 9 | M16A1, AK-47, M60, RPG-7, M79, Ithaca 37, M1911, M2 Browning, M3 Grease Gun |
-| Aircraft | 6 | UH-1 Huey (w/ M60 door guns), UH-1C Gunship, AH-1 Cobra, F-4 Phantom, AC-47 Spooky, A-1 Skyraider |
-| Ground vehicles | 5 | M151 Jeep, M113 APC, M35 Truck, M48 Patton, PT-76 |
-| Watercraft | 2 | Sampan, PBR |
+| Weapons | 15 | M16A1, AK-47, M60, RPG-7, M79, Ithaca 37, M1911, M2 Browning, M3 Grease Gun, M14, SKS, Dragunov SVD, RPD, K-bar, claymore clicker |
+| Aircraft | 14 | UH-1 Huey, UH-1C Gunship, AH-1 Cobra, F-4 Phantom, AC-47 Spooky, A-1 Skyraider, B-52, C-130, CH-47, OH-6, OV-10, A-37, HH-3E, MiG-17 |
+| Ground vehicles | 9 | M151 Jeep, M113 APC, M35 Truck, M48 Patton, PT-76, T-54, Ontos, ZIL-157, M42 Duster |
+| Watercraft | 5 | Sampan, PBR, Swift Boat (PCF), LCM-8, raiding raft |
 | Structures | 34 | Sandbag wall/bunker, guard tower, helipad, TOC bunker, tunnel entrance, AA emplacements |
-| Buildings | 12 | Shophouse, French villa, pagoda, church, farmhouse, warehouse |
+| Buildings | 18 | Shophouse, French villa, pagoda, church, farmhouse, warehouse, Buddhist temple, stilt house, schoolhouse, tea house |
+| Animals | 11 | Tiger, water buffalo, wild boar, macaque, gibbon, king cobra, monitor, gecko, heron, python, flying-fox bat |
 | Legacy props | 1 | Wooden barrel |
 | Pixel Forge NPC bodies | 4 | US Army, ARVN, NVA, VC combined skinned GLBs |
 | Pixel Forge props | 80 | Barrels, boxes, bottles, fences, fish, camp, fortification, and clutter GLBs |
 
 All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR materials (metalness/roughness).
+
+The runtime model registry (`src/systems/assets/modelPaths.ts`) is now a stable
+re-export of the GENERATED catalog `src/config/generated/warAssetCatalog.ts`,
+emitted by `npm run assets:import-war-catalog`. The importer normalizes the
+pixel-forge `_repaint-2026-06` package (axis-wrap per class, canonical rig-joint
+grafts, budget triage) instead of the package's blind `copy-to-tij.ps1`. Per-asset
+import records (provenance + the budget REROLL_REQUESTS list) live under
+`docs/asset-provenance/repaint-2026-06/`; the import pipeline and the five
+drop-in breaks it corrects are documented in
+`docs/rearch/WAR_ASSET_REPAINT_AUDIT_2026-06-11.md`. The 2026-06 import shipped 99
+normalized GLBs (9 budget rejects keep their prior GLB on disk: helipad,
+sandbag-wall, sandbag-bunker, ammo-bunker, toc-bunker, concertina-wire,
+barbed-wire-fence, rice-dike, and the net-new egret). New aircraft/ground/animal
+slugs land cataloged but are wired into runtime by later cutover tasks of the
+cycle. Note: `village-hut` / `village-hut-damaged` are classed `buildings` in the
+source package but live under `structures/` in TIJ (catalog `StructureModels`).
 
 ## Integration Status
 

@@ -1,0 +1,16 @@
+{
+  "slug": "flying-fox-bat",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/flying-fox-bat.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:25:54.621Z",
+  "sourcePrompt": "A flying-fox fruit bat roosting upside-down from a bare branch, about forty centimeters head to folded tail, hanging by two hooked feet. The leathery dark wings wrap the body like a closed cloak, with the small clawed thumbs peeking at the fold, while the fox-like head hangs lowest - a furry muzzle, round dark eyes and pointed ears. Russet-brown fur against black wing membrane, still and watchful.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

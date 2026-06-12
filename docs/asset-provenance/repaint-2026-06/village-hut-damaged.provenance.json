@@ -1,0 +1,18 @@
+{
+  "slug": "village-hut-damaged",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "structures/village-hut-damaged.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:22:25.381Z",
+  "sourcePrompt": "A battle-damaged Vietnamese village hut - the same small bamboo-and-thatch home on short posts, wrecked by shelling. Half the thatched roof has collapsed inward leaving charred rafters open to the sky, one bamboo wall is blown out into splintered staves, and broken thatch and bamboo debris lie around the breach. The standing half remains intact for contrast. Scorched black thatch against pale bamboo, forlorn.",
+  "handEdit": "roof thatch rotation signs flipped to lie on slope planes (both slopes were mirrored); offline rebake",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3696 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

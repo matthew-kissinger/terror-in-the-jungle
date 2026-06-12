@@ -1,0 +1,18 @@
+{
+  "slug": "farmhouse",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/farmhouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:53:28.432Z",
+  "sourcePrompt": "A Vietnamese rural farmhouse, a single-story family home about eight meters wide - a step up from a hut. Plastered timber-framed walls in a warm earth tone, a clay-tile roof with gentle pitch, a covered veranda across the front on wooden posts sheltering the central doorway, and shuttered windows either side. Earthy plaster, dark timber and terracotta tile, settled and lived-in.",
+  "handEdit": "back slope extended 2.56->3.30 on its 33deg plane: eave now drapes to y=2.10 with 0.77m overhang (was hiked at 2.50 with 0.15m), matching the front; ribs follow",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2780 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

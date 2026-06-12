@@ -1,0 +1,16 @@
+{
+  "slug": "m79",
+  "class": "weapons",
+  "action": "replace",
+  "tijTarget": "weapons/m79.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:01:46.355Z",
+  "sourcePrompt": "An M79 \"Thumper\" 40mm grenade launcher, a stubby single-shot weapon about seventy centimeters long, like an oversized sawn-off shotgun. A short fat smoothbore barrel, hinged open-and-shut at a wide break-action breech, a wooden fore-end under the barrel, a wooden shoulder stock, and a tall flip-up leaf sight near the breech. Walnut wood and dark blued metal, squat and distinctive.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

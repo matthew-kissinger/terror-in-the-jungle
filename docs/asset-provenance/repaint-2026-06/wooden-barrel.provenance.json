@@ -1,0 +1,16 @@
+{
+  "slug": "wooden-barrel",
+  "class": "props",
+  "action": "replace",
+  "tijTarget": "props/wooden-barrel.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:28:12.063Z",
+  "sourcePrompt": "A coopered wooden barrel standing upright, about ninety centimeters tall. Vertical oak staves swell to a proud belly at the middle and taper to flat round ends, bound by four dark iron hoops - two near the ends, two flanking the bulge - with a small bung hole in one stave. Weathered brown oak and rust-spotted iron, sturdy and timeless.",
+  "handEdit": "16 thin stave-groove CSG blades removed (boolean blowup left the wall see-through with radial fins); flat-shaded 32-seg lathe facets read as staves; bung-hole diff kept",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

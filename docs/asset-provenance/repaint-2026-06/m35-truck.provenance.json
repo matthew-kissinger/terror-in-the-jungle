@@ -1,0 +1,16 @@
+{
+  "slug": "m35-truck",
+  "class": "ground",
+  "action": "replace",
+  "tijTarget": "vehicles/ground/m35-truck.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:11:56.453Z",
+  "sourcePrompt": "An M35 \"Deuce and a Half\" six-wheel cargo truck, about six and a half meters long, sitting high on its axles. A round-fendered hooded cab with a flat split windshield leads; behind it a long cargo bed rides on the frame under arched bows carrying a canvas tarp roof. One axle under the cab, two close-set at the rear with big knobby tires, a stout front bumper, and a low tailgate. Olive-drab and canvas tan, broad and hard-working.",
+  "handEdit": "windshield rebuilt as border frame + visible glass panes (glass was buried in a solid slab); steering wheel reoriented perpendicular to a floor-anchored column (was vertical disc twisted 45deg on Y, column missed the hub); offline rebake",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

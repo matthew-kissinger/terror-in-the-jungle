@@ -1,0 +1,29 @@
+{
+  "slug": "ah1-cobra",
+  "class": "aircraft",
+  "action": "replace",
+  "tijTarget": "vehicles/aircraft/ah1-cobra.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T19:36:16.956Z",
+  "sourcePrompt": "An AH-1G Cobra attack helicopter, about thirteen meters long but barely a meter wide across the fuselage - a flying blade parked on skinny skids. A tandem cockpit steps up from the gunner in front to the pilot behind under a long glass canopy, a rounded chin turret with a minigun hangs under the nose, and short stub wings carry rocket pods on each side. The slim tail boom carries a swept fin and tail rotor, and a two-bladed main rotor spans wider than the aircraft is long. Dark olive, sleek and predatory.",
+  "handEdit": "Math.PI radian rotations converted to intended degrees (createPart rotation is degrees); offline rebake, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 2
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 2
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

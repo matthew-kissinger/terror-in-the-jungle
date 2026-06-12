@@ -1,0 +1,16 @@
+{
+  "slug": "rpd-lmg",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/rpd-lmg.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:18:32.841Z",
+  "sourcePrompt": "An RPD light machine gun, an NVA belt-fed squad automatic, just over a meter long. A wood-stocked machine gun with a long plain barrel, a folding bipod at the muzzle, a wooden buttstock, pistol grip and fore-grip, and its signature round sheet-metal drum hanging centered beneath the receiver carrying the belt. Wood furniture and blued steel, low-slung and steady.",
+  "handEdit": "drum rotated 90deg: flat faces now front/back (belt coil plane perpendicular to barrel); offline rebake",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

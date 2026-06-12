@@ -1,0 +1,18 @@
+{
+  "slug": "pagoda",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/pagoda.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:43:39.705Z",
+  "sourcePrompt": "A small Vietnamese Buddhist pagoda in the Mahayana style, about six meters square under roughly eight meters of stacked roof. Two tiers of green glazed-tile roofs with dramatically upturned eave corners and ornamental ridge finials, red-lacquered columns framing an open raised entrance up a short flight of steps, and white stucco side walls with lattice windows. Red, green and gold, ornate and serene.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4620 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

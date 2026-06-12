@@ -1,0 +1,18 @@
+{
+  "slug": "rubber-plantation-mansion",
+  "class": "buildings",
+  "action": "new",
+  "tijTarget": "buildings/rubber-plantation-mansion.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:21:17.159Z",
+  "sourcePrompt": "A French-colonial rubber-plantation mansion, grander than a villa - two tall stories about sixteen meters wide. A wide columned veranda wraps the entire ground floor with a matching balustraded gallery above, a raised central entrance porch with double doors crowns a fan of steps, tall louvered shutters line both floors, and a red-tile hipped roof spreads over deep eaves. Whitewash and red tile, stately, opulent and faded.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "13396 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "water-buffalo",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/water-buffalo.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:01:09.606Z",
+  "sourcePrompt": "A domestic water buffalo standing placidly, about one point eight meters at the shoulder and built like a barrel. A massive bovine with a low-hung head carrying broad crescent horns that sweep back and out, a deep heavy body on stout legs, a short tufted tail, and a thick neck with loose folds. Dark slate-gray hide with a dusty sheen, immense and calm.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

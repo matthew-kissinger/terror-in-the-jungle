@@ -1,0 +1,16 @@
+{
+  "slug": "t54-tank",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/t54-tank.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:23:36.269Z",
+  "sourcePrompt": "A T-54 main battle tank, the NVA's Soviet-pattern armor, about six and a half meters of hull with the 100mm gun stretching it past nine. A low sloped hull under a smooth half-egg dome turret, the long gun wearing a bore evacuator near the muzzle; five big road wheels per side with a distinct gap between the first and second and no return rollers, fenders carrying external fuel drums at the rear. Squat, rounded and purposeful. Dark olive-green.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

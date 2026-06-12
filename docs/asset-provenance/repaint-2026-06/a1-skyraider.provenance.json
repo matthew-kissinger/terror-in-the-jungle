@@ -1,0 +1,23 @@
+{
+  "slug": "a1-skyraider",
+  "class": "aircraft",
+  "action": "replace",
+  "tijTarget": "vehicles/aircraft/a1-skyraider.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T20:39:24.392Z",
+  "sourcePrompt": "An A-1 Skyraider \"Spad\", a burly single-engine attack aircraft about twelve meters long, sitting tail-low on taildragger gear. A big radial engine cowl with a four-bladed propeller fills the nose, a framed bubble canopy sits over mid-fuselage, and straight broad wings carry rows of underwing hardpoints loaded with bombs and rockets. A tall rounded tail fin finishes a deep-bellied fuselage that looks built to haul. Navy gray over olive, rugged and heavy-shouldered.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_Propeller",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 10
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "market-stall",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/market-stall.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:37:20.068Z",
+  "sourcePrompt": "An open-air Vietnamese street market stall, about three meters wide and head-high. A simple wooden stand: four rough poles holding up a single slanted awning of faded tarp, a plank counter across the front loaded with produce and goods, and woven baskets and a stacked crate or two at its feet. No walls, all structure. Weathered wood and sun-faded canvas, busy and improvised.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "5532 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "pond-heron",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/pond-heron.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:21:39.481Z",
+  "sourcePrompt": "A Chinese pond heron standing hunched at the water's edge, about half a meter tall. A compact heron with its neck drawn in so the streaked brown head sits low on the shoulders, a straight pointed bill angled slightly down, folded white wings under a buff-streaked breast, and sturdy yellow legs. Brown streaks over white, quiet and watchful.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

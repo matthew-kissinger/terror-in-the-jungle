@@ -120,6 +120,7 @@
     "assets:optimize:dry": "npx tsx scripts/optimize-assets.ts --dry-run",
     "assets:fix-alpha": "npm run check:pixel-forge-cutover",
     "assets:import-pixel-forge-aircraft": "npx tsx scripts/import-pixel-forge-aircraft.ts",
+    "assets:import-war-catalog": "npx tsx scripts/import-war-catalog.ts",
     "assets:generate-npc-crops": "npx tsx scripts/generate-pixel-forge-npc-tile-crops.ts",
     "ui:matrix": "npx tsx scripts/ui-device-matrix.ts",
     "test": "vitest",

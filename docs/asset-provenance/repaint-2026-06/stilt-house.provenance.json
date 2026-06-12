@@ -1,0 +1,18 @@
+{
+  "slug": "stilt-house",
+  "class": "buildings",
+  "action": "new",
+  "tijTarget": "buildings/stilt-house.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:07:57.549Z",
+  "sourcePrompt": "A Mekong Delta stilt house standing about two meters above flood-prone ground on tall slender hardwood posts. A timber house with woven-mat walls and a thatched roof perched on the open stilt frame, a railed front porch along one side, and a steep ladder-stair climbing from the ground to the porch door; the shaded under-space stays open with a few cross-braces. Timber, thatch and air, perched and breezy.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2584 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "schoolhouse",
+  "class": "buildings",
+  "action": "new",
+  "tijTarget": "buildings/schoolhouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:12:56.559Z",
+  "sourcePrompt": "A modest Vietnamese rural schoolhouse, a single-story rectangular building about ten meters long. Plain timber-plank walls under a low-pitched corrugated-tin roof, a row of three large shuttered window openings down the long classroom side, and a small covered entrance porch at one end with a step up. Weathered wood, rusty tin, orderly and plain.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4540 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

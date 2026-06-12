@@ -1,0 +1,16 @@
+{
+  "slug": "m151-jeep",
+  "class": "ground",
+  "action": "replace",
+  "tijTarget": "vehicles/ground/m151-jeep.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:06:53.472Z",
+  "sourcePrompt": "An M151 MUTT, the US quarter-ton utility jeep, about three and a half meters long with all four tires on the ground. A small open-topped jeep: a flat windshield folded upright above a flat grille with two round headlights, an open two-seat body with simple bucket seats and a flat hood, big square wheel arches over knobby tires, and a spare tire bolted on the flat tail. Olive-drab steel, boxy, light and rugged.",
+  "handEdit": "steering wheel disc reoriented to face driver perpendicular to column (torus default faced sideways; old z-spin was a no-op on a torus); offline rebake",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

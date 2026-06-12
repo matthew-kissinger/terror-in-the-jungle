@@ -1,0 +1,18 @@
+{
+  "slug": "shophouse",
+  "class": "buildings",
+  "action": "replace",
+  "tijTarget": "buildings/shophouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:25:47.053Z",
+  "sourcePrompt": "A narrow Vietnamese urban shophouse of Saigon or Da Nang, French-colonial in flavor: about four meters wide but two tall stories, made for a tight street. An open shopfront at street level under a horizontal signboard, tall shuttered windows and a small railed balcony above, stucco walls with simple cornice lines, and a shallow clay-tile roof. Faded pastel stucco - mint or ochre - weathered and characterful.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3556 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

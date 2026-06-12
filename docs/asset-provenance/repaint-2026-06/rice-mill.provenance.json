@@ -1,0 +1,18 @@
+{
+  "slug": "rice-mill",
+  "class": "buildings",
+  "action": "new",
+  "tijTarget": "buildings/rice-mill.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:24:25.563Z",
+  "sourcePrompt": "A small Vietnamese rice mill, a working shed about eight meters long with one long side open. A timber frame under a rusted corrugated-tin roof with a small roof vent, the open side revealing a chunky milling machine with a hopper and belt wheel inside, and plump grain sacks stacked on a low loading platform out front. Weathered gray wood, rusty tin and burlap, gritty and industrious.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3004 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

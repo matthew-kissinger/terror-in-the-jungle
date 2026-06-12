@@ -1,0 +1,25 @@
+{
+  "slug": "m48-patton",
+  "class": "ground",
+  "action": "replace",
+  "tijTarget": "vehicles/ground/m48-patton.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T18:26:13.796Z",
+  "sourcePrompt": "An M48 Patton main battle tank, about seven meters of hull with the gun reaching past nine, planted on wide tracks. A rounded cast hull rises to a domed turret set just forward of center, carrying a long 90mm gun ending in a T-shaped muzzle brake, with a boxy searchlight above the gun and a small machine-gun cupola on the turret roof. Six road wheels per side under track skirts of rounded fenders. Olive-drab, massive, all curves and weight.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [
+    {
+      "name": "Joint_Turret",
+      "meshCount": 11
+    },
+    {
+      "name": "Joint_MainGun",
+      "meshCount": 5
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

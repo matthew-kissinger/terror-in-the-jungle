@@ -1,0 +1,16 @@
+{
+  "slug": "water-monitor",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/water-monitor.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-12T00:14:30.556Z",
+  "sourcePrompt": "A water monitor lizard standing in a high-walk pause, about a meter and a half from snout to tail-tip - half of it muscular tail. A big amphibious lizard on four splayed bent legs with long claws, a long neck carrying a tapered snout with a flicking tongue, and a deep keeled tail trailing in a curve. Dark gray-brown skin flecked with yellow speckle rows, watchful and prehistoric.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

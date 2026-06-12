@@ -1,0 +1,18 @@
+{
+  "slug": "perimeter-berm",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/perimeter-berm.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:56:14.552Z",
+  "sourcePrompt": "A defensive perimeter berm section about eight meters long. A bulldozed earth embankment rising to chest height, its forward face steep and its rear sloping into a shallow walkway, the crest topped with a course or two of sandbags forming a firing line. Raw shoved earth and tan sandbags, the camp's hard edge.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4936 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

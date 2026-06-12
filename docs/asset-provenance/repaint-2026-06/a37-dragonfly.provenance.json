@@ -1,0 +1,16 @@
+{
+  "slug": "a37-dragonfly",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/a37-dragonfly.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T21:57:41.753Z",
+  "sourcePrompt": "An A-37 Dragonfly light attack jet, small at under nine meters, parked level on tricycle gear. A compact straight-winged jet with a wide side-by-side two-seat canopy, engine intakes buried in the wing roots, tip tanks capping each wingtip like fat cigars, and bombs and rocket pods crowding the underwing pylons. Short, stubby and dense with stores. Camouflage green over light gray, small and pugnacious.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

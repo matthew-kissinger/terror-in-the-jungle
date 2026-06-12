@@ -1,0 +1,29 @@
+{
+  "slug": "ac47-spooky",
+  "class": "aircraft",
+  "action": "replace",
+  "tijTarget": "vehicles/aircraft/ac47-spooky.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T20:20:45.472Z",
+  "sourcePrompt": "An AC-47 \"Spooky\" gunship, a Douglas C-47 transport turned side-firing gunship, about twenty meters long with a wingspan wider still, sitting tail-down on taildragger gear. A rounded nose and stepped cockpit lead a fat cigar fuselage; two radial engines with propellers hang on broad low wings; a tall rounded tail fin rises aft. Three minigun muzzles poke from windows along the left fuselage side. Olive-drab over a dark underbelly, vintage and ominous.",
+  "handEdit": "PropHub disc added at blade plane (blades read as separate in inspector); offline rebake from edited code.js, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_PropellerR",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 5
+    },
+    {
+      "name": "Joint_PropellerL",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 5
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

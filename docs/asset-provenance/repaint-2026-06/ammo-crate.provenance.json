@@ -1,0 +1,18 @@
+{
+  "slug": "ammo-crate",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/ammo-crate.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:42:49.169Z",
+  "sourcePrompt": "A military ammunition crate about eighty centimeters long. A sturdy rectangular wooden box with a hinged lid, rope loop handles on each end, metal reinforcing strips at the corners, and stenciled white markings along the side. Olive-drab painted wood with darker metal banding, dense and regulation.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2732 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

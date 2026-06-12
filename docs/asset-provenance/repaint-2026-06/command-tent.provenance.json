@@ -1,0 +1,18 @@
+{
+  "slug": "command-tent",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/command-tent.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:52:06.987Z",
+  "sourcePrompt": "A military command tent, a large ridge-line canvas field tent about six meters long. A taut canvas roof peaks along a central ridge pole and breaks to sloping side walls, guy ropes stake out from the eaves all around, and the entrance flaps at one gable end are rolled open. Olive-drab canvas with visible seams, taut and field-grade.",
+  "handEdit": "whole tent yawed -90deg: ridge now along Z, entrance +Z, matching the old TIJ command-tent orientation (game placements assume it)",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3184 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

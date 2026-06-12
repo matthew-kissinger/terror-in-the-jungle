@@ -1,0 +1,29 @@
+{
+  "slug": "uh1-huey",
+  "class": "aircraft",
+  "action": "replace",
+  "tijTarget": "vehicles/aircraft/uh1-huey.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T18:17:55.099Z",
+  "sourcePrompt": "A UH-1H \"Huey\" transport helicopter, the workhorse of the US Army in Vietnam, about thirteen meters nose to tail and parked on its skids. A rounded greenhouse cockpit with chin windows flows into a broad slab-sided cabin with wide open side doorways; from there a slim tail boom, longer than the cabin itself, tapers back to a small fin with a tail rotor and short horizontal stabilizers. Two long landing skids ride on tubular cross struts, and a two-bladed main rotor longer than the fuselage sits on a tall mast above the cabin. Olive-drab overall, iconic and utilitarian.",
+  "handEdit": "Math.PI radian rotations converted to intended degrees (createPart rotation is degrees); offline rebake, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 6
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 2
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

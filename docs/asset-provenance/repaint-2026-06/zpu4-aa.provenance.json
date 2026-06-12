@@ -1,0 +1,18 @@
+{
+  "slug": "zpu4-aa",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/zpu4-aa.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:19:09.143Z",
+  "sourcePrompt": "A ZPU-4 quad anti-aircraft gun, an NVA towed mount about four and a half meters long. Four heavy machine-gun barrels with conical flash hiders sit clustered in a two-by-two block, elevated together skyward from a rotating central mount with a gunner's seat and two small shield plates, all riding a four-wheeled towing carriage with a hitch arm. Dark green steel, bristling and skyward.",
+  "handEdit": "jacks deployed DOWN to ground pads (feet hovered at y=0.8, upside-down); turret slew 15->0deg square to carriage; shields reoriented thin-axis-X to face forward in a shallow V (were sideways wings); 35deg elevation kept",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3860 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

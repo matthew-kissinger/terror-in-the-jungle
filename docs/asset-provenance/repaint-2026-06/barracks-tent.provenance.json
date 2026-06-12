@@ -1,0 +1,18 @@
+{
+  "slug": "barracks-tent",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/barracks-tent.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:39:25.894Z",
+  "sourcePrompt": "A medium barracks tent, a long ridge-line canvas tent about nine meters long. Vertical canvas side walls rise to a peaked roof along a ridge with a stovepipe poking through, evenly spaced guy ropes stake out both eaves, and the entrance flaps at one end are tied back showing the dark interior. Olive-drab canvas, orderly billeting.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3084 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

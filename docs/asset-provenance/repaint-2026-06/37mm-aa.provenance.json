@@ -1,0 +1,16 @@
+{
+  "slug": "37mm-aa",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/37mm-aa.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:06:23.943Z",
+  "sourcePrompt": "A 37mm anti-aircraft gun, an NVA towed autocannon about six meters long with its barrel raised high. A single long thin barrel with a small flash cone elevates steeply from a cradle between two flat armor shield plates, gunner seats and handwheels hang off the mount, and the whole gun rides a cruciform carriage on two rubber road wheels with outrigger arms. Dark green steel, lean and skyward.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

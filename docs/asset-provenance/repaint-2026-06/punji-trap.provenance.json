@@ -1,0 +1,18 @@
+{
+  "slug": "punji-trap",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/punji-trap.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:21:54.570Z",
+  "sourcePrompt": "A punji-stake trap, a VC booby trap - a shallow pit about a meter and a half across. The bottom bristles with a bed of sharpened bamboo stakes angled upward, while a flimsy cover of sticks, leaves and grass lies half-collapsed into the opening, broken at the center. Pale sharpened bamboo against dark disturbed earth, cruel and hidden.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2620 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

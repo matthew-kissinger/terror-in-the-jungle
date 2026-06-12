@@ -1,0 +1,18 @@
+{
+  "slug": "m3-grease-gun",
+  "class": "weapons",
+  "action": "replace",
+  "tijTarget": "weapons/m3-grease-gun.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T19:09:03.541Z",
+  "sourcePrompt": "An M3A1 \"Grease Gun\" .45 submachine gun issued to US armored crews, about three quarters of a meter with its wire stock extended. A crude stamped-steel cylindrical body like a mechanic's grease gun, a stubby barrel, a long straight box magazine hanging from the underside, a simple pistol grip, and a thin collapsible wire shoulder stock of two parallel rods. Bare stamped steel, utilitarian and boxy.",
+  "handEdit": "attachment + radian-rotation surgery (grip/mag/handguard contact, intended angles restored); offline rebake, no model call",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2256 tris over 1,500 weapon budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

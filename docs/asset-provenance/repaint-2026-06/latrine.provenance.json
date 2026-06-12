@@ -1,0 +1,16 @@
+{
+  "slug": "latrine",
+  "class": "structures",
+  "action": "replace",
+  "tijTarget": "structures/latrine.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T23:59:05.179Z",
+  "sourcePrompt": "A field latrine, a narrow standalone privy about two and a half meters tall. An upright shed of rough vertical planks under a single-slope corrugated-tin roof, a plank door on strap hinges with a gap at top and bottom, and a thin vent pipe rising up one back corner. Sun-grayed wood and rusty tin, humble and necessary.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

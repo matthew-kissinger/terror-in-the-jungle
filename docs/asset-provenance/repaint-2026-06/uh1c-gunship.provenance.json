@@ -1,0 +1,29 @@
+{
+  "slug": "uh1c-gunship",
+  "class": "aircraft",
+  "action": "replace",
+  "tijTarget": "vehicles/aircraft/uh1c-gunship.glb",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-11T19:32:54.103Z",
+  "sourcePrompt": "A UH-1C Huey gunship, the armed Vietnam Huey, parked on its skids - the same thirteen-meter rounded-cockpit fuselage and long tapering tail boom as the transport, but bristling. Short stub pylons jut from the cabin sides carrying cylindrical rocket pods, flexible machine guns hang at the open doors, and the two-bladed main rotor rides a tall mast with a small tail rotor aft. The stance is slightly nose-low and heavy. Olive-drab, aggressive and purposeful.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 7
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 2
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

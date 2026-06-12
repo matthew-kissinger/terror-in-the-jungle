@@ -1,0 +1,18 @@
+{
+  "slug": "tea-house",
+  "class": "buildings",
+  "action": "new",
+  "tijTarget": "buildings/tea-house.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-11T22:16:43.423Z",
+  "sourcePrompt": "A traditional Vietnamese tea house, a small quan tra about five meters wide with its whole front open to the street. A raised wooden floor a step up from the ground, a tiled roof with gently upturned corners over carved eave brackets, round paper lanterns hanging along the open front, and low wooden tables and stools visible in the warm interior. Honey-toned wood with red-and-gold trim, inviting.",
+  "handEdit": null,
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "6832 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}
