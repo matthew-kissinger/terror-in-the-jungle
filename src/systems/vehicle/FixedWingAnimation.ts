@@ -37,6 +37,10 @@ export class FixedWingAnimation {
 
     const nodes: PropellerState['nodes'] = [];
     const targetNames = display.propellerNodes.map(n => n.toLowerCase());
+    // Catalog spin axis is the source of truth for the repaint fleet (the
+    // upstream prop animation clips were stripped at import). Any surviving
+    // animation track still overrides per-node when present.
+    const catalogAxis: PropellerSpinAxis = display.propellerSpinAxis;
     const animationAxes = inferSpinAxesFromAnimationClips(animations);
 
     group.traverse((child) => {
@@ -45,7 +49,7 @@ export class FixedWingAnimation {
         if (name.includes(target)) {
           nodes.push({
             node: child,
-            axis: animationAxes.get(name) ?? 'z',
+            axis: animationAxes.get(name) ?? catalogAxis,
           });
           break;
         }
@@ -59,9 +63,9 @@ export class FixedWingAnimation {
 
   /**
    * Spin propellers based on throttle. Called each frame.
-   * Propeller rotation axis is Z (forward-facing prop spins around its local Z).
-   * When `isActive` is false (parked unpiloted aircraft), the propeller stops
-   * entirely — no idle-floor spin.
+   * Each propeller spins around its own local axis (from the war-asset catalog;
+   * the repaint A-1/AC-47 hubs spin around local X). When `isActive` is false
+   * (parked unpiloted aircraft), the propeller stops entirely — no idle spin.
    */
   update(aircraftId: string, throttle: number, dt: number, isActive: boolean = true): void {
     const state = this.propellers.get(aircraftId);

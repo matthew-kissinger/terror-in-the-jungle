@@ -23,6 +23,13 @@ import * as THREE from 'three';
  * are local muzzle offsets (forward = -Z, right = +X, up = +Y). All shots still
  * route through the shared combatant hitscan path — only origin / direction /
  * spread / cadence / magazine differ per airframe.
+ *
+ * Muzzle offsets are re-banded to the repaint catalog airframe dims
+ * (cycle-2026-06-11): A-1 14.1 m span / 12.51 m length, F-4 18.82 m length,
+ * AC-47 26.3 m span / 20.21 m length. (The war-asset catalog carries explicit
+ * `muzzleNodes` only for hand weapons; aircraft armament is positioned off the
+ * measured airframe bbox, not a per-node anchor — the muzzles sit on the wing
+ * roots / nose / left fuselage of the larger airframes.)
  */
 export interface FixedWingWeaponConfig {
   /** HUD-facing weapon name. */
@@ -62,11 +69,13 @@ const A1_WING_CANNONS: FixedWingWeaponConfig = {
   spreadDeg: 0.5,
   tracerInterval: 2,
   fireAxis: [0, 0, -1],
+  // Two cannons per wing on the 14.1 m-span wing, firing from the leading edge
+  // ahead of the 12.51 m fuselage origin.
   muzzles: [
-    [-2.6, -0.4, -3.0],
-    [-1.6, -0.4, -3.0],
-    [1.6, -0.4, -3.0],
-    [2.6, -0.4, -3.0],
+    [-3.2, -0.4, -3.6],
+    [-1.9, -0.4, -3.6],
+    [1.9, -0.4, -3.6],
+    [3.2, -0.4, -3.6],
   ],
 };
 
@@ -82,7 +91,9 @@ const F4_NOSE_ROTARY: FixedWingWeaponConfig = {
   spreadDeg: 0.8,
   tracerInterval: 3,
   fireAxis: [0, 0, -1],
-  muzzles: [[0, -0.3, -4.0]],
+  // Nose gun pushed forward to the nose of the longer 18.82 m airframe (origin
+  // near the wing; nose tip is ~-9 m, so -6.5 m clears the radome).
+  muzzles: [[0, -0.3, -6.5]],
 };
 
 /**
@@ -98,10 +109,12 @@ const AC47_BROADSIDE_BATTERY: FixedWingWeaponConfig = {
   spreadDeg: 1.2,
   tracerInterval: 1,
   fireAxis: [-1, 0, 0],
+  // Three windows down the left fuselage of the 20.21 m-long airframe; the guns
+  // poke out the left side (-X) and walk fore-to-aft along the cabin (Z).
   muzzles: [
-    [-2.2, -0.2, 2.0],
-    [-2.2, -0.2, 0.0],
-    [-2.2, -0.2, -2.0],
+    [-1.9, -0.3, 3.0],
+    [-1.9, -0.3, 0.0],
+    [-1.9, -0.3, -3.0],
   ],
 };
 
@@ -163,29 +176,35 @@ export interface FixedWingCameraFit {
   readonly broadside?: FixedWingBroadsideView;
 }
 
+// Chase distances re-banded to the repaint catalog airframe dims
+// (cycle-2026-06-11): the larger airframes need a touch more standoff to frame.
+// Ordering a1 < f4 < ac47 is preserved (agile prop closest, gunship widest).
 const A1_CAMERA_FIT: FixedWingCameraFit = {
-  chaseDistance: 30,
+  chaseDistance: 32,
   chaseHeight: 8,
   fovWidenEnabled: false,
   sightConvergenceRange: 320,
 };
 
 const F4_CAMERA_FIT: FixedWingCameraFit = {
-  chaseDistance: 35,
-  chaseHeight: 8,
+  chaseDistance: 40,
+  chaseHeight: 9,
   fovWidenEnabled: true,
   sightConvergenceRange: 420,
 };
 
 const AC47_CAMERA_FIT: FixedWingCameraFit = {
-  chaseDistance: 40,
-  chaseHeight: 12,
+  chaseDistance: 48,
+  chaseHeight: 13,
   fovWidenEnabled: false,
   sightConvergenceRange: 360,
+  // Gunner view sits off the right side (+X) of the 26.3 m-span airframe and
+  // looks across at the left-fuselage broadside battery; widened to clear the
+  // larger half-span.
   broadside: {
-    lateralOffset: 26,
-    heightOffset: 9,
-    aftOffset: 4,
+    lateralOffset: 30,
+    heightOffset: 11,
+    aftOffset: 5,
   },
 };
 
