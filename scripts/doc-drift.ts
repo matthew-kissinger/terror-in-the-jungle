@@ -123,9 +123,6 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/REARCHITECTURE.md::missing_code_path::scripts/perf-active-driver.js",
   "docs/directives/webgpu-migration-10.md::missing_package_script::check:hydrology-bakes",
   "docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md::missing_code_path::src/engine/determinism",
-  "docs/rearch/WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md::missing_package_script::check:hydrology-bakes",
-  "docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md::missing_package_script::check:hydrology-bakes",
-  "docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md::missing_package_script::check:water-runtime",
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md::missing_markdown_link::../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md",
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/cycle-close-validation.md::missing_markdown_link::../../tasks/cycle-mobile-webgl2-fallback-fix.md",
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/mobile-renderer-mode-truth.md::missing_markdown_link::../../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md",
@@ -134,10 +131,18 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md::missing_markdown_link::../../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md",
   "docs/rearch/TANK_SYSTEMS_2026-05-13.md::missing_code_path::src/systems/vehicle/TankCannonProjectile.ts",
   "docs/rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md::missing_code_path::scripts/capture-of-water-airfield-shots.ts",
+  "docs/rearch/WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md::missing_package_script::check:hydrology-bakes",
+  "docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md::missing_package_script::check:hydrology-bakes",
+  "docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md::missing_package_script::check:water-runtime",
   "docs/rearch/zone-manager-decoupling.md::missing_code_path::src/integration/scenarios/zone-query-parity.test.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/file.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/other.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/test.test.ts",
+  "docs/tasks/ambient-wildlife-mvp.md::missing_code_path::src/config/WildlifeConfig.ts",
+  "docs/tasks/ambient-wildlife-mvp.md::missing_code_path::src/systems/wildlife/WildlifeSystem.ts",
+  "docs/tasks/asset-gallery-route.md::missing_code_path::scripts/check-asset-gallery.ts",
+  "docs/tasks/asset-gallery-route.md::missing_code_path::src/dev/assetGallery/AssetGalleryApp.ts",
+  "docs/tasks/asset-gallery-route.md::missing_package_script::check:asset-gallery",
 ]);
 // >>> GRANDFATHER-END <<<
 // ---------------------------------------------------------------------------
