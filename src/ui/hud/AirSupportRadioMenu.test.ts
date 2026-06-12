@@ -7,6 +7,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AirSupportRadioMenu } from './AirSupportRadioMenu';
+import { AIR_SUPPORT_RADIO_ASSETS } from '../../systems/airsupport/AirSupportRadioCatalog';
+
+const ASSET_COUNT = AIR_SUPPORT_RADIO_ASSETS.length;
 
 describe('AirSupportRadioMenu', () => {
   let menu: AirSupportRadioMenu;
@@ -26,6 +29,23 @@ describe('AirSupportRadioMenu', () => {
     expect(document.body.textContent).toContain('AC-47 Orbit');
     expect(document.body.textContent).toContain('Cobra Rocket Run');
     expect(document.body.textContent).toContain('Huey Gunship Strafe');
+    // The top-tier Arc Light row renders from the data-driven catalog.
+    expect(document.body.textContent).toContain('B-52 Arc Light');
+  });
+
+  it('renders a clickable B-52 Arc Light asset row that dispatches a selection', () => {
+    const onAssetSelected = vi.fn();
+    menu.setCallbacks({ onAssetSelected });
+    menu.setVisible(true);
+
+    const arclight = document.querySelector<HTMLButtonElement>('[data-radio-asset="b52_arclight"]');
+    expect(arclight).not.toBeNull();
+    arclight?.click();
+
+    expect(onAssetSelected).toHaveBeenCalledWith({
+      assetId: 'b52_arclight',
+      targetMarking: 'smoke',
+    });
   });
 
   it('selects a target mark and asset without dispatching a mission', () => {
@@ -53,7 +73,7 @@ describe('AirSupportRadioMenu', () => {
     const ac47 = document.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]');
     const f4 = document.querySelector<HTMLButtonElement>('[data-radio-asset="f4_bombs"]');
 
-    expect(document.body.textContent).toContain('5/6 ready');
+    expect(document.body.textContent).toContain(`${ASSET_COUNT - 1}/${ASSET_COUNT} ready`);
     expect(ac47?.disabled).toBe(true);
     expect(ac47?.textContent).toContain('2m');
     expect(f4?.disabled).toBe(false);
