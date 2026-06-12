@@ -27,13 +27,24 @@ import {
 
 const MODELS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'models');
 
-/** Count indexed vs non-indexed primitives by reading the GLB JSON chunk. */
-function primitiveIndexing(glbPath: string): { indexed: number; nonIndexed: number } {
+const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
+const TYPE_COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+
+interface GlbJsonChunk {
+  meshes?: Array<{ primitives?: Array<{ indices?: number; attributes?: Record<string, number>; targets?: Array<Record<string, number>> }> }>;
+  accessors?: Array<{ bufferView?: number; componentType?: number; type?: string }>;
+  bufferViews?: Array<{ byteStride?: number }>;
+}
+
+function readGlbJson(glbPath: string): GlbJsonChunk {
   const buf = readFileSync(glbPath);
   const jsonLen = buf.readUInt32LE(12);
-  const json = JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf-8')) as {
-    meshes?: Array<{ primitives?: Array<{ indices?: number }> }>;
-  };
+  return JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf-8')) as GlbJsonChunk;
+}
+
+/** Count indexed vs non-indexed primitives by reading the GLB JSON chunk. */
+function primitiveIndexing(glbPath: string): { indexed: number; nonIndexed: number } {
+  const json = readGlbJson(glbPath);
   let indexed = 0;
   let nonIndexed = 0;
   for (const mesh of json.meshes ?? []) {
@@ -43,6 +54,36 @@ function primitiveIndexing(glbPath: string): { indexed: number; nonIndexed: numb
     }
   }
   return { indexed, nonIndexed };
+}
+
+/**
+ * Count vertex-attribute accessors whose bufferView carries a non-tight
+ * `byteStride` (i.e. is interleaved). THREE r184's GLTFLoader builds an
+ * `InterleavedBufferAttribute` for exactly these, and `mergeGeometries` cannot
+ * merge an interleaved attribute against a packed one (gpuType mismatch). A
+ * canonical import leaves zero of these.
+ */
+function interleavedAttributeAccessors(glbPath: string): number {
+  const json = readGlbJson(glbPath);
+  const accessors = json.accessors ?? [];
+  const bufferViews = json.bufferViews ?? [];
+  const attributeAccessors = new Set<number>();
+  for (const mesh of json.meshes ?? []) {
+    for (const prim of mesh.primitives ?? []) {
+      for (const a of Object.values(prim.attributes ?? {})) attributeAccessors.add(a);
+      for (const target of prim.targets ?? []) for (const a of Object.values(target)) attributeAccessors.add(a);
+    }
+  }
+  let interleaved = 0;
+  for (const ai of attributeAccessors) {
+    const a = accessors[ai];
+    if (!a || a.bufferView === undefined) continue;
+    const bv = bufferViews[a.bufferView];
+    if (!bv || bv.byteStride === undefined) continue;
+    const tight = (COMPONENT_BYTES[a.componentType ?? 5126] ?? 4) * (TYPE_COMPONENTS[a.type ?? 'SCALAR'] ?? 1);
+    if (bv.byteStride !== tight) interleaved += 1;
+  }
+  return interleaved;
 }
 
 function entry(slug: string): WarAssetEntry {
@@ -172,6 +213,40 @@ describe('imported GLBs are uniformly indexed so THREE merges are all-or-none', 
   it('covers the weapons whose mixed indexing broke the combat120 weapon merge', () => {
     for (const path of [WeaponModels.AK47, WeaponModels.M60, WeaponModels.M79]) {
       expect(primitiveIndexing(join(MODELS_ROOT, path)).nonIndexed).toBe(0);
+    }
+  });
+});
+
+describe('imported GLBs use tightly-packed (de-interleaved) attribute storage', () => {
+  // THREE r184 builds an InterleavedBufferAttribute for any accessor whose
+  // bufferView has a non-tight byteStride, and a plain BufferAttribute for
+  // packed ones. BufferGeometryUtils.mergeGeometries cannot merge across the two
+  // (InterleavedBufferAttribute lacks gpuType -> "gpuType must be consistent"
+  // throw), so the pixel-forge source's MIXED interleaved/packed layout broke the
+  // CombatantRenderer NPC-weapon merge and spammed the combat120 console. The
+  // importer now de-interleaves every attribute accessor, so every imported GLB
+  // loads as plain BufferAttributes only and merges cleanly.
+
+  // REJECT replacements keep their prior (un-reimported) GLB bytes on disk, which
+  // are outside this canonicalization contract — assert only on the imported set.
+  const importedEntries: WarAssetEntry[] = Object.values(warAssetCatalog).filter(
+    (e) => e.budgetStatus !== 'REJECT' && existsSync(join(MODELS_ROOT, e.path)),
+  );
+
+  it('finds imported (non-reject) GLBs on disk to assert against', () => {
+    expect(importedEntries.length).toBeGreaterThan(0);
+  });
+
+  it.each(importedEntries.map((e) => [e.slug, e.path] as const))(
+    '%s has zero interleaved (non-tight byteStride) attribute accessors',
+    (_slug, path) => {
+      expect(interleavedAttributeAccessors(join(MODELS_ROOT, path))).toBe(0);
+    },
+  );
+
+  it('de-interleaves the weapons whose mixed storage threw the gpuType merge error', () => {
+    for (const path of [WeaponModels.M16A1, WeaponModels.AK47, WeaponModels.M60]) {
+      expect(interleavedAttributeAccessors(join(MODELS_ROOT, path))).toBe(0);
     }
   });
 });
