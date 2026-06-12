@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { BuildingModels, PropModels, StructureModels } from './modelPaths';
+import { BuildingModels, StructureModels } from './modelPaths';
 
 export type ModelGroundingMode = 'bounds_center_bottom';
 export type ModelCollisionMode = 'none' | 'bounds';
@@ -117,30 +117,13 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     collisionMode: 'none',
     drawCallOptimization: 'batch',
   },
-  [StructureModels.FUEL_DRUM]: {
-    groundingMode: 'bounds_center_bottom',
-    normalizeBy: 'none',
-    collisionMode: 'none',
-    displayScale: 0.5,
-  },
-  [StructureModels.SUPPLY_CRATE]: {
-    groundingMode: 'bounds_center_bottom',
-    normalizeBy: 'none',
-    collisionMode: 'none',
-    displayScale: 0.5,
-  },
-  [StructureModels.AMMO_CRATE]: {
-    groundingMode: 'bounds_center_bottom',
-    normalizeBy: 'none',
-    collisionMode: 'none',
-    displayScale: 0.5,
-  },
-  [PropModels.WOODEN_BARREL]: {
-    groundingMode: 'bounds_center_bottom',
-    normalizeBy: 'none',
-    collisionMode: 'none',
-    displayScale: 0.5,
-  },
+  // fuel-drum / supply-crate / ammo-crate / wooden-barrel previously carried a
+  // displayScale: 0.5 fudge calibrated to the OLD oversized GLBs. The 2026-06
+  // repaint catalog ships these props at real meter scale (fuel-drum 0.6x0.92m,
+  // supply-crate 0.61x1.01m, ammo-crate 0.9x0.43m, wooden-barrel 0.7x0.9m), so
+  // the fudge double-shrinks them. They now fall through to the default profile
+  // and render at the shared STRUCTURE_SCALE convention like every other
+  // real-scale prop (see WAR_ASSET_REPAINT_AUDIT_2026-06-11.md debt list).
 };
 
 export function getModelPlacementProfile(modelPath: string): ModelPlacementProfile {
