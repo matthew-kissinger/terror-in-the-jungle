@@ -271,7 +271,7 @@ export class WildlifeSystem implements GameSystem {
   private async spawnSpecies(species: WildlifeSpecies, x: number, z: number): Promise<void> {
     // Guard the cap again after the async load resolves — many ticks may have
     // passed and other spawns / despawns can have changed the count.
-    if (this.agents.length >= WILDLIFE_CONFIG.maxActive || !this.active || !this.terrain) {
+    if (this.agents.length >= WILDLIFE_CONFIG.maxActive || !this.active || !this.terrain || !this.player) {
       return;
     }
     let object: THREE.Object3D;
@@ -281,7 +281,19 @@ export class WildlifeSystem implements GameSystem {
       Logger.warn('world', `Failed to load wildlife model ${species.modelPath}`, error);
       return;
     }
-    if (this.agents.length >= WILDLIFE_CONFIG.maxActive || !this.active || !this.terrain) {
+    if (this.agents.length >= WILDLIFE_CONFIG.maxActive || !this.active || !this.terrain || !this.player) {
+      modelLoader.disposeInstance(object);
+      return;
+    }
+
+    // The ring point was sampled outside the min-spawn exclusion at sample time,
+    // but a player moving toward it during the async load can pull the spawn
+    // inside the 80m ring. Re-measure against the player's CURRENT position
+    // (horizontal only, matching advanceAgents) and bail rather than pop an
+    // animal in too close.
+    this.player.getPosition(_playerPos);
+    _agentToPlayer.set(x - _playerPos.x, 0, z - _playerPos.z);
+    if (_agentToPlayer.length() < WILDLIFE_CONFIG.minPlayerSpawnDistanceM) {
       modelLoader.disposeInstance(object);
       return;
     }
