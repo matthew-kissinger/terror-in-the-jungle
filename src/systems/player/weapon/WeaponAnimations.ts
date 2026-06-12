@@ -18,6 +18,16 @@ export class WeaponAnimations {
   private weaponRecoilVelocity = { x: 0, y: 0, z: 0, rotX: 0 }
   private readonly RECOIL_SPRING_STIFFNESS = 120
   private readonly RECOIL_SPRING_DAMPING = 15
+  // Viewmodel-recoil saturation. The underdamped spring had no positional clamp,
+  // so at automatic fire rates the up/back offset stacked (~2.5x a single shot)
+  // and the gun rode visibly high in the frame. These cap how far the viewmodel
+  // rides; the incoming impulse is also scaled by remaining headroom (see
+  // applyRecoilImpulse) so it eases into the plateau rather than hard-walling.
+  // Each ceiling sits above a single shot's peak (y~0.040, z~-0.073, rotX~0.004),
+  // so single-shot kick is visually unchanged; sustained fire holds below them.
+  private readonly RECOIL_MAX_Y = 0.055     // up offset ceiling (world units)
+  private readonly RECOIL_MAX_ROTX = 0.018  // pitch-rotation ceiling (radians)
+  private readonly RECOIL_MAX_Z = 0.11      // backward offset ceiling (world units)
 
   // Idle motion
   private idleTime = 0
@@ -115,10 +125,19 @@ export class WeaponAnimations {
   }
 
   applyRecoilImpulse(recoilMultiplier: number): void {
-    // Apply recoil impulse to weapon spring system
-    this.weaponRecoilVelocity.z -= 2.2 * recoilMultiplier // Backward kick
-    this.weaponRecoilVelocity.y += 1.2 * recoilMultiplier // Upward kick
-    this.weaponRecoilVelocity.rotX += 0.12 * recoilMultiplier // Rotation kick
+    // Scale each impulse component by the spring's remaining headroom toward its
+    // saturation ceiling. A rested viewmodel (offset ~0) gets the full kick, so a
+    // single shot is unchanged; under sustained fire the offset approaches the cap
+    // and the headroom shrinks toward 0, easing the gun onto a believable plateau
+    // instead of stacking ever higher. updateRecoilRecovery() also hard-clamps the
+    // offsets as a backstop.
+    const headroomZ = THREE.MathUtils.clamp(1 - -this.weaponRecoilOffset.z / this.RECOIL_MAX_Z, 0, 1)
+    const headroomY = THREE.MathUtils.clamp(1 - this.weaponRecoilOffset.y / this.RECOIL_MAX_Y, 0, 1)
+    const headroomRotX = THREE.MathUtils.clamp(1 - this.weaponRecoilOffset.rotX / this.RECOIL_MAX_ROTX, 0, 1)
+
+    this.weaponRecoilVelocity.z -= 2.2 * recoilMultiplier * headroomZ // Backward kick
+    this.weaponRecoilVelocity.y += 1.2 * recoilMultiplier * headroomY // Upward kick
+    this.weaponRecoilVelocity.rotX += 0.12 * recoilMultiplier * headroomRotX // Rotation kick
 
     // Small random horizontal kick for variety
     this.weaponRecoilVelocity.x += (Math.random() - 0.5) * 0.4
@@ -185,6 +204,13 @@ export class WeaponAnimations {
     this.weaponRecoilOffset.y += this.weaponRecoilVelocity.y * deltaTime
     this.weaponRecoilOffset.z += this.weaponRecoilVelocity.z * deltaTime
     this.weaponRecoilOffset.rotX += this.weaponRecoilVelocity.rotX * deltaTime
+
+    // Saturate the viewmodel offset so sustained fire holds a believable height
+    // instead of riding ever higher in the frame. The headroom-scaled impulse
+    // normally keeps us below these; this is the hard backstop.
+    this.weaponRecoilOffset.y = THREE.MathUtils.clamp(this.weaponRecoilOffset.y, -this.RECOIL_MAX_Y, this.RECOIL_MAX_Y)
+    this.weaponRecoilOffset.z = THREE.MathUtils.clamp(this.weaponRecoilOffset.z, -this.RECOIL_MAX_Z, this.RECOIL_MAX_Z)
+    this.weaponRecoilOffset.rotX = THREE.MathUtils.clamp(this.weaponRecoilOffset.rotX, -this.RECOIL_MAX_ROTX, this.RECOIL_MAX_ROTX)
   }
 
   private updatePumpAnimation(deltaTime: number): void {
