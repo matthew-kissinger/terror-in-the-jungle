@@ -132,6 +132,7 @@ describe('VehicleActionBar', () => {
     expect((document.querySelector('[aria-label="EXIT"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="FIRE"]') as HTMLDivElement).style.display).toBe('none');
     expect((document.querySelector('[aria-label="WPN"]') as HTMLDivElement).style.display).toBe('none');
+    expect((document.querySelector('[aria-label="VIEW"]') as HTMLDivElement).style.display).toBe('none');
     expect((document.querySelector('[aria-label="MAP"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="CMD"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="STAB"]') as HTMLDivElement).style.display).toBe('flex');
@@ -229,6 +230,65 @@ describe('VehicleActionBar', () => {
     expect(onCycle).toHaveBeenNthCalledWith(1, 1);
     expect(onCycle).toHaveBeenNthCalledWith(2, 2);
     expect(onCycle).toHaveBeenNthCalledWith(3, 0);
+  });
+
+  it('shows and routes the contextual view toggle', () => {
+    const onViewToggle = vi.fn();
+    bar.setCallbacks({ onViewToggle });
+    bar.setVehicleContext({
+      kind: 'plane',
+      role: 'gunship',
+      hudVariant: 'flight',
+      weaponCount: 1,
+      viewToggle: {
+        inactiveLabel: 'SIDE',
+        activeLabel: 'CHASE',
+        active: false,
+        ariaLabel: 'Switch to broadside view',
+      },
+      capabilities: {
+        canExit: true,
+        canFirePrimary: true,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    const viewBtn = document.querySelector('[aria-label="Switch to broadside view"]') as HTMLDivElement;
+    expect(viewBtn.style.display).toBe('flex');
+    expect(viewBtn.textContent).toBe('SIDE');
+
+    viewBtn.dispatchEvent(pointerEvent('pointerdown'));
+    expect(onViewToggle).toHaveBeenCalledTimes(1);
+
+    bar.setVehicleContext({
+      kind: 'plane',
+      role: 'gunship',
+      hudVariant: 'flight',
+      weaponCount: 1,
+      viewToggle: {
+        inactiveLabel: 'SIDE',
+        activeLabel: 'CHASE',
+        active: true,
+        ariaLabel: 'Switch to chase view',
+      },
+      capabilities: {
+        canExit: true,
+        canFirePrimary: true,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+    expect((document.querySelector('[aria-label="Switch to chase view"]') as HTMLDivElement).textContent)
+      .toBe('CHASE');
   });
 
   it('STAB fires onToggleAutoHover callback', () => {

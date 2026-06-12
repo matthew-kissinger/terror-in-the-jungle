@@ -109,6 +109,12 @@ interface GraftJointSpec {
   meshes: string[];
   pivot?: 'meshes-center' | 'hub';
   hubMesh?: string;
+  /**
+   * Root-local offset applied to the inserted joint and its child meshes as a
+   * unit. Use this when an upstream mesh set is authored at the wrong location
+   * but still needs to spin around its own hub-relative pivot.
+   */
+  translationOffset?: [number, number, number];
   type?: 'mainBlades' | 'tailBlades';
   spinAxis?: 'x' | 'y' | 'z';
 }
@@ -614,8 +620,10 @@ function detachChild(json: GlbJson, parents: number[], child: number): void {
 }
 
 /**
- * Insert a graft joint at `pivot`, reparenting `meshIdxs` under it with their
- * translations rebased so world (root-space) position is preserved. All assets
+ * Insert a graft joint at `pivot`, reparenting `meshIdxs` under it. By default
+ * translations are rebased so world (root-space) position is preserved. When a
+ * `translationOffset` is provided, the whole grafted subtree moves by that
+ * offset while retaining each mesh's hub-relative local transform. All assets
  * here have a flat hierarchy (meshes are direct children of the single root
  * with TRS-only local transforms), so we rebase translation directly. Returns
  * the new joint node index, or -1 if no listed mesh was found.
@@ -640,8 +648,14 @@ function graftJoint(json: GlbJson, rootIdx: number, spec: GraftJointSpec): Joint
     pivot = [sum[0] / meshIdxs.length, sum[1] / meshIdxs.length, sum[2] / meshIdxs.length];
   }
 
+  const offset = spec.translationOffset ?? [0, 0, 0];
+  const jointTranslation: Vec3 = [
+    pivot[0] + (offset[0] ?? 0),
+    pivot[1] + (offset[1] ?? 0),
+    pivot[2] + (offset[2] ?? 0),
+  ];
   const jointIdx = json.nodes!.length;
-  json.nodes!.push({ name: spec.name, translation: [pivot[0], pivot[1], pivot[2]], children: [] });
+  json.nodes!.push({ name: spec.name, translation: jointTranslation, children: [] });
 
   for (const mi of meshIdxs) {
     detachChild(json, parents, mi);

@@ -53,6 +53,15 @@ export function resolveVehiclePromptCopy(vehicle: IVehicle): string {
   if (id.startsWith('m48_') || id.includes('_m48_')) {
     return 'Press F to board M48 Patton tank';
   }
+  if (id.includes('m35')) {
+    return 'Press F to board M35 cargo truck';
+  }
+  if (id.includes('m113')) {
+    return 'Press F to board M113 APC';
+  }
+  if (id.includes('zil_157') || id.includes('zil157')) {
+    return 'Press F to board ZIL-157 truck';
+  }
   if (id.startsWith('pbr_') || id.includes('_pbr_')) {
     return 'Press F to board PBR gunboat';
   }

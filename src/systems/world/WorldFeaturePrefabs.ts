@@ -85,7 +85,7 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(6.25, 0, -3.75), yaw: 0 },
       { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(-5, 0, -6.25), yaw: 0 },
       { modelPath: StructureModels.PUNJI_TRAP, offset: new THREE.Vector3(7.5, 0, 8.75), yaw: Math.PI * 0.25 },
-      // Static NVA supply truck (Soviet ZIL-157) — non-drivable scenery.
+      // NVA supply truck (Soviet ZIL-157) - promoted to the ground vehicle runtime when spawned.
       { modelPath: GroundVehicleModels.ZIL_157, offset: new THREE.Vector3(11, 0, -8), yaw: Math.PI * 0.45, registerCollision: true },
     ],
   },
@@ -183,7 +183,7 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-14, 0, 3), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: GroundVehicleModels.M151_JEEP, offset: new THREE.Vector3(0, 0, 6), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(14, 0, 1), yaw: Math.PI * 0.55, registerCollision: true },
-      // Static US AA + recoilless dressing — non-drivable scenery (M35 precedent).
+      // Static US AA + recoilless dressing. M35/M151/M113 placements above promote separately.
       { modelPath: GroundVehicleModels.M42_DUSTER, offset: new THREE.Vector3(-14, 0, 14), yaw: Math.PI * 0.4, registerCollision: true },
       { modelPath: GroundVehicleModels.ONTOS, offset: new THREE.Vector3(14, 0, 14), yaw: -Math.PI * 0.4, registerCollision: true },
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(0, 0, 14), yaw: 0 },
@@ -227,8 +227,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-18, 0, 12), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(12, 0, 10), yaw: Math.PI * 0.58, registerCollision: true },
       { modelPath: GroundVehicleModels.M48_PATTON, offset: new THREE.Vector3(24, 0, 14), yaw: Math.PI * 0.6, registerCollision: true },
-      // Static US AA + recoilless dressing — non-drivable scenery (M35/M48
-      // precedent). Both sit inside the 34 m Ta Bat footprint radius.
+      // Static US AA + recoilless dressing. M35/M113 promote separately; both
+      // static AA assets sit inside the 34 m Ta Bat footprint radius.
       { modelPath: GroundVehicleModels.M42_DUSTER, offset: new THREE.Vector3(-26, 0, 0), yaw: Math.PI * 0.45, registerCollision: true },
       { modelPath: GroundVehicleModels.ONTOS, offset: new THREE.Vector3(28, 0, 2), yaw: -Math.PI * 0.5, registerCollision: true },
       { modelPath: StructureModels.AMMO_CRATE, offset: new THREE.Vector3(-10, 0, 20), yaw: 0 },

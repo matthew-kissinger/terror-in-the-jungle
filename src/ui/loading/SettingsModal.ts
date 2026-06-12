@@ -481,12 +481,14 @@ export class SettingsModal extends UIComponent {
       <div class="${styles.hint}">WASD - Move | Shift - Sprint | Space - Jump</div>
       <div class="${styles.hint}">Mouse - Look | Left Click - Fire | Right Click - ADS</div>
       <div class="${styles.hint}">R - Reload | G - Grenade | 1-6 - Weapons | TAB - Scoreboard</div>
-      <div class="${styles.hint}">Z - Squad command overlay | Shift+1..5 - quick commands</div>
+      <div class="${styles.hint}">T - Air support radio | Z - Squad command overlay | Shift+1..5 - quick commands</div>
+      <div class="${styles.hint}">F - Board / exit / seat swap ground vehicles | LMB - fire armed vehicle</div>
     `;
     const touch = `
       <div class="${styles.hint}"><strong>Touch Controls</strong></div>
       <div class="${styles.hint}">Left Joystick - Move | Drag Screen - Look</div>
       <div class="${styles.hint}">Fire/ADS/Sprint/Jump Buttons on screen</div>
+      <div class="${styles.hint}">Vehicle bar: EXIT / FIRE / SIDE / MAP / CMD / ORBIT</div>
     `;
     const gamepad = isTouch ? '' : `
       <div class="${styles.hint}" style="margin-top:8px"><strong>Gamepad</strong></div>
@@ -497,7 +499,12 @@ export class SettingsModal extends UIComponent {
       <div class="${styles.hint}" style="margin-top:8px"><strong>Helicopter</strong></div>
       <div class="${styles.hint}">${isTouch ? 'Joysticks for Collective/Yaw + Cyclic' : 'W/S - Altitude | A/D - Yaw | Arrows - Cyclic | E - Enter/Exit | G - Deploy squad'}</div>
     `;
-    return `${isTouch ? touch : kbm}${gamepad}${heli}`;
+    const fixedWing = `
+      <div class="${styles.hint}" style="margin-top:8px"><strong>Fixed Wing / Air Support</strong></div>
+      <div class="${styles.hint}">${isTouch ? 'SIDE / CHASE switches AC-47 gunship camera' : 'W/S - Throttle | A/D - Rudder | Arrows - Pitch/Roll | V - AC-47 side/chase view'}</div>
+      <div class="${styles.hint}">${isTouch ? 'CMD opens command mode; air support radio is available from command UI' : 'T opens the air support radio; look at target, then select a strike'}</div>
+    `;
+    return `${isTouch ? touch : kbm}${gamepad}${heli}${fixedWing}`;
   }
 
   private buildTipsSection(isTouch: boolean): string {

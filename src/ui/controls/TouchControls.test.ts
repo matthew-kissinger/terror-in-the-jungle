@@ -367,6 +367,33 @@ describe('TouchControls', () => {
     expect(onEnterExitHelicopter).toHaveBeenCalledTimes(1);
   });
 
+  it('routes vehicle action-bar view toggle to the fixed-wing callback', () => {
+    const controls = new TouchControls();
+    const onFixedWingViewToggle = vi.fn();
+    controls.setCallbacks({
+      onFireStart: vi.fn(),
+      onFireStop: vi.fn(),
+      onJump: vi.fn(),
+      onReload: vi.fn(),
+      onGrenade: vi.fn(),
+      onSprintStart: vi.fn(),
+      onSprintStop: vi.fn(),
+      onWeaponSelect: vi.fn(),
+      onADSToggle: vi.fn(),
+      onSandbagRotateLeft: vi.fn(),
+      onSandbagRotateRight: vi.fn(),
+      onRallyPointPlace: vi.fn(),
+      onFixedWingViewToggle,
+    });
+
+    const vehicleCallbacks = vehicleActionBarInstances[0].setCallbacks.mock.calls[0][0] as {
+      onViewToggle: () => void;
+    };
+    vehicleCallbacks.onViewToggle();
+
+    expect(onFixedWingViewToggle).toHaveBeenCalledTimes(1);
+  });
+
   it('presentation vehicle context toggles the vehicle action bar', () => {
     const controls = new TouchControls();
     controls.show();

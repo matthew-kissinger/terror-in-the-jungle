@@ -263,6 +263,7 @@ describe('PlayerInput', () => {
         onScoreboardToggle: vi.fn(),
         onEnterExitHelicopter: vi.fn(),
         onToggleAutoHover: vi.fn(),
+        onFixedWingViewToggle: vi.fn(),
         onToggleMouseControl: vi.fn(),
         onSandbagRotateLeft: vi.fn(),
         onSandbagRotateRight: vi.fn(),
@@ -379,6 +380,14 @@ describe('PlayerInput', () => {
       playerInput.setInHelicopter(true);
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlRight' }));
       expect(callbacks.onToggleMouseControl).toHaveBeenCalled();
+    });
+
+    it('uses V as the fixed-wing view toggle while flying instead of rally placement', () => {
+      playerInput.setFlightVehicleMode('plane');
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' }));
+
+      expect(callbacks.onFixedWingViewToggle).toHaveBeenCalledTimes(1);
+      expect(callbacks.onRallyPointPlace).not.toHaveBeenCalled();
     });
 
     it('should trigger sandbag rotation when appropriate key pressed and in sandbag mode', () => {
@@ -504,6 +513,19 @@ describe('PlayerInput', () => {
 
         expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
         expect(onEnterExitVehicle).not.toHaveBeenCalled();
+      });
+
+      it('routes touch vehicle view toggle to the fixed-wing callback', () => {
+        playerInput.dispose();
+        vi.mocked(shouldUseTouchControls).mockReturnValue(true);
+        playerInput = new PlayerInput();
+        const onFixedWingViewToggle = vi.fn();
+        playerInput.setCallbacks({ onFixedWingViewToggle });
+        const touchCallbacks = touchControlsInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        touchCallbacks.onFixedWingViewToggle();
+
+        expect(onFixedWingViewToggle).toHaveBeenCalledTimes(1);
       });
     });
 

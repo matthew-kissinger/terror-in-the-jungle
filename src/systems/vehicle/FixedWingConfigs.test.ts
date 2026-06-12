@@ -78,9 +78,9 @@ describe('FixedWingConfigs — gear clearance seats on measured catalog dims', (
     }
   });
 
-  it('the tall AC-47 taildragger seats higher than the low-slung jet', () => {
+  it('the AC-47 parked clearance is driven by landing gear, not misplaced propeller tips', () => {
     expect(FIXED_WING_CONFIGS.AC47_SPOOKY.physics.gearClearance)
-      .toBeGreaterThan(FIXED_WING_CONFIGS.F4_PHANTOM.physics.gearClearance);
+      .toBeLessThan(0.5);
   });
 });
 

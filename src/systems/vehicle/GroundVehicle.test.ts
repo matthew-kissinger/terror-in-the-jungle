@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { Faction } from '../combat/types';
-import { GroundVehicle, isM151ModelPath } from './GroundVehicle';
+import { GroundVehicleModels } from '../assets/modelPaths';
+import {
+  createGroundVehicleForModelPath,
+  GroundVehicle,
+  isGroundVehicleModelPath,
+  isM151ModelPath,
+} from './GroundVehicle';
 import {
   createM151Jeep,
   M151_SCENARIO_SPAWNS,
@@ -12,10 +18,57 @@ import {
 } from './M151JeepSpawn';
 import { VehicleManager } from './VehicleManager';
 
+function makeTerrain() {
+  return {
+    getHeightAt: () => 0,
+    getEffectiveHeightAt: () => 0,
+    getSlopeAt: () => 0,
+    getNormalAt: (_x: number, _z: number, target = new THREE.Vector3()) => target.set(0, 1, 0),
+    getPlayableWorldSize: () => 4000,
+    getWorldSize: () => 4000,
+    isTerrainReady: () => true,
+    hasTerrainAt: () => true,
+    getActiveTerrainTileCount: () => 1,
+    setSurfaceWetness: () => {},
+    updatePlayerPosition: () => {},
+    registerCollisionObject: vi.fn(),
+    unregisterCollisionObject: vi.fn(),
+    raycastTerrain: () => ({ hit: false }),
+  };
+}
+
 describe('GroundVehicle', () => {
   it('recognizes the M151 model path', () => {
     expect(isM151ModelPath('vehicles/ground/m151-jeep.glb')).toBe(true);
     expect(isM151ModelPath('vehicles/ground/m35-truck.glb')).toBe(false);
+  });
+
+  it('recognizes support-vehicle model paths as runtime ground vehicles', () => {
+    expect(isGroundVehicleModelPath(GroundVehicleModels.M151_JEEP)).toBe(true);
+    expect(isGroundVehicleModelPath(GroundVehicleModels.M35_TRUCK)).toBe(true);
+    expect(isGroundVehicleModelPath(GroundVehicleModels.M113_APC)).toBe(true);
+    expect(isGroundVehicleModelPath(GroundVehicleModels.ZIL_157)).toBe(true);
+    expect(isGroundVehicleModelPath(GroundVehicleModels.T54_TANK)).toBe(false);
+  });
+
+  it('creates runtime vehicles for promoted support models', () => {
+    const truck = createGroundVehicleForModelPath(
+      'm35_runtime',
+      new THREE.Object3D(),
+      GroundVehicleModels.M35_TRUCK,
+      Faction.US,
+    );
+    const apc = createGroundVehicleForModelPath(
+      'm113_runtime',
+      new THREE.Object3D(),
+      GroundVehicleModels.M113_APC,
+      Faction.US,
+    );
+
+    expect(truck).toBeInstanceOf(GroundVehicle);
+    expect(apc).toBeInstanceOf(GroundVehicle);
+    expect(createGroundVehicleForModelPath('t54_static', new THREE.Object3D(), GroundVehicleModels.T54_TANK))
+      .toBeNull();
   });
 
   it('tracks M151 seats and occupant handoff behavior', () => {
@@ -76,6 +129,21 @@ describe('GroundVehicle', () => {
     expect(vehicle.isDestroyed()).toBe(true);
     expect(vehicle.getHealthPercent()).toBe(0);
     expect(scene.children).toHaveLength(1);
+  });
+
+  it('registers and unregisters a dynamic terrain collision proxy', () => {
+    const object = new THREE.Object3D();
+    const vehicle = new GroundVehicle('m151_collision', object, Faction.US);
+    const terrain = makeTerrain();
+
+    vehicle.setTerrain(terrain as any);
+    expect(terrain.registerCollisionObject).toHaveBeenCalledWith('m151_collision', object, { dynamic: true });
+
+    vehicle.setTerrain(terrain as any);
+    expect(terrain.registerCollisionObject).toHaveBeenCalledTimes(1);
+
+    vehicle.setTerrain(null);
+    expect(terrain.unregisterCollisionObject).toHaveBeenCalledWith('m151_collision');
   });
 });
 

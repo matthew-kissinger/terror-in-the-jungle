@@ -113,6 +113,8 @@ function createRefs() {
     },
     terrainSystem: {
       getHeightAt: vi.fn((_x: number, _z: number) => 12),
+      registerCollisionObject: vi.fn(),
+      unregisterCollisionObject: vi.fn(),
     },
     ticketSystem: {},
     vehicleManager: {

@@ -303,7 +303,11 @@ describe('WorldFeatureSystem', () => {
     expect(vehicle.category).toBe('ground');
     expect(vehicle.hasFreeSeats('pilot')).toBe(true);
     expect(vehicle.getPosition().y).toBeCloseTo(5.45);
-    expect(terrainManager.registerCollisionObject).not.toHaveBeenCalled();
+    expect(terrainManager.registerCollisionObject).toHaveBeenCalledWith(
+      'test_motor_pool_m151',
+      expect.any(Object),
+      { dynamic: true },
+    );
 
     let meshCount = 0;
     let frozenMeshCount = 0;
@@ -326,6 +330,46 @@ describe('WorldFeatureSystem', () => {
     await flushPromises();
 
     expect(vehicleManager.unregister).toHaveBeenCalledWith('test_motor_pool_m151');
+  });
+
+  it('registers promoted support-truck placements as ground vehicles', async () => {
+    const vehicleManager = {
+      register: vi.fn(),
+      unregister: vi.fn(),
+    };
+    system.setVehicleManager(vehicleManager as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'test_motor_pool',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              id: 'm35',
+              modelPath: GroundVehicleModels.M35_TRUCK,
+              offset: new THREE.Vector3(0, 0, 0),
+              registerCollision: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    expect(vehicleManager.register).toHaveBeenCalledTimes(1);
+    const vehicle = vehicleManager.register.mock.calls[0][0];
+    expect(vehicle.vehicleId).toBe('test_motor_pool_m35');
+    expect(vehicle.category).toBe('ground');
+    expect(vehicle.hasFreeSeats('pilot')).toBe(true);
+    expect(terrainManager.registerCollisionObject).toHaveBeenCalledWith(
+      'test_motor_pool_m35',
+      expect.any(Object),
+      { dynamic: true },
+    );
   });
 
   it('batches compatible static placements across features in the same culling sector', async () => {

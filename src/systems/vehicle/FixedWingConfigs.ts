@@ -242,11 +242,10 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 8.0,
       rollingResistance: 0.017,
       brakeDeceleration: 12,
-      // Re-banded to the repaint AC-47 catalog dims (cycle-2026-06-11): the
-      // measured GLB bottoms out 2.35 m below model origin (minY -2.35; tall
-      // taildragger stance), so the parked origin sits 2.35 m over the ground
-      // to seat the gear/belly. The old 0.5 was tuned to the undersized model.
-      gearClearance: 2.35,
+      // Re-banded after the AC-47 prop-graft fix: the misplaced propeller
+      // assemblies no longer define the ground contact. Parked clearance seats
+      // the actual landing gear/tailwheel against the runway.
+      gearClearance: 0.07,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 11,
       groundEffectStrength: 0.22,

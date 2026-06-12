@@ -267,6 +267,9 @@ describe('resolveVehiclePromptCopy', () => {
   it.each<[string, VehicleCategory, string]>([
     ['motor_pool_small_m151', 'ground', 'Press F to board M151 Jeep'],
     ['m48_tank_of_us_fob', 'ground', 'Press F to board M48 Patton tank'],
+    ['airfield_motor_pool_m35_truck', 'ground', 'Press F to board M35 cargo truck'],
+    ['airfield_motor_pool_m113_apc', 'ground', 'Press F to board M113 APC'],
+    ['nva_tunnel_zil_157', 'ground', 'Press F to board ZIL-157 truck'],
     ['sampan_open_frontier_river', 'watercraft', 'Press F to board Sampan'],
     ['pbr_us_open_frontier', 'watercraft', 'Press F to board PBR gunboat'],
     ['m2hb_emp_of_us_fob', 'emplacement', 'Press F to crew M2HB emplacement'],

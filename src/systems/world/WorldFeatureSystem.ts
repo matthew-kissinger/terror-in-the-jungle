@@ -16,7 +16,7 @@ import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
-import { GroundVehicle, isM151ModelPath } from '../vehicle/GroundVehicle';
+import { createGroundVehicleForModelPath, groundVehicleIdForPlacement, isGroundVehicleModelPath } from '../vehicle/GroundVehicle';
 import { FixedWingModel } from '../vehicle/FixedWingModel';
 import type { FixedWingSpawnMetadata } from '../vehicle/FixedWingOperations';
 import type { VehicleManager } from '../vehicle/VehicleManager';
@@ -335,12 +335,9 @@ export class WorldFeatureSystem implements GameSystem {
         }
       });
       const objectId = `${feature.id}_${placement.id ?? i}`;
-      const isDynamicGroundVehicle = isM151ModelPath(placement.modelPath) && Boolean(this.vehicleManager);
-      // M151 prefabs become live GroundVehicle instances. Keeping them inside
-      // the frozen/static feature tree leaves their matrices stale after the
-      // physics state changes, so the player sees a boardable but immobile jeep.
-      // Dynamic vehicles also must not leave static collision/LOS bounds behind
-      // at their spawn point after they drive away.
+      const isDynamicGroundVehicle = isGroundVehicleModelPath(placement.modelPath) && Boolean(this.vehicleManager);
+      // Runtime ground-vehicle prefabs must move outside frozen static scenery
+      // and stale collision/LOS bounds.
       if (isDynamicGroundVehicle) {
         this.scene.add(object);
       } else {
@@ -496,17 +493,19 @@ export class WorldFeatureSystem implements GameSystem {
     placement: StaticModelPlacementConfig,
     object: THREE.Object3D,
   ): string | undefined {
-    if (!this.vehicleManager || !isM151ModelPath(placement.modelPath)) {
+    if (!this.vehicleManager || !isGroundVehicleModelPath(placement.modelPath)) {
       return undefined;
     }
 
-    object.userData.worldFeatureGroundVehicleId = objectId;
-    const vehicle = new GroundVehicle(objectId, object);
+    const vehicleId = groundVehicleIdForPlacement(objectId, placement.modelPath);
+    object.userData.worldFeatureGroundVehicleId = vehicleId;
+    const vehicle = createGroundVehicleForModelPath(vehicleId, object, placement.modelPath);
+    if (!vehicle) return undefined;
     if (this.terrainManager) {
       vehicle.setTerrain(this.terrainManager);
     }
     this.vehicleManager.register(vehicle);
-    return objectId;
+    return vehicleId;
   }
 
   private isGroundVehicleMesh(mesh: THREE.Mesh): boolean {

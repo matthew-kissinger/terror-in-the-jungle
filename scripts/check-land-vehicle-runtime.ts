@@ -4,7 +4,7 @@
 
 /**
  * Focused live-loop proof for land vehicle owner-acceptance issues:
- * M151/M48 boarding, W-drive displacement, and third-person camera framing.
+ * M151/M35/M113/M48 boarding, W-drive displacement, and third-person camera framing.
  *
  * This intentionally uses the current PlayerController public path
  * (`handleBoardNearestVehicle` / `handleExitVehicle`) instead of the stale
@@ -21,7 +21,7 @@ import { chromium, type Page } from 'playwright';
 import { startServer, stopServer } from './preview-server';
 
 type ModeId = 'open_frontier' | 'a_shau_valley';
-type VehicleKind = 'm151' | 'm48';
+type VehicleKind = 'm151' | 'm35' | 'm113' | 'm48';
 type CheckStatus = 'pass' | 'warn' | 'fail';
 
 interface Options {
@@ -181,6 +181,8 @@ const OUT_DIR = join(process.cwd(), 'artifacts', 'playtests', 'land-vehicle-runt
 
 const TARGETS: Array<{ mode: ModeId; kind: VehicleKind }> = [
   { mode: 'open_frontier', kind: 'm151' },
+  { mode: 'open_frontier', kind: 'm35' },
+  { mode: 'open_frontier', kind: 'm113' },
   { mode: 'open_frontier', kind: 'm48' },
   { mode: 'a_shau_valley', kind: 'm151' },
   { mode: 'a_shau_valley', kind: 'm48' },
@@ -188,6 +190,8 @@ const TARGETS: Array<{ mode: ModeId; kind: VehicleKind }> = [
 
 const MIN_TRAVEL_METERS: Record<VehicleKind, number> = {
   m151: 2.0,
+  m35: 1.5,
+  m113: 1.0,
   m48: 0.75,
 };
 
@@ -197,6 +201,8 @@ const MIN_TRAVEL_METERS: Record<VehicleKind, number> = {
 // feedback 2026-06-10). Current adapter tuning lands ~29° (m151) / ~27° (m48).
 const CAMERA_DOWN_ANGLE_DEG_BAND: Record<VehicleKind, { min: number; max: number }> = {
   m151: { min: 15, max: 40 },
+  m35: { min: 12, max: 42 },
+  m113: { min: 12, max: 42 },
   m48: { min: 15, max: 40 },
 };
 
@@ -330,17 +336,17 @@ function pickTarget(vehicles: VehicleSnapshot[], kind: VehicleKind): VehicleSnap
   const matches = vehicles.filter((vehicle) => {
     const id = vehicle.id.toLowerCase();
     if (vehicle.category !== 'ground') return false;
+    if (kind === 'm35') return id.includes('m35');
+    if (kind === 'm113') return id.includes('m113');
     if (kind === 'm48') return id.includes('m48');
-    // M151 world-feature registrations use feature-derived ids in current
-    // builds (for example `airfield_motor_pool_3`), not always an `m151`
-    // token. Match the same semantic family rule as PlayerVehicleAdapterFactory:
-    // any non-M48 ground IVehicle is the wheeled ground adapter path.
-    return !id.includes('m48');
+    // M151 should be proved by its explicit runtime id. Support trucks/APCs
+    // have their own target rows above, so do not let them satisfy this check.
+    return id.includes('m151');
   });
   if (kind === 'm48') {
     return matches.find((vehicle) => vehicle.faction === 'US') ?? matches[0] ?? null;
   }
-  return matches.find((vehicle) => vehicle.id.toLowerCase().includes('m151')) ?? matches[0] ?? null;
+  return matches[0] ?? null;
 }
 
 async function waitForTargetVehicle(
@@ -629,8 +635,8 @@ async function proveTarget(page: Page, mode: ModeId, kind: VehicleKind): Promise
     await page.keyboard.down('w');
     await page.waitForTimeout(500);
     debug.push(await getVehicleDebugSnapshot(page, target.id, 'while-w-held'));
-    const requestedFrames = kind === 'm48' ? 240 : 180;
-    const frameTimeoutMs = kind === 'm48' ? 30_000 : 24_000;
+    const requestedFrames = kind === 'm48' || kind === 'm35' || kind === 'm113' ? 240 : 180;
+    const frameTimeoutMs = kind === 'm48' || kind === 'm35' || kind === 'm113' ? 30_000 : 24_000;
     const deterministic = await advanceHarnessTime(page, requestedFrames * (1000 / 60));
     if (deterministic.advanced) {
       driveFramesObserved = deterministic.frames;
@@ -680,6 +686,8 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
     activeTargets.some((target) => target.mode === mode && target.kind === kind);
 
   const openFrontierJeep = byTarget('open_frontier', 'm151');
+  const openFrontierM35 = byTarget('open_frontier', 'm35');
+  const openFrontierM113 = byTarget('open_frontier', 'm113');
   const openFrontierTank = byTarget('open_frontier', 'm48');
   const aShauJeep = byTarget('a_shau_valley', 'm151');
   const aShauTank = byTarget('a_shau_valley', 'm48');
@@ -711,6 +719,20 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
       check('open_frontier_m48_boarded', openFrontierTank?.boarded === true, openFrontierTank, 'Open Frontier M48 boards through PlayerController.handleBoardNearestVehicle.'),
       check('open_frontier_m48_drives', (openFrontierTank?.travelMeters ?? 0) >= MIN_TRAVEL_METERS.m48, openFrontierTank?.travelMeters, 'Open Frontier M48 moves after holding W in the live loop.'),
       check('open_frontier_m48_camera_framing', cameraDownAngleInBand('m48', openFrontierTank?.cameraAfterBoard), openFrontierTank?.cameraAfterBoard, 'Open Frontier M48 follow camera sits in the elevated-but-forward band.'),
+    );
+  }
+  if (hasTarget('open_frontier', 'm35')) {
+    rows.push(
+      check('open_frontier_m35_boarded', openFrontierM35?.boarded === true, openFrontierM35, 'Open Frontier M35 cargo truck boards through PlayerController.handleBoardNearestVehicle.'),
+      check('open_frontier_m35_drives', (openFrontierM35?.travelMeters ?? 0) >= MIN_TRAVEL_METERS.m35, openFrontierM35?.travelMeters, 'Open Frontier M35 cargo truck moves after holding W in the live loop.'),
+      check('open_frontier_m35_camera_framing', cameraDownAngleInBand('m35', openFrontierM35?.cameraAfterBoard), openFrontierM35?.cameraAfterBoard, 'Open Frontier M35 cargo truck follow camera sits in the elevated-but-forward band.'),
+    );
+  }
+  if (hasTarget('open_frontier', 'm113')) {
+    rows.push(
+      check('open_frontier_m113_boarded', openFrontierM113?.boarded === true, openFrontierM113, 'Open Frontier M113 APC boards through PlayerController.handleBoardNearestVehicle.'),
+      check('open_frontier_m113_drives', (openFrontierM113?.travelMeters ?? 0) >= MIN_TRAVEL_METERS.m113, openFrontierM113?.travelMeters, 'Open Frontier M113 APC moves after holding W in the live loop.'),
+      check('open_frontier_m113_camera_framing', cameraDownAngleInBand('m113', openFrontierM113?.cameraAfterBoard), openFrontierM113?.cameraAfterBoard, 'Open Frontier M113 APC follow camera sits in the elevated-but-forward band.'),
     );
   }
   if (hasTarget('a_shau_valley', 'm48')) {

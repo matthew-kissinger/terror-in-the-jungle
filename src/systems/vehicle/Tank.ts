@@ -138,6 +138,7 @@ export class Tank implements IVehicle {
   private readonly physics: TrackedVehiclePhysics;
   private readonly turret: TankTurret;
   private terrain: ITerrainRuntime | null = null;
+  private collisionTerrain: ITerrainRuntime | null = null;
 
   /** HP state machine (R2, `tank-damage-states`). */
   private readonly damageConfig: TankDamageConfig;
@@ -218,6 +219,13 @@ export class Tank implements IVehicle {
   // ---------- Terrain wiring ----------
 
   setTerrain(terrain: ITerrainRuntime | null): void {
+    if (this.collisionTerrain !== terrain) {
+      this.unregisterCollisionProxy();
+      if (terrain) {
+        terrain.registerCollisionObject(this.vehicleId, this.object, { dynamic: true });
+        this.collisionTerrain = terrain;
+      }
+    }
     this.terrain = terrain;
     if (terrain && typeof terrain.getPlayableWorldSize === 'function') {
       const worldSize = terrain.getPlayableWorldSize();
@@ -539,8 +547,14 @@ export class Tank implements IVehicle {
 
   dispose(): void {
     this.destroyed = true;
+    this.unregisterCollisionProxy();
     this.physics.dispose();
     this.turret.dispose();
     this.object.removeFromParent();
+  }
+
+  private unregisterCollisionProxy(): void {
+    this.collisionTerrain?.unregisterCollisionObject(this.vehicleId);
+    this.collisionTerrain = null;
   }
 }

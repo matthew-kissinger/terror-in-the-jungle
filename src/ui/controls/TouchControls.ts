@@ -59,6 +59,7 @@ interface TouchControlCallbacks {
   onVehicleFireStart?: () => void;
   onVehicleFireStop?: () => void;
   onHelicopterWeaponSwitch?: (index: number) => void;
+  onFixedWingViewToggle?: () => void;
 }
 
 export class TouchControls {
@@ -183,6 +184,7 @@ export class TouchControls {
       onMapToggle: () => callbacks.onMapToggle?.(),
       onSquadCommand: () => callbacks.onSquadCommand?.(),
       onHelicopterWeaponCycle: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
+      onViewToggle: () => callbacks.onFixedWingViewToggle?.(),
     });
   }
 

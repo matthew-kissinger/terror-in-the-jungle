@@ -250,12 +250,9 @@ export class PlayerController implements GameSystem {
           this.helicopterAdapter?.toggleAutoHover();
         }
       },
-      onToggleAltitudeLock: () => {
-        if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
-          this.helicopterAdapter?.toggleAltitudeLock();
-        }
-      },
+      onToggleAltitudeLock: () => this.vehicleStateManager.getVehicleType() === 'helicopter' && this.helicopterAdapter?.toggleAltitudeLock(),
       onToggleMouseControl: () => this.handleToggleMouseControl(),
+      onFixedWingViewToggle: () => this.vehicleStateManager.getVehicleType() === 'fixed_wing' && this.fixedWingAdapter?.toggleBroadsideView(),
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
       onRallyPointPlace: () => this.handleRallyPointPlacement(),

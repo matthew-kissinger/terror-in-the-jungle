@@ -36,21 +36,111 @@ export const M151_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   maxClimbSlope: 0.54,
 };
 
+const M151_MAX_HP = 250;
+
+const M35_TRUCK_SEATS: VehicleSeat[] = [
+  { index: 0, role: 'pilot', occupantId: null, localOffset: new THREE.Vector3(-0.45, 1.35, -1.15), exitOffset: new THREE.Vector3(-2.4, 0, -1) },
+  { index: 1, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(0.45, 1.35, -1.15), exitOffset: new THREE.Vector3(2.4, 0, -1) },
+  { index: 2, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(-0.55, 1.35, 1.1), exitOffset: new THREE.Vector3(-2.4, 0, 1.2) },
+  { index: 3, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(0.55, 1.35, 1.1), exitOffset: new THREE.Vector3(2.4, 0, 1.2) },
+];
+
+const APC_SEATS: VehicleSeat[] = [
+  { index: 0, role: 'pilot', occupantId: null, localOffset: new THREE.Vector3(-0.55, 1.3, -1.15), exitOffset: new THREE.Vector3(-2.3, 0, -1.3) },
+  { index: 1, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(0.55, 1.35, -0.9), exitOffset: new THREE.Vector3(2.3, 0, -1.1) },
+  { index: 2, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(-0.45, 1.25, 0.75), exitOffset: new THREE.Vector3(-2.3, 0, 1.2) },
+  { index: 3, role: 'passenger', occupantId: null, localOffset: new THREE.Vector3(0.45, 1.25, 0.75), exitOffset: new THREE.Vector3(2.3, 0, 1.2) },
+];
+
+const M35_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
+  mass: 5900,
+  wheelbase: 4.2,
+  trackWidth: 1.9,
+  engineTorque: 820,
+  maxSteer: 0.46,
+  maxClimbSlope: 0.34,
+};
+
+const APC_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
+  mass: 12300,
+  wheelbase: 3.4,
+  trackWidth: 2.3,
+  engineTorque: 980,
+  maxSteer: 0.42,
+  maxClimbSlope: 0.42,
+};
+
+interface GroundVehicleRuntimeProfile {
+  seats: VehicleSeat[];
+  physicsConfig: Partial<GroundVehiclePhysicsConfig>;
+  maxHp: number;
+}
+
+const GROUND_VEHICLE_RUNTIME_PROFILES: Record<string, GroundVehicleRuntimeProfile> = {
+  [GroundVehicleModels.M151_JEEP]: {
+    seats: DEFAULT_M151_SEATS,
+    physicsConfig: M151_PHYSICS_CONFIG,
+    maxHp: M151_MAX_HP,
+  },
+  [GroundVehicleModels.M35_TRUCK]: {
+    seats: M35_TRUCK_SEATS,
+    physicsConfig: M35_PHYSICS_CONFIG,
+    maxHp: 420,
+  },
+  [GroundVehicleModels.ZIL_157]: {
+    seats: M35_TRUCK_SEATS,
+    physicsConfig: M35_PHYSICS_CONFIG,
+    maxHp: 420,
+  },
+  [GroundVehicleModels.M113_APC]: {
+    seats: APC_SEATS,
+    physicsConfig: APC_PHYSICS_CONFIG,
+    maxHp: 650,
+  },
+};
+
 export function isM151ModelPath(modelPath: string): boolean {
   return modelPath === GroundVehicleModels.M151_JEEP;
 }
 
+export function isGroundVehicleModelPath(modelPath: string): boolean {
+  return GROUND_VEHICLE_RUNTIME_PROFILES[modelPath] !== undefined;
+}
+
+export function groundVehicleIdForPlacement(objectId: string, modelPath: string): string {
+  const token = modelPath.replace(/^vehicles\/ground\//, '').replace(/\.glb$/, '').replace(/-/g, '_');
+  return objectId.includes(token.split('_')[0]) ? objectId : `${objectId}_${token}`;
+}
+
+export function createGroundVehicleForModelPath(
+  vehicleId: string,
+  object: THREE.Object3D,
+  modelPath: string,
+  faction: Faction = Faction.US,
+): GroundVehicle | null {
+  const profile = GROUND_VEHICLE_RUNTIME_PROFILES[modelPath];
+  if (!profile) return null;
+  return new GroundVehicle(
+    vehicleId,
+    object,
+    faction,
+    profile.seats,
+    profile.physicsConfig,
+    profile.maxHp,
+  );
+}
+
 const _scratchPos = new THREE.Vector3();
-const M151_MAX_HP = 250;
 
 export class GroundVehicle implements IVehicle {
   readonly category = 'ground' as const;
   readonly faction: Faction;
   private readonly seats: VehicleSeat[];
   private readonly velocity = new THREE.Vector3();
-  private readonly damage = new VehicleDamageState(M151_MAX_HP);
+  private readonly damage: VehicleDamageState;
   private readonly physics: GroundVehiclePhysics;
   private terrain: ITerrainRuntime | null = null;
+  private collisionTerrain: ITerrainRuntime | null = null;
 
   constructor(
     readonly vehicleId: string,
@@ -58,8 +148,10 @@ export class GroundVehicle implements IVehicle {
     faction: Faction = Faction.US,
     seats: VehicleSeat[] = DEFAULT_M151_SEATS,
     physicsConfig: Partial<GroundVehiclePhysicsConfig> = M151_PHYSICS_CONFIG,
+    maxHp: number = M151_MAX_HP,
   ) {
     this.faction = faction;
+    this.damage = new VehicleDamageState(maxHp);
     this.seats = seats.map((seat) => ({
       ...seat,
       localOffset: seat.localOffset.clone(),
@@ -75,6 +167,13 @@ export class GroundVehicle implements IVehicle {
   // ---------- Terrain wiring ----------
 
   setTerrain(terrain: ITerrainRuntime | null): void {
+    if (this.collisionTerrain !== terrain) {
+      this.unregisterCollisionProxy();
+      if (terrain) {
+        terrain.registerCollisionObject(this.vehicleId, this.object, { dynamic: true });
+        this.collisionTerrain = terrain;
+      }
+    }
     this.terrain = terrain;
     if (terrain && typeof terrain.getPlayableWorldSize === 'function') {
       const worldSize = terrain.getPlayableWorldSize();
@@ -203,6 +302,12 @@ export class GroundVehicle implements IVehicle {
 
   dispose(): void {
     this.damage.destroy();
+    this.unregisterCollisionProxy();
     this.object.removeFromParent();
+  }
+
+  private unregisterCollisionProxy(): void {
+    this.collisionTerrain?.unregisterCollisionObject(this.vehicleId);
+    this.collisionTerrain = null;
   }
 }

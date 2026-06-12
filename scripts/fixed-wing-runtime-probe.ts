@@ -151,8 +151,8 @@ async function readRenderState(page: Page): Promise<string | null> {
 async function bootOpenFrontier(page: Page, url: string): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: STARTUP_TIMEOUT_MS });
   await page.waitForFunction(() => Boolean((window as any).__engine), undefined, { timeout: STARTUP_TIMEOUT_MS });
-  await page.evaluate(() => {
-    (window as any).__engine.startGameWithMode('open_frontier');
+  await page.evaluate(async () => {
+    await (window as any).__engine.startGameWithMode('open_frontier');
   });
   await page.waitForFunction(() => Boolean((window as any).__engine?.gameStarted), undefined, { timeout: STARTUP_TIMEOUT_MS });
   try {
@@ -706,7 +706,7 @@ async function main(): Promise<void> {
     });
 
     const results: ScenarioResult[] = [];
-    const url = `http://${HOST}:${port}/?perf=1&seed=${mapSeed}`;
+    const url = `http://${HOST}:${port}/?perf=1&capture=1&uiTransitions=0&seed=${mapSeed}`;
     for (const configKey of ['A1_SKYRAIDER', 'F4_PHANTOM', 'AC47_SPOOKY']) {
       let completed = false;
       let lastError: unknown = null;

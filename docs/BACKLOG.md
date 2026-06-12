@@ -372,6 +372,20 @@ state.
 Items below are acknowledged but not active directives unless the project
 owner opens or reassigns them.
 
+### Owner intake 2026-06-12 (voice notes — do NOT auto-promote; owner will align before dispatch)
+
+- **Real-time terrain / world editor.** In-tool live editing to hone lighting,
+  sky, terrain reflection, and asset placement. Tooling-cycle candidate;
+  complements the KB-TERRAIN texture/lighting items.
+- **Vegetation asset regeneration on an upgraded Pixel Forge.** Owner reports
+  current vegetation assets are "a little shaky"; wants a fresh generation
+  pass for ALL vegetation once pixel-forge is upgraded. Extends the KB-LOAD
+  "Pixel Forge vegetation candidate" line.
+- **Battle royale game mode in A Shau Valley.** Fortnite-style BR loop:
+  shrinking play area, medical equipment (bandages), survival elements,
+  slower heal cadence (tuning explicitly open — owner wants an alignment
+  pass on scope before this is dispatched). KB-STRATEGIE-adjacent new mode.
+
 ### KB-LOAD
 
 - Accepted Pixel Forge vegetation candidate import and runtime proof.

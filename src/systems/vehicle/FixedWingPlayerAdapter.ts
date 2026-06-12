@@ -53,8 +53,13 @@ const FW_ORBIT_HOLD_MIN_DROPOUT_ALTITUDE_M = 20;
 // broadside gunner view (rising edge), reusing the tank-sight RMB pattern.
 const FW_BROADSIDE_TOGGLE_BUTTON = 2;
 
-function createFixedWingUIContext(role: string, weaponCount: number): VehicleUIContext {
-  return {
+function createFixedWingUIContext(
+  role: string,
+  weaponCount: number,
+  broadsideAvailable: boolean,
+  broadsideActive: boolean,
+): VehicleUIContext {
+  const context: VehicleUIContext = {
     kind: 'plane',
     role,
     hudVariant: 'flight',
@@ -72,6 +77,15 @@ function createFixedWingUIContext(role: string, weaponCount: number): VehicleUIC
       canOpenCommand: true,
     },
   };
+  if (broadsideAvailable) {
+    context.viewToggle = {
+      inactiveLabel: 'SIDE',
+      activeLabel: 'CHASE',
+      active: broadsideActive,
+      ariaLabel: broadsideActive ? 'Switch to chase view' : 'Switch to broadside view',
+    };
+  }
+  return context;
 }
 
 /**
@@ -99,6 +113,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   // unaffected — the toggle only repositions the camera.
   private broadsideViewActive = false;
   private prevBroadsideToggleDown = false;
+  private broadsideToggleRequested = false;
 
   private fixedWingModel: FixedWingModel;
   private activeAircraftId: string | null = null;
@@ -123,6 +138,9 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingPilotMode = 'assisted';
     this.lastMouseControlEnabled = getFlightMouseControlEnabled(ctx.cameraController);
     this.activeAircraftId = ctx.vehicleId;
+    this.broadsideViewActive = false;
+    this.prevBroadsideToggleDown = false;
+    this.broadsideToggleRequested = false;
 
     seatPlayer(ctx, 'fixedwing.enter');
 
@@ -135,10 +153,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.showFixedWingInstruments?.();
     hudSystem?.showFixedWingMouseIndicator?.();
     hudSystem?.updateFixedWingMouseMode?.(getFlightMouseControlEnabled(ctx.cameraController));
-    hudSystem?.setVehicleContext?.(createFixedWingUIContext(
-      config?.role ?? 'pilot',
-      this.fixedWingModel.getWeaponCount(ctx.vehicleId),
-    ));
+    this.pushVehicleContext(hudSystem);
 
     // Set stall speed for HUD display
     const fd = this.fixedWingModel.getFlightData(ctx.vehicleId);
@@ -166,8 +181,6 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
 
     // Start every aircraft on the chase cam (broadside view off). Airframes
     // without a broadside battery never enter it.
-    this.broadsideViewActive = false;
-    this.prevBroadsideToggleDown = false;
     ctx.cameraController.setFixedWingBroadsideView(false);
 
     // Re-acquire pointer lock for mouse flight controls
@@ -184,6 +197,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     ctx.cameraController?.restoreInfantryAngles();
     this.broadsideViewActive = false;
     this.prevBroadsideToggleDown = false;
+    this.broadsideToggleRequested = false;
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
     hudSystem?.hideFixedWingInstruments?.();
@@ -247,24 +261,40 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
    * only repositions the camera — flight controls are unchanged either way.
    */
   private updateBroadsideView(ctx: VehicleUpdateContext): void {
-    const hasBroadside = getFixedWingCameraFit(this.activeConfigKey).broadside !== undefined;
+    const hasBroadside = this.hasBroadsideView();
     const down = typeof ctx.input.isMouseButtonPressed === 'function'
       ? ctx.input.isMouseButtonPressed(FW_BROADSIDE_TOGGLE_BUTTON)
       : false;
 
-    if (hasBroadside && down && !this.prevBroadsideToggleDown) {
+    const toggleRequested = this.broadsideToggleRequested;
+    this.broadsideToggleRequested = false;
+    const wasActive = this.broadsideViewActive;
+    if (hasBroadside && ((down && !this.prevBroadsideToggleDown) || toggleRequested)) {
       this.broadsideViewActive = !this.broadsideViewActive;
     }
     this.prevBroadsideToggleDown = down;
 
     // Force-off for airframes without a broadside so a stale toggle never sticks.
     const desired = hasBroadside && this.broadsideViewActive;
+    this.broadsideViewActive = desired;
     ctx.cameraController.setFixedWingBroadsideView(desired);
+    if (wasActive !== desired) {
+      this.pushVehicleContext(ctx.hudSystem as IHUDSystem | undefined);
+    }
   }
 
   /** True when the AC-47 broadside gunner view is engaged. */
   isBroadsideViewActive(): boolean {
     return this.broadsideViewActive;
+  }
+
+  /**
+   * Request a broadside/chase toggle from a discrete UI or keyboard action.
+   * The actual camera write happens in update(), where the adapter has the
+   * current camera and HUD context.
+   */
+  toggleBroadsideView(): void {
+    this.broadsideToggleRequested = true;
   }
 
   resetControlState(): void {
@@ -279,6 +309,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.lastMouseControlEnabled = false;
     this.broadsideViewActive = false;
     this.prevBroadsideToggleDown = false;
+    this.broadsideToggleRequested = false;
   }
 
   // ── Fire control ──
@@ -481,6 +512,21 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       this.fixedWingModel.getWeaponAmmoCapacity(aircraftId),
       this.fixedWingModel.getWeaponName(aircraftId),
     );
+  }
+
+  private pushVehicleContext(hudSystem: IHUDSystem | undefined): void {
+    if (!hudSystem || !this.activeAircraftId) return;
+    const config = this.activeConfigKey ? FIXED_WING_CONFIGS[this.activeConfigKey] : null;
+    hudSystem.setVehicleContext?.(createFixedWingUIContext(
+      config?.role ?? 'pilot',
+      this.fixedWingModel.getWeaponCount(this.activeAircraftId),
+      this.hasBroadsideView(),
+      this.broadsideViewActive,
+    ));
+  }
+
+  private hasBroadsideView(): boolean {
+    return getFixedWingCameraFit(this.activeConfigKey).broadside !== undefined;
   }
 
   private addMouseControl(mouseMovement: { x: number; y: number }, sensitivity: number = FW_MOUSE_SENSITIVITY): void {

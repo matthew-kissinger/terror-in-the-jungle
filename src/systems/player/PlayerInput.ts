@@ -49,8 +49,8 @@ export interface InputCallbacks {
   onSquadCommand?: () => void;
   onSquadQuickCommand?: (slot: number) => void;
   onHelicopterWeaponSwitch?: (index: number) => void;
-  /** Swap the player between the pilot seat and the door gun (door-gun-seat). */
   onHelicopterDoorGunToggle?: () => void;
+  onFixedWingViewToggle?: () => void;
   onAirSupportMenu?: () => void;
   onMenuOpen?: () => void;
 }
@@ -179,6 +179,7 @@ export class PlayerInput {
         onVehicleFireStart: () => callbacks.onMouseDown?.(0),
         onVehicleFireStop: () => callbacks.onMouseUp?.(0),
         onHelicopterWeaponSwitch: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
+        onFixedWingViewToggle: () => callbacks.onFixedWingViewToggle?.(),
       });
     }
 
@@ -532,12 +533,11 @@ export class PlayerInput {
       (this.callbacks.onEnterExitVehicle ?? this.callbacks.onEnterExitHelicopter)?.();
     }
 
-    // Flight-vehicle controls
     if (this.isInFlightVehicle()) {
-      // Toggle mouse control mode with Right Ctrl
       if (event.code === 'ControlRight') {
         this.callbacks.onToggleMouseControl?.();
       }
+      if (event.code === 'KeyV') this.callbacks.onFixedWingViewToggle?.();
     }
 
     // Helicopter-specific controls

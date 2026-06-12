@@ -109,6 +109,7 @@ export class InputManager extends PlayerInput {
       onEnterExitHelicopter: () => this.runGameplay(callbacks.onEnterExitHelicopter),
       onToggleFlightAssist: () => this.runGameplay(callbacks.onToggleFlightAssist ?? callbacks.onToggleAutoHover),
       onToggleAutoHover: () => this.runGameplay(callbacks.onToggleAutoHover),
+      onFixedWingViewToggle: () => this.runGameplay(callbacks.onFixedWingViewToggle),
       onToggleAltitudeLock: () => this.runGameplay(callbacks.onToggleAltitudeLock),
       onToggleMouseControl: () => this.runGameplay(callbacks.onToggleMouseControl),
       onSandbagRotateLeft: () => this.runInfantry(callbacks.onSandbagRotateLeft),

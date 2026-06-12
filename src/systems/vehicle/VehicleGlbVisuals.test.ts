@@ -96,6 +96,7 @@ describe('applyM151JeepGlbVisual', () => {
 
     expect(ok).toBe(true);
     expect(root.children).toContain(glb);
+    expect(glb.scale.x).toBeCloseTo(1.15);
     // No procedural Mesh children remain on the chassis root.
     expect(root.children.filter((c) => (c as THREE.Mesh).isMesh)).toHaveLength(0);
     expect(body.castShadow).toBe(true);

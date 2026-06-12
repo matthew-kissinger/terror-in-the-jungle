@@ -63,6 +63,16 @@ export interface VehicleUIContext {
   hudVariant: 'flight' | 'groundVehicle' | 'turret';
   weaponCount: number;
   /**
+   * Optional action-bar view toggle. AC-47 uses this for side-gunner/chase
+   * camera parity on touch where RMB is unavailable.
+   */
+  viewToggle?: {
+    inactiveLabel: string;
+    activeLabel: string;
+    active: boolean;
+    ariaLabel?: string;
+  };
+  /**
    * Optional sight magnification factor for craft with a zoomable sight
    * (1 = 1x, >1 = zoomed). The tank gunner toggles this with RMB. Additive +
    * optional so existing vehicle contexts are unaffected; consumers that don't

@@ -54,6 +54,7 @@ export interface TurretRigSource {
 /** Procedural turret parts mounted on the rig by `mountM48TurretMeshes`. */
 const PROCEDURAL_TURRET_MESHES = ['m48_turret', 'm48_turret_ring', 'm48_cupola'] as const;
 const PROCEDURAL_GUN_MESHES = ['m48_mantlet', 'm48_barrel', 'm48_muzzle_brake'] as const;
+const M151_RUNTIME_VISUAL_SCALE = 1.15;
 
 function enableShadows(root: THREE.Object3D): void {
   root.traverse((obj) => {
@@ -87,6 +88,7 @@ export async function applyM151JeepGlbVisual(
     return false; // keep the procedural placeholder
   }
   glb.name = 'm151_glb_visual';
+  glb.scale.setScalar(M151_RUNTIME_VISUAL_SCALE);
   enableShadows(glb);
   removeProceduralMeshes(chassisRoot);
   chassisRoot.add(glb);

@@ -14,7 +14,7 @@
  * the two scenarios the cycle ships against (Open Frontier + A Shau).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { Tank } from './Tank';
 import { VehicleManager } from './VehicleManager';
@@ -56,6 +56,25 @@ describe('Tank IVehicle', () => {
       const tank = new Tank('t1', object, Faction.US);
       expect(tank.category).toBe('ground');
       expect(tank.faction).toBe(Faction.US);
+    });
+
+    it('registers and unregisters a dynamic terrain collision proxy', () => {
+      const object = new THREE.Object3D();
+      const tank = new Tank('m48_collision', object, Faction.US);
+      const terrain = {
+        ...makeFlatTerrain(0),
+        registerCollisionObject: vi.fn(),
+        unregisterCollisionObject: vi.fn(),
+      };
+
+      tank.setTerrain(terrain);
+      expect(terrain.registerCollisionObject).toHaveBeenCalledWith('m48_collision', object, { dynamic: true });
+
+      tank.setTerrain(terrain);
+      expect(terrain.registerCollisionObject).toHaveBeenCalledTimes(1);
+
+      tank.dispose();
+      expect(terrain.unregisterCollisionObject).toHaveBeenCalledWith('m48_collision');
     });
 
     it('seeds physics from the placed object so first update does not snap to origin', () => {

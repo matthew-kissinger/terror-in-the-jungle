@@ -111,6 +111,7 @@
           "meshes": ["Mesh_PropHubR", "Mesh_SpinnerR", "Mesh_BladeR0", "Mesh_BladeR1", "Mesh_BladeR2"],
           "pivot": "hub",
           "hubMesh": "Mesh_PropHubR",
+          "translationOffset": [0, 3.33, 0],
           "type": "mainBlades",
           "spinAxis": "x"
         },
@@ -119,6 +120,7 @@
           "meshes": ["Mesh_PropHubL", "Mesh_SpinnerL", "Mesh_BladeL0", "Mesh_BladeL1", "Mesh_BladeL2"],
           "pivot": "hub",
           "hubMesh": "Mesh_PropHubL",
+          "translationOffset": [0, 3.33, 0],
           "type": "mainBlades",
           "spinAxis": "x"
         }

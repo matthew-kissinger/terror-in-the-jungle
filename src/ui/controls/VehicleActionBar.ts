@@ -9,6 +9,7 @@
  * - EXIT (red) - exit vehicle
  * - FIRE (red) - vehicle weapon fire (attack/gunship only)
  * - WPN (green) - cycle cockpit weapons (attack/gunship only)
+ * - VIEW (green) - context view toggle (AC-47 side/chase)
  * - MAP / CMD (green) - full map / squad command (touch parity with infantry action column)
  * - STAB (green) - toggle auto-hover stabilization
  * - LOOK (green) - hold-to-look free camera
@@ -31,6 +32,7 @@ interface VehicleActionCallbacks {
   onMapToggle?: () => void;
   onSquadCommand?: () => void;
   onHelicopterWeaponCycle?: (index: number) => void;
+  onViewToggle?: () => void;
 }
 
 export class VehicleActionBar extends UIComponent {
@@ -39,6 +41,7 @@ export class VehicleActionBar extends UIComponent {
   private exitBtn!: HTMLDivElement;
   private fireBtn!: HTMLDivElement;
   private wpnBtn!: HTMLDivElement;
+  private viewBtn!: HTMLDivElement;
   private mapBtn!: HTMLDivElement;
   private cmdBtn!: HTMLDivElement;
   private hoverBtn!: HTMLDivElement;
@@ -64,6 +67,8 @@ export class VehicleActionBar extends UIComponent {
     this.fireBtn.style.display = 'none';
     this.wpnBtn = this.createButton('WPN', styles.vehicleBtn);
     this.wpnBtn.style.display = 'none';
+    this.viewBtn = this.createButton('VIEW', styles.vehicleBtn);
+    this.viewBtn.style.display = 'none';
     this.mapBtn = this.createButton('MAP', styles.vehicleBtn);
     this.cmdBtn = this.createButton('CMD', styles.vehicleBtn);
     this.hoverBtn = this.createButton('STAB', styles.vehicleBtn);
@@ -73,6 +78,7 @@ export class VehicleActionBar extends UIComponent {
     this.exitBtn.dataset.action = 'exit';
     this.fireBtn.dataset.action = 'fire';
     this.wpnBtn.dataset.action = 'weapon';
+    this.viewBtn.dataset.action = 'view';
     this.mapBtn.dataset.action = 'map';
     this.cmdBtn.dataset.action = 'command';
     this.hoverBtn.dataset.action = 'hover';
@@ -82,6 +88,7 @@ export class VehicleActionBar extends UIComponent {
     this.root.appendChild(this.exitBtn);
     this.root.appendChild(this.fireBtn);
     this.root.appendChild(this.wpnBtn);
+    this.root.appendChild(this.viewBtn);
     this.root.appendChild(this.mapBtn);
     this.root.appendChild(this.cmdBtn);
     this.root.appendChild(this.hoverBtn);
@@ -123,6 +130,12 @@ export class VehicleActionBar extends UIComponent {
       const weaponCount = Math.max(this.vehicleContext?.weaponCount ?? 2, 1);
       this.vehicleWeaponIndex = (this.vehicleWeaponIndex + 1) % weaponCount;
       this.callbacks.onHelicopterWeaponCycle?.(this.vehicleWeaponIndex);
+    }, { passive: false });
+
+    this.listen(this.viewBtn, 'pointerdown', (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.callbacks.onViewToggle?.();
     }, { passive: false });
 
     this.listen(this.mapBtn, 'pointerdown', (e: PointerEvent) => {
@@ -182,6 +195,8 @@ export class VehicleActionBar extends UIComponent {
     this.exitBtn.style.display = capabilities?.canExit ? 'flex' : 'none';
     this.fireBtn.style.display = capabilities?.canFirePrimary ? 'flex' : 'none';
     this.wpnBtn.style.display = capabilities?.canCycleWeapons ? 'flex' : 'none';
+    this.viewBtn.style.display = context?.viewToggle ? 'flex' : 'none';
+    this.applyViewToggleLabel(context);
     this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
     this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
     this.hoverBtn.style.display = capabilities?.canStabilize ? 'flex' : 'none';
@@ -263,5 +278,15 @@ export class VehicleActionBar extends UIComponent {
       : 'STAB';
     this.hoverBtn.textContent = label;
     this.hoverBtn.setAttribute('aria-label', label);
+  }
+
+  private applyViewToggleLabel(context: VehicleUIContext | null): void {
+    const toggle = context?.viewToggle;
+    const label = toggle
+      ? toggle.active ? toggle.activeLabel : toggle.inactiveLabel
+      : 'VIEW';
+    this.viewBtn.textContent = label;
+    this.viewBtn.setAttribute('aria-label', toggle?.ariaLabel ?? label);
+    this.viewBtn.classList.toggle(styles.vehicleBtnActive, toggle?.active ?? false);
   }
 }

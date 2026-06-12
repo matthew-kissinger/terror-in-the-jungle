@@ -466,14 +466,34 @@ describe('FixedWingPlayerAdapter', () => {
       const { ctx, updateCtx } = ac47Context();
       // Entry seeds the chase cam (broadside off).
       expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(false);
+      expect(ctx.hudSystem!.setVehicleContext).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          viewToggle: expect.objectContaining({ active: false, inactiveLabel: 'SIDE' }),
+        }),
+      );
 
       tapRmb(ctx, updateCtx);
       expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(true);
       expect(adapter.isBroadsideViewActive()).toBe(true);
+      expect(ctx.hudSystem!.setVehicleContext).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          viewToggle: expect.objectContaining({ active: true, activeLabel: 'CHASE' }),
+        }),
+      );
 
       tapRmb(ctx, updateCtx);
       expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(false);
       expect(adapter.isBroadsideViewActive()).toBe(false);
+    });
+
+    it('toggles the broadside view from the explicit UI action request', () => {
+      const { ctx, updateCtx } = ac47Context();
+
+      adapter.toggleBroadsideView();
+      adapter.update(updateCtx);
+
+      expect(ctx.cameraController.setFixedWingBroadsideView).toHaveBeenLastCalledWith(true);
+      expect(adapter.isBroadsideViewActive()).toBe(true);
     });
 
     it('clears the broadside view on exit so it cannot leak to infantry', () => {
