@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
-import { GroundVehicleModels } from '../assets/modelPaths';
+import { AnimalModels, BuildingModels, GroundVehicleModels, warAssetCatalog } from '../assets/modelPaths';
+import { isM151ModelPath } from '../vehicle/GroundVehicle';
 import type { MapFeatureDefinition, StaticModelPlacementConfig } from '../../config/gameModeTypes';
 
 // Historical hull dimensions for the four ground vehicles that appear in
@@ -154,5 +155,117 @@ describe('motor_pool_heavy_ashau prefab', () => {
         `${placement.modelPath} at offset (${placement.offset.x}, ${placement.offset.z}) sits ${radius.toFixed(2)} m from prefab center`,
       ).toBeLessThanOrEqual(34);
     }
+  });
+
+  it('parks an M42 Duster and an Ontos as static US motor-pool dressing', () => {
+    const paths = prefab.placements.map((p) => p.modelPath);
+    expect(paths).toContain(GroundVehicleModels.M42_DUSTER);
+    expect(paths).toContain(GroundVehicleModels.ONTOS);
+  });
+});
+
+// cycle-2026-06-11-war-asset-repaint, world-catalog-refresh:
+// the six net-new repaint buildings and the parked-vehicle / wildlife scenery
+// must reach the settlement prefab pools. These assert the wiring contract
+// from a caller's view (which prefab carries which catalog asset, and the
+// one-landmark-per-settlement rarity), not the exact offsets.
+
+const LANDMARK_BUILDINGS = new Set<string>([
+  BuildingModels.BUDDHIST_TEMPLE,
+  BuildingModels.RUBBER_PLANTATION_MANSION,
+  BuildingModels.SCHOOLHOUSE,
+]);
+
+function placementsFor(prefabId: string): StaticModelPlacementConfig[] {
+  const prefab = getWorldFeaturePrefab(makeFeature(prefabId));
+  if (!prefab) {
+    throw new Error(`${prefabId} prefab is missing`);
+  }
+  return prefab.placements;
+}
+
+describe('repaint building wiring into settlement pools', () => {
+  it('wires every net-new repaint building into a settlement prefab pool', () => {
+    const newBuildings = [
+      BuildingModels.BUDDHIST_TEMPLE,
+      BuildingModels.STILT_HOUSE,
+      BuildingModels.SCHOOLHOUSE,
+      BuildingModels.TEA_HOUSE,
+      BuildingModels.RUBBER_PLANTATION_MANSION,
+      BuildingModels.RICE_MILL,
+    ];
+    const settlementPrefabs = [
+      'village_cluster_small',
+      'village_market_small',
+      'village_riverside_small',
+      'village_damaged_small',
+      'supply_depot_small',
+    ];
+    const placedPaths = new Set(
+      settlementPrefabs.flatMap((id) => placementsFor(id).map((p) => p.modelPath)),
+    );
+    for (const building of newBuildings) {
+      expect(placedPaths.has(building), `${building} should appear in a settlement prefab pool`).toBe(true);
+    }
+  });
+
+  it('keeps every placed building on a budget-accepted GLB (no REJECTED replacement reaches a prefab)', () => {
+    const settlementPrefabs = [
+      'village_cluster_small',
+      'village_market_small',
+      'village_riverside_small',
+      'village_damaged_small',
+    ];
+    for (const id of settlementPrefabs) {
+      for (const placement of placementsFor(id)) {
+        const slug = Object.values(warAssetCatalog).find((e) => e.path === placement.modelPath)?.slug;
+        if (!slug) {
+          continue; // path may differ (e.g. structures shared via re-export); only assert what we can resolve
+        }
+        const entry = warAssetCatalog[slug];
+        // RICE_DIKE is REJECTED but intentionally kept on its OLD GLB — its
+        // catalog entry records the rejected REPLACEMENT, not the shipped GLB,
+        // so it is the one documented exception in riverside dressing.
+        if (entry.action === 'replace' && entry.budgetStatus === 'REJECT') {
+          expect(slug, `${slug} REJECTED replacement must not be a fresh building placement`).toBe('rice-dike');
+        }
+      }
+    }
+  });
+
+  it('places at most one landmark building per settlement (temple/mansion/school rarity)', () => {
+    const settlementPrefabs = [
+      'village_cluster_small',
+      'village_market_small',
+      'village_riverside_small',
+      'village_damaged_small',
+    ];
+    for (const id of settlementPrefabs) {
+      const landmarkCount = placementsFor(id).filter((p) => LANDMARK_BUILDINGS.has(p.modelPath)).length;
+      expect(landmarkCount, `${id} should carry at most one landmark building`).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe('parked-vehicle and wildlife scenery wiring', () => {
+  it('parks a static T-54 at the NVA trail base (non-drivable scenery, not an M151)', () => {
+    const placements = placementsFor('nva_trail_base_small');
+    const t54 = placements.find((p) => p.modelPath === GroundVehicleModels.T54_TANK);
+    expect(t54).toBeDefined();
+    expect(isM151ModelPath(t54!.modelPath)).toBe(false);
+  });
+
+  it('parks a static ZIL-157 supply truck at the NVA tunnel camp', () => {
+    const placements = placementsFor('nva_tunnel_camp_small');
+    const zil = placements.find((p) => p.modelPath === GroundVehicleModels.ZIL_157);
+    expect(zil).toBeDefined();
+    expect(isM151ModelPath(zil!.modelPath)).toBe(false);
+  });
+
+  it('dresses the riverside paddy with a pond heron and no collision', () => {
+    const placements = placementsFor('village_riverside_small');
+    const heron = placements.find((p) => p.modelPath === AnimalModels.POND_HERON);
+    expect(heron).toBeDefined();
+    expect(heron!.registerCollision ?? false).toBe(false);
   });
 });

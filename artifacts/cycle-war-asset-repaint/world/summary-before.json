@@ -1,0 +1,204 @@
+{
+  "createdAt": "2026-06-12T16:37:36.207Z",
+  "tag": "before",
+  "records": [
+    {
+      "mode": "open_frontier",
+      "feature": "firebase",
+      "featureId": "fob_west_build_now",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\open_frontier-firebase-before.png",
+      "anchor": {
+        "x": -1025,
+        "z": -760
+      },
+      "stats": {
+        "drawCalls": 47,
+        "triangles": 581824,
+        "geometries": 578,
+        "worldStaticFeatureTriangles": 45280,
+        "worldStaticFeatureMeshes": 281
+      },
+      "notes": ""
+    },
+    {
+      "mode": "open_frontier",
+      "feature": "village",
+      "featureId": "village_cluster_main",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\open_frontier-village-before.png",
+      "anchor": {
+        "x": -600,
+        "z": 0
+      },
+      "stats": {
+        "drawCalls": 50,
+        "triangles": 944707,
+        "geometries": 595,
+        "worldStaticFeatureTriangles": 45280,
+        "worldStaticFeatureMeshes": 281
+      },
+      "notes": ""
+    },
+    {
+      "mode": "open_frontier",
+      "feature": "airfield",
+      "featureId": "airfield_motor_pool",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\open_frontier-airfield-before.png",
+      "anchor": {
+        "x": 155,
+        "z": -1195
+      },
+      "stats": {
+        "drawCalls": 53,
+        "triangles": 1400172,
+        "geometries": 654,
+        "worldStaticFeatureTriangles": 45280,
+        "worldStaticFeatureMeshes": 281
+      },
+      "notes": ""
+    },
+    {
+      "mode": "a_shau_valley",
+      "feature": "firebase",
+      "featureId": "firebase_ripcord",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\a_shau_valley-firebase-before.png",
+      "anchor": {
+        "x": 6238.856960335052,
+        "z": 6144.945550378216
+      },
+      "stats": {
+        "drawCalls": 146,
+        "triangles": 1525716,
+        "geometries": 120,
+        "worldStaticFeatureTriangles": 99326,
+        "worldStaticFeatureMeshes": 661
+      },
+      "notes": ""
+    },
+    {
+      "mode": "a_shau_valley",
+      "feature": "village",
+      "featureId": "aluoi_village",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\a_shau_valley-village-before.png",
+      "anchor": {
+        "x": 1963.4080546073244,
+        "z": 2805.345550378485
+      },
+      "stats": {
+        "drawCalls": 149,
+        "triangles": 2529007,
+        "geometries": 141,
+        "worldStaticFeatureTriangles": 99326,
+        "worldStaticFeatureMeshes": 661
+      },
+      "notes": ""
+    },
+    {
+      "mode": "a_shau_valley",
+      "feature": "airfield",
+      "featureId": "tabat_motor_pool",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\a_shau_valley-airfield-before.png",
+      "anchor": {
+        "x": -711.3127808157299,
+        "z": -5043.716329621656
+      },
+      "stats": {
+        "drawCalls": 152,
+        "triangles": 3530990,
+        "geometries": 194,
+        "worldStaticFeatureTriangles": 99326,
+        "worldStaticFeatureMeshes": 661
+      },
+      "notes": ""
+    },
+    {
+      "mode": "zone_control",
+      "feature": "firebase",
+      "featureId": "firebase_us",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\zone_control-firebase-before.png",
+      "anchor": {
+        "x": -50,
+        "z": -180
+      },
+      "stats": {
+        "drawCalls": 38,
+        "triangles": 403342,
+        "geometries": 328,
+        "worldStaticFeatureTriangles": 22812,
+        "worldStaticFeatureMeshes": 204
+      },
+      "notes": ""
+    },
+    {
+      "mode": "zone_control",
+      "feature": "village",
+      "featureId": "village_alpha",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\zone_control-village-before.png",
+      "anchor": {
+        "x": -220,
+        "z": 30
+      },
+      "stats": {
+        "drawCalls": 41,
+        "triangles": 638143,
+        "geometries": 328,
+        "worldStaticFeatureTriangles": 22812,
+        "worldStaticFeatureMeshes": 204
+      },
+      "notes": ""
+    },
+    {
+      "mode": "zone_control",
+      "feature": "airfield",
+      "featureId": "",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\zone_control-airfield-before.png",
+      "anchor": null,
+      "stats": null,
+      "notes": "no matching feature in this mode"
+    },
+    {
+      "mode": "team_deathmatch",
+      "feature": "firebase",
+      "featureId": "firebase_us",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\team_deathmatch-firebase-before.png",
+      "anchor": {
+        "x": -50,
+        "z": -180
+      },
+      "stats": {
+        "drawCalls": 155,
+        "triangles": 347863,
+        "geometries": 274,
+        "worldStaticFeatureTriangles": 22812,
+        "worldStaticFeatureMeshes": 204
+      },
+      "notes": ""
+    },
+    {
+      "mode": "team_deathmatch",
+      "feature": "village",
+      "featureId": "village_alpha",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\team_deathmatch-village-before.png",
+      "anchor": {
+        "x": -220,
+        "z": 30
+      },
+      "stats": {
+        "drawCalls": 158,
+        "triangles": 581484,
+        "geometries": 296,
+        "worldStaticFeatureTriangles": 22812,
+        "worldStaticFeatureMeshes": 204
+      },
+      "notes": ""
+    },
+    {
+      "mode": "team_deathmatch",
+      "feature": "airfield",
+      "featureId": "",
+      "filename": "C:\\Users\\Mattm\\X\\games-3d\\terror-in-the-jungle\\.claude\\worktrees\\agent-a099b067d3a809a92\\artifacts\\cycle-war-asset-repaint\\world\\team_deathmatch-airfield-before.png",
+      "anchor": null,
+      "stats": null,
+      "notes": "no matching feature in this mode"
+    }
+  ]
+}
