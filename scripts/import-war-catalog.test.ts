@@ -10,6 +10,9 @@
  * need are recorded — rather than mirroring the importer's internals.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   WeaponModels,
@@ -21,6 +24,26 @@ import {
   warAssetCatalog,
   type WarAssetEntry,
 } from '../src/systems/assets/modelPaths';
+
+const MODELS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'models');
+
+/** Count indexed vs non-indexed primitives by reading the GLB JSON chunk. */
+function primitiveIndexing(glbPath: string): { indexed: number; nonIndexed: number } {
+  const buf = readFileSync(glbPath);
+  const jsonLen = buf.readUInt32LE(12);
+  const json = JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf-8')) as {
+    meshes?: Array<{ primitives?: Array<{ indices?: number }> }>;
+  };
+  let indexed = 0;
+  let nonIndexed = 0;
+  for (const mesh of json.meshes ?? []) {
+    for (const prim of mesh.primitives ?? []) {
+      if (prim.indices !== undefined) indexed += 1;
+      else nonIndexed += 1;
+    }
+  }
+  return { indexed, nonIndexed };
+}
 
 function entry(slug: string): WarAssetEntry {
   const e = warAssetCatalog[slug];
@@ -117,5 +140,38 @@ describe('rig grafts recorded for runtime articulation', () => {
     expect(m16.magazineNodes).toContain('Mesh_MagSeg1');
     expect(m16.magazineNodes).toContain('Mesh_MagFloor');
     expect(m16.muzzleNodes).toContain('Mesh_FlashHiderBore');
+  });
+});
+
+describe('imported GLBs are uniformly indexed so THREE merges are all-or-none', () => {
+  // CombatantRenderer.createOptimizedWeaponRoot merges every mesh of an
+  // NPC-held weapon GLB; THREE's mergeGeometries requires every geometry to be
+  // uniformly indexed (all or none). The pixel-forge source ships the
+  // occasional non-indexed primitive inside an otherwise-indexed model
+  // (ak47's muzzle brake), which used to break the merge and spam console
+  // errors. The importer now synthesizes a sequential index buffer for any
+  // primitive that lacks one, so no consumer hits the mixed-index case.
+
+  const onDiskEntries: WarAssetEntry[] = Object.values(warAssetCatalog).filter((e) =>
+    existsSync(join(MODELS_ROOT, e.path)),
+  );
+
+  it('finds the catalogued GLBs on disk to assert against', () => {
+    expect(onDiskEntries.length).toBeGreaterThan(0);
+  });
+
+  it.each(onDiskEntries.map((e) => [e.slug, e.path] as const))(
+    '%s has zero non-indexed primitives',
+    (_slug, path) => {
+      const { indexed, nonIndexed } = primitiveIndexing(join(MODELS_ROOT, path));
+      expect(indexed).toBeGreaterThan(0);
+      expect(nonIndexed).toBe(0);
+    },
+  );
+
+  it('covers the weapons whose mixed indexing broke the combat120 weapon merge', () => {
+    for (const path of [WeaponModels.AK47, WeaponModels.M60, WeaponModels.M79]) {
+      expect(primitiveIndexing(join(MODELS_ROOT, path)).nonIndexed).toBe(0);
+    }
   });
 });

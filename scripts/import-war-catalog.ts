@@ -43,6 +43,10 @@ import { dirname, join } from 'node:path';
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const BIN_CHUNK_TYPE = 0x004e4942;
 const FLOAT = 5126;
+const UNSIGNED_SHORT = 5123;
+const UNSIGNED_INT = 5125;
+const ELEMENT_ARRAY_BUFFER = 34963;
+const USHORT_MAX_VERTS = 65536;
 const AXIS_NODE_NAME = 'TIJ_AxisNormalize';
 // Quaternion that rotates +X forward to +Z forward (yaw -90 deg about Y).
 const X_TO_Z = [0, -Math.SQRT1_2, 0, Math.SQRT1_2] as const;
@@ -91,8 +95,9 @@ interface GlbJson {
   scenes?: Array<{ nodes?: number[]; [k: string]: unknown }>;
   nodes?: GlbNode[];
   meshes?: Array<{ primitives?: Array<{ indices?: number; attributes?: Record<string, number> }> }>;
-  accessors?: Array<{ bufferView?: number; byteOffset?: number; componentType?: number; count?: number; type?: string; min?: number[]; max?: number[] }>;
-  bufferViews?: Array<{ byteOffset?: number; byteStride?: number }>;
+  accessors?: Array<{ name?: string; bufferView?: number; byteOffset?: number; componentType?: number; count?: number; type?: string; min?: number[]; max?: number[] }>;
+  bufferViews?: Array<{ buffer?: number; byteOffset?: number; byteLength?: number; byteStride?: number; target?: number }>;
+  buffers?: Array<{ byteLength?: number; uri?: string }>;
   materials?: unknown[];
   animations?: unknown[];
   [k: string]: unknown;
@@ -213,6 +218,96 @@ function writeGlb(file: string, json: GlbJson, bin: Buffer | null): void {
   header.writeUInt32LE(2, 4);
   header.writeUInt32LE(total, 8);
   writeFileSync(file, Buffer.concat([header, ...chunks], total));
+}
+
+// ─── Index synthesis (make every primitive indexed) ──────────────────────────
+
+/**
+ * THREE's BufferGeometryUtils.mergeGeometries requires every merged geometry to
+ * be uniformly indexed (all-or-none). The pixel-forge source ships the
+ * occasional non-indexed primitive inside an otherwise-indexed model (e.g.
+ * ak47's Mesh_MuzzleBrake), so any runtime consumer that merges a model's
+ * meshes (CombatantRenderer.createOptimizedWeaponRoot) fails to merge and falls
+ * back to unmerged multi-mesh geometry, spamming console errors and inflating
+ * draw calls.
+ *
+ * Fix at import time: synthesize a sequential index buffer (0..count-1) for
+ * every primitive that lacks an `indices` accessor, appending the bytes to the
+ * BIN chunk and bookkeeping a new bufferView + accessor consistent with how the
+ * source already encodes its existing index buffers. After this pass every
+ * primitive in every imported GLB is indexed, so merges are all-or-none.
+ *
+ * Idempotent: a primitive that already has `indices` is skipped, so re-running
+ * over already-indexed output appends nothing and produces zero byte diffs.
+ *
+ * Returns the (possibly extended) BIN buffer; `bin` is unchanged when no
+ * primitive needed indices.
+ */
+function synthesizeIndices(json: GlbJson, bin: Buffer | null): Buffer | null {
+  const appended: Buffer[] = [];
+  let cursor = bin ? bin.length : 0;
+  const baseLen = cursor;
+
+  for (const mesh of json.meshes ?? []) {
+    for (const prim of mesh.primitives ?? []) {
+      if (prim.indices !== undefined) continue;
+
+      const posIdx = prim.attributes?.POSITION;
+      if (posIdx === undefined) continue; // nothing to index against
+      const count = json.accessors?.[posIdx]?.count ?? 0;
+      if (count <= 0) continue;
+
+      const useUint = count >= USHORT_MAX_VERTS;
+      const componentType = useUint ? UNSIGNED_INT : UNSIGNED_SHORT;
+      const compBytes = useUint ? 4 : 2;
+
+      // glTF requires a bufferView's byteOffset to be a multiple of the
+      // component size; pad the running cursor up to that boundary.
+      const pad = (compBytes - (cursor % compBytes)) % compBytes;
+      if (pad > 0) {
+        appended.push(Buffer.alloc(pad, 0));
+        cursor += pad;
+      }
+
+      const idxBuf = Buffer.alloc(count * compBytes);
+      for (let i = 0; i < count; i++) {
+        if (useUint) idxBuf.writeUInt32LE(i, i * 4);
+        else idxBuf.writeUInt16LE(i, i * 2);
+      }
+
+      json.bufferViews ??= [];
+      const bufferViewIdx = json.bufferViews.length;
+      json.bufferViews.push({
+        buffer: 0,
+        byteOffset: cursor,
+        byteLength: idxBuf.length,
+        target: ELEMENT_ARRAY_BUFFER,
+      });
+
+      json.accessors ??= [];
+      const accessorIdx = json.accessors.length;
+      const accName = json.accessors[posIdx]?.name;
+      json.accessors.push({
+        ...(accName ? { name: `${accName.replace(/_pos$/, '')}_synthidx` } : {}),
+        type: 'SCALAR',
+        componentType,
+        count,
+        bufferView: bufferViewIdx,
+        byteOffset: 0,
+      });
+
+      prim.indices = accessorIdx;
+      appended.push(idxBuf);
+      cursor += idxBuf.length;
+    }
+  }
+
+  if (appended.length === 0) return bin;
+
+  const extended = bin ? Buffer.concat([bin, ...appended]) : Buffer.concat(appended);
+  json.buffers ??= [{ byteLength: 0 }];
+  json.buffers[0] = { ...(json.buffers[0] ?? {}), byteLength: baseLen + appended.reduce((s, b) => s + b.length, 0) };
+  return extended;
 }
 
 // ─── Matrix / transform helpers (row-major 4x4) ──────────────────────────────
@@ -829,8 +924,11 @@ function main(): void {
       // still lists the slug (with prior path) so consumers compile.
       rejects.push({ asset, triage: triageResult, tris, sizeKB });
     } else if (!dryRun) {
+      // Make every primitive indexed so THREE merges are all-or-none
+      // (CombatantRenderer's weapon merge fails on mixed-index models).
+      const outBin = synthesizeIndices(json, bin);
       mkdirSync(dirname(targetGlb), { recursive: true });
-      writeGlb(targetGlb, json, bin);
+      writeGlb(targetGlb, json, outBin);
       written = true;
     }
 
