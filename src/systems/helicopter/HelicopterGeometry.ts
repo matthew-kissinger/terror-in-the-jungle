@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { modelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
-import { AircraftModels } from '../assets/modelPaths';
+import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
+import type { WarAssetEntry, WarAssetJoint } from '../assets/modelPaths';
 import { Logger } from '../../utils/Logger';
 
 /**
@@ -17,6 +18,7 @@ interface AircraftInfo {
 }
 
 type RotorAnimationType = 'mainBlades' | 'tailBlades';
+type RotorSpinAxis = 'x' | 'y' | 'z';
 
 const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
   UH1_HUEY:      { modelPath: AircraftModels.UH1_HUEY,      displayName: 'UH-1 Huey',      faction: 'US' },
@@ -25,17 +27,33 @@ const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
   AC47_SPOOKY:   { modelPath: AircraftModels.AC47_SPOOKY,    displayName: 'AC-47 Spooky',   faction: 'US' },
   F4_PHANTOM:    { modelPath: AircraftModels.F4_PHANTOM,      displayName: 'F-4 Phantom',    faction: 'US' },
   A1_SKYRAIDER:  { modelPath: AircraftModels.A1_SKYRAIDER,    displayName: 'A-1 Skyraider',  faction: 'US' },
+
+  // Dormant catalog registrations (cycle-2026-06-11-war-asset-repaint, scope 5).
+  // These have normalized static GLBs with grafted rotor joints but no flight
+  // model this cycle. They are loadable (gallery / future role systems) and
+  // spin their rotors procedurally like every other rotorcraft. They are NOT in
+  // AIRCRAFT_CONFIGS, so they never spawn at helipads (getAircraftConfig falls
+  // back to the Huey for any key without flight physics).
+  CH47_CHINOOK:           { modelPath: AircraftModels.CH47_CHINOOK,           displayName: 'CH-47 Chinook',           faction: 'US' },
+  OH6_KIOWA_SCOUT:        { modelPath: AircraftModels.OH6_KIOWA_SCOUT,        displayName: 'OH-6 Kiowa Scout',        faction: 'US' },
+  // hh3e is a scale re-roll advisory (audit: ~9.4m vs real ~17.6m fuselage) —
+  // cataloged dormant so it is reachable once a corrected GLB lands.
+  HH3E_JOLLY_GREEN_GIANT: { modelPath: AircraftModels.HH3E_JOLLY_GREEN_GIANT, displayName: 'HH-3E Jolly Green Giant', faction: 'US' },
 };
 
 /**
- * Load any aircraft GLB and wire rotor groups for animation.
+ * Load any aircraft GLB and wire its rotor joints for procedural spin.
  *
- * All GLBs face +Z (Y-up). Rotated -90° Y so nose faces forward.
- * HelicopterAnimation.updateRotors() looks for children with
- * userData.type === 'mainBlades' / 'tailBlades' and spins them.
+ * The repaint GLBs are 100% static (no baked rotor animation clips). The war
+ * asset importer grafted canonical `Joint_MainRotor` / `Joint_TailRotor` pivots
+ * over the blade meshes and recorded each pivot's spin axis in the generated
+ * catalog (`warAssetCatalog[slug].joints`). We resolve those named pivots and
+ * tag them so `HelicopterAnimation.updateRotors()` spins them off engine RPM —
+ * no animation playback, no axis guessing.
  *
- * Blade meshes named MainRotor/MainBlade and TailRotor/TailBlade
- * are auto-grouped under spin parents. Synthetic blades are added as fallback.
+ * All GLBs face +Z (Y-up); rotated -90° Y so the nose faces airframe-forward.
+ * The synthetic-blade fallback is kept for the case where a GLB ships with no
+ * grafted rotor joint of a kind (a future asset or a partial load).
  */
 export async function createHelicopterGeometry(
   aircraftKey: string,
@@ -47,7 +65,7 @@ export async function createHelicopterGeometry(
   }
   const { modelPath, displayName, faction } = info ?? AIRCRAFT_INFO.UH1_HUEY;
 
-  const { scene, animations } = await modelLoader.loadAnimatedModel(modelPath);
+  const { scene } = await modelLoader.loadAnimatedModel(modelPath);
 
   // Rotate GLB -90 degrees so nose faces forward in game space
   scene.rotation.y = -Math.PI / 2;
@@ -55,7 +73,7 @@ export async function createHelicopterGeometry(
   const helicopterGroup = new THREE.Group();
   helicopterGroup.add(scene);
 
-  wireRotorGroups(scene, helicopterGroup, animations);
+  wireRotorJoints(scene, helicopterGroup, modelPath);
   optimizeAircraftScene(scene, aircraftKey);
 
   helicopterGroup.userData = {
@@ -70,55 +88,48 @@ export async function createHelicopterGeometry(
 
 // ─── Rotor wiring ─────────────────────────────────────────────────────────
 
-function wireRotorGroups(
+/**
+ * Tag the grafted rotor pivots so the animation system spins them. Reads the
+ * spin contract (joint name + type + axis) from the generated catalog rather
+ * than inferring it from animation tracks or fuzzy name matching. Falls back to
+ * synthetic blades only when the catalog declares no rotor joint of a kind or
+ * the named pivot is missing from the loaded scene.
+ */
+function wireRotorJoints(
   scene: THREE.Group,
   helicopterGroup: THREE.Group,
-  animations: THREE.AnimationClip[],
+  modelPath: string,
 ): void {
-  const animationAxes = inferSpinAxesFromAnimationClips(animations);
-  const mainBladeNodes: THREE.Object3D[] = [];
-  const tailBladeNodes: THREE.Object3D[] = [];
-  let rotorHub: THREE.Object3D | undefined;
+  const rotorJoints = getCatalogRotorJoints(modelPath);
+  const nodesByName = indexNodesByName(scene);
 
-  scene.traverse((child) => {
-    const name = child.name.toLowerCase();
-    const rotorType = getRotorAnimationType(name);
+  let taggedMain = false;
+  let taggedTail = false;
 
-    if (rotorType) {
-      child.userData.type = rotorType;
-      child.userData.spinAxis = animationAxes.get(name) ?? (rotorType === 'mainBlades' ? 'y' : 'z');
+  for (const joint of rotorJoints) {
+    const node = nodesByName.get(joint.name.toLowerCase());
+    if (!node) {
+      Logger.warn(
+        'helicopter',
+        `Catalog rotor joint "${joint.name}" not found in ${modelPath}; using synthetic fallback`,
+      );
+      continue;
     }
-
-    if (isMainRotorPartName(name)) {
-      mainBladeNodes.push(child);
-    } else if (isTailRotorPartName(name)) {
-      tailBladeNodes.push(child);
-    }
-
-    if (isRotorHubName(name)) {
-      rotorHub = child;
-    }
-  });
-
-  const hasGroupedMain = hasRotorAnimationRoot(scene, 'mainBlades');
-  if (mainBladeNodes.length > 0 && !hasGroupedMain) {
-    groupBladesUnderParent(scene, mainBladeNodes, 'mainBlades', rotorHub);
+    node.userData.type = joint.type;
+    node.userData.spinAxis = joint.spinAxis ?? defaultSpinAxis(joint.type);
+    if (joint.type === 'mainBlades') taggedMain = true;
+    if (joint.type === 'tailBlades') taggedTail = true;
   }
 
-  const hasGroupedTail = hasRotorAnimationRoot(scene, 'tailBlades');
-  if (tailBladeNodes.length > 0 && !hasGroupedTail) {
-    groupBladesUnderParent(scene, tailBladeNodes, 'tailBlades');
-  }
-
-  // Synthetic fallbacks if no blades found at all
-  if (mainBladeNodes.length === 0 && !hasGroupedMain) {
+  // Synthetic fallbacks: only when no real pivot of that kind was tagged.
+  if (!taggedMain) {
     const mainBlades = createSyntheticMainRotor();
     mainBlades.userData.spinAxis = 'y';
     mainBlades.position.set(0, 4.5, 0);
     helicopterGroup.add(mainBlades);
     Logger.debug('helicopter', 'Added synthetic main rotor blades');
   }
-  if (tailBladeNodes.length === 0 && !hasGroupedTail) {
+  if (!taggedTail) {
     const tailBlades = createSyntheticTailRotor();
     tailBlades.userData.spinAxis = 'z';
     tailBlades.position.set(-6, 2.5, 0);
@@ -127,39 +138,43 @@ function wireRotorGroups(
   }
 }
 
-function inferSpinAxesFromAnimationClips(animations: THREE.AnimationClip[]): Map<string, 'x' | 'y' | 'z'> {
-  const axes = new Map<string, 'x' | 'y' | 'z'>();
-  for (const clip of animations) {
-    for (const track of clip.tracks) {
-      if (!track.name.endsWith('.quaternion') || track.values.length < 8) {
-        continue;
-      }
-      const nodeName = track.name.slice(0, -'.quaternion'.length).toLowerCase();
-      const axis = inferQuaternionTrackAxis(track.values);
-      if (axis) {
-        axes.set(nodeName, axis);
-      }
-    }
-  }
-  return axes;
+/**
+ * Resolve the rotor joints (mainBlades / tailBlades) for a model path from the
+ * generated war-asset catalog. The catalog is keyed by slug == GLB basename.
+ */
+function getCatalogRotorJoints(modelPath: string): Array<WarAssetJoint & { type: RotorAnimationType }> {
+  const entry = getCatalogEntry(modelPath);
+  if (!entry?.joints) return [];
+  return entry.joints.filter(
+    (joint): joint is WarAssetJoint & { type: RotorAnimationType } =>
+      joint.type === 'mainBlades' || joint.type === 'tailBlades',
+  );
 }
 
-function inferQuaternionTrackAxis(values: ArrayLike<number>): 'x' | 'y' | 'z' | null {
-  let maxX = 0;
-  let maxY = 0;
-  let maxZ = 0;
-  for (let i = 0; i + 3 < values.length; i += 4) {
-    maxX = Math.max(maxX, Math.abs(values[i]));
-    maxY = Math.max(maxY, Math.abs(values[i + 1]));
-    maxZ = Math.max(maxZ, Math.abs(values[i + 2]));
-  }
+function getCatalogEntry(modelPath: string): WarAssetEntry | undefined {
+  const slug = slugFromModelPath(modelPath);
+  return warAssetCatalog[slug];
+}
 
-  if (maxX < 0.5 && maxY < 0.5 && maxZ < 0.5) {
-    return null;
-  }
-  if (maxX >= maxY && maxX >= maxZ) return 'x';
-  if (maxY >= maxX && maxY >= maxZ) return 'y';
-  return 'z';
+/** Derive the catalog slug (== GLB basename without extension) from a path. */
+function slugFromModelPath(modelPath: string): string {
+  const base = modelPath.split('/').pop() ?? modelPath;
+  return base.replace(/\.glb$/i, '');
+}
+
+function indexNodesByName(root: THREE.Object3D): Map<string, THREE.Object3D> {
+  const byName = new Map<string, THREE.Object3D>();
+  root.traverse((child) => {
+    const key = child.name.toLowerCase();
+    if (key && !byName.has(key)) {
+      byName.set(key, child);
+    }
+  });
+  return byName;
+}
+
+function defaultSpinAxis(type: RotorAnimationType): RotorSpinAxis {
+  return type === 'mainBlades' ? 'y' : 'z';
 }
 
 function optimizeAircraftScene(scene: THREE.Group, aircraftKey: string): void {
@@ -176,112 +191,28 @@ function optimizeAircraftScene(scene: THREE.Group, aircraftKey: string): void {
   }
 }
 
-function groupBladesUnderParent(
-  scene: THREE.Group,
-  bladeNodes: THREE.Object3D[],
-  groupName: string,
-  hub?: THREE.Object3D,
-): void {
-  const group = new THREE.Group();
-  group.name = groupName;
-  group.userData.type = groupName;
-
-  const pivot = hub
-    ? hub.getWorldPosition(new THREE.Vector3())
-    : bladeNodes[0].getWorldPosition(new THREE.Vector3());
-  scene.worldToLocal(pivot);
-  group.position.copy(pivot);
-
-  for (const blade of bladeNodes) {
-    const worldPos = blade.getWorldPosition(new THREE.Vector3());
-    scene.worldToLocal(worldPos);
-    blade.removeFromParent();
-    blade.position.sub(pivot);
-    group.add(blade);
-  }
-  if (hub && !bladeNodes.includes(hub)) {
-    const worldPos = hub.getWorldPosition(new THREE.Vector3());
-    scene.worldToLocal(worldPos);
-    hub.removeFromParent();
-    hub.position.sub(pivot);
-    group.add(hub);
-  }
-  scene.add(group);
-  Logger.debug('helicopter', `Grouped ${bladeNodes.length} ${groupName} meshes under spin parent`);
-}
-
-function getRotorAnimationType(name: string): RotorAnimationType | null {
-  if (
-    name.includes('mainrotor')
-    || name.includes('main_rotor')
-    || name.includes('mainblades')
-    || name.includes('main_blades')
-  ) {
-    return 'mainBlades';
-  }
-
-  if (
-    name.includes('tailrotor')
-    || name.includes('tail_rotor')
-    || name.includes('tailblades')
-    || name.includes('tail_blades')
-  ) {
-    return 'tailBlades';
-  }
-
-  return null;
-}
-
-function hasRotorAnimationRoot(scene: THREE.Object3D, rotorType: RotorAnimationType): boolean {
-  let found = false;
-  scene.traverse((child) => {
-    if (child.userData.type === rotorType) {
-      found = true;
-    }
-  });
-  return found;
-}
-
-function isMainRotorPartName(name: string): boolean {
-  return name.includes('mainblade')
-    || name.includes('mainrotor')
-    || name.includes('main_rotor')
-    || name.includes('mrblade')
-    || name.includes('mrhub')
-    || name.includes('mrtip')
-    || name.includes('rotormast');
-}
-
-function isTailRotorPartName(name: string): boolean {
-  return name.includes('tailblade')
-    || name.includes('tailrotor')
-    || name.includes('tail_rotor')
-    || name.includes('trblade')
-    || name.includes('trhub')
-    || name.includes('trtip');
-}
-
-function isRotorHubName(name: string): boolean {
-  return name.includes('rotorhub')
-    || name.includes('mrhub')
-    || name.includes('trhub');
-}
-
+/**
+ * A mesh belongs to a spinning rotor when any ancestor is a tagged rotor pivot
+ * (userData.type) or carries a canonical grafted rotor joint name. Such meshes
+ * must stay out of the static draw-call batch so the pivot can spin them.
+ */
 export function isHelicopterAnimatedRotorMesh(mesh: THREE.Mesh): boolean {
-  const name = mesh.name.toLowerCase();
-  if (isMainRotorPartName(name) || isTailRotorPartName(name) || isRotorHubName(name)) {
-    return true;
-  }
-
   let current: THREE.Object3D | null = mesh;
   while (current) {
     if (current.userData.type === 'mainBlades' || current.userData.type === 'tailBlades') {
       return true;
     }
+    if (isCanonicalRotorJointName(current.name)) {
+      return true;
+    }
     current = current.parent;
   }
-
   return false;
+}
+
+function isCanonicalRotorJointName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === 'joint_mainrotor' || lower === 'joint_tailrotor';
 }
 
 // ─── Synthetic fallback rotors ────────────────────────────────────────────

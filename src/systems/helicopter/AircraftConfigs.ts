@@ -29,6 +29,14 @@ export interface AircraftWeaponMount {
   type: 'nose_turret' | 'side_mount' | 'rocket_pod';
   firingMode: 'pilot' | 'crew';
   ammoCapacity: number;
+  /**
+   * Mount offset in the weapon-system frame (+Z forward, +X right, +Y up),
+   * applied with the airframe quaternion. Re-banded to the repaint GLB dims
+   * (cycle-2026-06-11-war-asset-repaint) so the tracer/muzzle origin sits on
+   * the airframe rather than floating inside the smaller legacy hull. Source
+   * dims (model axes [w, h, length], `warAssetCatalog`): UH-1C
+   * [3.71, 3.96, 13.86], AH-1 Cobra [3.74, 3.82, 14.34].
+   */
   localPosition: [number, number, number];
   fireRate: number;          // rounds per second
   damage: number;            // per-hit (hitscan) or max (explosive)
@@ -86,7 +94,10 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     seats: 2,
     role: 'gunship',
     weapons: [
-      { name: 'M60 Door Gun', type: 'side_mount', firingMode: 'crew', ammoCapacity: 500, localPosition: [-1.5, 0.3, -0.5], fireRate: 9, damage: 20, spreadDeg: 3 },
+      // M60 on the left cabin side. Lateral pushed to the new ~3.7m-wide
+      // cabin edge (half-width ~1.85m) so the gunner/muzzle sits at the door,
+      // not inside the hull; slightly aft of the cabin midpoint.
+      { name: 'M60 Door Gun', type: 'side_mount', firingMode: 'crew', ammoCapacity: 500, localPosition: [-1.8, 0.3, -0.6], fireRate: 9, damage: 20, spreadDeg: 3 },
     ],
   },
 
@@ -109,8 +120,14 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     seats: 1,
     role: 'attack',
     weapons: [
-      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000, localPosition: [0, -0.3, 2.5], fireRate: 50, damage: 15, spreadDeg: 2.5, tracerInterval: 3 },
-      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14, localPosition: [-1.2, -0.2, 1.0], fireRate: 3.3, damage: 150, damageRadius: 8, projectileSpeed: 150 },
+      // Chin-turret minigun under the nose. Forward offset reaches the longer
+      // ~14.3m fuselage's nose; dropped slightly so the muzzle reads under the
+      // gunner station (Mesh_ChinTurret / Mesh_Minigun region).
+      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000, localPosition: [0, -0.45, 3.3], fireRate: 50, damage: 15, spreadDeg: 2.5, tracerInterval: 3 },
+      // Stub-wing rocket pods. fireProjectile() alternates the ±side offset, so
+      // localPosition carries the height/forward seat; pods sit just ahead of
+      // CG on the stub wings of the ~3.7m-wide airframe.
+      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14, localPosition: [-1.4, -0.25, 1.2], fireRate: 3.3, damage: 150, damageRadius: 8, projectileSpeed: 150 },
     ],
   },
 };

@@ -75,4 +75,19 @@ describe('AircraftConfigs', () => {
       expect(config.weapons).toEqual([]);
     });
   });
+
+  describe('dormant catalog aircraft (no flight model this cycle)', () => {
+    // ch47 / oh6 / hh3e are loadable static GLBs registered for the gallery and
+    // future role systems, but no flight model was invented for them this cycle.
+    // The guarantee is that they have NO dedicated flight config, so they can
+    // never spawn at a helipad with a fabricated handling model — any lookup
+    // resolves to the Huey transport fallback instead.
+    for (const dormantKey of ['CH47_CHINOOK', 'OH6_KIOWA_SCOUT', 'HH3E_JOLLY_GREEN_GIANT']) {
+      it(`${dormantKey} has no invented flight config`, () => {
+        expect(AIRCRAFT_CONFIGS[dormantKey]).toBeUndefined();
+        // Falls back to the Huey transport handling, identical to an unknown key.
+        expect(getAircraftConfig(dormantKey)).toBe(AIRCRAFT_CONFIGS.UH1_HUEY);
+      });
+    }
+  });
 });
