@@ -16,27 +16,48 @@ const failingLoader: VehicleModelLoader = {
   loadModel: () => Promise.reject(new Error('offline')),
 };
 
-function fakeM48Glb(): THREE.Group {
+/** Quaternion the war-asset importer bakes onto the TIJ_AxisNormalize wrapper. */
+const AXIS_NORMALIZE_QUAT = new THREE.Quaternion(0, Math.SQRT1_2, 0, Math.SQRT1_2); // +90° Y
+
+/**
+ * Mirror the importer's output shape: the turret + gun joints live *under* a
+ * `TIJ_AxisNormalize` (+90° Y) wrapper, with the barrel authored along the
+ * source +X axis (which the wrapper rotates to engine-forward -Z). This is the
+ * structure that broke a naive `removeFromParent` re-seat — the wrapper has to
+ * be honoured, so the test asset has to carry it.
+ */
+function fakeM48Glb(): { glb: THREE.Group; turret: THREE.Object3D; gun: THREE.Object3D; muzzle: THREE.Object3D } {
   const glb = new THREE.Group();
+  const axis = new THREE.Object3D();
+  axis.name = 'TIJ_AxisNormalize';
+  axis.quaternion.copy(AXIS_NORMALIZE_QUAT);
+  const body = new THREE.Object3D();
+  body.name = 'M48Patton';
   const hull = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
   hull.name = 'Mesh_Hull';
-  glb.add(hull);
+  body.add(hull);
+
   const turret = new THREE.Group();
   turret.name = 'Joint_Turret';
-  turret.position.set(0, 1.79, -0.3);
+  turret.position.set(1.04, 2.22, -0.11); // source +X-forward authored offset
   const gun = new THREE.Group();
   gun.name = 'Joint_MainGun';
-  gun.position.set(0, 0.35, -1.55); // authored offset relative to the turret ring
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4), new THREE.MeshStandardMaterial());
-  barrel.name = 'glb_barrel';
-  gun.add(barrel);
-  turret.add(gun);
-  glb.add(turret);
-  return glb;
+  gun.position.set(3.92, 2.05, 0); // source +X-forward authored offset
+  // Muzzle tip authored along the source +X axis (forward in source frame).
+  const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4), new THREE.MeshStandardMaterial());
+  muzzle.name = 'Mesh_MuzzleBrakeCap';
+  muzzle.position.set(1.58, 0, 0);
+  gun.add(muzzle);
+
+  body.add(turret, gun);
+  axis.add(body);
+  glb.add(axis);
+  return { glb, turret, gun, muzzle };
 }
 
 function fakeTurretRig(): { rig: TurretRigSource; yawNode: THREE.Object3D; pitchNode: THREE.Object3D } {
   const yawNode = new THREE.Object3D();
+  yawNode.position.set(0, 1.7, 0);
   const pitchNode = new THREE.Object3D();
   pitchNode.position.set(0, 0.45, -0.3);
   yawNode.add(pitchNode);
@@ -54,6 +75,14 @@ function fakeTurretRig(): { rig: TurretRigSource; yawNode: THREE.Object3D; pitch
     getTurret: () => ({ getYawNode: () => yawNode, getPitchNode: () => pitchNode }),
   };
   return { rig, yawNode, pitchNode };
+}
+
+/** Forward direction of the barrel (gun pivot -> muzzle) in chassis frame. */
+function barrelForward(chassisRoot: THREE.Object3D, gun: THREE.Object3D, muzzle: THREE.Object3D): THREE.Vector3 {
+  chassisRoot.updateWorldMatrix(false, true);
+  const pivot = gun.getWorldPosition(new THREE.Vector3());
+  const tip = muzzle.getWorldPosition(new THREE.Vector3());
+  return tip.sub(pivot).normalize();
 }
 
 describe('applyM151JeepGlbVisual', () => {
@@ -88,9 +117,7 @@ describe('applyM48TankGlbVisual', () => {
   it('splits the GLB across chassis root + turret rig nodes', async () => {
     const root = buildM48ChassisMesh();
     const { rig, yawNode, pitchNode } = fakeTurretRig();
-    const glb = fakeM48Glb();
-    const turret = glb.getObjectByName('Joint_Turret')!;
-    const gun = glb.getObjectByName('Joint_MainGun')!;
+    const { glb, turret, gun } = fakeM48Glb();
 
     const ok = await applyM48TankGlbVisual(root, rig, loaderResolving(glb));
 
@@ -98,18 +125,51 @@ describe('applyM48TankGlbVisual', () => {
     // Hull content stays on the chassis root; procedural hull boxes removed.
     expect(root.children).toContain(glb);
     expect(root.children.filter((c) => (c as THREE.Mesh).isMesh)).toHaveLength(0);
-    // Turret traverses with the rig yaw node, centred on the ring pivot.
+    // Turret rides the yaw node so crew aim traverses it; gun rides the pitch
+    // node so it elevates with the barrel.
     expect(turret.parent).toBe(yawNode);
-    expect(turret.position.length()).toBe(0);
-    // Gun elevates with the rig pitch node, keeping the authored offset
-    // relative to the turret ring minus the pitch node's own offset.
     expect(gun.parent).toBe(pitchNode);
-    expect(gun.position.x).toBeCloseTo(0, 5);
-    expect(gun.position.y).toBeCloseTo(0.35 - 0.45, 5);
-    expect(gun.position.z).toBeCloseTo(-1.55 - -0.3, 5);
     // Procedural turret + gun parts removed from the rig.
     expect(yawNode.getObjectByName('m48_turret')).toBeUndefined();
     expect(pitchNode.getObjectByName('m48_barrel')).toBeUndefined();
+  });
+
+  it('keeps the barrel pointing down-bore after re-seating past the axis wrapper', async () => {
+    // The importer wraps the +X-forward source in a +90° Y axis-normalize
+    // node. A naive detach would drop that rotation and leave the barrel
+    // pointing out the tank's side; the re-seat must preserve engine-forward.
+    const root = buildM48ChassisMesh();
+    const { rig } = fakeTurretRig();
+    const { glb, gun, muzzle } = fakeM48Glb();
+
+    const ok = await applyM48TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    const forward = barrelForward(root, gun, muzzle);
+    // Engine-forward is chassis-local -Z; the barrel must point down it.
+    expect(forward.dot(new THREE.Vector3(0, 0, -1))).toBeGreaterThan(0.99);
+  });
+
+  it('traverses + elevates the re-seated turret with the rig', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeTurretRig();
+    const { glb, gun, muzzle } = fakeM48Glb();
+
+    await applyM48TankGlbVisual(root, rig, loaderResolving(glb));
+    const restMuzzle = muzzle.getWorldPosition(new THREE.Vector3());
+
+    // Yaw the turret 90° and elevate the gun — the muzzle must move, proving
+    // the GLB parts ride the articulation rig rather than sitting static.
+    yawNode.rotation.y = Math.PI / 2;
+    pitchNode.rotation.x = 0.3; // +X pitch lifts chassis-local -Z toward +Y
+    const aimedForward = barrelForward(root, gun, muzzle);
+    const aimedMuzzle = muzzle.getWorldPosition(new THREE.Vector3());
+
+    expect(aimedMuzzle.distanceTo(restMuzzle)).toBeGreaterThan(0.5);
+    // After a 90° yaw the barrel swings off chassis -Z toward the side.
+    expect(Math.abs(aimedForward.z)).toBeLessThan(0.9);
+    // Elevation lifts the muzzle tip above the rest pose.
+    expect(aimedForward.y).toBeGreaterThan(0);
   });
 
   it('keeps every procedural mesh when the GLB lacks the turret joints', async () => {

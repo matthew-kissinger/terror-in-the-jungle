@@ -15,10 +15,24 @@ import { GroundVehicleModels } from '../assets/modelPaths';
  * failure the procedural placeholder simply stays — the same fallback the
  * original briefs allowed, now pointed the right way around.
  *
- * Both GLBs are authored -Z-forward with the ground plane at y=0 (verified
- * against their node tables on 2026-06-10), matching the
- * GroundVehiclePhysics / TrackedVehiclePhysics chassis conventions, so no
- * yaw or grounding correction is applied.
+ * Both GLBs come through the war-asset import pipeline
+ * (cycle-2026-06-11-war-asset-repaint), which wraps the source +X-forward art
+ * in a `TIJ_AxisNormalize` node (a +90° Y rotation) so the loaded scene
+ * presents -Z-forward with the ground plane at y=0 — matching the
+ * GroundVehiclePhysics / TrackedVehiclePhysics chassis conventions. Because
+ * the whole GLB keeps that wrapper, the m151 swap needs no yaw or grounding
+ * correction.
+ *
+ * The m48 swap is the exception: it lifts the importer-grafted
+ * `Joint_Turret` / `Joint_MainGun` out from *under* the axis wrapper to seat
+ * them on the live turret rig. Detaching them with `removeFromParent()` would
+ * drop the wrapper's 90° rotation and leave the turret + barrel pointing along
+ * the source +X axis (i.e. out the tank's side). We therefore re-seat with
+ * `Object3D.attach()`, which preserves each joint's world transform — wrapper
+ * rotation included — by baking it into the joint's new local transform under
+ * the rig node. The rig sits at rest (zero yaw/pitch) when the GLB resolves,
+ * so the baked rest pose is correct and runtime traverse/elevation composes on
+ * top of it.
  */
 
 /** Loader seam for tests; production callers use the shared modelLoader. */
@@ -83,15 +97,19 @@ export async function applyM151JeepGlbVisual(
  * Swap the drivable M48's procedural meshes for `m48-patton.glb`, re-seating
  * the articulated parts on the Tank's turret rig:
  *
- *  - `Joint_Turret` (turret bulk + cupola + searchlight) mounts on the rig
- *    yaw node with its translation zeroed, so crew aim traverses the GLB
- *    turret around the turret-ring pivot the cannon math already uses.
- *  - `Joint_MainGun` (mantlet + barrel) mounts on the rig pitch node. Its
- *    authored offset relative to the turret ring is preserved (minus the
- *    pitch node's own local offset) so the rendered barrel keeps the
- *    authored mantlet placement while elevating around the rig trunnion.
- *  - The remaining GLB content (hull + tracks + exhausts) replaces the
+ *  - `Joint_Turret` (turret bulk + cupola + searchlight + hatches) mounts on
+ *    the rig yaw node so crew aim traverses the GLB turret around the
+ *    turret-ring pivot the cannon math already uses.
+ *  - `Joint_MainGun` (mantlet + barrel + muzzle brake) mounts on the rig
+ *    pitch node so the rendered barrel elevates around the rig trunnion.
+ *  - The remaining GLB content (hull + tracks + wheels) replaces the
  *    procedural hull boxes on the chassis root.
+ *
+ * Both joints are re-seated with `Object3D.attach()` so their world transform
+ * (including the import pipeline's axis-normalize rotation) survives the move
+ * out from under the GLB wrapper. `attach` needs current world matrices, so
+ * the GLB is added to the chassis — sharing the rig's frame — and the chassis
+ * world matrix is refreshed before the joints move.
  *
  * Resolves true on success; false keeps every procedural mesh in place
  * (load failure or unexpected asset shape).
@@ -116,24 +134,23 @@ export async function applyM48TankGlbVisual(
   const yawNode = rig.getYawNode();
   const pitchNode = rig.getPitchNode();
 
-  // Authored gun-pivot offset relative to the turret ring; re-expressed in
-  // pitch-node-local space so the barrel keeps its authored placement while
-  // pitching around the rig trunnion.
-  const gunLocal = gunJoint.position.clone().sub(pitchNode.position);
-  gunJoint.removeFromParent();
-  gunJoint.position.copy(gunLocal);
-  turretJoint.removeFromParent();
-  turretJoint.position.set(0, 0, 0);
-
-  // Only swap once the split succeeded: procedural hull/tracks off the
-  // chassis root, procedural turret + gun parts off the rig nodes.
+  // Swap the hull GLB onto the chassis first so the joints share the rig's
+  // world frame, then refresh world matrices so `attach` reads correct poses.
+  // Procedural hull/tracks come off the chassis root; procedural turret + gun
+  // parts come off the rig nodes.
   removeProceduralMeshes(chassisRoot);
   for (const name of PROCEDURAL_TURRET_MESHES) yawNode.getObjectByName(name)?.removeFromParent();
   for (const name of PROCEDURAL_GUN_MESHES) pitchNode.getObjectByName(name)?.removeFromParent();
 
   glb.name = 'm48_glb_visual';
   chassisRoot.add(glb);
-  yawNode.add(turretJoint);
-  pitchNode.add(gunJoint);
+  chassisRoot.updateWorldMatrix(false, true);
+
+  // `attach` preserves world transform across the re-parent, baking the
+  // axis-normalize rotation into each joint's new local transform. The rig is
+  // at rest here, so the baked pose is the correct turret/gun rest orientation
+  // and runtime yaw/pitch compose on top of it.
+  yawNode.attach(turretJoint);
+  pitchNode.attach(gunJoint);
   return true;
 }
