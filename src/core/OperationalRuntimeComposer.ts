@@ -36,6 +36,7 @@ type OperationalRuntimeRefs = Pick<
   | 'ticketSystem'
   | 'vehicleManager'
   | 'warSimulator'
+  | 'wildlifeSystem'
   | 'worldFeatureSystem'
   | 'zoneManager'
 >;
@@ -73,6 +74,7 @@ interface OperationalRuntimeGroups {
     | 'playerController'
     | 'terrainSystem'
     | 'vehicleManager'
+    | 'wildlifeSystem'
     | 'worldFeatureSystem'
   >;
   airSupportRuntime: Pick<
@@ -123,6 +125,7 @@ export function createOperationalRuntimeGroups(
       playerController: refs.playerController,
       terrainSystem: refs.terrainSystem,
       vehicleManager: refs.vehicleManager,
+      wildlifeSystem: refs.wildlifeSystem,
       worldFeatureSystem: refs.worldFeatureSystem,
     },
     airSupportRuntime: {
@@ -247,6 +250,17 @@ function wireVehicleRuntime(
     && typeof runtime.terrainSystem.getLOSAccelerator === 'function') {
     runtime.worldFeatureSystem.setLOSAccelerator(runtime.terrainSystem.getLOSAccelerator());
   }
+
+  // Wire ambient wildlife (ambient-wildlife-mvp). It reads terrain height/slope
+  // through ITerrainRuntime, the current mode + objective layout via the game
+  // mode manager, and the player position to spawn-bias / flee. The mode gate
+  // (OF + A Shau only) lives inside the system, so combat-stress harnesses get
+  // zero animals even though the system is always constructed.
+  runtime.wildlifeSystem.configureDependencies({
+    terrain: runtime.terrainSystem,
+    modeProvider: runtime.gameModeManager,
+    player: runtime.playerController,
+  });
 
   // Wire FixedWingModel
   runtime.fixedWingModel.setTerrainManager(runtime.terrainSystem);

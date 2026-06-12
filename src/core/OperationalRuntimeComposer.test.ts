@@ -133,6 +133,9 @@ function createRefs() {
       setTerrainManager: vi.fn(),
       setFixedWingModel: vi.fn(),
     },
+    wildlifeSystem: {
+      configureDependencies: vi.fn(),
+    },
     zoneManager: {},
   } as any;
 

@@ -39,6 +39,7 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
+import { WildlifeSystem } from '../systems/wildlife/WildlifeSystem';
 
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
 import { AirSupportManager } from '../systems/airsupport/AirSupportManager';
@@ -164,6 +165,11 @@ export class SystemInitializer {
     refs.helicopterModel = new HelicopterModel(scene);
     refs.fixedWingModel = new FixedWingModel(scene);
     refs.worldFeatureSystem = new WorldFeatureSystem(scene, camera);
+    // Ambient wildlife (ambient-wildlife-mvp): cold-cadence ground-animal
+    // spawner, gated to OF + A Shau. Runs in the untracked "Other" block and
+    // is a near no-op until its internal cadence fires, so it stays off the
+    // combat render/AI hot path. Dependencies wired in the operational runtime.
+    refs.wildlifeSystem = new WildlifeSystem(scene);
 
     refs.navmeshSystem = new NavmeshSystem();
     // Prewarm WASM download+compile now so it's ready when mode startup needs it.
@@ -264,7 +270,8 @@ export class SystemInitializer {
       refs.airSupportManager,
       refs.aaEmplacementSystem,
       refs.vehicleManager,
-      refs.m2hbEmplacementSystem
+      refs.m2hbEmplacementSystem,
+      refs.wildlifeSystem
     ];
 
     // Registry keys survive production minification; constructor names do not.

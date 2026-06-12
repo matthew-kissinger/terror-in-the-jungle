@@ -48,6 +48,7 @@ import type { VehicleManager } from '../systems/vehicle/VehicleManager';
 import type { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
 import type { FixedWingModel } from '../systems/vehicle/FixedWingModel';
 import type { M2HBEmplacementSystem } from '../systems/combat/weapons/M2HBEmplacement';
+import type { WildlifeSystem } from '../systems/wildlife/WildlifeSystem';
 
 export interface SystemKeyToType {
   assetLoader: AssetLoader;
@@ -95,6 +96,7 @@ export interface SystemKeyToType {
   npcVehicleController: NPCVehicleController;
   fixedWingModel: FixedWingModel;
   m2hbEmplacementSystem: M2HBEmplacementSystem;
+  wildlifeSystem: WildlifeSystem;
 }
 
 type SystemKey = keyof SystemKeyToType;
@@ -182,4 +184,5 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'npcVehicleController',
   'fixedWingModel',
   'm2hbEmplacementSystem',
+  'wildlifeSystem',
 ] as const;
