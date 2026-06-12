@@ -222,14 +222,59 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** none.
+- **Active:** `cycle-2026-06-11-war-asset-repaint` — integrate the 108-asset
+  pixel-forge repaint (69 replacements + 39 net-new) through the acceptance
+  standard: importer-normalized, budget-triaged, all five GLB consumer classes
+  cut over, catalog-registered with an in-engine gallery; plus two net-new
+  features (ambient wildlife MVP, B-52 arclight call-in). Ground truth +
+  policy: [docs/rearch/WAR_ASSET_REPAINT_AUDIT_2026-06-11.md](rearch/WAR_ASSET_REPAINT_AUDIT_2026-06-11.md).
+  Directive: KATALOG-1.
 - **Previous:** `cycle-2026-06-09-lighting-acceptance` (2/2: #380 #381,
   campaign closer) — see BACKLOG "Recently Completed". The full campaign arc:
   spike → core → foliage-npc → exposure-unify → acceptance.
 
 ### Tasks (DAG)
 
-(Populate when the next cycle opens.)
+**R0 (orchestrator, main session, before any dispatch):**
+capture pre-cycle perf evidence — `npm run perf:capture:combat120`,
+`perf:capture:openfrontier:short`, `perf:capture:ashau:short` — and record
+the artifact dirs + HEAD SHA here. These are the close gate's comparison
+basis (no tracked baseline exists).
+
+| Round | Task slug | Brief | Notes |
+|---|---|---|---|
+| R1 | `war-asset-import-pipeline` | docs/tasks/war-asset-import-pipeline.md | Solo round — gates everything; owns modelPaths.ts + all GLB writes. Do NOT run the package's copy-to-tij.ps1. |
+| R2 | `asset-gallery-route` | docs/tasks/asset-gallery-route.md | |
+| R2 | `weapons-rig-cutover` | docs/tasks/weapons-rig-cutover.md | combat-reviewer gate |
+| R2 | `helicopter-glb-cutover` | docs/tasks/helicopter-glb-cutover.md | |
+| R2 | `fixed-wing-glb-cutover` | docs/tasks/fixed-wing-glb-cutover.md | |
+| R2 | `ground-vehicle-glb-cutover` | docs/tasks/ground-vehicle-glb-cutover.md | |
+| R3 | `world-catalog-refresh` | docs/tasks/world-catalog-refresh.md | terrain-nav-reviewer if terrain/nav files touched |
+| R3 | `ambient-wildlife-mvp` | docs/tasks/ambient-wildlife-mvp.md | DROPPABLE → backlog without blocking close |
+| R3 | `b52-arclight-callin` | docs/tasks/b52-arclight-callin.md | DROPPABLE → backlog without blocking close |
+| R4 | `repaint-acceptance-close` | docs/tasks/repaint-acceptance-close.md | Orchestrator may run inline (docs + captures + deploy) |
+
+### Dependencies
+
+- Everything `addBlockedBy: war-asset-import-pipeline`.
+- `world-catalog-refresh` additionally blocked by `ground-vehicle-glb-cutover`
+  (places its catalog entries as parked scenery).
+- `b52-arclight-callin` additionally blocked by `fixed-wing-glb-cutover`
+  (shared `FixedWingConfigs.ts`).
+- `repaint-acceptance-close` blocked by all R2 + surviving R3 tasks.
+
+### File-ownership (conflict prevention)
+
+- `modelPaths.ts` + `public/models/**` + generated catalog: import-pipeline ONLY.
+- `WorldFeaturePrefabs.ts` + templates + `ModelPlacementProfiles.ts`: world-catalog-refresh ONLY.
+- `FixedWingConfigs.ts`: fixed-wing task (R2), then arclight (R3) — sequenced.
+
+### Cycle-specific hard-stops (on top of the standing ones)
+
+- combat120 p99 > +5% vs the R0 capture after any round → halt, do not deploy.
+- Import-pipeline budget triage diverging wildly from the audit memo's
+  expected reject set (>±4 assets) → pause and re-verify measurement before
+  dispatching R2.
 
 ## Dispatch protocol
 
