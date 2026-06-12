@@ -46,6 +46,7 @@ const FLOAT = 5126;
 const UNSIGNED_SHORT = 5123;
 const UNSIGNED_INT = 5125;
 const ELEMENT_ARRAY_BUFFER = 34963;
+const ARRAY_BUFFER = 34962;
 const USHORT_MAX_VERTS = 65536;
 const AXIS_NODE_NAME = 'TIJ_AxisNormalize';
 // Quaternion that rotates +X forward to +Z forward (yaw -90 deg about Y).
@@ -308,6 +309,141 @@ function synthesizeIndices(json: GlbJson, bin: Buffer | null): Buffer | null {
   json.buffers ??= [{ byteLength: 0 }];
   json.buffers[0] = { ...(json.buffers[0] ?? {}), byteLength: baseLen + appended.reduce((s, b) => s + b.length, 0) };
   return extended;
+}
+
+// ─── Canonical buffer storage (de-interleave + compact BIN rebuild) ──────────
+
+/**
+ * THREE r184's GLTFLoader builds an `InterleavedBufferAttribute` for any accessor
+ * whose bufferView carries a non-tight `byteStride`, and a plain `BufferAttribute`
+ * for tightly-packed ones. `BufferGeometryUtils.mergeGeometries` cannot merge
+ * across the two — `InterleavedBufferAttribute` has no `gpuType`, so the gpuType
+ * consistency check throws ("mergeAttributes() failed. BufferAttribute.gpuType
+ * must be consistent"). The pixel-forge source ships a MIXED layout: 98 of 99
+ * GLBs interleave some primitives and tightly-pack others within the same file
+ * (m16a1: 38 strided + 37 tight accessors). The runtime weapon merge in
+ * CombatantRenderer.createOptimizedWeaponRoot then fails to merge, falls back to
+ * unmerged meshes, and spams the console while inflating draw calls.
+ *
+ * This pass canonicalizes buffer storage so every accessor lands in its own
+ * tightly-packed bufferView (no interleaving, no shared strided blocks). The BIN
+ * chunk is rebuilt from scratch so dead interleaved bytes do not linger as
+ * zombies. After this pass three's GLTFLoader yields only plain
+ * `BufferAttribute`s and mergeGeometries succeeds over any subset.
+ *
+ * What it preserves byte-exact: it copies each accessor's logical values element
+ * by element (read with the source stride + byteOffset, write tight) — these are
+ * lossless copies of the same Float32/UINT8/… bytes, with NO requantization and
+ * NO precision change. Any bufferView NOT referenced by an accessor (embedded
+ * texture image data lives in BIN this way) is copied byte-for-byte and its
+ * references (images[].bufferView) remapped, so pixel data is never touched.
+ *
+ * Alignment: every emitted bufferView starts on a 4-byte boundary (the strictest
+ * glTF component-size requirement here), and each accessor's byteOffset is 0
+ * because it owns its bufferView — so accessor byteOffsets are trivially valid
+ * multiples of the component size.
+ *
+ * Idempotency: packing walks accessors then non-accessor bufferViews in index
+ * order and emits tight, deterministic bytes. Re-running over already-canonical
+ * output reads the same tight values and re-emits the identical layout — zero
+ * byte diffs.
+ */
+function canonicalizeBuffers(json: GlbJson, bin: Buffer | null): Buffer | null {
+  if (!bin) return bin;
+  const accessors = json.accessors ?? [];
+  const bufferViews = json.bufferViews ?? [];
+  if (accessors.length === 0 && bufferViews.length === 0) return bin;
+
+  // Classify which bufferViews hold index data vs vertex-attribute data so the
+  // rebuilt views carry the correct ARRAY_BUFFER / ELEMENT_ARRAY_BUFFER target,
+  // consistent with how the source (and synthesizeIndices) tag their views.
+  const indexAccessors = new Set<number>();
+  const attributeAccessors = new Set<number>();
+  for (const mesh of json.meshes ?? []) {
+    for (const prim of mesh.primitives ?? []) {
+      if (prim.indices !== undefined) indexAccessors.add(prim.indices);
+      for (const a of Object.values(prim.attributes ?? {})) attributeAccessors.add(a);
+      for (const target of (prim as { targets?: Array<Record<string, number>> }).targets ?? []) {
+        for (const a of Object.values(target)) attributeAccessors.add(a);
+      }
+    }
+  }
+
+  const out: Buffer[] = [];
+  let cursor = 0;
+  const newBufferViews: NonNullable<GlbJson['bufferViews']> = [];
+
+  const pushAligned = (payload: Buffer, target: number | undefined): number => {
+    const pad = (4 - (cursor % 4)) % 4;
+    if (pad > 0) {
+      out.push(Buffer.alloc(pad, 0));
+      cursor += pad;
+    }
+    const bvIdx = newBufferViews.length;
+    newBufferViews.push({
+      buffer: 0,
+      byteOffset: cursor,
+      byteLength: payload.length,
+      ...(target !== undefined ? { target } : {}),
+    });
+    out.push(payload);
+    cursor += payload.length;
+    return bvIdx;
+  };
+
+  // 1. Repack every accessor that references a bufferView into its own tight view.
+  for (let ai = 0; ai < accessors.length; ai++) {
+    const a = accessors[ai];
+    if (a.bufferView === undefined) continue; // sparse-only / generated accessor
+    const srcBv = bufferViews[a.bufferView];
+    if (!srcBv) continue;
+    const comp = COMPONENT_BYTES[a.componentType ?? FLOAT] ?? 4;
+    const nc = TYPE_COMPONENTS[a.type ?? 'SCALAR'] ?? 1;
+    const itemBytes = comp * nc;
+    const stride = srcBv.byteStride ?? itemBytes;
+    const base = (srcBv.byteOffset ?? 0) + (a.byteOffset ?? 0);
+    const count = a.count ?? 0;
+
+    const tight = Buffer.alloc(count * itemBytes);
+    for (let i = 0; i < count; i++) {
+      bin.copy(tight, i * itemBytes, base + i * stride, base + i * stride + itemBytes);
+    }
+
+    const target = indexAccessors.has(ai)
+      ? ELEMENT_ARRAY_BUFFER
+      : attributeAccessors.has(ai)
+        ? ARRAY_BUFFER
+        : srcBv.target;
+    const bvIdx = pushAligned(tight, target);
+    a.bufferView = bvIdx;
+    a.byteOffset = 0;
+  }
+
+  // 2. Copy any bufferView not referenced by an accessor byte-exact (embedded
+  //    texture image data), remapping the references that point at it.
+  const referenced = new Set<number>();
+  for (const a of accessors) if (a.bufferView !== undefined) referenced.add(a.bufferView);
+  const remap = new Map<number, number>();
+  for (let bv = 0; bv < bufferViews.length; bv++) {
+    if (referenced.has(bv)) continue;
+    const src = bufferViews[bv];
+    const start = src.byteOffset ?? 0;
+    const slice = Buffer.from(bin.subarray(start, start + (src.byteLength ?? 0)));
+    const bvIdx = pushAligned(slice, src.target);
+    if (src.byteStride !== undefined) newBufferViews[bvIdx].byteStride = src.byteStride;
+    remap.set(bv, bvIdx);
+  }
+  if (remap.size > 0) {
+    for (const img of (json.images ?? []) as Array<{ bufferView?: number }>) {
+      if (img.bufferView !== undefined && remap.has(img.bufferView)) img.bufferView = remap.get(img.bufferView)!;
+    }
+  }
+
+  json.bufferViews = newBufferViews;
+  const rebuilt = Buffer.concat(out);
+  json.buffers ??= [{ byteLength: 0 }];
+  json.buffers[0] = { ...(json.buffers[0] ?? {}), byteLength: rebuilt.length };
+  return rebuilt;
 }
 
 // ─── Matrix / transform helpers (row-major 4x4) ──────────────────────────────
@@ -926,7 +1062,11 @@ function main(): void {
     } else if (!dryRun) {
       // Make every primitive indexed so THREE merges are all-or-none
       // (CombatantRenderer's weapon merge fails on mixed-index models).
-      const outBin = synthesizeIndices(json, bin);
+      const indexedBin = synthesizeIndices(json, bin);
+      // De-interleave every attribute accessor and compact the BIN, so three's
+      // GLTFLoader yields only plain BufferAttributes and mergeGeometries does
+      // not throw on mixed interleaved/packed gpuType.
+      const outBin = canonicalizeBuffers(json, indexedBin);
       mkdirSync(dirname(targetGlb), { recursive: true });
       writeGlb(targetGlb, json, outBin);
       written = true;
