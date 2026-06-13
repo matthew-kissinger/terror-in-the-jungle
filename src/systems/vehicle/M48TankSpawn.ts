@@ -40,6 +40,7 @@ import type { VehicleManager } from './VehicleManager';
 export function buildM48ChassisMesh(): THREE.Group {
   const root = new THREE.Group();
   root.name = 'm48_chassis_root';
+  root.userData.perfCategory = 'ground_vehicles';
 
   const { length, width, height } = M48_HULL_DIMENSIONS;
 
@@ -98,6 +99,7 @@ export function mountM48TurretMeshes(tank: Tank): void {
   turretBody.scale.set(1.0, 0.55, 1.25); // squashed + elongated fore-aft
   turretBody.position.set(0, 0.35, -0.1);
   turretBody.name = 'm48_turret';
+  turretBody.userData.perfCategory = 'ground_vehicles';
   yawNode.add(turretBody);
 
   const turretRing = new THREE.Mesh(
@@ -106,6 +108,7 @@ export function mountM48TurretMeshes(tank: Tank): void {
   );
   turretRing.position.set(0, 0.05, 0);
   turretRing.name = 'm48_turret_ring';
+  turretRing.userData.perfCategory = 'ground_vehicles';
   yawNode.add(turretRing);
 
   // Commander cupola on the turret roof (cosmetic detail, traverses w/ turret).
@@ -115,6 +118,7 @@ export function mountM48TurretMeshes(tank: Tank): void {
   );
   cupola.position.set(0.5, 0.85, 0.45);
   cupola.name = 'm48_cupola';
+  cupola.userData.perfCategory = 'ground_vehicles';
   yawNode.add(cupola);
 
   // Mantlet: the gun shield where the barrel exits the turret face. Parents
@@ -125,6 +129,7 @@ export function mountM48TurretMeshes(tank: Tank): void {
   );
   mantlet.position.set(0, 0, -0.9);
   mantlet.name = 'm48_mantlet';
+  mantlet.userData.perfCategory = 'ground_vehicles';
   pitchNode.add(mantlet);
 
   // Barrel: 90mm M41 main gun. Centred at -2.5 m along pitch-local -Z so
@@ -136,6 +141,7 @@ export function mountM48TurretMeshes(tank: Tank): void {
   barrel.rotation.x = Math.PI * 0.5; // cylinder +Y -> local -Z
   barrel.position.set(0, 0, -2.5);
   barrel.name = 'm48_barrel';
+  barrel.userData.perfCategory = 'ground_vehicles';
   pitchNode.add(barrel);
 
   // Muzzle brake: short fatter sleeve at the barrel tip.
@@ -146,6 +152,7 @@ export function mountM48TurretMeshes(tank: Tank): void {
   muzzleBrake.rotation.x = Math.PI * 0.5;
   muzzleBrake.position.set(0, 0, -4.85);
   muzzleBrake.name = 'm48_muzzle_brake';
+  muzzleBrake.userData.perfCategory = 'ground_vehicles';
   pitchNode.add(muzzleBrake);
 }
 

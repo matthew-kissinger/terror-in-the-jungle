@@ -1,10 +1,11 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-world-systems-debug-proofs
 
-Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, and
-diagnostic large-mode culling inputs are in progress. Owner alignment is still
-required before default-on sky/cloud/post, full vegetation, terrain authoring,
-source-asset/runtime water work, or certified culling/HLOD remediation.
+Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, trusted
+large-mode diagnostic inputs, and culling owner-path certification are recorded.
+Owner alignment is still required before default-on sky/cloud/post, full
+vegetation, terrain authoring, source-asset/runtime water work, or runtime
+culling/HLOD changes.
 
 Predecessor: `docs/tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md`
 shipped the initial `RendererFeatureProfile` policy surface. This cycle folds
@@ -131,6 +132,11 @@ pushing, merging to `master`, deploying production, and passing
   `wildlife` and `atmosphere` existed in raw attribution but were not counted
   outside `unattributed`. It does not relax the 10% threshold or hide truly
   unnamed/unregistered meshes.
+- Existing runtime primitives now attach diagnostic `userData.perfCategory`
+  ownership without changing visuals, draw calls, materials, gameplay, or asset
+  loading: sun disc, weather rain, zone-control markers, M151/M48 procedural
+  roots and turret meshes, M2HB/AA emplacements, tank shells, ammo crates,
+  weapon pickups, and air-support placeholders.
 - Local gate: `npm run validate:fast` passes; 403 test files and 5,960 tests
   passed on the latest branch run.
 
@@ -206,6 +212,21 @@ pushing, merging to `master`, deploying production, and passing
   evidence, but certification still requires registering/categorizing the
   remaining Open Frontier unnamed geometry or otherwise proving why it is not
   relevant to the branch.
+- After explicit diagnostic ownership tags for existing runtime primitives,
+  the matched no-combat/no-active-player 60s-warmup captures passed attribution
+  trust on the same perf build. Open Frontier:
+  `artifacts/perf/2026-06-13T18-52-45-146Z/summary.json`; visible
+  unattributed triangles dropped to `8.682%`. A Shau:
+  `artifacts/perf/2026-06-13T18-56-10-756Z/summary.json`; visible
+  unattributed triangles dropped to `3.464%`. Remaining unattributed examples
+  are mostly `vehicles/ground/m35-truck.glb`, so future asset-catalog owner
+  tagging can narrow that bucket further without blocking this proof.
+- `npm run check:culling-baseline` now records owner-path certification with a
+  WARN-only caveat for the excluded combat diagnostic:
+  `artifacts/perf/2026-06-13T18-59-10-145Z/projekt-143-culling-owner-baseline/summary.json`.
+  Culling proof trust, Open Frontier trust, A Shau trust, owner-path selection,
+  and both visible-unattributed thresholds passed. The combat diagnostic remains
+  excluded from certification until measurement trust passes.
 - `npm run check:tod-coherence` passed the A Shau 8-TOD hard gate:
   `artifacts/lighting-rig/tod-sweep/gate/verdict.json`. Foliage and NPC
   luminance coherence passed; GLB range ratio still fails only the advisory
@@ -240,7 +261,7 @@ pushing, merging to `master`, deploying production, and passing
 - [x] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,
       not a full Fable `Forests` port or true meshlet Nanite.
 - [ ] Final quiet-machine perf attribution is recorded and compared to R0.
-- [ ] Open Frontier visible unattributed geometry is under the 10% culling
+- [x] Open Frontier visible unattributed geometry is under the 10% culling
       certification threshold, or the remaining bucket is explicitly registered
       and justified.
 - [x] `npm run validate:fast` passes.

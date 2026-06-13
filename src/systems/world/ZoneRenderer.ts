@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { CaptureZone, ZoneState } from './ZoneManager';
 import { Faction, isOpfor } from '../combat/types';
 
+const WORLD_ZONE_PERF_CATEGORY = 'world_zones';
+
 export class ZoneRenderer {
   private scene: THREE.Scene;
 
@@ -50,6 +52,8 @@ export class ZoneRenderer {
     const ringGeometry = new THREE.RingGeometry(zone.radius - 1, zone.radius, 32);
     const ringMaterial = this.getMaterialForState(zone.state);
     zone.zoneMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+    zone.zoneMesh.name = `ZoneRing_${zone.id}`;
+    zone.zoneMesh.userData.perfCategory = WORLD_ZONE_PERF_CATEGORY;
     zone.zoneMesh.rotation.x = -Math.PI / 2;
     zone.zoneMesh.position.copy(zone.position);
     zone.zoneMesh.position.y = terrainHeight + 0.1;
@@ -60,6 +64,8 @@ export class ZoneRenderer {
     const poleGeometry = new THREE.CylinderGeometry(0.2, 0.2, zone.height, 8);
     const poleMaterial = new THREE.MeshBasicMaterial({ color: 0x444444 });
     zone.flagPole = new THREE.Mesh(poleGeometry, poleMaterial);
+    zone.flagPole.name = `ZoneFlagPole_${zone.id}`;
+    zone.flagPole.userData.perfCategory = WORLD_ZONE_PERF_CATEGORY;
     zone.flagPole.position.copy(zone.position);
     zone.flagPole.position.y = terrainHeight + zone.height / 2;
     zone.flagPole.matrixAutoUpdate = true;
@@ -77,6 +83,8 @@ export class ZoneRenderer {
       forceSinglePass: true
     });
     zone.usFlagMesh = new THREE.Mesh(flagGeometry, usFlagMaterial);
+    zone.usFlagMesh.name = `ZoneFlag_US_${zone.id}`;
+    zone.usFlagMesh.userData.perfCategory = WORLD_ZONE_PERF_CATEGORY;
     zone.usFlagMesh.position.copy(zone.position);
     zone.usFlagMesh.position.x += 2.5;
     zone.usFlagMesh.position.y = terrainHeight;
@@ -93,6 +101,8 @@ export class ZoneRenderer {
       forceSinglePass: true
     });
     zone.opforFlagMesh = new THREE.Mesh(flagGeometry, opforFlagMaterial);
+    zone.opforFlagMesh.name = `ZoneFlag_OPFOR_${zone.id}`;
+    zone.opforFlagMesh.userData.perfCategory = WORLD_ZONE_PERF_CATEGORY;
     zone.opforFlagMesh.position.copy(zone.position);
     zone.opforFlagMesh.position.x += 2.5;
     zone.opforFlagMesh.position.y = terrainHeight;
@@ -124,6 +134,8 @@ export class ZoneRenderer {
       forceSinglePass: true
     });
     zone.progressRing = new THREE.Mesh(progressGeometry, progressMaterial);
+    zone.progressRing.name = `ZoneProgressRing_${zone.id}`;
+    zone.progressRing.userData.perfCategory = WORLD_ZONE_PERF_CATEGORY;
     zone.progressRing.rotation.x = -Math.PI / 2;
     zone.progressRing.position.copy(zone.position);
     zone.progressRing.position.y = terrainHeight + 0.2;
@@ -156,6 +168,8 @@ export class ZoneRenderer {
     });
 
     const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.name = `ZoneLabel_${zone.id}`;
+    sprite.userData.perfCategory = WORLD_ZONE_PERF_CATEGORY;
     sprite.position.copy(zone.position);
     sprite.position.y = zone.position.y + zone.height + 3;
     sprite.scale.set(10, 2.5, 1);

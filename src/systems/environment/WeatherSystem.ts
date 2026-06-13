@@ -152,6 +152,8 @@ export class WeatherSystem implements GameSystem {
     });
 
     this.rainMesh = new THREE.InstancedMesh(geometry, material, this.rainCount);
+    this.rainMesh.name = 'WeatherRainInstancedMesh';
+    this.rainMesh.userData.perfCategory = 'weather';
     this.rainMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.rainMesh.frustumCulled = false; // Rain follows camera, bounding sphere won't be accurate
     this.rainMesh.visible = false;

@@ -34,6 +34,7 @@ export function buildM2HBTripod(): {
 } {
   const root = new THREE.Group();
   root.name = 'm2hb_tripod_root';
+  root.userData.perfCategory = 'emplacements';
 
   // Tripod base — three legs in a tetrahedral spread, dark olive.
   const legGeom = new THREE.CylinderGeometry(0.025, 0.025, 1.1, 5);

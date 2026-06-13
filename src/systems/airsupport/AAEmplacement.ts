@@ -335,6 +335,8 @@ export class AAEmplacementSystem implements GameSystem {
 
 function createAAMesh(type: 'zpu4' | '37mm'): THREE.Group {
   const group = new THREE.Group();
+  group.name = `AAEmplacement_${type}`;
+  group.userData.perfCategory = 'emplacements';
   const color = type === 'zpu4' ? 0x445544 : 0x554444;
   // Base platform
   const baseGeom = new THREE.CylinderGeometry(1.2, 1.5, 0.4, 8);
