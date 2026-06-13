@@ -90,7 +90,8 @@ const VEGETATION_TUNING: Record<string, VegetationTuning> = {
     fadeDistance: 360,
     maxDistance: 430,
     baseDensity: 0.8,
-    placement: 'random',
+    placement: 'poisson',
+    poissonMinDistance: 14,
     maxSlopeDeg: 30,
   },
   coconut: {

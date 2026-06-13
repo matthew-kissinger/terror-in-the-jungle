@@ -34,6 +34,17 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     biomeRules: [
       { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, elevationBlendWidth: 4, priority: 2 },
     ],
+    farCanopyTint: {
+      enabled: true,
+      startDistance: 420,
+      endDistance: 980,
+      strength: 0.22,
+      fogStrength: 0.4,
+      coverageDistance: 1400,
+      coverageStrength: 0.14,
+      coverageScale: 210,
+      color: [0.12, 0.26, 0.11],
+    },
   },
   terrainFlow: {
     enabled: true,

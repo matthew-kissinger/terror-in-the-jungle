@@ -511,6 +511,22 @@ function farCanopyTintMask(slopeUp: TslNode, elevation: TslNode, worldPos: TslNo
   );
 }
 
+function farCanopyCoverageMask(slopeUp: TslNode, elevation: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
+  const enabled = step(tslFloat(0.5), tslReference('float', uniforms.farCanopyTintEnabled));
+  const start = tslReference('float', uniforms.farCanopyTintStartDistance);
+  const end = tslMax(start.add(1), tslReference('float', uniforms.farCanopyTintEndDistance));
+  const coverageDistance = tslMax(end.add(1), tslReference('float', uniforms.farCanopyCoverageDistance));
+  const cameraDistance = tslLength(tslCameraPosition.xz.sub(worldPos.xz));
+  const fadeMask = smoothstep(start, end, cameraDistance)
+    .mul(tslFloat(1).sub(smoothstep(coverageDistance, coverageDistance.add(480), cameraDistance)));
+  const terrainMask = smoothstep(tslFloat(0.22), tslFloat(0.82), slopeUp)
+    .mul(tslFloat(1).sub(smoothstep(tslFloat(2600), tslFloat(4300), elevation)));
+  const coverageScale = tslMax(tslFloat(1), tslReference('float', uniforms.farCanopyCoverageScale));
+  const canopyPockets = smoothstep(tslFloat(0.34), tslFloat(0.86), hashUvNode(worldPos.xz.div(coverageScale).add(tslVec2(9.41, 2.17))));
+  return tslClamp(tslReference('float', uniforms.farCanopyCoverageStrength)
+    .mul(enabled).mul(fadeMask).mul(terrainMask).mul(tslMix(tslFloat(0.36), tslFloat(1), canopyPockets)), tslFloat(0), tslFloat(0.42));
+}
+
 function visualEdgeTintMask(worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
   const playableWorldSize = tslReference('float', uniforms.terrainPlayableWorldSize);
   const visualMargin = tslReference('float', uniforms.terrainVisualMargin);
@@ -626,6 +642,11 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const canopyColor = tslReference('color', uniforms.farCanopyTintColor)
     .mul(tslMix(tslFloat(0.82), tslFloat(1.18), hashUvNode(worldPos.xz.mul(0.007).add(tslVec2(1.37, 8.53)))));
   finalColor = tslMix(finalColor, canopyColor, farCanopyMask);
+  const canopyCoverageMask = farCanopyCoverageMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
+  const canopyCoverageColor = canopyColor.mul(
+    tslMix(tslFloat(0.72), tslFloat(1.08), hashUvNode(worldPos.xz.mul(0.014).add(tslVec2(4.91, 6.73)))),
+  );
+  finalColor = tslMix(finalColor, canopyCoverageColor, canopyCoverageMask);
   finalColor = applyFeatureSurfaceColor(finalColor, worldPos, uniforms);
   const visualEdgeMask = visualEdgeTintMask(worldPos, uniforms);
   finalColor = tslMix(finalColor, canopyColor.mul(0.78), visualEdgeMask.mul(0.92));
@@ -827,6 +848,9 @@ export function updateTerrainMaterialFarCanopyTint(
   terrainUniforms.farCanopyTintEndDistance.value = normalized.endDistance;
   terrainUniforms.farCanopyTintStrength.value = normalized.strength;
   terrainUniforms.farCanopyTintFogStrength.value = normalized.fogStrength;
+  terrainUniforms.farCanopyCoverageDistance.value = normalized.coverageDistance;
+  terrainUniforms.farCanopyCoverageStrength.value = normalized.coverageStrength;
+  terrainUniforms.farCanopyCoverageScale.value = normalized.coverageScale;
   (terrainUniforms.farCanopyTintColor.value as THREE.Color).setRGB(
     normalized.color[0],
     normalized.color[1],
@@ -888,7 +912,7 @@ function applyTerrainMaterialOptions(
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
   material.userData.terrainFarCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
   material.userData.terrainAtmosphereLighting = normalizeTerrainAtmosphereLighting(options.atmosphereLighting);
-  material.customProgramCacheKey = () => 'TerrainTSL_v1';
+  material.customProgramCacheKey = () => 'TerrainTSL_v2';
   configureTerrainNodeMaterial(material, shaderBindings.uniforms);
 }
 
@@ -1025,6 +1049,9 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     farCanopyTintEndDistance: { value: farCanopyTint.endDistance },
     farCanopyTintStrength: { value: farCanopyTint.strength },
     farCanopyTintFogStrength: { value: farCanopyTint.fogStrength },
+    farCanopyCoverageDistance: { value: farCanopyTint.coverageDistance },
+    farCanopyCoverageStrength: { value: farCanopyTint.coverageStrength },
+    farCanopyCoverageScale: { value: farCanopyTint.coverageScale },
     farCanopyTintColor: { value: new THREE.Color(
       farCanopyTint.color[0],
       farCanopyTint.color[1],
@@ -1071,6 +1098,9 @@ function normalizeFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): Req
   const endDistance = Math.max(startDistance + 1, farCanopyTint?.endDistance ?? 1400);
   const strength = THREE.MathUtils.clamp(farCanopyTint?.strength ?? 0.28, 0, 0.65);
   const fogStrength = THREE.MathUtils.clamp(farCanopyTint?.fogStrength ?? 0.42, 0, 1);
+  const coverageDistance = Math.max(endDistance, farCanopyTint?.coverageDistance ?? endDistance);
+  const coverageStrength = THREE.MathUtils.clamp(farCanopyTint?.coverageStrength ?? 0, 0, 0.42);
+  const coverageScale = Math.max(1, farCanopyTint?.coverageScale ?? 256);
   const color = farCanopyTint?.color ?? [0.12, 0.26, 0.11];
 
   return {
@@ -1079,6 +1109,9 @@ function normalizeFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): Req
     endDistance,
     strength,
     fogStrength,
+    coverageDistance,
+    coverageStrength,
+    coverageScale,
     color,
   };
 }

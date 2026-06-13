@@ -210,6 +210,9 @@ describe('TerrainMaterial', () => {
         endDistance: 1250,
         strength: 0.28,
         fogStrength: 0.72,
+        coverageDistance: 1600,
+        coverageStrength: 0.18,
+        coverageScale: 220,
         color: [0.12, 0.26, 0.11],
       },
     });
@@ -221,6 +224,9 @@ describe('TerrainMaterial', () => {
     expect(uniforms.farCanopyTintEndDistance.value).toBe(1250);
     expect(uniforms.farCanopyTintStrength.value).toBeCloseTo(0.28);
     expect(uniforms.farCanopyTintFogStrength.value).toBeCloseTo(0.72);
+    expect(uniforms.farCanopyCoverageDistance.value).toBe(1600);
+    expect(uniforms.farCanopyCoverageStrength.value).toBeCloseTo(0.18);
+    expect(uniforms.farCanopyCoverageScale.value).toBe(220);
     expect(mat.colorNode).toBeDefined();
     expect(mat.roughnessNode).toBeDefined();
   });
@@ -278,6 +284,9 @@ describe('TerrainMaterial', () => {
       endDistance: 1600,
       strength: 0.34,
       fogStrength: 0.78,
+      coverageDistance: 2400,
+      coverageStrength: 0.22,
+      coverageScale: 320,
       color: [0.11, 0.25, 0.10],
     });
 
@@ -285,6 +294,9 @@ describe('TerrainMaterial', () => {
     expect(uniforms.farCanopyTintEnabled.value).toBe(1);
     expect(uniforms.farCanopyTintEndDistance.value).toBe(1600);
     expect(uniforms.farCanopyTintFogStrength.value).toBeCloseTo(0.78);
+    expect(uniforms.farCanopyCoverageDistance.value).toBe(2400);
+    expect(uniforms.farCanopyCoverageStrength.value).toBeCloseTo(0.22);
+    expect(uniforms.farCanopyCoverageScale.value).toBe(320);
     expect(uniforms.farCanopyTintColor.value.g).toBeCloseTo(0.25);
   });
 

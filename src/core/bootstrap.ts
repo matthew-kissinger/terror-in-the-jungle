@@ -199,6 +199,10 @@ export async function bootstrapGame(): Promise<void> {
         engine.renderer.getRendererBackendCapabilities()
       );
 
+      (window as any).__rendererFeatureProfile = () => (
+        engine.renderer.getRendererFeatureProfile()
+      );
+
       // R3 TSL shader-cost probe surface. Returns per-material compiled
       // GLSL + sampler / uniform / instruction counts for every TSL
       // node-material tagged with a node-material marker. Used by

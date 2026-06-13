@@ -38,6 +38,9 @@ export interface TerrainFarCanopyTintConfig {
   endDistance?: number;
   strength?: number;
   fogStrength?: number;
+  coverageDistance?: number;
+  coverageStrength?: number;
+  coverageScale?: number;
   color?: readonly [number, number, number];
 }
 
