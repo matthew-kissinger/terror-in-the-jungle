@@ -1,9 +1,10 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-world-systems-debug-proofs
 
-Status: active branch; R1/R2/R3/R4 scaffolds and focused proof gates are in
-progress. Owner alignment is still required before default-on sky/cloud/post,
-full vegetation, terrain authoring, or source-asset/runtime water work.
+Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, and
+diagnostic large-mode culling inputs are in progress. Owner alignment is still
+required before default-on sky/cloud/post, full vegetation, terrain authoring,
+source-asset/runtime water work, or certified culling/HLOD remediation.
 
 Predecessor: `docs/tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md`
 shipped the initial `RendererFeatureProfile` policy surface. This cycle folds
@@ -124,6 +125,12 @@ pushing, merging to `master`, deploying production, and passing
   horizon coverage, or blocked source-asset lanes; it keeps runtime defaults
   off, excludes blocked/source-only species, copies no Fable assets, and
   explicitly refuses true meshlet Nanite.
+- `scripts/check-culling-baseline.ts` now keeps its existing owner categories
+  but includes all explicit scene-attribution buckets in the visible-triangle
+  denominator. This fixes proof-tool drift where current categories such as
+  `wildlife` and `atmosphere` existed in raw attribution but were not counted
+  outside `unattributed`. It does not relax the 10% threshold or hide truly
+  unnamed/unregistered meshes.
 - Local gate: `npm run validate:fast` passes; 403 test files and 5,960 tests
   passed on the latest branch run.
 
@@ -173,6 +180,32 @@ pushing, merging to `master`, deploying production, and passing
   was `0.000ms`; the sampled tail was render/Other dominated (`98.1ms`, 98%)
   with `Player` as the top system (`55.0ms`). Treat this as p99 triage
   evidence, not a quiet baseline.
+- A bounded diagnostic retry of Open Frontier with no combat, no active-player
+  harness, no rebuild, and a longer 60s warmup passed:
+  `artifacts/perf/2026-06-13T18-24-02-167Z/summary.json`. This is a
+  render/terrain/harness isolation packet, not gameplay perf proof. It
+  produced measurement trust PASS (`probeAvg=19.75ms`, `probeP95=30.00ms`),
+  validation WARN, avg `18.75ms`, max p99 `34.20ms`, max frame `35.30ms`,
+  and `0` missed samples. The earlier 100ms p99 failure therefore appears to
+  be late startup/background settling unless reproduced after the longer
+  warmup.
+- The matched A Shau no-combat/no-active-player, 60s-warmup diagnostic passed:
+  `artifacts/perf/2026-06-13T18-26-54-378Z/summary.json`. It produced
+  measurement trust PASS (`probeAvg=20.92ms`, `probeP95=31.00ms`), validation
+  WARN, avg `20.04ms`, max p99 `35.60ms`, max frame `49.70ms`, and `0` missed
+  samples. Treat it as terrain/render/culling input only.
+- `npm run check:culling-baseline` after those diagnostic captures and the
+  scene-attribution denominator fix selected
+  `large-mode-world-static-and-visible-helicopters`, but the packet still
+  failed certification:
+  `artifacts/perf/2026-06-13T18-30-57-630Z/projekt-143-culling-owner-baseline/summary.json`.
+  Culling proof, Open Frontier trust, A Shau trust, and owner-path selection
+  passed. A Shau visible unattributed triangles were under threshold
+  (`8.131%`), but Open Frontier remained over the 10% gate (`12.24%`).
+  Runtime culling/HLOD work may use the selected owner path as directional
+  evidence, but certification still requires registering/categorizing the
+  remaining Open Frontier unnamed geometry or otherwise proving why it is not
+  relevant to the branch.
 - `npm run check:tod-coherence` passed the A Shau 8-TOD hard gate:
   `artifacts/lighting-rig/tod-sweep/gate/verdict.json`. Foliage and NPC
   luminance coherence passed; GLB range ratio still fails only the advisory
@@ -207,6 +240,9 @@ pushing, merging to `master`, deploying production, and passing
 - [x] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,
       not a full Fable `Forests` port or true meshlet Nanite.
 - [ ] Final quiet-machine perf attribution is recorded and compared to R0.
+- [ ] Open Frontier visible unattributed geometry is under the 10% culling
+      certification threshold, or the remaining bucket is explicitly registered
+      and justified.
 - [x] `npm run validate:fast` passes.
 - [ ] Work is committed, pushed, merged to `master`, deployed, and verified
       with `npm run check:live-release`.
