@@ -120,6 +120,34 @@ pushing, merging to `master`, deploying production, and passing
 - Local gate: `npm run validate:fast` passes; 402 test files and 5,955 tests
   passed on the latest branch run.
 
+## Evidence Captured
+
+2026-06-13 proof runs after the R3 gate:
+
+- `npm run check:platform-capabilities -- --run-browser --headless
+  --check-live-headers` wrote
+  `artifacts/perf/2026-06-13T17-38-23-217Z/projekt-143-platform-capability-probe/summary.json`.
+  Local and live cross-origin isolation headers passed. Headless Chromium used
+  SwiftShader and exposed no WebGPU adapter, so this is browser/header evidence,
+  not strict-WebGPU capability proof.
+- `npm run check:tod-coherence` passed the A Shau 8-TOD hard gate:
+  `artifacts/lighting-rig/tod-sweep/gate/verdict.json`. Foliage and NPC
+  luminance coherence passed; GLB range ratio still fails only the advisory
+  check.
+- `npm run evidence:atmosphere` captured ground, sky, and aircraft/cloud shots
+  for A Shau, Open Frontier, TDM, Zone Control, and combat120:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-06-13T17-44-48-827Z/summary.json`.
+  The run completed under `webgpu-webgl-fallback` because this browser exposed
+  no WebGPU adapter, so it is fallback visual evidence rather than strict-WebGPU
+  visual closure.
+- `npm run perf:capture:combat120` produced a measurement-trust PASS packet at
+  `artifacts/perf/2026-06-13T17-49-13-305Z/summary.json`; `npm run
+  perf:compare -- --scenario combat120` printed raw metrics only because the
+  repo has no tracked perf baseline. The capture is directional, not a quiet
+  perf pass: avg `19.61ms`, p95 `32.70ms`, p99 `44.70ms`, max `60.80ms`,
+  heap growth `42.29 MB`. Tail attribution says cover search is not the driver
+  (`0.000ms`); the worst tail is render/Other dominated (`36.5ms`, 82%).
+
 ## Acceptance
 
 - [ ] Owner aligns on debug-only water proof being in scope.
