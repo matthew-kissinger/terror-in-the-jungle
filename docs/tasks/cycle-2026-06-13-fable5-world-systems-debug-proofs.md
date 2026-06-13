@@ -95,6 +95,12 @@ pushing, merging to `master`, deploying production, and passing
 - `GameRenderer` attaches the WebGPU `device.lost` promise after renderer
   init and reports loss through renderer capabilities without blocking startup
   or attempting recovery in this cycle.
+- `src/systems/terrain/HeightfieldErosionAuthoritySpike.ts` adds a CPU
+  diagnostic over TIJ `IHeightProvider` terrain authority. It samples the
+  current height provider, reports slope, sink, flow-strength, and erosion-risk
+  summaries, and explicitly remains debug-only, non-authoritative, and
+  non-mutating. It does not import Fable heightfield code, alter A Shau DEMs,
+  rebuild terrain ownership, or create runtime water.
 - `src/systems/environment/water/DebugWaterProof.ts` adds a pure debug-only
   basin/river sampler. It is non-authoritative and intentionally does not
   implement the dormant buoyancy sampler, so it cannot reactivate gameplay
@@ -104,7 +110,7 @@ pushing, merging to `master`, deploying production, and passing
   source-asset requirements, aggregate LOD bands, WebGPU culling proof
   dependencies, and blocked-source status. It does not add, swap, or activate
   vegetation assets.
-- Local gate: `npm run validate:fast` passes; 400 test files and 5,944 tests
+- Local gate: `npm run validate:fast` passes; 401 test files and 5,948 tests
   passed on the latest branch run.
 
 ## Acceptance
@@ -113,7 +119,7 @@ pushing, merging to `master`, deploying production, and passing
 - [ ] Quiet R0 perf attribution is recorded before world-system changes.
 - [x] Renderer feature profile covers limits, device-loss policy, and proof
       hooks for the new prototype lanes.
-- [ ] Heightfield/erosion remains a spike against TIJ terrain authority; no
+- [x] Heightfield/erosion remains a spike against TIJ terrain authority; no
       terrain authority swap lands.
 - [x] Hydrology/water produces only debug water-level, basin, or river proof
       surfaces; no gameplay water lands.
@@ -123,6 +129,6 @@ pushing, merging to `master`, deploying production, and passing
 - [x] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,
       not a full Fable `Forests` port or true meshlet Nanite.
 - [ ] Final quiet-machine perf attribution is recorded and compared to R0.
-- [ ] `npm run validate:fast` passes.
+- [x] `npm run validate:fast` passes.
 - [ ] Work is committed, pushed, merged to `master`, deployed, and verified
       with `npm run check:live-release`.
