@@ -1,9 +1,10 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-webgpu-world-systems
 
-Status: active; owner alignment complete. R1 WebGPU feature-profile slice is
-implemented in `src/core/RendererFeatureProfile.ts`; broader visual/world
-systems remain gated by the plan below.
+Status: shipped predecessor; R1 WebGPU feature-profile slice is implemented in
+`src/core/RendererFeatureProfile.ts`. Broader visual/world systems are now
+queued in
+`docs/tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md`.
 
 Goal statement: Analyze TIJ and Fable5 end to end, choose the WebGPU-primary
 architecture posture, adapt the useful Fable terrain, erosion, hydrology,

@@ -23,6 +23,14 @@ function makeCapabilities(
       maxStorageBufferBindingSize: 256 * 1024 * 1024,
       maxComputeInvocationsPerWorkgroup: 256,
     },
+    deviceLoss: {
+      supported: true,
+      lost: false,
+      reason: null,
+      message: null,
+      eventCount: 0,
+      lastEventAtMs: null,
+    },
     error: null,
     notes: ['test caps'],
   };
@@ -44,9 +52,13 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.webglCompatibilityMode).toBe('none');
     expect(profile.decisions.webgpuCompute.available).toBe(true);
     expect(profile.decisions.webgpuCompute.policy).toBe('requiredWebGPU');
+    expect(profile.decisions.webgpuCompute.proofHooks).toContain('npm run check:platform-capabilities');
+    expect(profile.requiredLimits.maxComputeInvocationsPerWorkgroup.satisfied).toBe(true);
     expect(profile.decisions.storageBufferWorldFields.available).toBe(true);
     expect(profile.decisions.volumetricCloudPrototype.policy).toBe('diagnosticOnly');
     expect(profile.decisions.gpuForestCulling.policy).toBe('diagnosticOnly');
+    expect(profile.decisions.debugWaterProof.available).toBe(true);
+    expect(profile.decisions.debugWaterProof.policy).toBe('diagnosticOnly');
   });
 
   it('keeps the unified WebGL2 fallback as compatibility without mirroring WebGPU-only systems', () => {
@@ -65,6 +77,7 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.webgpuCompute.available).toBe(false);
     expect(profile.decisions.volumetricCloudPrototype.available).toBe(false);
     expect(profile.decisions.gpuForestCulling.available).toBe(false);
+    expect(profile.decisions.debugWaterProof.available).toBe(true);
   });
 
   it('treats explicit legacy WebGL as diagnostic instead of a new feature target', () => {
@@ -83,6 +96,7 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.sharedTslNodeMaterials.available).toBe(false);
     expect(profile.decisions.webgpuCompute.available).toBe(false);
     expect(profile.decisions.renderPipelinePost.available).toBe(false);
+    expect(profile.decisions.debugWaterProof.available).toBe(false);
   });
 
   it('refuses GPU world fields when the adapter storage-buffer limit is below the cycle floor', () => {
@@ -96,6 +110,7 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.webgpuCompute.available).toBe(true);
     expect(profile.decisions.storageBufferWorldFields.available).toBe(false);
     expect(profile.decisions.storageBufferWorldFields.policy).toBe('diagnosticOnly');
+    expect(profile.requiredLimits.maxStorageBufferBindingSize.satisfied).toBe(false);
     expect(profile.decisions.hydrologyAnalysis.available).toBe(false);
   });
 
@@ -105,5 +120,26 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.runtimeWater.available).toBe(false);
     expect(profile.decisions.runtimeWater.policy).toBe('disabled');
     expect(profile.decisions.runtimeWater.reason).toContain('out of scope');
+    expect(profile.decisions.debugWaterProof.available).toBe(true);
+  });
+
+  it('disables WebGPU-only proof lanes after device loss is reported', () => {
+    const profile = buildRendererFeatureProfile(makeCapabilities({
+      deviceLoss: {
+        supported: true,
+        lost: true,
+        reason: 'unknown',
+        message: 'test device reset',
+        eventCount: 1,
+        lastEventAtMs: 1000,
+      },
+    }));
+
+    expect(profile.posture).toBe('unavailable');
+    expect(profile.deviceLoss.lost).toBe(true);
+    expect(profile.decisions.webgpuCompute.available).toBe(false);
+    expect(profile.decisions.storageBufferWorldFields.available).toBe(false);
+    expect(profile.decisions.debugWaterProof.available).toBe(false);
+    expect(profile.decisions.webgpuCompute.reason).toContain('device loss');
   });
 });
