@@ -24,6 +24,10 @@ import {
   type RendererBackendCapabilities,
   type RendererBackendMode,
 } from './RendererBackend';
+import {
+  buildRendererFeatureProfile,
+  type RendererFeatureProfile,
+} from './RendererFeatureProfile';
 
 /**
  * Default fog / scene-background colour applied before the analytic sky
@@ -337,6 +341,10 @@ export class GameRenderer {
       adapterLimits: { ...this.rendererCapabilities.adapterLimits },
       notes: [...this.rendererCapabilities.notes],
     };
+  }
+
+  getRendererFeatureProfile(): RendererFeatureProfile {
+    return buildRendererFeatureProfile(this.rendererCapabilities);
   }
 
   /**

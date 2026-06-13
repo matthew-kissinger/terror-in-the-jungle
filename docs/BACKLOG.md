@@ -13,6 +13,12 @@ recently-completed retrospectives are archived at
 ## Current state
 See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
+## Proposed next cycle
+
+| slug | status | scope |
+|---|---|---|
+| `cycle-2026-06-13-fable5-webgpu-world-systems` | active; R1 feature profile started | WebGPU-primary feature posture, Fable5 world-system analysis, p99 attribution policy, sky/cloud/post prototype planning, forest/species/Nanite-lite plan, and hydrology/water analysis with runtime water explicitly out of scope. Brief: [docs/tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md](tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md); analysis: [docs/rearch/FABLE5_WEBGPU_WORLD_SYSTEMS_2026-06-13.md](rearch/FABLE5_WEBGPU_WORLD_SYSTEMS_2026-06-13.md). |
+
 ## Owner-gated cycles
 
 Cycles queued but explicitly **not** auto-promoted. Each waits on the named
