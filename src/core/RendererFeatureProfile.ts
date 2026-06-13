@@ -87,6 +87,7 @@ const PROOF_HOOKS: Record<RendererFeatureId, string[]> = {
   ],
   gpuForestCulling: [
     'window.__rendererFeatureProfile().decisions.gpuForestCulling',
+    'npm run check:forest-lod-plan',
     'npm run check:culling-baseline',
   ],
   octahedralImpostorBake: [

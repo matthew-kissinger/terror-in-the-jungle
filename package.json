@@ -170,6 +170,7 @@
     "check:route-quality": "npx tsx scripts/check-route-quality.ts",
     "check:helicopter-parity": "npx tsx scripts/check-helicopter-parity.ts",
     "check:platform-capabilities": "npx tsx scripts/check-platform-capabilities.ts",
+    "check:forest-lod-plan": "vitest run src/systems/terrain/ForestAggregateLodPlan.test.ts",
     "check:sky-cloud-post-proof": "npx tsx scripts/check-sky-cloud-post-proof-gate.ts",
     "evidence:atmosphere": "npx tsx scripts/capture-atmosphere-recovery-shots.ts",
     "capture:tod-sweep": "npx tsx scripts/capture-tod-coherence-sweep.ts",

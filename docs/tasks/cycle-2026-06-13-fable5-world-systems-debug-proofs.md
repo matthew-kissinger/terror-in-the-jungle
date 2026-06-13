@@ -1,9 +1,9 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-world-systems-debug-proofs
 
-Status: active branch; R1/R2 scaffold started. Owner alignment is still
-required before expanding into sky/cloud/post, full vegetation, terrain
-authoring, or species source-asset work.
+Status: active branch; R1/R2/R3/R4 scaffolds and focused proof gates are in
+progress. Owner alignment is still required before default-on sky/cloud/post,
+full vegetation, terrain authoring, or source-asset/runtime water work.
 
 Predecessor: `docs/tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md`
 shipped the initial `RendererFeatureProfile` policy surface. This cycle folds
@@ -117,7 +117,14 @@ pushing, merging to `master`, deploying production, and passing
   source-asset requirements, aggregate LOD bands, WebGPU culling proof
   dependencies, and blocked-source status. It does not add, swap, or activate
   vegetation assets.
-- Local gate: `npm run validate:fast` passes; 402 test files and 5,955 tests
+- `src/systems/terrain/ForestAggregateLodPlan.ts` turns the forest/Nanite-lite
+  idea into a deterministic TIJ decision surface over current vegetation
+  species specs and renderer capability profile. It classifies aggregate cells
+  into current CPU residency, optional WebGPU compact proof, terrain-material
+  horizon coverage, or blocked source-asset lanes; it keeps runtime defaults
+  off, excludes blocked/source-only species, copies no Fable assets, and
+  explicitly refuses true meshlet Nanite.
+- Local gate: `npm run validate:fast` passes; 403 test files and 5,960 tests
   passed on the latest branch run.
 
 ## Evidence Captured
@@ -140,6 +147,12 @@ pushing, merging to `master`, deploying production, and passing
   The renderer profile was `webgpuPrimary`, `renderer=webgpu-strict`,
   device-loss was clear, compute/storage limits passed, and the
   sky/cloud/post diagnostic gate returned `state=webgpu-proof`.
+- `npm run check:forest-lod-plan` passed the R4 aggregate vegetation proof
+  unit gate: accepted runtime species use the current billboard/scatter path or
+  optional WebGPU compact proof, future broadleaf far bands require WebGPU
+  forest culling plus impostor-bake proof hooks, source-spec trees stay blocked
+  without accepted TIJ assets, and horizon canopy resolves through
+  `TerrainMaterial` rather than individual tree geometry.
 - `npm run check:tod-coherence` passed the A Shau 8-TOD hard gate:
   `artifacts/lighting-rig/tod-sweep/gate/verdict.json`. Foliage and NPC
   luminance coherence passed; GLB range ratio still fails only the advisory
