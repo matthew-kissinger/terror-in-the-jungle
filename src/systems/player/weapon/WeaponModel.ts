@@ -86,8 +86,9 @@ export class WeaponModel {
     const adsYRotation = Math.PI / 2 // Straight forward for ADS
     weaponRig.rotation.y = THREE.MathUtils.lerp(baseYRotation, adsYRotation, adsProgress)
 
-    // X rotation: tilt barrel UPWARD toward crosshair + reload animation + switch animation
-    const baseXRotation = THREE.MathUtils.degToRad(18) // More upward tilt when not ADS
+    // X rotation: keep hip-fire presentation lower than ADS while still
+    // raising smoothly to the sight line.
+    const baseXRotation = THREE.MathUtils.degToRad(8)
     const adsXRotation = 0 // Level for sight alignment
     const reloadRotation = this.reload.getReloadRotation()
     weaponRig.rotation.x = THREE.MathUtils.lerp(baseXRotation, adsXRotation, adsProgress) + recoilOffset.rotX + reloadRotation.x + switchOffset.rotX

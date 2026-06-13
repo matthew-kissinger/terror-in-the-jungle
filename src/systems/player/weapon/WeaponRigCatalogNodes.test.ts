@@ -251,7 +251,7 @@ describe('WeaponRigManager magazine grouping preserves world pose (weapon-mag-tr
     scene.rotation.y = Math.PI / 2
     rig.add(scene)
     rig.scale.set(1.5, 1.5, 1.5)
-    rig.position.set(0.5, -0.45, -0.75)
+    rig.position.set(0.5, -0.6, -0.82)
     rig.updateMatrixWorld(true)
     return rig
   }

@@ -43,39 +43,17 @@ import {
 const DOME_RADIUS = 500;
 const DOME_WIDTH_SEGMENTS = 64;
 const DOME_HEIGHT_SEGMENTS = 32;
-// Cycle `tsl-preetham-fragment-port` (2026-05-17): the visual dome is now
-// per-fragment-shaded via TSL. The 32x32 backing texture is the only
-// remaining CPU-baked LUT — it serves `sample()` / `getZenith()` /
-// `getHorizon()` for fog + hemisphere readers, NOT the dome itself.
-// Mode `'lut-bake'` (back-out) keeps a `MeshBasicMaterial` reading the
-// 32x32 texture as a fallback for browsers / mobile GPUs where the TSL
-// dome regresses. Per the spike Section 4 acceptance: net memory is a
-// small reduction vs the pre-port baseline (256x128 half-float ⇒ 32x32
-// half-float).
-//
-// Cycle `skylut-resolution-bump` (2026-05-19): elevation rows bumped
-// 8 → 32 to eliminate banded fog/hemisphere reads under the post-AGX
-// exposure range. The 8-row quantisation produced discrete radiance
-// bins at Open Frontier midday ("random dark spots" on terrain) and
-// hard fog-color steps at low elevation that read as a visible
-// "skybox edge through terrain" on A Shau flyovers. Memory delta:
-// +3 KB (256 → 1024 half-float texels for the GPU fallback texture)
-// + 2.25 KB (768 → 3072 floats for the CPU LUT). Bake cost: ~4x a
-// sub-millisecond op, well inside the 2 s / 8 s refresh cadence.
+// The TSL dome is per-fragment shaded. This 32x32 half-float LUT remains for
+// CPU fog/hemisphere readers and the `lut-bake` fallback; the row count keeps
+// low-elevation fog reads from banding.
 const SKY_TEXTURE_WIDTH = 32;
 const SKY_TEXTURE_HEIGHT = 32;
 
 const LUT_AZIMUTH_BINS = 32;
 const LUT_ELEVATION_BINS = 32;
 
-// Elevation-keyed sun↔moon blend for the bakeLUT sun-color path.
-// At -2° elevation (sun just below the horizon, the "vibe band" of civil
-// twilight) the warm Fex transmittance is preserved; at -8° and below the
-// sun color reads cool moonlight rather than the long-path-amplified deep
-// red the raw Fex extinction produces. Owner-default civil-twilight band
-// per `docs/rearch/SUN_AND_ATMOSPHERE_VISION_2026-05-16.md` Section 6
-// question 2 recommendation (b). MOON_COLOR is the cool-moonlight target
-// from spike Section 2 vision + Section 4 night target.
+// Elevation-keyed sun/moon blend for bakeLUT: warm civil twilight near -2deg,
+// cool moonlight below -8deg.
 const MOON_COLOR = new THREE.Color(0.18, 0.20, 0.30);
 const TWILIGHT_UPPER_RAD = Math.PI / 180 * -2; // sun warm above this
 const TWILIGHT_LOWER_RAD = Math.PI / 180 * -8; // pure moon below this
@@ -106,6 +84,8 @@ const CLOUD_DECK_ALTITUDE_METERS = 1800;
 const CLOUD_MAX_TRACE_METERS = 14000;
 const CLOUD_HORIZON_FADE_START_Y = 0.035;
 const CLOUD_HORIZON_FADE_FULL_Y = 0.2;
+const CLOUD_MIX_BASE_WEIGHT = 0.26;
+const CLOUD_MIX_COVERAGE_GAIN = 0.68;
 
 /**
  * Angular threshold (cosine form) at which a sun-direction change forces a
@@ -577,6 +557,12 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     return this.cloudMaskAtDirection(this.scratchDir);
   }
 
+  sampleCloudVisualWeightForDebug(direction: THREE.Vector3): number {
+    const len = Math.hypot(direction.x, direction.y, direction.z) || 1;
+    this.scratchDir.set(direction.x / len, direction.y / len, direction.z / len);
+    return this.cloudVisualWeightAtDirection(this.scratchDir);
+  }
+
   sample(dir: THREE.Vector3, out: THREE.Color): THREE.Color {
     this.ensureLUT();
     const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
@@ -754,11 +740,8 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
   }
 
   private mixCloudDeck(direction: THREE.Vector3, color: THREE.Color): void {
-    const mask = this.cloudMaskAtDirection(direction);
-    if (mask <= 0.001) return;
-
-    const horizonFade = smoothstep(CLOUD_HORIZON_FADE_START_Y, CLOUD_HORIZON_FADE_FULL_Y, direction.y);
-    const cloudWeight = mask * horizonFade * (0.18 + 0.58 * clamp01(this.cloudCoverage));
+    const cloudWeight = this.cloudVisualWeightAtDirection(direction);
+    if (cloudWeight <= 0.001) return;
     this.scratchCloudColor.setRGB(
       0.78 + this.sunColor.r * 0.16,
       0.80 + this.sunColor.g * 0.14,
@@ -791,6 +774,14 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     const lower = 0.82 + (0.22 - 0.82) * clamp01(this.cloudCoverage);
     const mask = smoothstep(lower, lower + 0.24, field);
     return mask * horizonFade;
+  }
+
+  private cloudVisualWeightAtDirection(direction: THREE.Vector3): number {
+    const mask = this.cloudMaskAtDirection(direction);
+    if (mask <= 0.001) return 0;
+    const horizonFade = smoothstep(CLOUD_HORIZON_FADE_START_Y, CLOUD_HORIZON_FADE_FULL_Y, direction.y);
+    const mixWeight = CLOUD_MIX_BASE_WEIGHT + CLOUD_MIX_COVERAGE_GAIN * clamp01(this.cloudCoverage);
+    return clamp01(mask * horizonFade * mixWeight);
   }
 
   dispose(): void {

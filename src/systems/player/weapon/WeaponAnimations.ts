@@ -35,7 +35,7 @@ export class WeaponAnimations {
   private swayOffset = { x: 0, y: 0 }
 
   // Base position (relative to screen)
-  private readonly basePosition = { x: 0.5, y: -0.45, z: -0.75 }
+  private readonly basePosition = { x: 0.5, y: -0.6, z: -0.82 }
   private readonly adsPosition = { x: 0.0, y: -0.18, z: -0.55 }
 
   private baseFOV = 75 // Store base FOV for zoom effect

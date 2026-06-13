@@ -31,9 +31,16 @@ export const M151_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   mass: 1120,
   wheelbase: 2.06,
   trackWidth: 1.42,
-  engineTorque: 240,
-  maxSteer: 0.6,
-  maxClimbSlope: 0.54,
+  engineTorque: 420,
+  gearRatio: 5.2,
+  maxSteer: 0.58,
+  maxClimbSlope: 0.76,
+  rollingCoef: 85,
+  velocityDamping: 0.88,
+  angularDamping: 0.76,
+  lateralGripDamping: 0.08,
+  slopeDriveFloor: 0.65,
+  slopeGravityScale: 0.28,
 };
 
 const M151_MAX_HP = 250;
@@ -56,18 +63,34 @@ const M35_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   mass: 5900,
   wheelbase: 4.2,
   trackWidth: 1.9,
-  engineTorque: 820,
+  engineTorque: 1800,
+  gearRatio: 5.4,
   maxSteer: 0.46,
-  maxClimbSlope: 0.34,
+  maxClimbSlope: 0.66,
+  rollingCoef: 260,
+  airDragCoef: 4,
+  velocityDamping: 0.87,
+  angularDamping: 0.74,
+  lateralGripDamping: 0.07,
+  slopeDriveFloor: 0.6,
+  slopeGravityScale: 0.28,
 };
 
 const APC_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   mass: 12300,
   wheelbase: 3.4,
   trackWidth: 2.3,
-  engineTorque: 980,
+  engineTorque: 2100,
+  gearRatio: 5.2,
   maxSteer: 0.42,
-  maxClimbSlope: 0.42,
+  maxClimbSlope: 0.68,
+  rollingCoef: 420,
+  airDragCoef: 5,
+  velocityDamping: 0.87,
+  angularDamping: 0.74,
+  lateralGripDamping: 0.06,
+  slopeDriveFloor: 0.6,
+  slopeGravityScale: 0.28,
 };
 
 interface GroundVehicleRuntimeProfile {

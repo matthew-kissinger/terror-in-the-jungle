@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-13 (Fable/world-systems release-decision run: proof/scaffold subset is release-safe, default-on terrain/water/sky/forest/HLOD/Nanite-lite expansions remain owner-gated, and latest live-release proof is required for the final decision-record HEAD; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual acceptance remains open across the PLAYTEST_PENDING registry)
+Last verified: 2026-06-13 (world-systems runtime release candidate: accepted jungle vegetation aggregate LOD remains in scope, first-person weapons are lowered, wheeled/tracked vehicles get an arcade-hybrid grip/slope baseline, existing sky-dome clouds get a safe visibility retune, and terrain ownership/runtime water/full Fable forest/Nanite/WebGPU post replacement remain default-off; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,6 +30,30 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
+- **2026-06-13 — world-systems runtime release candidate**
+  (`cycle-2026-06-13-world-systems-runtime-release`): latest `master` now has
+  player-facing runtime changes in flight, not only proof records. The
+  accepted vegetation aggregate LOD pass remains the vegetation scope for this
+  release: `JungleGroundRing`, far-canopy coverage, and the accepted
+  `fanPalm`/`coconut` canopy tier ship; broadleaf/rubber/banyan/mangrove/
+  elephant-grass source assets remain blocked until an accepted asset pass.
+  First-person weapon hip presentation is lowered for all guns while ADS stays
+  level. Wheeled and tracked vehicle physics now add lateral grip,
+  slope-drive floor, reduced grounded slope gravity, and retuned M151,
+  M35/ZIL, and M113 profiles for less ice-rink drift and better hill authority;
+  the shared ground follow camera is also pulled back/up so promoted trucks and
+  APCs do not trap the view inside the hull.
+  Existing sky-dome clouds receive a safe visibility-weight retune; the deeper
+  WebGPU-only sky/cloud/post replacement remains matrix-gated and default-off.
+  No terrain ownership swap, runtime water, wholesale Fable assets, full forest
+  port, or true meshlet Nanite ships in this release. Local runtime proof is
+  green across focused tests, `validate:fast`, `validate`, vegetation horizon /
+  grounding, TOD coherence, land-vehicle runtime proof, browser smoke, and Open
+  Frontier startup. Strict `perf:quick` all-green is a no-go for this slice
+  because the standard run still fails heap recovery and warns on p99; the CDP
+  forced-GC diagnostic shows heap can recover but is not clean frame-tail proof,
+  and `check:memory` is stale against the current deploy flow. Push, deploy,
+  exact-HEAD CI, and live-release proof are still required for final closeout.
 - **2026-06-13 — Fable/world-systems release-decision run**
   (`cycle-2026-06-13-world-systems-release-decision-run`): latest `master`
   is treated as the release candidate. The proof/scaffold subset is GO:

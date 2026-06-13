@@ -6,37 +6,14 @@ import { FixedStepRunner } from '../../utils/FixedStepRunner';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 /**
- * Hand-rolled tracked-vehicle physics — fixed-step rigid-body sim sized for the
- * M48 tank slice per docs/rearch/TANK_SYSTEMS_2026-05-13.md.
- *
- * Sibling (not subclass) of GroundVehiclePhysics. Reuses the fixed-1/60 s
- * integration loop shape from the wheeled chassis, substituting Ackermann with
- * skid-steer: independent leftTrackSpeed / rightTrackSpeed combine into
- * chassis-frame forward velocity + yaw rate via standard differential-drive
- * kinematics (memo §"Locomotion: skid-steer"):
- *
- *   v_forward = (leftTrackSpeed + rightTrackSpeed) * 0.5 * maxTrackSpeed
- *   omega_y   = (rightTrackSpeed - leftTrackSpeed) * maxTrackSpeed
- *                / trackSeparation
- *
- * Ground constraint samples four chassis corners (front-left, front-right,
- * rear-left, rear-right) against the fenced ITerrainRuntime height field, with
- * one center-normal sample driving pitch + roll conform. ITerrainRuntime is
- * consumed read-only — no fence change.
- *
- * The tracks-blown state pins per-track speeds to zero (driver throttle/turn
- * input is accepted but produces no chassis motion); chassis tilt and terrain
- * conform remain functional so the turret can still slew and fire (turret
- * rig lives in a separate file, cycle #9). Slope-stall scales the per-track
- * forward force by (1 - slope / maxClimbSlope), matching the GroundVehicle
- * pattern (and going to zero at the climb-slope limit).
- *
- * No external physics library: explicit Euler integration with exponential
- * damping, no broadphase, no constraint solver.
+ * Fixed-step skid-steer chassis for M48-class tanks. The runtime stays
+ * hand-rolled: four terrain corner samples, one center normal, explicit Euler
+ * integration, and no broadphase/constraint solver.
  */
 
 // ---------- Module-scope scratch vectors / quaternions ----------
 const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
 const _worldUp = new THREE.Vector3(0, 1, 0);
 const _normal = new THREE.Vector3();
 const _yawAxis = new THREE.Vector3(0, 1, 0);
@@ -52,38 +29,26 @@ const CORNER_LABELS = ['FL', 'FR', 'RL', 'RR'] as const;
 const MAX_ACCUMULATED_STEP_SECONDS = 0.75;
 
 export interface TrackedVehicleControls {
-  /** Forward/back throttle axis: W - S, range [-1, +1]. */
   throttleAxis: number;
-  /** Turn axis: D - A (right positive), range [-1, +1]. */
   turnAxis: number;
-  /** Brake pedal magnitude, range [0, 1]. */
   brake: number;
 }
 
 export interface TrackedVehiclePhysicsConfig {
-  /** Chassis mass (kg). M48 ~ 46000. */
   mass: number;
-  /** Lateral distance between track centerlines (m). M48 ~ 2.92, T-55 ~ 2.64. */
   trackSeparation: number;
-  /** Hull length used for corner sampling (m). M48 ~ 6.4. */
   hullLength: number;
-  /** Chassis-origin Y above ground contact (m). */
   axleOffset: number;
-  /** Per-track ground speed at full-deflection input (m/s). M48 ~ 12 m/s on road. */
   maxTrackSpeed: number;
-  /** Peak braking force (N). */
   maxBrake: number;
-  /** Maximum climbable slope before drive force fades to zero (rad). Tank ~ 0.61. */
   maxClimbSlope: number;
-  /** Linear rolling drag coefficient (N per m/s). */
   rollingCoef: number;
-  /** Quadratic air drag (N per (m/s)^2). Negligible for tanks but kept for parity. */
   airDragCoef: number;
-  /** Exponential damping base for linear velocity (per second). */
   velocityDamping: number;
-  /** Exponential damping base for angular velocity (per second). */
   angularDamping: number;
-  /** Per-second lerp rate from raw track command toward smoothed track speed. */
+  lateralGripDamping: number;
+  slopeDriveFloor: number;
+  slopeGravityScale: number;
   inputSmoothRate: number;
 }
 
@@ -128,14 +93,17 @@ const DEFAULT_PHYSICS: TrackedVehiclePhysicsConfig = {
   trackSeparation: 2.92,
   hullLength: 6.4,
   axleOffset: 0.55,
-  maxTrackSpeed: 12,
+  maxTrackSpeed: 13,
   maxBrake: 240000,
-  maxClimbSlope: 0.61,
+  maxClimbSlope: 0.72,
   rollingCoef: 1800,
   airDragCoef: 8,
-  velocityDamping: 0.85,
-  angularDamping: 0.75,
-  inputSmoothRate: 4.0,
+  velocityDamping: 0.8,
+  angularDamping: 0.7,
+  lateralGripDamping: 0.05,
+  slopeDriveFloor: 0.5,
+  slopeGravityScale: 0.28,
+  inputSmoothRate: 5.0,
 };
 
 const SPEED_EPS = 1e-4;
@@ -536,7 +504,7 @@ export class TrackedVehiclePhysics {
   ): void {
     const {
       mass, trackSeparation, maxTrackSpeed, rollingCoef, airDragCoef,
-      maxBrake, maxClimbSlope,
+      maxBrake, maxClimbSlope, slopeDriveFloor,
     } = this.cfg;
 
     // Chassis-forward in world frame (model convention: local -Z forward).
@@ -548,7 +516,12 @@ export class TrackedVehiclePhysics {
     if (terrain && this.state.isGrounded) {
       const slope = terrain.getSlopeAt(this.state.position.x, this.state.position.z);
       if (slope > 0 && maxClimbSlope > 0) {
-        slopeFactor = THREE.MathUtils.clamp(1 - slope / maxClimbSlope, 0, 1);
+        slopeFactor = slope >= maxClimbSlope
+          ? 0
+          : Math.max(
+              THREE.MathUtils.clamp(slopeDriveFloor, 0, 1),
+              THREE.MathUtils.clamp(1 - slope / maxClimbSlope, 0, 1),
+            );
       }
     }
 
@@ -621,7 +594,7 @@ export class TrackedVehiclePhysics {
         -gDotN * normal.x,
         this.GRAVITY - gDotN * normal.y,
         -gDotN * normal.z,
-      ).multiplyScalar(mass);
+      ).multiplyScalar(mass * this.cfg.slopeGravityScale);
     } else {
       _gravityVec.set(0, this.GRAVITY * mass, 0);
     }
@@ -630,6 +603,7 @@ export class TrackedVehiclePhysics {
     this.state.velocity.x += (fx + _gravityVec.x) / mass * deltaTime;
     this.state.velocity.y += _gravityVec.y / mass * deltaTime;
     this.state.velocity.z += (fz + _gravityVec.z) / mass * deltaTime;
+    this.applyGroundTraction(deltaTime);
 
     // Integrate position from velocity.
     this.state.position.addScaledVector(this.state.velocity, deltaTime);
@@ -651,6 +625,18 @@ export class TrackedVehiclePhysics {
       _yawQuat.setFromAxisAngle(_yawAxis, angle);
       this.state.quaternion.premultiply(_yawQuat).normalize();
     }
+  }
+
+  private applyGroundTraction(deltaTime: number): void {
+    if (!this.state.isGrounded) return;
+    _right.set(1, 0, 0).applyQuaternion(this.state.quaternion).normalize();
+    const lateralSpeed = this.state.velocity.dot(_right);
+    if (Math.abs(lateralSpeed) < 1e-5) return;
+    const retained = Math.pow(
+      THREE.MathUtils.clamp(this.cfg.lateralGripDamping, 0, 1),
+      deltaTime,
+    );
+    this.state.velocity.addScaledVector(_right, -lateralSpeed * (1 - retained));
   }
 
   // ---------- Damping ----------
