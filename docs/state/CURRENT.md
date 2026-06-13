@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-12 (war-asset repaint cycle close: 191-GLB generated catalog live across all five consumer classes, `check:live-release` ALL PASS on the close deploy, combat120 steady-state p99 33.40ms vs the 35.39 halt line; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual acceptance remains open across the PLAYTEST_PENDING registry)
+Last verified: 2026-06-13 (Fable/world-systems release-decision run: proof/scaffold subset is release-safe, default-on terrain/water/sky/forest/HLOD/Nanite-lite expansions remain owner-gated, and latest live-release proof is required for the final decision-record HEAD; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,10 +26,30 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-06-12)
+## Current focus (2026-06-13)
 
 The most recent shipped work, newest first:
 
+- **2026-06-13 — Fable/world-systems release-decision run**
+  (`cycle-2026-06-13-world-systems-release-decision-run`): latest `master`
+  is treated as the release candidate. The proof/scaffold subset is GO:
+  renderer feature profile/device-loss/limits reporting, debug
+  heightfield/erosion spike, debug water proof, sky/cloud/post proof gate,
+  Vietnam vegetation species/source specs, forest aggregate LOD planner,
+  culling attribution tags, and documentation. The risky expansions stay
+  default-off/deferred: terrain authority swap, runtime water,
+  sky/cloud/post replacement, new vegetation source assets, runtime
+  forest/HLOD, and true meshlet Nanite. Release truth for the final
+  decision-record commit is `npm run validate`, `npm run deploy:prod`,
+  optional exact-HEAD `npm run ci:manual`, and `npm run check:live-release`.
+- **2026-06-13 — Fable5 world-system debug proofs**
+  (`cycle-2026-06-13-fable5-world-systems-debug-proofs`, deployed
+  `6796a6a6`): Fable5 is reference-only. The cycle shipped TIJ-owned
+  diagnostics and proof hooks for heightfield/erosion, debug-only water,
+  strict-WebGPU sky/cloud/post proof, Vietnam species specs, forest aggregate
+  LOD planning, and culling attribution. It did not copy Fable assets, swap
+  terrain authority, reactivate gameplay water, default-on cloud/post, or ship
+  runtime HLOD/Nanite.
 - **2026-06-12 — war-asset repaint integration** (`cycle-2026-06-11-war-asset-repaint`,
   12 PRs #383-#394, deployed `9c64c0bf`): the 108-asset Pixel Forge repaint
   flows through a generalized importer (`npm run assets:import-war-catalog` —

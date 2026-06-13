@@ -1,10 +1,11 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-world-systems-debug-proofs
 
-Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, strict
-WebGPU all-mode visual matrix, trusted large-mode diagnostic inputs, and
-culling owner-path certification are recorded. Owner alignment is still
-required before default-on sky/cloud/post, full vegetation, terrain authoring,
+Status: shipped scaffold/proof subset on `master`; R1/R2/R3/R4 scaffolds,
+focused proof gates, strict WebGPU all-mode visual matrix, trusted large-mode
+diagnostic inputs, culling owner-path certification, production deploy, and
+live-release proof are recorded. Owner alignment is still required before
+default-on sky/cloud/post, full vegetation, terrain authoring,
 source-asset/runtime water work, or runtime culling/HLOD changes. A current A
 Shau final quiet rerun has status `ok`, validation WARN, and measurement-trust
 PASS; residual A Shau Player/Weather/Zone warnings remain triage items, not
@@ -345,5 +346,5 @@ pushing, merging to `master`, deploying production, and passing
       certification threshold, or the remaining bucket is explicitly registered
       and justified.
 - [x] `npm run validate:fast` passes.
-- [ ] Work is committed, pushed, merged to `master`, deployed, and verified
+- [x] Work is committed, pushed, merged to `master`, deployed, and verified
       with `npm run check:live-release`.
