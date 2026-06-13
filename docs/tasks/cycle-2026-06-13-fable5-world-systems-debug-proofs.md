@@ -130,6 +130,16 @@ pushing, merging to `master`, deploying production, and passing
   Local and live cross-origin isolation headers passed. Headless Chromium used
   SwiftShader and exposed no WebGPU adapter, so this is browser/header evidence,
   not strict-WebGPU capability proof.
+- `npm run check:platform-capabilities -- --run-browser --check-live-headers`
+  wrote
+  `artifacts/perf/2026-06-13T17-54-31-607Z/projekt-143-platform-capability-probe/summary.json`.
+  Headed Chromium exposed the RTX 3070 WebGPU adapter; local and live
+  cross-origin isolation headers passed.
+- `npm run check:sky-cloud-post-proof` passed strict-WebGPU gate proof:
+  `artifacts/proofs/sky-cloud-post/2026-06-13T17-56-58-158Z/summary.json`.
+  The renderer profile was `webgpuPrimary`, `renderer=webgpu-strict`,
+  device-loss was clear, compute/storage limits passed, and the
+  sky/cloud/post diagnostic gate returned `state=webgpu-proof`.
 - `npm run check:tod-coherence` passed the A Shau 8-TOD hard gate:
   `artifacts/lighting-rig/tod-sweep/gate/verdict.json`. Foliage and NPC
   luminance coherence passed; GLB range ratio still fails only the advisory

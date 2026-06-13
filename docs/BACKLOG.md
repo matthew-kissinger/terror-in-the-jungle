@@ -17,7 +17,7 @@ See [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 | slug | status | scope |
 |---|---|---|
-| `cycle-2026-06-13-fable5-world-systems-debug-proofs` | active branch; R1/R2/R3/R4 scaffolds plus terrain spike and fallback visual/perf evidence recorded; owner alignment, strict-WebGPU proof, quiet perf, and release still pending | Fold Fable5 heightfield/erosion, debug-only hydrology/water proof, WebGPU-only sky/cloud/post spike, generated Vietnam species specs, forest GPU culling/LOD, Nanite-lite aggregate evaluation, and renderer capability hardening into one TIJ-owned world-systems cycle without wholesale ports. Brief: [docs/tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md](tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md); predecessor analysis: [docs/rearch/FABLE5_WEBGPU_WORLD_SYSTEMS_2026-06-13.md](rearch/FABLE5_WEBGPU_WORLD_SYSTEMS_2026-06-13.md). |
+| `cycle-2026-06-13-fable5-world-systems-debug-proofs` | active branch; R1/R2/R3/R4 scaffolds plus terrain spike, strict-WebGPU gate proof, and fallback visual/perf evidence recorded; owner alignment, strict visual matrix, quiet perf, and release still pending | Fold Fable5 heightfield/erosion, debug-only hydrology/water proof, WebGPU-only sky/cloud/post spike, generated Vietnam species specs, forest GPU culling/LOD, Nanite-lite aggregate evaluation, and renderer capability hardening into one TIJ-owned world-systems cycle without wholesale ports. Brief: [docs/tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md](tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md); predecessor analysis: [docs/rearch/FABLE5_WEBGPU_WORLD_SYSTEMS_2026-06-13.md](rearch/FABLE5_WEBGPU_WORLD_SYSTEMS_2026-06-13.md). |
 
 ## Owner-gated cycles
 
