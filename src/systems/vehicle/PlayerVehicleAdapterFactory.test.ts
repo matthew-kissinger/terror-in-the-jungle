@@ -116,7 +116,10 @@ interface Harness {
   exitSpy: ReturnType<typeof vi.spyOn>;
 }
 
-async function buildHarness(vehicles: Array<{ vehicle: any; position: THREE.Vector3 }>): Promise<Harness> {
+async function buildHarness(
+  vehicles: Array<{ vehicle: any; position: THREE.Vector3 }>,
+  options: { playerFaction?: Faction } = {},
+): Promise<Harness> {
   const vehicleManager = new VehicleManager();
   await vehicleManager.init();
   for (const { vehicle } of vehicles) {
@@ -131,6 +134,9 @@ async function buildHarness(vehicles: Array<{ vehicle: any; position: THREE.Vect
     vehicleManager,
     () => playerState.position,
     () => session.isInVehicle(),
+    options.playerFaction
+      ? { getPlayerFaction: () => options.playerFaction ?? null }
+      : {},
   );
   proximityChecker.setHUDSystem(hud);
 
@@ -234,6 +240,22 @@ describe('PlayerVehicleAdapterFactory.tryBoardNearest', () => {
     expect(vehicleType).toBe('tank');
     expect(vehicleId).toBe('m48_tank_of_us_fob');
     expect(h.session.getVehicleType()).toBe('tank');
+  });
+
+  it('does not board an enemy-owned tank from a non-boardable prompt', async () => {
+    const tank = new Tank('m48_tank_of_nva_fob', makeObject(new THREE.Vector3(10, 0, 10)), Faction.NVA);
+    const h = await buildHarness(
+      [{ vehicle: tank, position: tank.getPosition() }],
+      { playerFaction: Faction.US },
+    );
+
+    primePrompt(h.proximityChecker, h.playerState.position, tank.getPosition());
+
+    expect(h.hud.showInteractionPrompt).toHaveBeenCalledWith('Enemy M48 Patton tank - cannot board');
+    expect(h.proximityChecker.getLastShownVehicleId()).toBeNull();
+    expect(h.factory.tryBoardNearest()).toBe(false);
+    expect(h.enterSpy).not.toHaveBeenCalled();
+    expect(tank.getPilotId()).toBeNull();
   });
 
   it('dispatches a Sampan prompt through the watercraft adapter', async () => {

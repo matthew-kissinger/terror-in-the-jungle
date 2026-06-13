@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-13 (world-systems runtime release candidate: accepted jungle vegetation aggregate LOD remains in scope, first-person weapons are lowered, wheeled/tracked vehicles get an arcade-hybrid grip/slope baseline, existing sky-dome clouds get a safe visibility retune, and terrain ownership/runtime water/full Fable forest/Nanite/WebGPU post replacement remain default-off; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last verified: 2026-06-13 (world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`: accepted jungle vegetation aggregate LOD remains in scope, first-person weapons are lowered, wheeled/tracked vehicles get an arcade-hybrid grip/slope baseline, existing sky-dome clouds get a safe visibility retune, and terrain ownership/runtime water/full Fable forest/Nanite/WebGPU post replacement remain default-off; next cycle is the world-systems promotion-gate run that turns remaining Fable-derived lanes into GO/SPIKE/NO-GO decisions; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,9 +30,10 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
-- **2026-06-13 — world-systems runtime release candidate**
-  (`cycle-2026-06-13-world-systems-runtime-release`): latest `master` now has
-  player-facing runtime changes in flight, not only proof records. The
+- **2026-06-13 — world-systems runtime release**
+  (`cycle-2026-06-13-world-systems-runtime-release`, deployed
+  `965f4fe5760896e57a40ffa46f571695403412e4`): latest `master` has
+  player-facing runtime changes, not only proof records. The
   accepted vegetation aggregate LOD pass remains the vegetation scope for this
   release: `JungleGroundRing`, far-canopy coverage, and the accepted
   `fanPalm`/`coconut` canopy tier ship; broadleaf/rubber/banyan/mangrove/
@@ -52,8 +53,20 @@ The most recent shipped work, newest first:
   Frontier startup. Strict `perf:quick` all-green is a no-go for this slice
   because the standard run still fails heap recovery and warns on p99; the CDP
   forced-GC diagnostic shows heap can recover but is not clean frame-tail proof,
-  and `check:memory` is stale against the current deploy flow. Push, deploy,
-  exact-HEAD CI, and live-release proof are still required for final closeout.
+  and `check:memory` is stale against the current deploy flow. Exact-HEAD CI
+  run `27482202770`, deploy run `27482272756`, and `npm run check:live-release`
+  all passed; live proof is
+  `artifacts/perf/2026-06-13T23-29-50-702Z/projekt-143-live-release-proof/release-proof.json`.
+- **2026-06-13 — world-systems promotion gates**
+  (`cycle-2026-06-13-world-systems-promotion-gates`): current next-cycle
+  scaffold turns the remaining Fable-derived topics into explicit GO/SPIKE/
+  NO-GO decisions. Safe runtime promotions are limited to existing accepted
+  vegetation/runtime renderer policy and vehicle interaction clarity; terrain
+  authority, debug water, sky/cloud/post, and forest aggregate LOD remain spike
+  lanes; runtime water, true meshlet Nanite, and wholesale Fable asset/species
+  ports are no-go until separately approved. The code-backed ledger is
+  `src/systems/world/WorldSystemsPromotionGate.ts` with gate script
+  `npm run check:world-systems-promotion`.
 - **2026-06-13 — Fable/world-systems release-decision run**
   (`cycle-2026-06-13-world-systems-release-decision-run`): latest `master`
   is treated as the release candidate. The proof/scaffold subset is GO:

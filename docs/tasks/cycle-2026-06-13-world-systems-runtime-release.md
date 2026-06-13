@@ -1,10 +1,9 @@
 <!-- Runtime release record. Source: current master + Fable5/TIJ world-system evidence, 2026-06-13. -->
 # cycle-2026-06-13-world-systems-runtime-release
 
-Status: active runtime release candidate with local proof complete. This cycle
-converts the safe Fable/world-systems reference work into player-facing TIJ
-improvements where the gate is strong enough, and marks every risky lane
-default-off or no-go.
+Status: closed and deployed on 2026-06-13. This cycle converted the safe
+Fable/world-systems reference work into player-facing TIJ improvements where
+the gate was strong enough, and marked every risky lane default-off or no-go.
 
 Worktree: `C:\Users\Mattm\X\games-3d\terror-in-the-jungle-fable-debug-proofs`
 on `master`.
@@ -102,14 +101,11 @@ to `master`, pushed, deployed with `npm run deploy:prod`, and proven live by
 
 ## Release Closeout
 
-The cycle is not complete at local green. Close only after:
-
-- Commit accepted code/docs on `master`.
-- Push `master`.
-- Run exact-HEAD CI, using `npm run ci:manual` if the push does not trigger a
-  blocking CI run.
-- Run `npm run deploy:prod`.
-- Run `npm run check:live-release` and record the deployed SHA.
+- Commit/push: `965f4fe5760896e57a40ffa46f571695403412e4` on `master`.
+- Exact-HEAD CI: run `27482202770` passed.
+- Production deploy: run `27482272756` passed.
+- Live proof: `npm run check:live-release` PASS with artifact
+  `artifacts/perf/2026-06-13T23-29-50-702Z/projekt-143-live-release-proof/release-proof.json`.
 
 ## Acceptance
 
@@ -120,6 +116,6 @@ The cycle is not complete at local green. Close only after:
 - [x] Risky Fable-derived lanes are explicitly default-off or no-go.
 - [x] Local validation gates pass for the final tree.
 - [x] Browser/playtest screenshots are inspected after runtime changes.
-- [ ] Accepted code/docs are committed and pushed to `master`.
-- [ ] Production deploy succeeds.
-- [ ] `npm run check:live-release` passes for the deployed SHA.
+- [x] Accepted code/docs are committed and pushed to `master`.
+- [x] Production deploy succeeds.
+- [x] `npm run check:live-release` passes for the deployed SHA.

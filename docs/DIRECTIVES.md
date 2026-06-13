@@ -1,6 +1,6 @@
 # Directives
 
-Last verified: 2026-06-13 (world-systems runtime release candidate: first-person weapons lowered, wheeled/tracked vehicle physics retuned toward arcade-hybrid grip/slope behavior, existing sky-dome cloud contribution strengthened, accepted jungle vegetation aggregate LOD retained; terrain ownership/runtime water/full Fable forest/Nanite/default-on WebGPU post replacement remain default-off; owner visual/feel review remains before final directive close).
+Last verified: 2026-06-13 (world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`: first-person weapons lowered, wheeled/tracked vehicle physics retuned toward arcade-hybrid grip/slope behavior, existing sky-dome cloud contribution strengthened, accepted jungle vegetation aggregate LOD retained; terrain ownership/runtime water/full Fable forest/Nanite/default-on WebGPU post replacement remain default-off; owner visual/feel review remains before final directive close).
 
 Active directive list. Each row is binary `open` / `code-complete` / `done` / `closed`, owning subsystem, latest evidence (one link or short pointer), and the most load-bearing success criterion. Verbose evidence has moved to per-id memo files; carry-over discipline remains [docs/CARRY_OVERS.md](CARRY_OVERS.md); historical ledger prose at [docs/archive/PROJEKT_OBJEKT_143/](archive/PROJEKT_OBJEKT_143/).
 

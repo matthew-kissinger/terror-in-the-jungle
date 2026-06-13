@@ -10,18 +10,20 @@ import {
 } from './GroundVehicleProximityChecker';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
 import type { IVehicle, VehicleCategory } from './IVehicle';
+import { Faction } from '../combat/types';
 
 /**
  * Minimal IVehicle stand-in for the checker's read-only surface. The
  * checker only reads `vehicleId`, `category`, `isDestroyed()`, and
  * `getPosition()`, so the fake covers exactly those.
  */
-class FakeVehicle implements Pick<IVehicle, 'vehicleId' | 'category' | 'isDestroyed' | 'getPosition'> {
+class FakeVehicle implements Pick<IVehicle, 'vehicleId' | 'category' | 'faction' | 'isDestroyed' | 'getPosition'> {
   constructor(
     public vehicleId: string,
     public category: VehicleCategory,
     private position: THREE.Vector3,
     private destroyed = false,
+    public faction: Faction = Faction.US,
   ) {}
   isDestroyed(): boolean {
     return this.destroyed;
@@ -259,6 +261,82 @@ describe('GroundVehicleProximityChecker', () => {
     // Walk out of range → prompt hides, id goes back to null
     playerPos.set(20, 0, 0);
     checker.checkPlayerProximity();
+    expect(checker.getLastShownVehicleId()).toBeNull();
+  });
+
+  it('marks a friendly vehicle as boardable when player faction is known', () => {
+    const tank = new FakeVehicle('m48_tank_of_us_fob', 'ground', new THREE.Vector3(3, 0, 0), false, Faction.US);
+    const manager = makeVehicleManager([tank]);
+    const hud = makeHud();
+    const checker = new GroundVehicleProximityChecker(
+      manager as never,
+      () => new THREE.Vector3(0, 0, 0),
+      () => false,
+      { getPlayerFaction: () => Faction.ARVN },
+    );
+    checker.setHUDSystem(hud);
+
+    checker.checkPlayerProximity();
+
+    expect(hud.showInteractionPrompt).toHaveBeenCalledWith('Press F to board M48 Patton tank (friendly)');
+    expect(checker.getLastShownVehicleId()).toBe('m48_tank_of_us_fob');
+  });
+
+  it('shows enemy ownership without exposing the vehicle id for boarding', () => {
+    const tank = new FakeVehicle('m48_tank_of_nva_fob', 'ground', new THREE.Vector3(3, 0, 0), false, Faction.NVA);
+    const manager = makeVehicleManager([tank]);
+    const hud = makeHud();
+    const checker = new GroundVehicleProximityChecker(
+      manager as never,
+      () => new THREE.Vector3(0, 0, 0),
+      () => false,
+      { getPlayerFaction: () => Faction.US },
+    );
+    checker.setHUDSystem(hud);
+
+    checker.checkPlayerProximity();
+
+    expect(hud.showInteractionPrompt).toHaveBeenCalledWith('Enemy M48 Patton tank - cannot board');
+    expect(checker.getLastShownVehicleId()).toBeNull();
+  });
+
+  it('prefers a boardable friendly vehicle over a closer enemy prompt', () => {
+    const enemyTank = new FakeVehicle('m48_tank_of_nva_fob', 'ground', new THREE.Vector3(1, 0, 0), false, Faction.NVA);
+    const friendlyJeep = new FakeVehicle('motor_pool_small_m151', 'ground', new THREE.Vector3(5, 0, 0), false, Faction.US);
+    const manager = makeVehicleManager([enemyTank, friendlyJeep]);
+    const hud = makeHud();
+    const checker = new GroundVehicleProximityChecker(
+      manager as never,
+      () => new THREE.Vector3(0, 0, 0),
+      () => false,
+      { getPlayerFaction: () => Faction.US },
+    );
+    checker.setHUDSystem(hud);
+
+    checker.checkPlayerProximity();
+
+    expect(hud.showInteractionPrompt).toHaveBeenCalledWith('Press F to board M151 Jeep (friendly)');
+    expect(checker.getLastShownVehicleId()).toBe('motor_pool_small_m151');
+  });
+
+  it('hides an enemy-only prompt when the player walks away', () => {
+    const tank = new FakeVehicle('m48_tank_of_nva_fob', 'ground', new THREE.Vector3(3, 0, 0), false, Faction.NVA);
+    const manager = makeVehicleManager([tank]);
+    const hud = makeHud();
+    const playerPos = new THREE.Vector3(0, 0, 0);
+    const checker = new GroundVehicleProximityChecker(
+      manager as never,
+      () => playerPos,
+      () => false,
+      { getPlayerFaction: () => Faction.US },
+    );
+    checker.setHUDSystem(hud);
+
+    checker.checkPlayerProximity();
+    playerPos.set(20, 0, 0);
+    checker.checkPlayerProximity();
+
+    expect(hud.hideInteractionPrompt).toHaveBeenCalledTimes(1);
     expect(checker.getLastShownVehicleId()).toBeNull();
   });
 });

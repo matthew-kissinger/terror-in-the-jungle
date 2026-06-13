@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
+import { type Faction, isAlly } from '../combat/types';
 import type { IVehicle, VehicleCategory } from './IVehicle';
 import type { VehicleManager } from './VehicleManager';
 
@@ -34,6 +35,8 @@ const DRIVABLE_CATEGORIES: ReadonlySet<DrivableCategory> = new Set([
   'emplacement',
 ]);
 
+export type VehiclePromptRelation = 'unknown' | 'friendly' | 'enemy';
+
 /**
  * Resolve the per-vehicle copy for the prompt. Matches against vehicle id
  * substrings rather than category alone so we can distinguish M151 / M48
@@ -45,37 +48,50 @@ const DRIVABLE_CATEGORIES: ReadonlySet<DrivableCategory> = new Set([
  * The `category === 'emplacement'` filter therefore wins regardless of id
  * substring, and we only fall back to `m151_*` / `pbr_*` after that.
  */
-export function resolveVehiclePromptCopy(vehicle: IVehicle): string {
+export function resolveVehiclePromptCopy(
+  vehicle: IVehicle,
+  relation: VehiclePromptRelation = 'unknown',
+): string {
+  const displayName = resolveVehicleDisplayName(vehicle);
+  if (relation === 'enemy') {
+    return `Enemy ${displayName} - cannot board`;
+  }
+  const action = vehicle.category === 'emplacement' ? 'crew' : 'board';
+  const suffix = relation === 'friendly' ? ' (friendly)' : '';
+  return `Press F to ${action} ${displayName}${suffix}`;
+}
+
+function resolveVehicleDisplayName(vehicle: IVehicle): string {
   const id = vehicle.vehicleId;
   if (vehicle.category === 'emplacement') {
-    return 'Press F to crew M2HB emplacement';
+    return 'M2HB emplacement';
   }
   if (id.startsWith('m48_') || id.includes('_m48_')) {
-    return 'Press F to board M48 Patton tank';
+    return 'M48 Patton tank';
   }
   if (id.includes('m35')) {
-    return 'Press F to board M35 cargo truck';
+    return 'M35 cargo truck';
   }
   if (id.includes('m113')) {
-    return 'Press F to board M113 APC';
+    return 'M113 APC';
   }
   if (id.includes('zil_157') || id.includes('zil157')) {
-    return 'Press F to board ZIL-157 truck';
+    return 'ZIL-157 truck';
   }
   if (id.startsWith('pbr_') || id.includes('_pbr_')) {
-    return 'Press F to board PBR gunboat';
+    return 'PBR gunboat';
   }
   if (id.startsWith('sampan_') || id.includes('_sampan_')) {
-    return 'Press F to board Sampan';
+    return 'Sampan';
   }
   // M151 jeeps are registered with feature-derived ids (e.g.
   // `motor_pool_small_m151`), so we match the `_m151` token rather than a
   // strict prefix. Fall through to the generic ground label otherwise.
   if (id.startsWith('m151_') || id.includes('_m151') || vehicle.category === 'ground') {
-    return 'Press F to board M151 Jeep';
+    return 'M151 Jeep';
   }
   // Final fallback — covers any future watercraft that hasn't been named yet.
-  return 'Press F to board vehicle';
+  return 'vehicle';
 }
 
 interface ProximityCheckerOptions {
@@ -83,17 +99,28 @@ interface ProximityCheckerOptions {
   checkIntervalSeconds?: number;
   /** Override the 6 m radius. */
   promptRadiusMeters?: number;
+  /** Optional player faction for friendly/enemy boardability prompts. */
+  getPlayerFaction?: () => Faction | null;
+}
+
+interface PromptCandidate {
+  vehicle: IVehicle;
+  relation: VehiclePromptRelation;
+  boardable: boolean;
+  distanceSq: number;
 }
 
 export class GroundVehicleProximityChecker {
   private readonly vehicleManager: VehicleManager;
   private readonly getPlayerPosition: () => THREE.Vector3 | null;
   private readonly isPlayerInVehicle: () => boolean;
+  private readonly getPlayerFaction: () => Faction | null;
   private hudSystem: IHUDSystem | null = null;
   private readonly checkIntervalSeconds: number;
   private readonly promptRadiusMeters: number;
   private accumulator = 0;
   private lastShownVehicleId: string | null = null;
+  private lastPromptCopy: string | null = null;
 
   constructor(
     vehicleManager: VehicleManager,
@@ -106,6 +133,7 @@ export class GroundVehicleProximityChecker {
     this.isPlayerInVehicle = isPlayerInVehicle;
     this.checkIntervalSeconds = options.checkIntervalSeconds ?? CHECK_INTERVAL_S;
     this.promptRadiusMeters = options.promptRadiusMeters ?? PROMPT_RADIUS_M;
+    this.getPlayerFaction = options.getPlayerFaction ?? (() => null);
   }
 
   setHUDSystem(hudSystem: IHUDSystem): void {
@@ -156,26 +184,32 @@ export class GroundVehicleProximityChecker {
       return;
     }
 
-    const nearest = this.findNearestDrivable(playerPos);
-    if (!nearest) {
+    const candidate = this.findPromptCandidate(playerPos);
+    if (!candidate) {
       this.hidePrompt();
       return;
     }
 
     // Skip flashing the panel if the same vehicle is still nearest.
-    if (this.lastShownVehicleId === nearest.vehicleId) return;
+    const promptCopy = resolveVehiclePromptCopy(candidate.vehicle, candidate.relation);
+    const nextShownVehicleId = candidate.boardable ? candidate.vehicle.vehicleId : null;
+    if (this.lastPromptCopy === promptCopy) {
+      this.lastShownVehicleId = nextShownVehicleId;
+      return;
+    }
 
-    this.lastShownVehicleId = nearest.vehicleId;
-    this.hudSystem.showInteractionPrompt(resolveVehiclePromptCopy(nearest));
+    this.lastShownVehicleId = nextShownVehicleId;
+    this.lastPromptCopy = promptCopy;
+    this.hudSystem.showInteractionPrompt(promptCopy);
   }
 
-  private findNearestDrivable(playerPos: THREE.Vector3): IVehicle | null {
+  private findPromptCandidate(playerPos: THREE.Vector3): PromptCandidate | null {
     const candidates = this.vehicleManager.getVehiclesInRadius(
       playerPos,
       this.promptRadiusMeters,
     );
-    let best: IVehicle | null = null;
-    let bestDistanceSq = Infinity;
+    let bestBoardable: PromptCandidate | null = null;
+    let bestEnemy: PromptCandidate | null = null;
     for (const vehicle of candidates) {
       if (!DRIVABLE_CATEGORIES.has(vehicle.category as DrivableCategory)) continue;
       if (vehicle.isDestroyed()) continue;
@@ -185,17 +219,35 @@ export class GroundVehicleProximityChecker {
       const dx = vehiclePos.x - playerPos.x;
       const dz = vehiclePos.z - playerPos.z;
       const distanceSq = dx * dx + dz * dz;
-      if (distanceSq < bestDistanceSq) {
-        bestDistanceSq = distanceSq;
-        best = vehicle;
+      const relation = this.resolveRelation(vehicle);
+      const boardable = relation !== 'enemy';
+      const candidate: PromptCandidate = {
+        vehicle,
+        relation,
+        boardable,
+        distanceSq,
+      };
+      if (boardable) {
+        if (!bestBoardable || distanceSq < bestBoardable.distanceSq) {
+          bestBoardable = candidate;
+        }
+      } else if (!bestEnemy || distanceSq < bestEnemy.distanceSq) {
+        bestEnemy = candidate;
       }
     }
-    return best;
+    return bestBoardable ?? bestEnemy;
+  }
+
+  private resolveRelation(vehicle: IVehicle): VehiclePromptRelation {
+    const playerFaction = this.getPlayerFaction();
+    if (!playerFaction) return 'unknown';
+    return isAlly(playerFaction, vehicle.faction) ? 'friendly' : 'enemy';
   }
 
   private hidePrompt(): void {
-    if (this.lastShownVehicleId === null) return;
+    if (this.lastPromptCopy === null) return;
     this.lastShownVehicleId = null;
+    this.lastPromptCopy = null;
     this.hudSystem?.hideInteractionPrompt();
   }
 }

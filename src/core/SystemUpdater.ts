@@ -305,6 +305,7 @@ export class SystemUpdater {
     const vehicleManager = refs.vehicleManager;
     const playerController = refs.playerController;
     const hudSystem = refs.hudSystem;
+    const loadoutService = (refs as Partial<SystemKeyToType>).loadoutService;
     if (!vehicleManager || !playerController || !hudSystem) return;
 
     // `isInAnyVehicle()` covers helicopter, fixed-wing, ground vehicles
@@ -320,6 +321,9 @@ export class SystemUpdater {
       vehicleManager,
       () => playerController.getPosition(),
       isInVehicle,
+      {
+        getPlayerFaction: () => loadoutService?.getContext().faction ?? null,
+      },
     );
     this.groundVehicleProximityChecker.setHUDSystem(hudSystem);
 
