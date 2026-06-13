@@ -153,6 +153,26 @@ pushing, merging to `master`, deploying production, and passing
   forest culling plus impostor-bake proof hooks, source-spec trees stay blocked
   without accepted TIJ assets, and horizon canopy resolves through
   `TerrainMaterial` rather than individual tree geometry.
+- `npm run check:culling-proof` passed headed culling proof:
+  `artifacts/perf/2026-06-13T18-11-23-014Z/projekt-143-culling-proof/summary.json`.
+  The proof records visible category counts for world static features,
+  aircraft, helicopters, vegetation impostors, NPC impostors, and close NPC
+  GLBs before any runtime forest-culling work lands.
+- `npm run check:culling-baseline` after that proof still failed:
+  `artifacts/perf/2026-06-13T18-11-31-836Z/projekt-143-culling-owner-baseline/summary.json`.
+  Culling proof trust passed, but Open Frontier and A Shau trusted perf inputs
+  were missing, so this packet does not authorize runtime culling or HLOD
+  changes yet.
+- `npm run perf:capture:openfrontier:short` produced a non-trusted failed
+  large-mode perf artifact:
+  `artifacts/perf/2026-06-13T18-11-43-267Z/summary.json`. The capture
+  collected 118 samples and passed frame progression, average frame time, hitch
+  rate, console-error, and end-heap checks, but failed validation on peak p99
+  `100.00ms` and heap peak-growth `131.59 MB`; measurement trust was WARN
+  (`probeAvg=29.67ms`, `probeP95=46.00ms`). Tail attribution says cover search
+  was `0.000ms`; the sampled tail was render/Other dominated (`98.1ms`, 98%)
+  with `Player` as the top system (`55.0ms`). Treat this as p99 triage
+  evidence, not a quiet baseline.
 - `npm run check:tod-coherence` passed the A Shau 8-TOD hard gate:
   `artifacts/lighting-rig/tod-sweep/gate/verdict.json`. Foliage and NPC
   luminance coherence passed; GLB range ratio still fails only the advisory
