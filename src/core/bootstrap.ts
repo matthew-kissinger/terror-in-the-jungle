@@ -9,6 +9,10 @@ import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
 import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
 import { collectNodeMaterialShaders } from './RendererBackend';
+import {
+  buildSkyCloudPostProofGate,
+  readSkyCloudPostProofRequestFromSearch,
+} from '../systems/environment/SkyCloudPostProofGate';
 import { Logger } from '../utils/Logger';
 import { preloadIcons } from '../ui/icons/IconRegistry';
 import { isFlightTestMode } from '../dev/flightTestMode';
@@ -201,6 +205,13 @@ export async function bootstrapGame(): Promise<void> {
 
       (window as any).__rendererFeatureProfile = () => (
         engine.renderer.getRendererFeatureProfile()
+      );
+
+      (window as any).__skyCloudPostProofGate = () => (
+        buildSkyCloudPostProofGate(
+          engine.renderer.getRendererFeatureProfile(),
+          readSkyCloudPostProofRequestFromSearch(window.location.search),
+        )
       );
 
       // R3 TSL shader-cost probe surface. Returns per-material compiled

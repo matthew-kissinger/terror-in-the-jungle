@@ -95,6 +95,13 @@ pushing, merging to `master`, deploying production, and passing
 - `GameRenderer` attaches the WebGPU `device.lost` promise after renderer
   init and reports loss through renderer capabilities without blocking startup
   or attempting recovery in this cycle.
+- `src/systems/environment/SkyCloudPostProofGate.ts` composes the
+  `renderPipelinePost` and `volumetricCloudPrototype` renderer decisions into a
+  single strict-WebGPU diagnostic proof gate. The gate stays default-off,
+  exposes `window.__skyCloudPostProofGate()` under the existing diagnostics
+  surface, names `AtmosphereSystem/LightingRig` as the sole lighting authority,
+  blocks WebGL2 fallback mirroring, and records the required visual matrix
+  before any sky/cloud/post path can become default-on.
 - `src/systems/terrain/HeightfieldErosionAuthoritySpike.ts` adds a CPU
   diagnostic over TIJ `IHeightProvider` terrain authority. It samples the
   current height provider, reports slope, sink, flow-strength, and erosion-risk
@@ -110,7 +117,7 @@ pushing, merging to `master`, deploying production, and passing
   source-asset requirements, aggregate LOD bands, WebGPU culling proof
   dependencies, and blocked-source status. It does not add, swap, or activate
   vegetation assets.
-- Local gate: `npm run validate:fast` passes; 401 test files and 5,948 tests
+- Local gate: `npm run validate:fast` passes; 402 test files and 5,955 tests
   passed on the latest branch run.
 
 ## Acceptance
@@ -123,7 +130,7 @@ pushing, merging to `master`, deploying production, and passing
       terrain authority swap lands.
 - [x] Hydrology/water produces only debug water-level, basin, or river proof
       surfaces; no gameplay water lands.
-- [ ] Sky/cloud/post prototype remains WebGPU-only and proof-gated.
+- [x] Sky/cloud/post prototype remains WebGPU-only and proof-gated.
 - [x] Generated species are Vietnam definitions/specs only; no Fable assets or
       generated species are copied.
 - [x] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,

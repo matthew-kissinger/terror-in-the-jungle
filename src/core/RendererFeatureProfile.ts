@@ -77,10 +77,12 @@ const PROOF_HOOKS: Record<RendererFeatureId, string[]> = {
   ],
   renderPipelinePost: [
     'window.__rendererFeatureProfile().decisions.renderPipelinePost',
+    'window.__skyCloudPostProofGate()',
     'npm run check:tod-coherence',
   ],
   volumetricCloudPrototype: [
     'window.__rendererFeatureProfile().decisions.volumetricCloudPrototype',
+    'window.__skyCloudPostProofGate()',
     'npm run check:tod-coherence',
   ],
   gpuForestCulling: [
