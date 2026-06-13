@@ -99,8 +99,13 @@ pushing, merging to `master`, deploying production, and passing
   basin/river sampler. It is non-authoritative and intentionally does not
   implement the dormant buoyancy sampler, so it cannot reactivate gameplay
   water or watercraft.
-- Local gate: `npm run validate:fast` passed after regenerating the Pixel Forge
-  NPC crop map timestamp artifact; 399 test files and 5,938 tests passed.
+- `src/config/VietnamVegetationSpecies.ts` translates the Fable generated
+  species / forest LOD / Nanite-lite ideas into TIJ-owned Vietnam species,
+  source-asset requirements, aggregate LOD bands, WebGPU culling proof
+  dependencies, and blocked-source status. It does not add, swap, or activate
+  vegetation assets.
+- Local gate: `npm run validate:fast` passes; 400 test files and 5,944 tests
+  passed on the latest branch run.
 
 ## Acceptance
 
@@ -113,9 +118,9 @@ pushing, merging to `master`, deploying production, and passing
 - [x] Hydrology/water produces only debug water-level, basin, or river proof
       surfaces; no gameplay water lands.
 - [ ] Sky/cloud/post prototype remains WebGPU-only and proof-gated.
-- [ ] Generated species are Vietnam definitions/specs only; no Fable assets or
+- [x] Generated species are Vietnam definitions/specs only; no Fable assets or
       generated species are copied.
-- [ ] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,
+- [x] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,
       not a full Fable `Forests` port or true meshlet Nanite.
 - [ ] Final quiet-machine perf attribution is recorded and compared to R0.
 - [ ] `npm run validate:fast` passes.
