@@ -19,6 +19,13 @@ const {
   mockVegetationPendingCounts,
   mockVegetationDebugInfo,
   mockVegetationReadyAround,
+  mockJungleGroundRingConfigure,
+  mockJungleGroundRingSetWorldBounds,
+  mockJungleGroundRingRegenerateAll,
+  mockJungleGroundRingSetExclusionZones,
+  mockJungleGroundRingUpdateBudgeted,
+  mockJungleGroundRingPendingCounts,
+  mockJungleGroundRingDebugInfo,
   mockUpdateFarCanopyTint,
   mockUpdateAtmosphereLighting,
   mockBakeHeightmapSurface,
@@ -55,6 +62,31 @@ const {
     },
   }),
   mockVegetationReadyAround: vi.fn().mockReturnValue(true),
+  mockJungleGroundRingConfigure: vi.fn(),
+  mockJungleGroundRingSetWorldBounds: vi.fn(),
+  mockJungleGroundRingRegenerateAll: vi.fn(),
+  mockJungleGroundRingSetExclusionZones: vi.fn(),
+  mockJungleGroundRingUpdateBudgeted: vi.fn().mockReturnValue(false),
+  mockJungleGroundRingPendingCounts: vi.fn().mockReturnValue({ adds: 0, removals: 0 }),
+  mockJungleGroundRingDebugInfo: vi.fn().mockReturnValue({
+    cellSize: 32,
+    radiusCells: 3,
+    activeCells: 0,
+    targetCells: 0,
+    pendingAdditions: 0,
+    pendingRemovals: 0,
+    lastPlayerCell: null,
+    lastUpdate: {
+      requestedAddBudget: 0,
+      resolvedAddBudget: 0,
+      maxRemovalsPerFrame: 0,
+      addedCells: 0,
+      removedCells: 0,
+      generatedInstances: 0,
+      emptyCells: 0,
+      lastGeneratedCell: null,
+    },
+  }),
   mockUpdateFarCanopyTint: vi.fn(),
   mockUpdateAtmosphereLighting: vi.fn(),
   mockBakeHeightmapSurface: vi.fn().mockResolvedValue({
@@ -161,6 +193,21 @@ vi.mock('./VegetationScatterer', () => ({
   },
 }));
 
+vi.mock('./JungleGroundRing', () => ({
+  JungleGroundRing: class {
+    configure = mockJungleGroundRingConfigure;
+    setWorldBounds = mockJungleGroundRingSetWorldBounds;
+    setExclusionZones = mockJungleGroundRingSetExclusionZones;
+    update = vi.fn();
+    updateBudgeted = mockJungleGroundRingUpdateBudgeted;
+    getPendingCounts = mockJungleGroundRingPendingCounts;
+    getDebugInfo = mockJungleGroundRingDebugInfo;
+    clear = vi.fn();
+    regenerateAll = mockJungleGroundRingRegenerateAll;
+    dispose = vi.fn();
+  },
+}));
+
 vi.mock('../combat/LOSAccelerator', () => ({
   LOSAccelerator: class {
     registerChunk = vi.fn();
@@ -239,6 +286,13 @@ describe('TerrainSystem', () => {
     mockVegetationUpdateBudgeted.mockClear();
     mockVegetationPendingCounts.mockClear();
     mockVegetationReadyAround.mockClear();
+    mockJungleGroundRingConfigure.mockClear();
+    mockJungleGroundRingSetWorldBounds.mockClear();
+    mockJungleGroundRingRegenerateAll.mockClear();
+    mockJungleGroundRingSetExclusionZones.mockClear();
+    mockJungleGroundRingUpdateBudgeted.mockClear();
+    mockJungleGroundRingPendingCounts.mockClear();
+    mockJungleGroundRingDebugInfo.mockClear();
     mockUpdateFarCanopyTint.mockClear();
     mockUpdateAtmosphereLighting.mockClear();
     mockBakeHeightmapSurface.mockClear();
@@ -369,6 +423,7 @@ describe('TerrainSystem', () => {
       expect(terrain.getPlayableWorldSize()).toBe(500);
       expect(terrain.getVisualWorldSize()).toBeGreaterThan(terrain.getPlayableWorldSize());
       expect(mockVegetationSetWorldBounds).toHaveBeenLastCalledWith(500, 320);
+      expect(mockJungleGroundRingSetWorldBounds).toHaveBeenLastCalledWith(500, 320);
     });
 
     it('rebakes from the provider when a visual margin needs source-backed terrain beyond the prepared map', async () => {
@@ -435,6 +490,45 @@ describe('TerrainSystem', () => {
       await terrain.init();
       terrain.setBiomeConfig('highland', []);
       expect(mockVegetationRegenerateAll).toHaveBeenCalled();
+      expect(mockJungleGroundRingRegenerateAll).toHaveBeenCalled();
+    });
+
+    it('keeps near ground cover in JungleGroundRing while scatterer receives mid and canopy types', async () => {
+      const billboard = makeMockBillboard();
+      billboard.getActiveVegetationTypes.mockReturnValue([
+        { id: 'fern', tier: 'groundCover' },
+        { id: 'fanPalm', tier: 'midLevel' },
+        { id: 'banyan', tier: 'canopy' },
+      ]);
+      terrain = new TerrainSystem(
+        scene,
+        makeMockCamera(),
+        makeMockAssetLoader(),
+        billboard,
+        { size: 64, renderDistance: 6, loadDistance: 7, lodLevels: 4 },
+      );
+
+      await terrain.init();
+
+      expect(mockJungleGroundRingConfigure).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'fern', tier: 'groundCover' }),
+          expect.objectContaining({ id: 'fanPalm', tier: 'midLevel' }),
+          expect.objectContaining({ id: 'banyan', tier: 'canopy' }),
+        ]),
+        'denseJungle',
+        expect.any(Map),
+        [],
+      );
+      expect(mockVegetationConfigure).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ id: 'fanPalm', tier: 'midLevel' }),
+          expect.objectContaining({ id: 'banyan', tier: 'canopy' }),
+        ],
+        'denseJungle',
+        expect.any(Map),
+        [],
+      );
     });
 
     it('setBiomeConfig configures billboard system with every participating biome', () => {

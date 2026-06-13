@@ -21,22 +21,20 @@ import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
 import { bakeGameplayQueryGrid, computeGameplayQueryGridSize, computeTerrainSurfaceGridSize, TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
 import { VisualExtentHeightProvider } from './VisualExtentHeightProvider';
-import { VegetationScatterer, type VegetationScattererDebugInfo } from './VegetationScatterer';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { TerrainStreamingScheduler } from './streaming/TerrainStreamingScheduler';
 import {
   buildTerrainVegetationRuntimeConfig,
 } from './TerrainBiomeRuntimeConfig';
 import { createTerrainConfig, computeDefaultLODRanges, computeMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
+import { TerrainVegetationRuntime, type TerrainVegetationRuntimeDebugInfo } from './TerrainVegetationRuntime';
 
 interface TerrainStreamingMetricDebug {
   name: string;
   budgetMs: number;
   timeMs: number;
   pendingUnits: number;
-  debug?: {
-    vegetation?: VegetationScattererDebugInfo;
-  };
+  debug?: TerrainVegetationRuntimeDebugInfo;
 }
 
 interface TerrainModeSurfaceOptions {
@@ -84,7 +82,7 @@ export class TerrainSystem implements GameSystem {
   private renderRuntime: TerrainRenderRuntime | null = null;
   private surfaceRuntime: TerrainSurfaceRuntime;
   private terrainQueries: TerrainQueries;
-  private vegetationScatterer: VegetationScatterer;
+  private vegetationRuntime: TerrainVegetationRuntime;
   private workerPool: TerrainWorkerPool;
   private raycastRuntime: TerrainRaycastRuntime;
   private streamingScheduler: TerrainStreamingScheduler;
@@ -142,8 +140,8 @@ export class TerrainSystem implements GameSystem {
     const losAccelerator = new LOSAccelerator();
     this.raycastRuntime = new TerrainRaycastRuntime(losAccelerator);
     this.terrainQueries = new TerrainQueries(losAccelerator);
-    this.vegetationScatterer = new VegetationScatterer(globalBillboardSystem, this.config.vegetationCellSize);
-    this.vegetationScatterer.setWorldBounds(worldSize, this.config.visualMargin);
+    this.vegetationRuntime = new TerrainVegetationRuntime(globalBillboardSystem, this.config.vegetationCellSize);
+    this.vegetationRuntime.setWorldBounds(worldSize, this.config.visualMargin);
     this.workerPool = new TerrainWorkerPool();
     this.streamingScheduler = new TerrainStreamingScheduler();
   }
@@ -209,18 +207,11 @@ export class TerrainSystem implements GameSystem {
     const vegetationBudget = this.computeVegetationFrameBudget(deltaTime);
     let vegetationDidWork = false;
     this.streamingScheduler.runStream('vegetation', this.config.vegetationUpdateBudgetMs, budgetMs => {
-      const didWork = this.vegetationScatterer.updateBudgeted(this.playerPosition, {
-        maxAddsPerFrame: vegetationBudget.maxAddsPerFrame,
-        maxRemovalsPerFrame: Math.max(
-          vegetationBudget.maxRemovalsPerFrame,
-          Math.max(2, Math.floor(budgetMs * 6)),
-        ),
-      });
-      vegetationDidWork = didWork;
-      const pending = this.vegetationScatterer.getPendingCounts();
+      const result = this.vegetationRuntime.updateBudgeted(this.playerPosition, budgetMs, vegetationBudget);
+      vegetationDidWork = result.didWork;
       return {
-        workUnits: didWork ? 1 : 0,
-        pendingUnits: pending.adds + pending.removals,
+        workUnits: result.didWork ? 1 : 0,
+        pendingUnits: result.pendingUnits,
       };
     });
 
@@ -249,7 +240,7 @@ export class TerrainSystem implements GameSystem {
     this.renderRuntime = null;
     this.surfaceRuntime.dispose();
     this.terrainQueries.dispose();
-    this.vegetationScatterer.dispose();
+    this.vegetationRuntime.dispose();
     this.workerPool.dispose();
     this.raycastRuntime.dispose();
 
@@ -313,9 +304,9 @@ export class TerrainSystem implements GameSystem {
     };
     this.surfaceRuntime.setFeatureSurfacePatches(this.terrainFeatures.surfacePatches);
     this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
-    this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    this.vegetationRuntime.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
     if (this.isInitialized) {
-      this.vegetationScatterer.regenerateAll();
+      this.vegetationRuntime.regenerateAll();
     }
   }
 
@@ -335,9 +326,9 @@ export class TerrainSystem implements GameSystem {
     };
     this.surfaceRuntime.setFeatureSurfacePatches(this.terrainFeatures.surfacePatches);
     this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
-    this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    this.vegetationRuntime.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
     if (this.isInitialized) {
-      await this.vegetationScatterer.regenerateAllAsync(onVegetationProgress);
+      await this.vegetationRuntime.regenerateAllAsync(onVegetationProgress);
     }
   }
 
@@ -478,13 +469,13 @@ export class TerrainSystem implements GameSystem {
   }
 
   getStreamingMetrics(): TerrainStreamingMetricDebug[] {
-    const vegetationDebug = this.vegetationScatterer.getDebugInfo();
+    const vegetationDebug = this.vegetationRuntime.getDebugInfo();
     return this.streamingScheduler.getMetrics().map(metric => ({
       name: metric.name,
       budgetMs: metric.budgetMs,
       timeMs: metric.emaMs,
       pendingUnits: metric.pendingUnits,
-      ...(metric.name === 'vegetation' ? { debug: { vegetation: vegetationDebug } } : {}),
+      ...(metric.name === 'vegetation' ? { debug: vegetationDebug } : {}),
     }));
   }
 
@@ -521,7 +512,7 @@ export class TerrainSystem implements GameSystem {
     this.defaultBiomeId = options.defaultBiomeId;
     this.biomeRules = options.biomeRules ?? [];
     this.recomputeLodConfig();
-    this.vegetationScatterer.setWorldBounds(this.config.worldSize, this.config.visualMargin);
+    this.vegetationRuntime.setWorldBounds(this.config.worldSize, this.config.visualMargin);
     this.applyVegetationConfig();
 
     if (!this.isInitialized) return;
@@ -552,7 +543,7 @@ export class TerrainSystem implements GameSystem {
 
     this.config.visualMargin = nextMargin;
     this.recomputeLodConfig();
-    this.vegetationScatterer.setWorldBounds(this.config.worldSize, this.config.visualMargin);
+    this.vegetationRuntime.setWorldBounds(this.config.worldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
       this.renderRuntime?.reconfigure({
@@ -594,7 +585,7 @@ export class TerrainSystem implements GameSystem {
         this.defaultBiomeId,
         this.biomeRules,
       );
-      this.vegetationScatterer.regenerateAll();
+      this.vegetationRuntime.regenerateAll();
     }
   }
 
@@ -653,7 +644,7 @@ export class TerrainSystem implements GameSystem {
 
     this.config.worldSize = newWorldSize;
     this.recomputeLodConfig();
-    this.vegetationScatterer.setWorldBounds(newWorldSize, this.config.visualMargin);
+    this.vegetationRuntime.setWorldBounds(newWorldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
       this.renderRuntime?.reconfigure({
@@ -872,14 +863,14 @@ export class TerrainSystem implements GameSystem {
     const { biomeIds, biomePalettes } = vegetationConfig;
     this.billboardSystem.configure(biomeIds);
     const activeTypes = this.billboardSystem.getActiveVegetationTypes();
-    this.vegetationScatterer.configure(
+    this.vegetationRuntime.configure(
       activeTypes,
       this.defaultBiomeId,
       biomePalettes,
       this.biomeRules,
     );
     this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
-    this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    this.vegetationRuntime.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
   }
 
   private propagateTerrainSourceChanges(): void {
@@ -900,7 +891,7 @@ export class TerrainSystem implements GameSystem {
     markStartup('terrain.propagate.bvh-rebuild.end');
 
     markStartup('terrain.propagate.vegetation-regen.begin');
-    this.vegetationScatterer.regenerateAll();
+    this.vegetationRuntime.regenerateAll();
     markStartup('terrain.propagate.vegetation-regen.end');
   }
 }

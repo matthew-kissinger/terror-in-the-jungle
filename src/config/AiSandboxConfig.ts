@@ -20,6 +20,17 @@ export const AI_SANDBOX_CONFIG: GameModeConfig = {
     biomeRules: [
       { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, elevationBlendWidth: 4, priority: 2 },
     ],
+    farCanopyTint: {
+      enabled: true,
+      startDistance: 360,
+      endDistance: 820,
+      strength: 0.18,
+      fogStrength: 0.36,
+      coverageDistance: 1100,
+      coverageStrength: 0.12,
+      coverageScale: 180,
+      color: [0.12, 0.26, 0.11],
+    },
   },
   weather: {
     enabled: false,

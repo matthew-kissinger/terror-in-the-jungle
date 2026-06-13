@@ -21,6 +21,17 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
     biomeRules: [
       { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, elevationBlendWidth: 4, priority: 2 },
     ],
+    farCanopyTint: {
+      enabled: true,
+      startDistance: 380,
+      endDistance: 900,
+      strength: 0.2,
+      fogStrength: 0.38,
+      coverageDistance: 1200,
+      coverageStrength: 0.13,
+      coverageScale: 190,
+      color: [0.12, 0.26, 0.11],
+    },
   },
   weather: {
     enabled: true,

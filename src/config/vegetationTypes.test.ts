@@ -128,12 +128,19 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     }
   });
 
-  it('preserves the tall fan palm as runtime mid-level vegetation', () => {
+  it('promotes the approved palms as the first runtime canopy tree tier', () => {
     const fanPalm = VEGETATION_TYPES.find((type) => type.id === 'fanPalm');
+    const coconut = VEGETATION_TYPES.find((type) => type.id === 'coconut');
+    const canopyIds = VEGETATION_TYPES
+      .filter((type) => type.tier === 'canopy')
+      .map((type) => type.id)
+      .sort();
 
     expect(fanPalm).toBeDefined();
+    expect(coconut).toBeDefined();
     expect(fanPalm?.size).toBeGreaterThan(16);
-    expect(fanPalm?.tier).toBe('midLevel');
+    expect(coconut?.size).toBeGreaterThan(25);
+    expect(canopyIds).toEqual(['coconut', 'fanPalm']);
   });
 
   it('lifts and enlarges fern ground cover so it is not buried below terrain', () => {
@@ -177,7 +184,7 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(strongCyanStemPixels).toBe(0);
   });
 
-  it('slope-caps all random vegetation that can clip into hillside terrain', () => {
+  it('slope-caps ground and mid-level random vegetation that can clip into hillside terrain', () => {
     const randomTypes = VEGETATION_TYPES
       .filter((type) => type.placement === 'random')
       .sort((a, b) => a.id.localeCompare(b.id));
@@ -185,13 +192,11 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(randomTypes.map((type) => type.id)).toEqual([
       'bananaPlant',
       'elephantEar',
-      'fanPalm',
       'fern',
     ]);
     expect(randomTypes.every((type) => type.maxSlopeDeg !== undefined)).toBe(true);
     expect(VEGETATION_TYPES.find((type) => type.id === 'fern')?.maxSlopeDeg).toBeLessThanOrEqual(24);
     expect(VEGETATION_TYPES.find((type) => type.id === 'elephantEar')?.maxSlopeDeg).toBeLessThanOrEqual(22);
-    expect(VEGETATION_TYPES.find((type) => type.id === 'fanPalm')?.maxSlopeDeg).toBeLessThanOrEqual(30);
   });
 
   it('biases the jungle mix toward the tall palm and ground cover while keeping bamboo clustered', () => {
