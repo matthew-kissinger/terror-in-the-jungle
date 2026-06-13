@@ -5,8 +5,10 @@ Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, strict
 WebGPU all-mode visual matrix, trusted large-mode diagnostic inputs, and
 culling owner-path certification are recorded. Owner alignment is still
 required before default-on sky/cloud/post, full vegetation, terrain authoring,
-source-asset/runtime water work, or runtime culling/HLOD changes. A Shau final
-quiet perf remains a release blocker after a repeat validation failure.
+source-asset/runtime water work, or runtime culling/HLOD changes. A current A
+Shau final quiet rerun has status `ok`, validation WARN, and measurement-trust
+PASS; residual A Shau Player/Weather/Zone warnings remain triage items, not
+evidence that the Fable proof scaffolds regressed runtime visuals.
 
 Predecessor: `docs/tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md`
 shipped the initial `RendererFeatureProfile` policy surface. This cycle folds
@@ -261,7 +263,7 @@ pushing, merging to `master`, deploying production, and passing
   heap growth `42.29 MB`. Tail attribution says cover search is not the driver
   (`0.000ms`); the worst tail is render/Other dominated (`36.5ms`, 82%).
 - Final quiet diagnostic comparison against the available R0-proxy captures is
-  recorded but not release-clean. Open Frontier improved/held on the same
+  recorded. Open Frontier improved/held on the same
   no-combat/no-active-player 60s-warmup shape: R0-proxy
   `artifacts/perf/2026-06-13T18-24-02-167Z/summary.json` to final
   `artifacts/perf/2026-06-13T18-52-45-146Z/summary.json`, avg
@@ -279,8 +281,39 @@ pushing, merging to `master`, deploying production, and passing
   peak/end growth). Peak p99 stayed elevated at `42.40ms` and one frame landed
   over 50ms (`51.20ms`). Tail attribution again says cover search and Combat
   are not the driver; `RenderMain` is the top measured system and render/Other
-  accounts for the tail. This blocks merge/deploy until triaged or explicitly
-  accepted as environment noise by owner.
+  accounts for the tail. This packet is retained as a rejected diagnostic, not
+  as the current final quiet result.
+- Heap/render follow-up diagnostics on the failing A Shau packet classified the
+  issue as non-authoritative for acceptance:
+  `artifacts/perf/2026-06-13T19-21-11-208Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`
+  reported `retained_or_unrecovered_peak`, and
+  `artifacts/perf/2026-06-13T19-11-16-934Z/projekt-143-render-boundary-timing/render-boundary-timing.json`
+  was `render_boundary_user_timing_inconclusive/low` with
+  `renderer.render` max `21.2ms` inside the `51.2ms` peak.
+- A deep-CDP diagnostic retry with heap sampling and render-submission summary
+  produced attribution evidence only, not acceptance evidence:
+  `artifacts/perf/2026-06-13T19-22-01-805Z/summary.json`,
+  `artifacts/perf/2026-06-13T19-25-18-435Z/projekt-143-heap-sampling-attribution/summary.json`,
+  and
+  `artifacts/perf/2026-06-13T19-25-18-416Z/projekt-143-perf-heap-diagnostic/heap-diagnostic.json`.
+  Measurement trust was WARN because CDP overhead pushed p99 to `98.40ms`, but
+  forced-GC final heap dropped to `126.39 MB` and the heap shape was
+  `transient_gc_wave`. Allocation churn was dominated by Three renderer
+  math/skinning (`85.79%`) plus gameplay bundle churn (`10.67%`), with
+  `updateRain`, `getRelevantChunks`, and movement/terrain height-query owners
+  visible in the sampled top frames. Render submissions showed terrain
+  dominates triangles, while wildlife and ground vehicles dominate draw
+  submissions; none of this authorizes runtime forest, sky/post, or water
+  default-on work.
+- A current normal A Shau quiet rerun passed the acceptance-shaped gate:
+  `artifacts/perf/2026-06-13T19-25-54-553Z/summary.json`. It produced status
+  `ok`, validation WARN, measurement-trust PASS (`probeAvg=21.00ms`,
+  `probeP95=35.00ms`, `0` missed samples), avg `21.10ms`, peak p99 `34.10ms`,
+  max frame `49.60ms`, `0.00%` frames over 50ms, heap end-growth `6.41 MB`,
+  heap recovery `86.2%`, and tail attribution still says cover search and
+  Combat are not drivers. `npm run perf:compare -- --scenario a_shau_valley`
+  selected this artifact and printed raw metrics only because no tracked
+  baseline exists.
 
 ## Acceptance
 
@@ -301,8 +334,9 @@ pushing, merging to `master`, deploying production, and passing
       not a full Fable `Forests` port or true meshlet Nanite.
 - [x] Final quiet-machine perf attribution is recorded and compared to the
       available R0-proxy captures.
-- [ ] A Shau final quiet perf validates cleanly, or owner explicitly accepts
-      the repeat render/Other + heap-recovery failure as environment noise.
+- [x] A Shau final quiet perf has a current status-ok, measurement-trust PASS
+      rerun; residual validation WARNs and Player/Weather/Zone budget warnings
+      remain documented triage items.
 - [x] Open Frontier visible unattributed geometry is under the 10% culling
       certification threshold, or the remaining bucket is explicitly registered
       and justified.
