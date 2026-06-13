@@ -61,6 +61,8 @@ pushing, merging to `master`, deploying production, and passing
    - Capture Open Frontier, A Shau, and the smallest p99 reproducer.
    - Record whether p99 attribution implicates renderer, Player, Combat,
      terrain, vegetation, sky/post, startup, or measurement trust.
+   - This branch missed a true pre-change R0 window; the evidence table uses
+     matched `R0-proxy` quiet captures and labels that caveat explicitly.
 2. R1 WebGPU capability hardening:
    - Extend `RendererFeatureProfile` with required limits, device-loss
      reporting, and feature proof hooks.
@@ -317,8 +319,10 @@ pushing, merging to `master`, deploying production, and passing
 
 ## Acceptance
 
-- [ ] Owner aligns on debug-only water proof being in scope.
-- [ ] Quiet R0 perf attribution is recorded before world-system changes.
+- [x] Debug-only water proof is in scope for this cycle goal; gameplay water,
+      watercraft, runtime water, and Fable water materials remain out of scope.
+- [x] R0-proxy perf attribution is recorded and labeled; this branch does not
+      claim a true pre-change R0 capture.
 - [x] Renderer feature profile covers limits, device-loss policy, and proof
       hooks for the new prototype lanes.
 - [x] Heightfield/erosion remains a spike against TIJ terrain authority; no
