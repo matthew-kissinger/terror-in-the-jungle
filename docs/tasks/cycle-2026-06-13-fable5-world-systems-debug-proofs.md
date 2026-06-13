@@ -1,11 +1,12 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-world-systems-debug-proofs
 
-Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, trusted
-large-mode diagnostic inputs, and culling owner-path certification are recorded.
-Owner alignment is still required before default-on sky/cloud/post, full
-vegetation, terrain authoring, source-asset/runtime water work, or runtime
-culling/HLOD changes.
+Status: active branch; R1/R2/R3/R4 scaffolds, focused proof gates, strict
+WebGPU all-mode visual matrix, trusted large-mode diagnostic inputs, and
+culling owner-path certification are recorded. Owner alignment is still
+required before default-on sky/cloud/post, full vegetation, terrain authoring,
+source-asset/runtime water work, or runtime culling/HLOD changes. A Shau final
+quiet perf remains a release blocker after a repeat validation failure.
 
 Predecessor: `docs/tasks/cycle-2026-06-13-fable5-webgpu-world-systems.md`
 shipped the initial `RendererFeatureProfile` policy surface. This cycle folds
@@ -137,6 +138,11 @@ pushing, merging to `master`, deploying production, and passing
   loading: sun disc, weather rain, zone-control markers, M151/M48 procedural
   roots and turret meshes, M2HB/AA emplacements, tank shells, ammo crates,
   weapon pickups, and air-support placeholders.
+- `scripts/capture-atmosphere-recovery-shots.ts` now accepts `--renderer`,
+  `--headed`, and `--fail-on-scenario-error`, and records renderer backend
+  capabilities plus feature profile data in each shot. The default
+  `npm run evidence:atmosphere` path is unchanged, but the cycle can now
+  produce headed strict-WebGPU all-mode visual evidence.
 - Local gate: `npm run validate:fast` passes; 403 test files and 5,960 tests
   passed on the latest branch run.
 
@@ -237,6 +243,16 @@ pushing, merging to `master`, deploying production, and passing
   The run completed under `webgpu-webgl-fallback` because this browser exposed
   no WebGPU adapter, so it is fallback visual evidence rather than strict-WebGPU
   visual closure.
+- `npx tsx scripts/capture-atmosphere-recovery-shots.ts --headed --renderer
+  webgpu-strict --fail-on-scenario-error --no-build --port 9226` captured the
+  strict WebGPU all-mode visual matrix:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-06-13T19-07-57-910Z/summary.json`.
+  All 15 shots resolved `rendererBackendCapabilities.resolvedBackend=webgpu`,
+  all five modes produced 3 shots, there were no browser errors or scenario
+  errors, and cloud anchoring tracked camera X/Z in every mode. One combat120
+  sky-coverage shot remains a visual warning (`cloudTextureScore=7.82` against
+  the script's `8.0` threshold), so this proves matrix coverage but does not
+  authorize default-on sky/cloud/post changes.
 - `npm run perf:capture:combat120` produced a measurement-trust PASS packet at
   `artifacts/perf/2026-06-13T17-49-13-305Z/summary.json`; `npm run
   perf:compare -- --scenario combat120` printed raw metrics only because the
@@ -244,6 +260,27 @@ pushing, merging to `master`, deploying production, and passing
   perf pass: avg `19.61ms`, p95 `32.70ms`, p99 `44.70ms`, max `60.80ms`,
   heap growth `42.29 MB`. Tail attribution says cover search is not the driver
   (`0.000ms`); the worst tail is render/Other dominated (`36.5ms`, 82%).
+- Final quiet diagnostic comparison against the available R0-proxy captures is
+  recorded but not release-clean. Open Frontier improved/held on the same
+  no-combat/no-active-player 60s-warmup shape: R0-proxy
+  `artifacts/perf/2026-06-13T18-24-02-167Z/summary.json` to final
+  `artifacts/perf/2026-06-13T18-52-45-146Z/summary.json`, avg
+  `19.08ms -> 19.77ms`, peak p99 `34.20ms -> 33.50ms`, max frame
+  `35.30ms -> 34.50ms`, visible unattributed `12.24% -> 8.682%`. A Shau did
+  not hold: R0-proxy
+  `artifacts/perf/2026-06-13T18-26-54-378Z/summary.json` to final
+  `artifacts/perf/2026-06-13T18-56-10-756Z/summary.json`, avg
+  `20.11ms -> 21.54ms`, peak p99 `35.60ms -> 41.30ms`, max frame
+  `49.70ms -> 49.60ms`, visible unattributed `8.131% -> 3.464%`.
+- A repeat A Shau final quiet diagnostic failed validation:
+  `artifacts/perf/2026-06-13T19-11-16-934Z/summary.json`. Measurement trust
+  passed (`probeAvg=20.85ms`, `probeP95=32.00ms`, `0` missed samples), but
+  validation failed on heap recovery (`0.0%`, no reclaim from a `23.73 MB`
+  peak/end growth). Peak p99 stayed elevated at `42.40ms` and one frame landed
+  over 50ms (`51.20ms`). Tail attribution again says cover search and Combat
+  are not the driver; `RenderMain` is the top measured system and render/Other
+  accounts for the tail. This blocks merge/deploy until triaged or explicitly
+  accepted as environment noise by owner.
 
 ## Acceptance
 
@@ -256,11 +293,16 @@ pushing, merging to `master`, deploying production, and passing
 - [x] Hydrology/water produces only debug water-level, basin, or river proof
       surfaces; no gameplay water lands.
 - [x] Sky/cloud/post prototype remains WebGPU-only and proof-gated.
+- [x] Strict WebGPU all-mode visual matrix is recorded before any default-on
+      sky/cloud/post decision; remaining combat120 sky warning is documented.
 - [x] Generated species are Vietnam definitions/specs only; no Fable assets or
       generated species are copied.
 - [x] Forest/Nanite-lite output is an incremental TIJ LOD/culling adaptation,
       not a full Fable `Forests` port or true meshlet Nanite.
-- [ ] Final quiet-machine perf attribution is recorded and compared to R0.
+- [x] Final quiet-machine perf attribution is recorded and compared to the
+      available R0-proxy captures.
+- [ ] A Shau final quiet perf validates cleanly, or owner explicitly accepts
+      the repeat render/Other + heap-recovery failure as environment noise.
 - [x] Open Frontier visible unattributed geometry is under the 10% culling
       certification threshold, or the remaining bucket is explicitly registered
       and justified.

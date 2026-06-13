@@ -32,6 +32,8 @@ type CaptureSummary = {
   generatedAt: string;
   url: string;
   serverMode: string;
+  rendererMode: string | null;
+  headed: boolean;
   outputDir: string;
   scenarios: Array<{
     key: string;
@@ -80,6 +82,10 @@ function argValue(name: string): string | undefined {
   return idx >= 0 ? process.argv[idx + 1] : undefined;
 }
 
+function hasFlag(name: string): boolean {
+  return process.argv.includes(name);
+}
+
 function parsePort(): number {
   const raw = argValue('--port');
   if (!raw) return DEFAULT_PORT;
@@ -88,6 +94,11 @@ function parsePort(): number {
     throw new Error(`Invalid --port value: ${raw}`);
   }
   return parsed;
+}
+
+function parseRendererMode(): string | null {
+  const raw = argValue('--renderer')?.trim();
+  return raw && raw.length > 0 ? raw : null;
 }
 
 function parseOutputDir(): string {
@@ -99,6 +110,14 @@ function parseOutputDir(): string {
 
 function shouldBuild(): boolean {
   return !process.argv.includes('--no-build');
+}
+
+function shouldRunHeaded(): boolean {
+  return hasFlag('--headed');
+}
+
+function shouldFailOnScenarioError(): boolean {
+  return hasFlag('--fail-on-scenario-error');
 }
 
 function poseAwayFromSun(azimuthRad: number, kind: ViewKind, heightAGL: number, pitchDeg: number): ViewPlan {
@@ -380,6 +399,12 @@ async function poseAndRender(page: Page, view: ViewPlan): Promise<unknown> {
       const rendererInfo = typeof (window as any).__rendererInfo === 'function'
         ? (window as any).__rendererInfo()
         : null;
+      const rendererBackendCapabilities = typeof (window as any).__rendererBackendCapabilities === 'function'
+        ? (window as any).__rendererBackendCapabilities()
+        : null;
+      const rendererFeatureProfile = typeof (window as any).__rendererFeatureProfile === 'function'
+        ? (window as any).__rendererFeatureProfile()
+        : null;
       const waterMetrics = typeof water?.getDebugInfo === 'function'
         ? water.getDebugInfo()
         : null;
@@ -474,6 +499,8 @@ async function poseAndRender(page: Page, view: ViewPlan): Promise<unknown> {
           }
           : null,
         rendererInfo,
+        rendererBackendCapabilities,
+        rendererFeatureProfile,
         renderText,
       };
     },
@@ -717,14 +744,20 @@ async function main(): Promise<void> {
 
   const port = parsePort();
   const serverMode = parseServerModeArg(process.argv, 'perf');
-  const url = `http://127.0.0.1:${port}/?perf=1&diag=1&uiTransitions=0&logLevel=warn`;
+  const rendererMode = parseRendererMode();
+  const headed = shouldRunHeaded();
+  const rendererQuery = rendererMode ? `&renderer=${encodeURIComponent(rendererMode)}` : '';
+  const url = `http://127.0.0.1:${port}/?perf=1&diag=1&uiTransitions=0&logLevel=warn${rendererQuery}`;
   const summary: CaptureSummary = {
     generatedAt: new Date().toISOString(),
     url,
     serverMode,
+    rendererMode,
+    headed,
     outputDir,
     scenarios: [],
   };
+  let scenarioErrorCount = 0;
 
   let server: ServerHandle | null = null;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
@@ -737,7 +770,12 @@ async function main(): Promise<void> {
       log: logStep,
     });
 
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({
+      headless: !headed,
+      args: rendererMode?.toLowerCase().includes('webgpu')
+        ? ['--enable-unsafe-webgpu', '--enable-features=Vulkan,WebGPU,WebGPUDeveloperFeatures']
+        : [],
+    });
     for (const plan of plans()) {
       const context = await browser.newContext({ viewport: VIEWPORT });
       const page = await context.newPage();
@@ -768,6 +806,7 @@ async function main(): Promise<void> {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        scenarioErrorCount++;
         console.error(`Failed scenario ${plan.key}: ${message}`);
         summary.scenarios.push({
           key: plan.key,
@@ -789,6 +828,10 @@ async function main(): Promise<void> {
     logStep(`Wrote ${summaryFile}`);
     if (browser) await browser.close();
     if (server) await stopServer(server);
+  }
+
+  if (scenarioErrorCount > 0 && shouldFailOnScenarioError()) {
+    process.exitCode = 1;
   }
 }
 
