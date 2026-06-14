@@ -68,12 +68,18 @@ Any of:
   - deploy a specific ref through the same wrapper.
 - GitHub web UI: Actions tab -> "Deploy" workflow -> "Run workflow" button.
 
-Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` when you actually want the build live. This lets you batch multiple merges into one deploy. For docs-only release-state commits, CI may not start automatically because `ci.yml` is path-filtered; run `npm run ci:manual` before deploy.
+Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` when you actually want the build live. This lets you batch multiple merges into one deploy. If release proof needs an exact-HEAD CI run, use `npm run ci:manual` instead of calling `gh workflow run ci.yml` directly. The wrapper first looks for an existing same-commit CI run and watches or reuses it; it only dispatches a manual run when no exact-HEAD CI exists, such as a docs-only release-state commit skipped by the path filters.
 
 The workflow wrappers use `scripts/github-workflow-run.ts`, which removes
 `GITHUB_TOKEN` and `GH_TOKEN` from the child `gh` process. That avoids the
 common agent failure where a limited PAT shadows local keyring auth and GitHub
 returns `Resource not accessible by personal access token`.
+
+`ci.yml` concurrency is scoped by event and ref
+(`ci-${{ github.event_name }}-${{ github.ref }}`). Repeated pushes to the same
+ref still cancel stale push attempts, and repeated manual runs still cancel
+stale manual attempts, but a manual exact-HEAD proof cannot cancel the push
+checks that GitHub shows on `master`.
 
 The deploy job sets `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` so GitHub-hosted
 JavaScript actions run under the upcoming Node 24 action runtime. If this
@@ -216,9 +222,10 @@ Shau mode smoke. If the live manifest, WASM, or service worker is stale, do not
 reinterpret a local pass as deployed truth.
 
 Docs-only release-state commits are still release commits. If a commit changes
-what the repo claims about production, manually dispatch CI with
-`npm run ci:manual`, then deploy and verify the live manifest before closing the
-loop.
+what the repo claims about production, run `npm run ci:manual`; the wrapper
+will reuse any existing exact-HEAD CI run or dispatch a manual one when the
+path-filtered push skipped CI. Then deploy and verify the live manifest before
+closing the loop.
 
 ## 3. Cache-Control Strategy
 

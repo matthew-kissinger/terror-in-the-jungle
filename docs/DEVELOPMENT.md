@@ -164,6 +164,9 @@ closeout evidence.
 
 `.github/workflows/ci.yml` runs quality gates on push to `master`. Production
 deploy is manual through `.github/workflows/deploy.yml` or `npm run deploy:prod`.
+Use `npm run ci:manual` for exact-HEAD CI proof instead of direct `gh workflow
+run ci.yml`; the wrapper reuses an existing same-commit push CI run when one
+exists and only dispatches a manual fallback when CI was skipped.
 
 Required gates before deploy:
 1. `lint`

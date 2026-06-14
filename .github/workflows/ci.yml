@@ -35,7 +35,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Push CI and manual exact-head CI must not cancel each other. Repeated runs
+  # for the same event/ref still cancel stale attempts.
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

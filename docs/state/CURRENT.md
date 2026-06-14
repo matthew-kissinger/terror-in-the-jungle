@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-13 (world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`: accepted jungle vegetation aggregate LOD remains in scope, first-person weapons are lowered, wheeled/tracked vehicles get an arcade-hybrid grip/slope baseline, existing sky-dome clouds get a safe visibility retune, and terrain ownership/runtime water/full Fable forest/Nanite/WebGPU post replacement remain default-off; next cycle is the world-systems promotion-gate run that turns remaining Fable-derived lanes into GO/SPIKE/NO-GO decisions; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last verified: 2026-06-13 (CI release-signal housekeeping is the current cycle: exact-HEAD manual CI now reuses/watches an existing push CI run when present, CI concurrency is event/ref scoped so manual proof cannot cancel push checks, and no gameplay/assets changed in this housekeeping slice; prior world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,6 +30,18 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
+- **2026-06-13 — CI release-signal housekeeping**
+  (`cycle-2026-06-13-ci-release-signal-housekeeping`): root cause for the
+  cancelled push checks was the manual `workflow_dispatch` CI sharing
+  `ci-${{ github.ref }}` with push CI. The wrapper behind `npm run ci:manual`
+  now checks for exact-HEAD `ci.yml` runs and watches/reuses an active or
+  successful run before dispatching a duplicate. If the latest exact-HEAD CI
+  run already completed non-success, the wrapper fails instead of masking it
+  with a new run. `ci.yml` concurrency is now
+  `ci-${{ github.event_name }}-${{ github.ref }}`, so push and manual CI can no
+  longer cancel each other while stale same-event attempts still collapse. This
+  is release housekeeping only: no gameplay code, vegetation assets, weapon
+  pose, vehicle tuning, water, terrain, sky, or renderer behavior changed.
 - **2026-06-13 — world-systems runtime release**
   (`cycle-2026-06-13-world-systems-runtime-release`, deployed
   `965f4fe5760896e57a40ffa46f571695403412e4`): latest `master` has
