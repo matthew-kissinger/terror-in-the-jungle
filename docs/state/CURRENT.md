@@ -39,9 +39,12 @@ The most recent shipped work, newest first:
   run already completed non-success, the wrapper fails instead of masking it
   with a new run. `ci.yml` concurrency is now
   `ci-${{ github.event_name }}-${{ github.ref }}`, so push and manual CI can no
-  longer cancel each other while stale same-event attempts still collapse. This
-  is release housekeeping only: no gameplay code, vegetation assets, weapon
-  pose, vehicle tuning, water, terrain, sky, or renderer behavior changed.
+  longer cancel each other while stale same-event attempts still collapse. The
+  separate Dependabot `esbuild` dynamic update failure on this head is handled
+  by a root `esbuild@0.28.1` override; remaining `npm audit` output is moderate
+  transitive `wrangler`/`miniflare`/`ws`/`brace-expansion` maintenance. This is
+  release housekeeping only: no gameplay code, vegetation assets, weapon pose,
+  vehicle tuning, water, terrain, sky, or renderer behavior changed.
 - **2026-06-13 — world-systems runtime release**
   (`cycle-2026-06-13-world-systems-runtime-release`, deployed
   `965f4fe5760896e57a40ffa46f571695403412e4`): latest `master` has

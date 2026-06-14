@@ -43,6 +43,12 @@ That let the manual exact-HEAD proof cancel the push checks GitHub displays for
   - latest same-head terminal non-success: fail instead of masking it;
   - no same-head run after the wait window: dispatch manual CI.
 - Keep `deploy.yml` behavior unchanged.
+- Add a root `esbuild@0.28.1` npm override so the separate Dependabot
+  security-update run for `esbuild` stops failing on the repo's sibling
+  `file:../game-field-kits` dependencies. The remaining `npm audit` findings
+  after the override are moderate transitive issues under
+  `wrangler`/`miniflare`/`ws`/`brace-expansion`, not the failed dynamic
+  `esbuild` update.
 
 ## No Gameplay Scope
 
@@ -54,6 +60,8 @@ reference decisions in this cycle.
 
 - Focused unit proof:
   `npx vitest run scripts/github-workflow-run-utils.test.ts`
+- Dependency proof:
+  `npm ls esbuild` must resolve `esbuild@0.28.1` through the override.
 - Normal repo gate:
   `npm run validate:fast`
 - Release proof after push:

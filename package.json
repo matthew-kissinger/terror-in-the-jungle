@@ -208,6 +208,7 @@
     "wrangler": "^4.84.1"
   },
   "overrides": {
+    "esbuild": "0.28.1",
     "flatted": "^3.4.2",
     "postcss": "^8.5.10"
   },
