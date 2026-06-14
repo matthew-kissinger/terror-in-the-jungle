@@ -1,6 +1,7 @@
 # cycle-2026-06-14-fable-gated-systems-readout
 
-Status: scaffolded for owner alignment.
+Status: readout recorded; docs/proof only. No runtime lane is promoted by this
+cycle.
 
 ## Goal Statement
 
@@ -121,3 +122,92 @@ finish with exact-HEAD CI, production deploy, and `npm run check:live-release`.
   and source-asset economics rather than renderer fantasy.
 - Sky/cloud/post is the most likely visual spike to pursue, but only with
   strict WebGPU evidence and fallback discipline.
+
+## Readout Results (2026-06-14)
+
+No runtime code or assets changed in this readout. The decisions below are
+based on current repo proof surfaces and fresh local gates on `master`
+`8c253e87`.
+
+| Lane | Decision | Why |
+|---|---|---|
+| Renderer capability policy | **promote policy / no split** | The WebGPU-primary single-project posture fits the vision. Browser capability proof passed with a WebGPU adapter, WebGL2 fallback, SharedArrayBuffer isolation, and live header contract present. Continue improving fallback degradation in one repo rather than mirroring WebGPU/WebGL2 projects. |
+| Heightfield / erosion | **defer runtime; keep debug-only diagnostics** | The Fable terrain-field idea fits only as analysis/offline authoring input right now. `HeightfieldErosionAuthoritySpike` unit proof passes and terrain baseline passes, but no evidence authorizes A Shau DEM mutation, terrain authority swap, navmesh rebake changes, or startup-risk changes. |
+| Debug hydrology / water | **defer; keep debug proof only** | Debug basin/river sampling remains useful for a future VODA design pass, but runtime water stays no-go. Unit proof passes and renderer feature policy keeps hydrology/debug-water diagnostic-only. No material, query/physics, buoyancy, swimming, watercraft, or production surface is promoted. |
+| Sky / cloud / post | **defer; strongest visual spike candidate** | Strict WebGPU proof passes and TOD coherence passes. The all-mode atmosphere packet completed, but it ran on WebGL fallback and logged startup/perf warnings, and there is no owner visual acceptance. Keep the lane default-off until a strict-WebGPU visual matrix and owner review agree it improves clouds/lighting. |
+| Vegetation source assets | **defer to asset-source cycle** | Existing accepted vegetation remains OK: grounding and horizon audits pass with zero flagged horizon modes. New banyan/rubber/mangrove/elephant-grass/understory species are still blocked on accepted authored/imported source assets. Code-generated procedural vegetation remains burned. |
+| Forest aggregate LOD | **defer runtime; keep planner/proof hooks** | `check:forest-lod-plan` and headed culling proof pass. Culling baseline selects a usable owner path, but status is WARN because combat diagnostic certification remains excluded. This supports a scoped prototype, not a runtime forest/HLOD swap. |
+| Nanite-lite aggregate culling | **defer aggregate prototype; burn true meshlet Nanite** | Aggregate/cluster culling fits the 3,000-combatant materialization vision, but evidence does not yet prove visible savings without pop/flicker or fallback cost. True meshlet Nanite remains no-go for the browser target. |
+
+## Evidence Packet
+
+Common validation:
+
+- `npm run typecheck` — PASS.
+- `npm run lint:docs` — PASS.
+- `npm run check:doc-drift` — WARN only, `failing=0`.
+- `npm run check:world-systems-promotion` — PASS, 1 file / 3 tests.
+- Focused lane unit gate:
+  `npx vitest run src\core\RendererFeatureProfile.test.ts src\systems\terrain\HeightfieldErosionAuthoritySpike.test.ts src\systems\environment\water\DebugWaterProof.test.ts src\systems\environment\SkyCloudPostProofGate.test.ts src\systems\terrain\ForestAggregateLodPlan.test.ts src\config\VietnamVegetationSpecies.test.ts`
+  — PASS, 6 files / 32 tests.
+- `npm run validate:fast` — PASS, 406 files / 5,981 tests; source budget and
+  doc drift remain warning-only.
+
+Lane artifacts:
+
+- Renderer policy:
+  `artifacts/perf/2026-06-14T01-51-20-365Z/projekt-143-platform-capability-probe/summary.json`
+  — PASS; browser probe ran, WebGPU adapter available, WebGL2 renderer present,
+  SharedArrayBuffer isolation and live cross-origin isolation headers passed.
+- Sky/cloud/post strict gate:
+  `artifacts/proofs/sky-cloud-post/2026-06-14T01-50-57-681Z/summary.json`
+  — PASS; `renderer=webgpu`, `strictWebGPU=true`, gate state
+  `webgpu-proof`, device loss clear, compute/storage limits satisfied.
+- TOD coherence:
+  `artifacts/lighting-rig/tod-sweep/gate/verdict.json` — PASS; all 8 TODs
+  measurable; foliage and NPC hard checks pass; GLB range ratio remains
+  advisory.
+- Atmosphere evidence:
+  `artifacts/architecture-recovery/cycle9-atmosphere/2026-06-14T02-02-50-064Z/summary.json`
+  — screenshot packet complete for A Shau, Open Frontier, TDM, Zone Control,
+  and combat120. Treat as diagnostic fallback evidence because the run logged
+  WebGPU-unavailable fallback warnings and startup/perf warnings.
+- Terrain baseline:
+  `artifacts/perf/2026-06-14T02-00-28-283Z/projekt-143-terrain-horizon-baseline/summary.json`
+  — PASS; 4/4 elevated screenshots captured, renderer/terrain/vegetation
+  metrics present, trusted Open Frontier and A Shau perf baselines available,
+  culling telemetry trusted, browser errors clear.
+- Vegetation grounding:
+  `artifacts/perf/2026-06-14T01-51-20-131Z/vegetation-grounding-audit/summary.json`
+  — PASS.
+- Vegetation horizon:
+  `artifacts/perf/2026-06-14T01-51-20-030Z/vegetation-horizon-audit/horizon-audit.json`
+  — PASS context; 5 modes, 0 flagged modes, largest bare terrain band `0m`.
+- Culling proof:
+  `artifacts/perf/2026-06-14T02-00-15-642Z/projekt-143-culling-proof/summary.json`
+  — PASS; measurement trust PASS; renderer recorded 203 draw calls and 6,463
+  visible triangles in the proof scene.
+- Culling owner baseline:
+  `artifacts/perf/2026-06-14T02-00-21-465Z/projekt-143-culling-owner-baseline/summary.json`
+  — WARN; selected `large-mode-world-static-and-visible-helicopters`, Open
+  Frontier and A Shau trusted, unattributed visible triangles below threshold,
+  but combat diagnostic remains excluded from certification.
+
+## Release Recommendation
+
+Do not deploy production for this readout. It records proof-backed decisions
+only and does not change runtime code, assets, vegetation, water, terrain,
+sky/post defaults, culling behavior, or renderer policy defaults.
+
+Next actionable cycle should be one of:
+
+1. **Sky/cloud/post strict visual spike**: run strict WebGPU all-mode visual
+   evidence, owner screenshot review, fallback review, and only then decide
+   whether a flag-gated candidate is worth building.
+2. **Vegetation source-asset pass**: pursue authored/imported Vietnam jungle
+   source assets through `ASSET_ACCEPTANCE_STANDARD`, gallery/readability,
+   grounding, horizon, culling, and perf gates. No code-generated procedural
+   trees.
+3. **Forest aggregate prototype**: build a narrow aggregate-culling prototype
+   against current accepted vegetation and culling owner path; prove visible
+   savings, no pop/flicker, and fallback behavior before runtime promotion.
