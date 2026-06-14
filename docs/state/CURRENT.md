@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-14 (procedural vegetation scaffold is rejected and burned out of prod-facing source: no generated tree/understory pipeline, gallery route, package scripts, or runtime hooks remain from that pass. CI release-signal housekeeping proof remains recorded: exact-HEAD manual CI reuses/watches an existing push CI run when present, CI concurrency is event/ref scoped so manual proof cannot cancel push checks, latest CI-fix head `68798b85d137c4fa50ae7f0de3f30f4113648af3` has green push CI and deploy, and no gameplay/assets changed in that housekeeping slice; prior world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last verified: 2026-06-14 (next scaffold is `cycle-2026-06-14-fable-gated-systems-readout`: evidence-only unless an individual Fable-informed lane passes its promotion gate. Procedural vegetation scaffold is rejected and burned out of prod-facing source: no generated tree/understory pipeline, gallery route, package scripts, or runtime hooks remain from that pass. CI release-signal housekeeping proof remains recorded: exact-HEAD manual CI reuses/watches an existing push CI run when present, CI concurrency is event/ref scoped so manual proof cannot cancel push checks, latest CI-fix head `68798b85d137c4fa50ae7f0de3f30f4113648af3` has green push CI and deploy, and no gameplay/assets changed in that housekeeping slice; prior world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,6 +30,16 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
+- **2026-06-14 — Fable gated-systems readout scaffold**
+  (`cycle-2026-06-14-fable-gated-systems-readout`): proposed next cycle turns
+  the remaining Fable-informed lanes into lane-by-lane promote/defer/burn
+  decisions: renderer capability policy, heightfield/erosion, debug hydrology,
+  sky/cloud/post, vegetation source assets, forest aggregate LOD, and
+  Nanite-lite aggregate culling. This is evidence-only unless a lane passes its
+  specific proof gate and owner acceptance where needed. The scaffold keeps
+  procedural vegetation burned, runtime water off, terrain authority unchanged,
+  true meshlet Nanite out of scope, and Fable assets/reference content out of
+  the repo.
 - **2026-06-14 — procedural vegetation controlled burn**
   (`cycle-2026-06-14-procedural-vegetation-controlled-burn`): the generated
   procedural vegetation candidate path is rejected. The code-generated
