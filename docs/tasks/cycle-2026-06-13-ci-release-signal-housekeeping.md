@@ -1,19 +1,20 @@
 <!-- Release housekeeping record. Source: push/manual CI race audit, 2026-06-13. -->
 # cycle-2026-06-13-ci-release-signal-housekeeping
 
-Status: release-housekeeping checklist for the current `master` candidate.
+Status: release-housekeeping proof record. Re-run only if the CI/release signal
+regresses.
 
 Worktree:
 `C:\Users\Mattm\X\games-3d\terror-in-the-jungle-fable-debug-proofs`.
 
 ## Goal Statement
 
-Stabilize the release housekeeping and CI signal so `master` no longer shows
-misleading cancelled push checks after a valid release. Audit the CI/deploy
-workflow concurrency behavior, update the release wrapper and docs to avoid
-duplicate push/manual CI races, implement the least risky fix with test/script
-proof, then push to `master`, prove exact-HEAD CI is clean, deploy if required,
-and pass `npm run check:live-release`.
+Stabilize the repo housekeeping and CI release signal so `master` no longer
+shows misleading cancelled push checks after a valid release. Audit the
+CI/deploy workflow concurrency behavior, update the release wrapper and docs to
+avoid duplicate push/manual CI races, implement the least risky fix with
+test/script proof, then push to `master`, prove exact-HEAD CI is clean, deploy
+production, and pass `npm run check:live-release`.
 
 ## Root Cause
 
@@ -71,6 +72,17 @@ reference decisions in this cycle.
   latest `master` commit has no cancelled/failed CI run for the final head.
 - Production proof:
   `npm run deploy:prod`, then `npm run check:live-release`.
+
+## Current Proof
+
+- Latest CI-fix head:
+  `68798b85d137c4fa50ae7f0de3f30f4113648af3`.
+- Push CI: PASS,
+  `https://github.com/matthew-kissinger/terror-in-the-jungle/actions/runs/27483500090`.
+- Deploy: PASS,
+  `https://github.com/matthew-kissinger/terror-in-the-jungle/actions/runs/27483575632`.
+- Live release proof: PASS,
+  `artifacts/perf/2026-06-14T00-41-05-810Z/projekt-143-live-release-proof/release-proof.json`.
 
 ## Acceptance Criteria
 

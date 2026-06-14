@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-06-13 (CI release-signal housekeeping is the current cycle: exact-HEAD manual CI now reuses/watches an existing push CI run when present, CI concurrency is event/ref scoped so manual proof cannot cancel push checks, and no gameplay/assets changed in this housekeeping slice; prior world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last verified: 2026-06-14 (procedural vegetation scaffold is rejected and burned out of prod-facing source: no generated tree/understory pipeline, gallery route, package scripts, or runtime hooks remain from that pass. CI release-signal housekeeping proof remains recorded: exact-HEAD manual CI reuses/watches an existing push CI run when present, CI concurrency is event/ref scoped so manual proof cannot cancel push checks, latest CI-fix head `68798b85d137c4fa50ae7f0de3f30f4113648af3` has green push CI and deploy, and no gameplay/assets changed in that housekeeping slice; prior world-systems runtime release deployed at `965f4fe5760896e57a40ffa46f571695403412e4`; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,10 +26,20 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-06-13)
+## Current focus (2026-06-14)
 
 The most recent shipped work, newest first:
 
+- **2026-06-14 — procedural vegetation controlled burn**
+  (`cycle-2026-06-14-procedural-vegetation-controlled-burn`): the generated
+  procedural vegetation candidate path is rejected. The code-generated
+  banyan/rubber/teak/areca/mangrove/elephant-grass/deadfall/vine scaffold was
+  not visually acceptable and has been removed from prod-facing source. There
+  is no procedural vegetation pipeline, preview factory, gallery bootstrap
+  route, package script, runtime hook, or generated candidate asset shipping
+  from that pass. Fable remains useful only as an architecture reference:
+  accepted source assets first, then near geometry, mid aggregate/culling, and
+  far impostor or canopy shell only after source acceptance.
 - **2026-06-13 — CI release-signal housekeeping**
   (`cycle-2026-06-13-ci-release-signal-housekeeping`): root cause for the
   cancelled push checks was the manual `workflow_dispatch` CI sharing
@@ -45,6 +55,10 @@ The most recent shipped work, newest first:
   transitive `wrangler`/`miniflare`/`ws`/`brace-expansion` maintenance. This is
   release housekeeping only: no gameplay code, vegetation assets, weapon pose,
   vehicle tuning, water, terrain, sky, or renderer behavior changed.
+  Current production proof for head `68798b85d137c4fa50ae7f0de3f30f4113648af3`
+  is green: push CI run `27483500090`, deploy run `27483575632`, and
+  `npm run check:live-release` PASS at
+  `artifacts/perf/2026-06-14T00-41-05-810Z/projekt-143-live-release-proof/release-proof.json`.
 - **2026-06-13 — world-systems runtime release**
   (`cycle-2026-06-13-world-systems-runtime-release`, deployed
   `965f4fe5760896e57a40ffa46f571695403412e4`): latest `master` has
