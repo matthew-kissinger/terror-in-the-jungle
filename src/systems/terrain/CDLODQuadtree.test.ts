@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import { describe, it, expect } from 'vitest';
-import { CDLODQuadtree, type FrustumPlane } from './CDLODQuadtree';
+import { CDLODQuadtree, type CDLODTile, type FrustumPlane } from './CDLODQuadtree';
 import { computeDefaultLODRanges } from './TerrainConfig';
 
 function makeFrustumAllVisible(): FrustumPlane[] {
@@ -15,6 +15,133 @@ function makeFrustumAllVisible(): FrustumPlane[] {
     { nx: 0, ny: 0, nz: 1, d: 100000 },
     { nx: 0, ny: 0, nz: -1, d: 100000 },
   ];
+}
+
+function sharedEdgeBit(a: { x: number; z: number; size: number }, b: { x: number; z: number; size: number }): number {
+  if (Math.abs((b.x - a.x) - a.size) < 1e-6 && Math.abs(a.z - b.z) < 1e-6) return 2;
+  if (Math.abs((a.x - b.x) - a.size) < 1e-6 && Math.abs(a.z - b.z) < 1e-6) return 8;
+  if (Math.abs((b.z - a.z) - a.size) < 1e-6 && Math.abs(a.x - b.x) < 1e-6) return 1;
+  if (Math.abs((a.z - b.z) - a.size) < 1e-6 && Math.abs(a.x - b.x) < 1e-6) return 4;
+  return 0;
+}
+
+function oppositeEdgeBit(bit: number): number {
+  if (bit === 1) return 4;
+  if (bit === 2) return 8;
+  if (bit === 4) return 1;
+  if (bit === 8) return 2;
+  return 0;
+}
+
+function edgeProbe(tile: CDLODTile, bit: number): { x: number; z: number } {
+  const half = tile.size / 2;
+  const epsilon = Math.max(1e-3, tile.size * 1e-6);
+  if (bit === 1) return { x: tile.x, z: tile.z + half + epsilon };
+  if (bit === 2) return { x: tile.x + half + epsilon, z: tile.z };
+  if (bit === 4) return { x: tile.x, z: tile.z - half - epsilon };
+  return { x: tile.x - half - epsilon, z: tile.z };
+}
+
+function containsPoint(tile: CDLODTile, x: number, z: number): boolean {
+  const half = tile.size / 2;
+  const epsilon = Math.max(1e-3, tile.size * 1e-6);
+  return (
+    x >= tile.x - half - epsilon
+    && x <= tile.x + half + epsilon
+    && z >= tile.z - half - epsilon
+    && z <= tile.z + half + epsilon
+  );
+}
+
+function findTileContaining(
+  tiles: readonly CDLODTile[],
+  x: number,
+  z: number,
+  excludedTile: CDLODTile,
+): CDLODTile | undefined {
+  let smallest: CDLODTile | undefined;
+  for (const tile of tiles) {
+    if (tile === excludedTile) continue;
+    if (!containsPoint(tile, x, z)) continue;
+    if (!smallest || tile.size < smallest.size) smallest = tile;
+  }
+  return smallest;
+}
+
+interface SparseSkirtSeamInvariantStats {
+  checkedEdges: number;
+  skirtCoveredEdges: number;
+  lodTransitionEdges: number;
+  sameLodMorphSeams: number;
+}
+
+function expectSparseSkirtSeamInvariant(
+  worldSize: number,
+  tiles: readonly CDLODTile[],
+): SparseSkirtSeamInvariantStats {
+  const halfWorld = worldSize / 2;
+  let checkedEdges = 0;
+  let skirtCoveredEdges = 0;
+  let lodTransitionEdges = 0;
+  let sameLodMorphSeams = 0;
+
+  for (const tile of tiles) {
+    for (const bit of [1, 2, 4, 8]) {
+      checkedEdges++;
+      const probe = edgeProbe(tile, bit);
+      const edgeSkirtMask = Number(tile.edgeSkirtMask ?? 0);
+      const edgeMorphMask = Number(tile.edgeMorphMask ?? 0);
+      const hasSkirtCover = (edgeSkirtMask & bit) === bit;
+      const hasForceMorph = (edgeMorphMask & bit) === bit;
+
+      if (probe.x < -halfWorld || probe.x > halfWorld || probe.z < -halfWorld || probe.z > halfWorld) {
+        expect(hasSkirtCover).toBe(true);
+        expect(hasForceMorph).toBe(false);
+        skirtCoveredEdges++;
+        continue;
+      }
+
+      const neighbour = findTileContaining(tiles, probe.x, probe.z, tile);
+      if (!neighbour) {
+        expect(hasSkirtCover).toBe(true);
+        expect(hasForceMorph).toBe(false);
+        skirtCoveredEdges++;
+        continue;
+      }
+
+      if (neighbour.size > tile.size) {
+        expect(hasSkirtCover).toBe(true);
+        expect(hasForceMorph).toBe(true);
+        skirtCoveredEdges++;
+        lodTransitionEdges++;
+        continue;
+      }
+
+      if (neighbour.size < tile.size) {
+        expect(hasSkirtCover).toBe(true);
+        expect(hasForceMorph).toBe(false);
+        skirtCoveredEdges++;
+        continue;
+      }
+
+      const reciprocalBit = oppositeEdgeBit(bit);
+      const morphFactorsDiverge = Math.abs(neighbour.morphFactor - tile.morphFactor) > 1e-4;
+      if (morphFactorsDiverge) {
+        expect(hasSkirtCover).toBe(true);
+        expect((Number(neighbour.edgeSkirtMask ?? 0) & reciprocalBit) === reciprocalBit).toBe(true);
+        expect(hasForceMorph).toBe(false);
+        sameLodMorphSeams++;
+        skirtCoveredEdges++;
+      } else {
+        expect(hasForceMorph).toBe(false);
+      }
+    }
+  }
+
+  expect(checkedEdges).toBeGreaterThan(0);
+  expect(skirtCoveredEdges).toBeGreaterThan(0);
+  expect(lodTransitionEdges).toBeGreaterThan(0);
+  return { checkedEdges, skirtCoveredEdges, lodTransitionEdges, sameLodMorphSeams };
 }
 
 describe('CDLODQuadtree', () => {
@@ -286,6 +413,9 @@ describe('CDLODQuadtree', () => {
         expect(Number.isInteger(tile.edgeMorphMask)).toBe(true);
         expect(tile.edgeMorphMask).toBeGreaterThanOrEqual(0);
         expect(tile.edgeMorphMask).toBeLessThanOrEqual(15);
+        expect(Number.isInteger(tile.edgeSkirtMask)).toBe(true);
+        expect(tile.edgeSkirtMask).toBeGreaterThanOrEqual(0);
+        expect(tile.edgeSkirtMask).toBeLessThanOrEqual(15);
       }
     });
 
@@ -323,6 +453,80 @@ describe('CDLODQuadtree', () => {
       // This is a broad regression guard for A Shau-scale edge masks, not
       // proof of a specific keying implementation.
       expect(flagged.length).toBeGreaterThan(4);
+    });
+
+    it('marks sparse skirt cover without force-morphing same-LOD morph seams', () => {
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      const tiles = qt.selectTiles(0, 50, 0, null);
+
+      let compared = false;
+      for (let i = 0; i < tiles.length && !compared; i++) {
+        for (let j = 0; j < tiles.length && !compared; j++) {
+          if (i === j) continue;
+          const a = tiles[i];
+          const b = tiles[j];
+          if (a.size !== b.size || a.lodLevel !== b.lodLevel) continue;
+          if (Math.abs(a.morphFactor - b.morphFactor) <= 1e-4) continue;
+          const bit = sharedEdgeBit(a, b);
+          if (bit === 0) continue;
+
+          expect(a.edgeSkirtMask & bit).toBe(bit);
+          expect(a.edgeMorphMask & bit).toBe(0);
+          compared = true;
+        }
+      }
+
+      expect(compared).toBe(true);
+    });
+
+    it('keeps world-boundary skirt cover separate from edge morphing', () => {
+      const qt = new CDLODQuadtree(256, 1, [256]);
+      const tiles = qt.selectTiles(0, 50, 0, makeFrustumAllVisible());
+      const southwest = tiles.find((tile) => tile.x < 0 && tile.z < 0);
+
+      expect(southwest).toBeDefined();
+      expect((southwest!.edgeSkirtMask & 4) !== 0).toBe(true);
+      expect((southwest!.edgeSkirtMask & 8) !== 0).toBe(true);
+      expect(southwest!.edgeMorphMask & 4).toBe(0);
+      expect(southwest!.edgeMorphMask & 8).toBe(0);
+    });
+
+    it('preserves sparse-skirt seam cover at representative and A Shau-scale camera positions', () => {
+      const aggregate: SparseSkirtSeamInvariantStats = {
+        checkedEdges: 0,
+        skirtCoveredEdges: 0,
+        lodTransitionEdges: 0,
+        sameLodMorphSeams: 0,
+      };
+      const collect = (stats: SparseSkirtSeamInvariantStats): void => {
+        aggregate.checkedEdges += stats.checkedEdges;
+        aggregate.skirtCoveredEdges += stats.skirtCoveredEdges;
+        aggregate.lodTransitionEdges += stats.lodTransitionEdges;
+        aggregate.sameLodMorphSeams += stats.sameLodMorphSeams;
+      };
+
+      const representativeWorld = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      for (const [x, y, z] of [
+        [0, 50, 0],
+        [240, 80, -180],
+        [-360, 120, 260],
+      ]) {
+        collect(expectSparseSkirtSeamInvariant(worldSize, representativeWorld.selectTiles(x, y, z, null)));
+      }
+
+      const ashauWorld = 21000;
+      const ashauLOD = 8;
+      const ashauRanges = computeDefaultLODRanges(ashauWorld, ashauLOD);
+      const ashauQuadtree = new CDLODQuadtree(ashauWorld, ashauLOD, ashauRanges);
+      for (const [x, y, z] of [
+        [0, 50, 0],
+        [1950, 806, 2649],
+        [-2800, 420, 3900],
+      ]) {
+        collect(expectSparseSkirtSeamInvariant(ashauWorld, ashauQuadtree.selectTiles(x, y, z, null)));
+      }
+
+      expect(aggregate.sameLodMorphSeams).toBeGreaterThan(0);
     });
   });
 

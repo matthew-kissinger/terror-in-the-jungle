@@ -31,6 +31,13 @@ export interface CDLODTile {
    * Bit layout: 1 = +Z (north), 2 = +X (east), 4 = -Z (south), 8 = -X (west).
    */
   edgeMorphMask: number;
+  /**
+   * Bitmask flagging which tile edges need sparse skirt geometry for visual
+   * crack cover. This includes edgeMorphMask transitions, same-LOD edges whose
+   * shader-computed morph factors diverge, and selected/world boundary edges.
+   * It must not be fed into the shader force-morph path.
+   */
+  edgeSkirtMask?: number;
 }
 
 export interface FrustumPlane {
@@ -63,12 +70,17 @@ export interface CDLODSelectionStats {
 
 const MAX_TILES = 2048;
 const EDGE_PROBE_EPSILON = 1e-3;
+const MORPH_SEAM_EPSILON = 1e-4;
 const DEFAULT_MIN_Y = -500;
 const DEFAULT_MAX_Y = 2000;
 // computeMaxLODLevels currently caps CDLOD depth at 8. Keep a wider stride so
 // numeric grid keys stay collision-free if that cap moves modestly.
 const TILE_KEY_STRIDE = 2048;
 const TILE_KEY_LEVEL_STRIDE = TILE_KEY_STRIDE * TILE_KEY_STRIDE;
+
+function addEdgeSkirtBit(tile: CDLODTile, bit: number): void {
+  tile.edgeSkirtMask = Number(tile.edgeSkirtMask ?? 0) | bit;
+}
 
 export class CDLODQuadtree {
   private readonly worldSize: number;
@@ -116,7 +128,7 @@ export class CDLODQuadtree {
 
     // Pre-allocate tile objects
     for (let i = 0; i < MAX_TILES; i++) {
-      this.tileBuffer.push({ x: 0, z: 0, size: 0, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 });
+      this.tileBuffer.push({ x: 0, z: 0, size: 0, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0, edgeSkirtMask: 0 });
     }
   }
 
@@ -164,10 +176,12 @@ export class CDLODQuadtree {
   /**
    * Post-recursion neighbour pass: for every emitted tile, set bits in
    * `edgeMorphMask` for each of its four edges that abut a coarser-LOD
-   * (larger `size`) tile. Tiles meet edge-to-edge by construction, so
-   * walking up the size ladder from `tile.size * 2` to the world size
-   * and snapping to that level's grid will hit the unique containing
-   * tile if one was emitted at that scale.
+   * (larger `size`) tile. Separately set `edgeSkirtMask` for every edge
+   * that needs visual crack cover in the sparse-skirt renderer path.
+   *
+   * Tiles meet edge-to-edge by construction, so walking up the size ladder
+   * from `tile.size * 2` to the world size and snapping to that level's grid
+   * will hit the unique containing tile if one was emitted at that scale.
    *
    * Costs O(tiles * 4 * maxLOD) Map lookups; typical tile count is < 256
    * and lookup is O(1), well under the 0.05 ms additional budget called
@@ -188,22 +202,35 @@ export class CDLODQuadtree {
       // Probe points just outside each edge, then walk up the size
       // ladder snapping to that scale's centred grid.
       // Bit layout: 1=+Z (N), 2=+X (E), 4=-Z (S), 8=-X (W)
-      this.applyEdgeMorphProbe(t, t.x, t.z + half + EDGE_PROBE_EPSILON, 1, halfWorld);
-      this.applyEdgeMorphProbe(t, t.x + half + EDGE_PROBE_EPSILON, t.z, 2, halfWorld);
-      this.applyEdgeMorphProbe(t, t.x, t.z - half - EDGE_PROBE_EPSILON, 4, halfWorld);
-      this.applyEdgeMorphProbe(t, t.x - half - EDGE_PROBE_EPSILON, t.z, 8, halfWorld);
+      this.applyEdgeProbe(t, t.x, t.z + half + EDGE_PROBE_EPSILON, 1, halfWorld);
+      this.applyEdgeProbe(t, t.x + half + EDGE_PROBE_EPSILON, t.z, 2, halfWorld);
+      this.applyEdgeProbe(t, t.x, t.z - half - EDGE_PROBE_EPSILON, 4, halfWorld);
+      this.applyEdgeProbe(t, t.x - half - EDGE_PROBE_EPSILON, t.z, 8, halfWorld);
     }
   }
 
-  private applyEdgeMorphProbe(
+  private applyEdgeProbe(
     tile: CDLODTile,
     px: number,
     pz: number,
     bit: number,
     halfWorld: number,
   ): void {
-    // Probe outside the world bounds means the world edge - leave bit 0.
-    if (px < -halfWorld || px > halfWorld || pz < -halfWorld || pz > halfWorld) return;
+    // Probe outside the world bounds means an exposed world edge. Full CDLOD
+    // skirts covered this historically; sparse skirts must cover it too.
+    if (px < -halfWorld || px > halfWorld || pz < -halfWorld || pz > halfWorld) {
+      addEdgeSkirtBit(tile, bit);
+      return;
+    }
+
+    const sameSizeNeighbour = this.tileIndex.get(this.tileKey(px, pz, tile.size));
+    if (sameSizeNeighbour !== undefined) {
+      const neighbour = this.tileBuffer[sameSizeNeighbour];
+      if (Math.abs(neighbour.morphFactor - tile.morphFactor) > MORPH_SEAM_EPSILON) {
+        addEdgeSkirtBit(tile, bit);
+      }
+      return;
+    }
 
     for (let s = tile.size * 2; s <= this.worldSize; s *= 2) {
       // Snap probe point to the centred grid at scale `s`. Tiles of
@@ -212,9 +239,16 @@ export class CDLODQuadtree {
       const cz = Math.floor((pz + halfWorld) / s) * s + s / 2 - halfWorld;
       if (this.tileIndex.has(this.tileKey(cx, cz, s))) {
         tile.edgeMorphMask |= bit;
+        addEdgeSkirtBit(tile, bit);
         return;
       }
     }
+
+    // No emitted same-size/coarser neighbour was found. This happens along
+    // selected frustum/height-bound boundaries and when the adjacent area is
+    // represented by finer children. Preserve the old full-skirt visual cover
+    // without forcing shader morph on this edge.
+    addEdgeSkirtBit(tile, bit);
   }
 
   // Callers must skip world-edge probes before building neighbor keys.
@@ -337,6 +371,7 @@ export class CDLODQuadtree {
     tile.lodLevel = lodLevel;
     tile.morphFactor = morphFactor;
     tile.edgeMorphMask = 0;
+    tile.edgeSkirtMask = 0;
     this.tileCount++;
   }
 

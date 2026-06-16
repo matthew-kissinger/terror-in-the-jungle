@@ -455,6 +455,7 @@ describe('TerrainRenderRuntime', () => {
         lodLevel: 2,
         morphFactor: 0.25,
         edgeMorphMask: 0,
+        edgeSkirtMask: 0,
       },
     ]);
     expect(mockSelectTiles).toHaveBeenCalledTimes(1);
@@ -499,7 +500,10 @@ describe('TerrainRenderRuntime', () => {
     runtime.update();
 
     const activeTiles = runtime.getActiveTilesForDebug();
-    expect(activeTiles).toEqual(regrownTiles);
+    expect(activeTiles).toEqual([
+      { ...regrownTiles[0], edgeSkirtMask: 2 },
+      { ...regrownTiles[1], edgeSkirtMask: 3 },
+    ]);
     expect(activeTiles[0]).toBe(reusedFirstRecord);
     expect(activeTiles[1]).toBe(reusedSecondRecord);
   });
@@ -670,6 +674,39 @@ describe('TerrainRenderRuntime', () => {
       lastSubmissionClassification: 'dynamics-changed',
     });
     expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([edgeChangedTile]);
+  });
+
+  it('keeps regular terrain buffer submissions when sparse skirt cover changes', () => {
+    const firstTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.1, edgeMorphMask: 0, edgeSkirtMask: 0 };
+    const skirtChangedTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.6, edgeMorphMask: 0, edgeSkirtMask: 5 };
+    mockSelectTiles
+      .mockReturnValueOnce([firstTile])
+      .mockReturnValue([skirtChangedTile]);
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 1000,
+        visualMargin: 0,
+        maxLODLevels: 4,
+        lodRanges: [100, 250, 500, 1000],
+        tileResolution: 33,
+      },
+    );
+
+    runtime.update();
+    runtime.update();
+
+    expect(mockSelectTiles).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      instanceSubmissions: 2,
+      unchangedSubmissionSkips: 0,
+      lastSubmissionSkipped: false,
+      lastSubmissionClassification: 'dynamics-changed',
+    });
+    expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([skirtChangedTile]);
   });
 
   it('skips a late render-camera sync when the submitted CDLOD selection already matches the camera epoch', () => {
@@ -854,6 +891,42 @@ describe('TerrainRenderRuntime', () => {
     expect(result.submissionClassification).toBe('dynamics-changed');
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([edgeChangedTile]);
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      lateSyncInstanceSubmissions: 1,
+      lateSyncDynamicsChangedSubmissions: 1,
+      lastSubmissionOrigin: 'late-sync',
+      lastSubmissionClassification: 'dynamics-changed',
+    });
+  });
+
+  it('resubmits same terrain tiles when late sync changes sparse skirt cover', () => {
+    const firstTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.1, edgeMorphMask: 0, edgeSkirtMask: 0 };
+    const skirtChangedTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.7, edgeMorphMask: 0, edgeSkirtMask: 4 };
+    mockSelectTiles
+      .mockReturnValueOnce([firstTile])
+      .mockReturnValue([skirtChangedTile]);
+    const camera = new THREE.PerspectiveCamera();
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      camera,
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 1000,
+        visualMargin: 0,
+        maxLODLevels: 4,
+        lodRanges: [100, 250, 500, 1000],
+        tileResolution: 33,
+      },
+    );
+
+    runtime.update();
+    camera.rotation.y = THREE.MathUtils.degToRad(5);
+    const result = runtime.syncSelectionForCamera(camera);
+
+    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.submissionClassification).toBe('dynamics-changed');
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([skirtChangedTile]);
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       lateSyncInstanceSubmissions: 1,
       lateSyncDynamicsChangedSubmissions: 1,
