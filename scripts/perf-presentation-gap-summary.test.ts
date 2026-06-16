@@ -22,6 +22,7 @@ describe('summarizePresentationGapContexts', () => {
               lodCounts: { 0: 6, 1: 4 },
               morphingTiles: 8,
               edgeMorphTiles: 2,
+              edgeMorphMaskCounts: { 0: 8, 5: 2 },
               maxMorphFactor: 0.75,
               cameraSample: {
                 clearanceMeters: 1.8,
@@ -46,6 +47,10 @@ describe('summarizePresentationGapContexts', () => {
               shadowPrefixRatio: 0.25,
               lastSelectionMs: 0.2,
               lastUpdateInstancesMs: 0.4,
+              tileInteriorTriangles: 2048,
+              tileSkirtTriangles: 512,
+              tileSkirtTrianglesPerEdge: 128,
+              tileTotalTriangles: 2560,
             },
             terrainByStage: {
               'after-simulation': {
@@ -83,6 +88,7 @@ describe('summarizePresentationGapContexts', () => {
               lodCounts: { 0: 8, 1: 6 },
               morphingTiles: 12,
               edgeMorphTiles: 4,
+              edgeMorphMaskCounts: { 0: 10, 1: 4 },
               maxMorphFactor: 1,
               cameraSample: {
                 clearanceMeters: 3.2,
@@ -107,6 +113,10 @@ describe('summarizePresentationGapContexts', () => {
               shadowPrefixRatio: 1,
               lastSelectionMs: 0.6,
               lastUpdateInstancesMs: 0.8,
+              tileInteriorTriangles: 2048,
+              tileSkirtTriangles: 512,
+              tileSkirtTrianglesPerEdge: 128,
+              tileTotalTriangles: 2560,
             },
             terrainByStage: {
               'after-simulation': {
@@ -208,6 +218,28 @@ describe('summarizePresentationGapContexts', () => {
     });
     expect(summary?.terrain?.renderUpdateInstancesMs?.total).toBeCloseTo(1.2, 5);
     expect(summary?.terrain?.renderUpdateInstancesMs?.avg).toBeCloseTo(0.6, 5);
+    expect(summary?.terrain?.mainTerrainTriangleEstimate).toMatchObject({
+      count: 2,
+      total: 61440,
+      avg: 30720,
+      min: 25600,
+      max: 35840,
+    });
+    expect(summary?.terrain?.mainTerrainInteriorTriangleEstimate?.total).toBe(49152);
+    expect(summary?.terrain?.mainTerrainFullSkirtTriangleEstimate?.total).toBe(12288);
+    expect(summary?.terrain?.edgeTransitionSkirtTriangleEstimate?.total).toBe(1024);
+    expect(summary?.terrain?.potentialSkirtTriangleSavingsEstimate?.total).toBe(11264);
+    expect(summary?.terrain?.potentialSkirtTriangleSavingsRatio?.avg).toBeCloseTo(
+      (4608 / 25600 + 6656 / 35840) / 2,
+      5,
+    );
+    expect(summary?.terrain?.shadowTerrainTriangleEstimate).toMatchObject({
+      count: 2,
+      total: 97280,
+      avg: 48640,
+      min: 35840,
+      max: 61440,
+    });
     expect(summary?.terrain?.avgLodCounts).toMatchObject({
       0: 14 / 3,
       1: 10 / 3,
@@ -215,6 +247,16 @@ describe('summarizePresentationGapContexts', () => {
     expect(summary?.terrain?.maxLodCounts).toMatchObject({
       0: 8,
       1: 6,
+    });
+    expect(summary?.terrain?.avgEdgeMorphMaskCounts).toMatchObject({
+      0: 18 / 3,
+      1: 4 / 3,
+      5: 2 / 3,
+    });
+    expect(summary?.terrain?.maxEdgeMorphMaskCounts).toMatchObject({
+      0: 10,
+      1: 4,
+      5: 2,
     });
     expect(summary?.latest.map((gap) => gap.seq)).toEqual([1, 2, 3]);
   });

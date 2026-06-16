@@ -113,7 +113,7 @@ vi.mock('three', () => {
 });
 
 import { isPerfDiagnosticsEnabled, isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
-import { CDLODRenderer, createTileGeometry } from './CDLODRenderer';
+import { CDLODRenderer, computeTileGeometryStats, createTileGeometry } from './CDLODRenderer';
 import type { CDLODTile } from './CDLODQuadtree';
 
 const mockIsPerfDiagnosticsEnabled = vi.mocked(isPerfDiagnosticsEnabled);
@@ -368,6 +368,23 @@ describe('CDLODRenderer', () => {
     expect(isolatedRenderer.getMesh().receiveShadow).toBe(true);
   });
 
+  it('can disable skirt geometry only under the perf-harness terrain-skirt diagnostic flag', () => {
+    mockIsPerfHarnessEnabled.mockReturnValue(true);
+    setRuntimeSearch('?perf=1&perfDisableTerrainSkirts=1');
+
+    const isolatedRenderer = new CDLODRenderer({} as any, 33, 256);
+    const mesh: any = isolatedRenderer.getMesh();
+
+    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33);
+    expect(mesh.geometry.index.array.length).toBe((32 * 32 * 2) * 3);
+    expect(isolatedRenderer.getShadowPassStatsForDebug()).toMatchObject({
+      tileInteriorTriangles: 2048,
+      tileSkirtTriangles: 0,
+      tileSkirtTrianglesPerEdge: 0,
+      tileTotalTriangles: 2048,
+    });
+  });
+
   it('bounds terrain shadow caster instances by default without changing main-pass count', () => {
     renderer.updateInstances([
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
@@ -495,6 +512,26 @@ describe('createTileGeometry', () => {
     const geo: any = createTileGeometry(N);
     expect(geo.index).not.toBeNull();
     expect(geo.index.array.length).toBe(((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 4) * 3);
+  });
+
+  it('reports the same per-tile triangle split used by the geometry', () => {
+    expect(computeTileGeometryStats(33)).toMatchObject({
+      tileResolution: 33,
+      tileInteriorVertices: 1089,
+      tileSkirtVertices: 128,
+      tileInteriorTriangles: 2048,
+      tileSkirtTrianglesPerEdge: 128,
+      tileSkirtTriangles: 512,
+      tileTotalTriangles: 2560,
+    });
+    expect(computeTileGeometryStats(33, false)).toMatchObject({
+      tileInteriorVertices: 1089,
+      tileSkirtVertices: 0,
+      tileInteriorTriangles: 2048,
+      tileSkirtTrianglesPerEdge: 0,
+      tileSkirtTriangles: 0,
+      tileTotalTriangles: 2048,
+    });
   });
 
   it('duplicates skirt wall winding so seam covers survive FrontSide culling from either side', () => {
