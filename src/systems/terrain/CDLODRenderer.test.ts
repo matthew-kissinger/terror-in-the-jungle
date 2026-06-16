@@ -363,7 +363,7 @@ describe('CDLODRenderer', () => {
     expect(renderer.getMesh().receiveShadow).toBe(true);
   });
 
-  it('uses sparse edge skirts by default while keeping the main terrain mesh skirt-free', () => {
+  it('uses full perimeter skirts by default for production terrain seam cover', () => {
     renderer.updateInstances([
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
       { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5, edgeMorphMask: 3 },
@@ -371,35 +371,37 @@ describe('CDLODRenderer', () => {
     ]);
 
     const mesh: any = renderer.getMesh();
-    const edgeSkirtCounts = mesh.children.map((child: any) => child.count);
 
-    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33);
-    expect(edgeSkirtCounts).toEqual([1, 1, 0, 1]);
+    expect(mesh.children).toHaveLength(0);
+    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33 + 4 * 33 - 4);
     expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
-      sparseEdgeSkirtsEnabled: true,
+      sparseEdgeSkirtsEnabled: false,
       lastMainPassInstances: 3,
-      lastMainPassEdgeSkirtInstances: 3,
+      lastMainPassEdgeSkirtInstances: 0,
       tileInteriorTriangles: 2048,
-      tileSkirtTriangles: 0,
+      tileSkirtTriangles: 512,
       tileSkirtTrianglesPerEdge: 128,
-      tileTotalTriangles: 2048,
+      tileTotalTriangles: 2560,
       tileFullSkirtTriangles: 512,
-      lastMainPassTriangleEstimate: (3 * 2048) + (3 * 128),
+      lastMainPassTriangleEstimate: 3 * 2560,
     });
   });
 
-  it('uses edgeSkirtMask for sparse visual cover without changing shader morph bits', () => {
-    renderer.updateInstances([
+  it('can opt into sparse edge skirts for diagnostics without changing shader morph bits', () => {
+    setRuntimeSearch('?terrainSparseTerrainSkirts=1');
+    const sparseRenderer = new CDLODRenderer({} as any, 33, 256);
+
+    sparseRenderer.updateInstances([
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0, edgeSkirtMask: 5 },
     ]);
 
-    const mesh: any = renderer.getMesh();
+    const mesh: any = sparseRenderer.getMesh();
     const edgeSkirtCounts = mesh.children.map((child: any) => child.count);
     const params1 = mesh.geometry.attributes.tileParams1.array as Float32Array;
 
     expect(edgeSkirtCounts).toEqual([1, 0, 1, 0]);
     expect(params1[1]).toBe(0);
-    expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
+    expect(sparseRenderer.getShadowPassStatsForDebug()).toMatchObject({
       sparseEdgeSkirtsEnabled: true,
       lastMainPassInstances: 1,
       lastMainPassEdgeSkirtInstances: 2,
@@ -407,7 +409,7 @@ describe('CDLODRenderer', () => {
     });
   });
 
-  it('can restore legacy full perimeter skirts with the full-skirt query fallback', () => {
+  it('keeps the legacy full-skirt query fallback as an explicit compatibility flag', () => {
     setRuntimeSearch('?terrainFullTerrainSkirts=1');
 
     const fullSkirtRenderer = new CDLODRenderer({} as any, 33, 256);

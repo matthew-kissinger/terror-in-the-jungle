@@ -92,9 +92,18 @@ need the same release shepherding before they are called shipped.
   proof, not visual acceptance: focused terrain tests assert the seam-cover
   invariant across representative and A Shau-scale camera positions, including
   the owner-captured coordinate family near `x=1950,z=2649`. The old
-  full-perimeter skirt path remains available with
-  `?terrainFullTerrainSkirts=1` / `--terrain-full-skirts`; the no-skirt flag
-  remains diagnostic-only and is not a gameplay candidate.
+  full-perimeter skirt path is production default again after the owner saw the
+  intermittent terrain artifact return; sparse edge-only skirts are now an
+  explicit diagnostic A/B via `?terrainSparseTerrainSkirts=1` /
+  `--terrain-sparse-skirts`, and the no-skirt flag remains diagnostic-only.
+- Camera/aim structural inspection:
+  The infantry camera path did not show a second position-clipping fix to make
+  in this pass. `PlayerMovement` grounds the player at effective terrain height
+  plus eye height, `PlayerCamera.setInfantryViewAngles` and recoil refresh the
+  camera from that player position, and `CameraShakeSystem` contributes angular
+  offsets only. Keep harness view snaps and shot-time terrain/CDLOD sync in the
+  suspect set, but do not treat a visual smoke screenshot as proof of camera
+  clipping without a clearance artifact.
 - Pre-correction sparse-skirt runtime artifact:
   `artifacts/perf/2026-06-16T18-37-52-915Z` ran headed A Shau 60 NPC active
   combat with `TIJ_QUIET_MACHINE=1` and WebGPU, but measurement trust failed

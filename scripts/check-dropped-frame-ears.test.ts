@@ -70,6 +70,7 @@ function tempArtifact(options: ArtifactOptions): string {
       terrainHeightAwareFrustumRequested: false,
       terrainHeightAwareFrustumDisabled: false,
       terrainFullSkirtsRequested: false,
+      terrainSparseSkirtsRequested: false,
       terrainSkirtsDisabled: false,
       terrainFarCanopyTintDisabled: false,
       terrainLowSunOcclusionDisabled: false,
@@ -123,6 +124,15 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     }));
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_frontline_compression_requested' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects sparse terrain-skirt diagnostic captures as non-production terrain coverage', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: { terrainSparseSkirtsRequested: true },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_sparse_skirts_requested' && check.status === 'fail')).toBe(true);
   });
 });
 
