@@ -27,8 +27,21 @@ type RuntimeSample = {
   overBudgetPercent: number;
   heapUsedMb?: number;
   heapTotalMb?: number;
+  vegetation?: {
+    activeTotal: number;
+    reservedTotal: number;
+    freeTotal: number;
+    chunksTracked: number;
+    byType: Record<string, {
+      active: number;
+      highWater: number;
+      free: number;
+    }>;
+  };
   renderer?: {
     drawCalls: number;
+    drawCallsSinceLastSample?: number | null;
+    drawCallsPerFrameSinceLastSample?: number | null;
     triangles: number;
     geometries: number;
     textures: number;
@@ -73,6 +86,7 @@ type RuntimeSample = {
     budgetMs: number;
     timeMs: number;
     pendingUnits: number;
+    debug?: Record<string, unknown>;
   }>;
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
 };
@@ -148,6 +162,18 @@ const rendererSamples = samples.filter(s => s.renderer);
 const avgDrawCalls = rendererSamples.length > 0
   ? avg(rendererSamples.map(s => Number(s.renderer?.drawCalls ?? 0)))
   : 0;
+const drawCallDeltaSamples = rendererSamples
+  .map(s => Number(s.renderer?.drawCallsSinceLastSample))
+  .filter(value => Number.isFinite(value));
+const avgDrawCallsSinceLastSample = drawCallDeltaSamples.length > 0
+  ? avg(drawCallDeltaSamples)
+  : null;
+const drawCallsPerFrameSamples = rendererSamples
+  .map(s => Number(s.renderer?.drawCallsPerFrameSinceLastSample))
+  .filter(value => Number.isFinite(value));
+const avgDrawCallsPerFrame = drawCallsPerFrameSamples.length > 0
+  ? avg(drawCallsPerFrameSamples)
+  : null;
 const avgTriangles = rendererSamples.length > 0
   ? avg(rendererSamples.map(s => Number(s.renderer?.triangles ?? 0)))
   : 0;
@@ -157,6 +183,36 @@ const maxTextures = rendererSamples.length > 0
 const maxGeometries = rendererSamples.length > 0
   ? Math.max(...rendererSamples.map(s => Number(s.renderer?.geometries ?? 0)))
   : 0;
+const vegetationSamples = samples.filter(s => s.vegetation);
+const avgVegetationActive = vegetationSamples.length > 0
+  ? avg(vegetationSamples.map(s => Number(s.vegetation?.activeTotal ?? 0)))
+  : null;
+const peakVegetationActive = vegetationSamples.length > 0
+  ? Math.max(...vegetationSamples.map(s => Number(s.vegetation?.activeTotal ?? 0)))
+  : null;
+const avgVegetationReserved = vegetationSamples.length > 0
+  ? avg(vegetationSamples.map(s => Number(s.vegetation?.reservedTotal ?? 0)))
+  : null;
+const peakVegetationChunks = vegetationSamples.length > 0
+  ? Math.max(...vegetationSamples.map(s => Number(s.vegetation?.chunksTracked ?? 0)))
+  : null;
+const vegetationTypeBuckets = new Map<string, number[]>();
+for (const sample of vegetationSamples) {
+  for (const [type, stats] of Object.entries(sample.vegetation?.byType ?? {})) {
+    const bucket = vegetationTypeBuckets.get(type) ?? [];
+    bucket.push(Number(stats.active ?? 0));
+    vegetationTypeBuckets.set(type, bucket);
+  }
+}
+const topVegetationTypes = [...vegetationTypeBuckets.entries()]
+  .map(([type, values]) => ({
+    type,
+    avgActive: avg(values),
+    peakActive: values.length > 0 ? Math.max(...values) : 0,
+  }))
+  .filter(entry => entry.peakActive > 0)
+  .sort((a, b) => b.avgActive - a.avgActive)
+  .slice(0, 5);
 const stallSamples = samples.filter(s => s.browserStalls?.totals);
 const longTaskCount = stallSamples.length > 0
   ? Math.max(...stallSamples.map(s => Number(s.browserStalls?.totals?.longTaskCount ?? 0)))
@@ -298,6 +354,18 @@ const terrainQueueFlags = terrainSummary.flatMap(stream => {
   }
   return flags;
 });
+const renderTerrainDebugSamples = samples
+  .map(sample => sample.terrainStreams?.find(stream => stream.name === 'render')?.debug)
+  .filter((debug): debug is Record<string, unknown> => Boolean(debug));
+const latestRenderTerrainDebug = renderTerrainDebugSamples.length > 0
+  ? renderTerrainDebugSamples[renderTerrainDebugSamples.length - 1]
+  : null;
+const peakTerrainSelectionMs = renderTerrainDebugSamples.length > 0
+  ? Math.max(...renderTerrainDebugSamples.map(debug => Number(debug.lastSelectionMs ?? 0)).filter(Number.isFinite))
+  : null;
+const peakTerrainUpdateInstancesMs = renderTerrainDebugSamples.length > 0
+  ? Math.max(...renderTerrainDebugSamples.map(debug => Number(debug.lastUpdateInstancesMs ?? 0)).filter(Number.isFinite))
+  : null;
 
 console.log(`Artifact: ${latestDir}`);
 console.log(`Status: ${summary.status}`);
@@ -324,10 +392,33 @@ if (heapSamples.length > 0) {
   console.log(`Heap recovered from peak (MB): ${heapRecoveryFromPeak.toFixed(2)}`);
 }
 if (rendererSamples.length > 0) {
-  console.log(`Avg draw calls: ${avgDrawCalls.toFixed(2)}`);
+  if (avgDrawCallsSinceLastSample !== null) {
+    console.log(`Avg draw-call delta/sample: ${avgDrawCallsSinceLastSample.toFixed(2)}`);
+  }
+  if (avgDrawCallsPerFrame !== null) {
+    console.log(`Avg draw calls/frame: ${avgDrawCallsPerFrame.toFixed(2)}`);
+  }
+  console.log(`Avg raw draw calls: ${avgDrawCalls.toFixed(2)}`);
   console.log(`Avg triangles: ${avgTriangles.toFixed(0)}`);
   console.log(`Max textures: ${maxTextures}`);
   console.log(`Max geometries: ${maxGeometries}`);
+}
+if (
+  avgVegetationActive !== null &&
+  peakVegetationActive !== null &&
+  avgVegetationReserved !== null &&
+  peakVegetationChunks !== null
+) {
+  console.log(
+    `Vegetation: avg active ${avgVegetationActive.toFixed(0)}, peak active ${peakVegetationActive.toFixed(0)}, ` +
+    `avg reserved ${avgVegetationReserved.toFixed(0)}, peak chunks ${peakVegetationChunks.toFixed(0)}`
+  );
+  if (topVegetationTypes.length > 0) {
+    console.log('Vegetation top active types:');
+    for (const entry of topVegetationTypes) {
+      console.log(`- ${entry.type}: avg ${entry.avgActive.toFixed(0)}, peak ${entry.peakActive.toFixed(0)}`);
+    }
+  }
 }
 if (stallSamples.length > 0) {
   console.log(`Long tasks observed: ${longTaskCount} (max ${longTaskMaxMs.toFixed(2)}ms)`);
@@ -357,6 +448,21 @@ if (terrainSummary.length > 0) {
     for (const flag of terrainQueueFlags) {
       console.log(`- ${flag}`);
     }
+  }
+}
+if (latestRenderTerrainDebug) {
+  console.log(
+    `Terrain render-sync submissions: regular ${Number(latestRenderTerrainDebug.regularInstanceSubmissions ?? 0)}, ` +
+    `late ${Number(latestRenderTerrainDebug.lateSyncInstanceSubmissions ?? 0)} ` +
+    `(same ${Number(latestRenderTerrainDebug.lateSyncSameIdentitySubmissions ?? 0)}, ` +
+    `dynamics ${Number(latestRenderTerrainDebug.lateSyncDynamicsChangedSubmissions ?? 0)}, ` +
+    `tile ${Number(latestRenderTerrainDebug.lateSyncTileSetChangedSubmissions ?? 0)})`
+  );
+  if (peakTerrainSelectionMs !== null && peakTerrainUpdateInstancesMs !== null) {
+    console.log(
+      `Terrain render-sync peak select/updateInstances: ` +
+      `${peakTerrainSelectionMs.toFixed(2)}ms / ${peakTerrainUpdateInstancesMs.toFixed(2)}ms`
+    );
   }
 }
 

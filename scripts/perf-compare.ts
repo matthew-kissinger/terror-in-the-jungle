@@ -82,6 +82,7 @@ type CaptureSummary = {
   perfRuntime?: {
     npcCloseModelsDisabled?: boolean;
     terrainShadowsDisabled?: boolean;
+    boundedTerrainShadowPassEnabled?: boolean;
   };
   droppedFrameMetrics?: {
     browserRaf?: {
@@ -169,7 +170,8 @@ function avg(values: number[]): number {
 
 function isDiagnosticRuntimeVariant(summary: Partial<CaptureSummary>): boolean {
   return summary.perfRuntime?.npcCloseModelsDisabled === true
-    || summary.perfRuntime?.terrainShadowsDisabled === true;
+    || summary.perfRuntime?.terrainShadowsDisabled === true
+    || summary.perfRuntime?.boundedTerrainShadowPassEnabled === true;
 }
 
 function listCaptureDirs(options: { includeDiagnosticRuntimeVariants?: boolean } = {}): string[] {

@@ -119,6 +119,20 @@ type RuntimeCloseModelStats = {
   poolAvailable: Record<string, number>;
 };
 
+type RuntimeVegetationTypeStats = {
+  active: number;
+  highWater: number;
+  free: number;
+};
+
+type RuntimeVegetationStats = {
+  activeTotal: number;
+  reservedTotal: number;
+  freeTotal: number;
+  chunksTracked: number;
+  byType: Record<string, RuntimeVegetationTypeStats>;
+};
+
 type RuntimeSample = {
   ts: string;
   pagePerformanceNowMs?: number;
@@ -142,6 +156,7 @@ type RuntimeSample = {
   heapTotalMb?: number;
   uiErrorPanelVisible?: boolean;
   closeModelStats?: RuntimeCloseModelStats;
+  vegetation?: RuntimeVegetationStats;
   terrainRecoveryEvents?: Record<string, unknown>[];
   materializationTierEvents?: Record<string, unknown>[];
   combatBreakdown?: {
@@ -246,6 +261,8 @@ type RuntimeSample = {
   };
   renderer?: {
     drawCalls: number;
+    drawCallsSinceLastSample?: number | null;
+    drawCallsPerFrameSinceLastSample?: number | null;
     triangles: number;
     geometries: number;
     textures: number;
@@ -823,6 +840,7 @@ type CaptureSummary = {
     victoryConditionsDisabled: boolean;
     npcCloseModelsDisabled: boolean;
     terrainShadowsDisabled: boolean;
+    boundedTerrainShadowPassEnabled: boolean;
     terrainForceInstanceUploadEnabled: boolean;
     terrainFarCanopyTintDisabled: boolean;
     terrainLowSunOcclusionDisabled: boolean;
@@ -1689,6 +1707,7 @@ Common options:
   --gpu-timing
   --disable-npc-close-models
   --disable-terrain-shadows
+  --bounded-terrain-shadow-pass
   --terrain-force-instance-upload
   --disable-terrain-far-canopy-tint
   --disable-terrain-low-sun-occlusion
@@ -4040,6 +4059,7 @@ async function runCapture(): Promise<void> {
   const disableVictory = parseBooleanFlag('disable-victory', false);
   const disableNpcCloseModels = parseBooleanFlag('disable-npc-close-models', false);
   const disableTerrainShadows = parseBooleanFlag('disable-terrain-shadows', false);
+  const boundedTerrainShadowPass = parseBooleanFlag('bounded-terrain-shadow-pass', false);
   const terrainForceInstanceUpload = parseBooleanFlag('terrain-force-instance-upload', false);
   const disableTerrainFarCanopyTint = parseBooleanFlag('disable-terrain-far-canopy-tint', false);
   const disableTerrainLowSunOcclusion = parseBooleanFlag('disable-terrain-low-sun-occlusion', false);
@@ -4094,7 +4114,7 @@ async function runCapture(): Promise<void> {
     seenKeys: new Set<string>(),
     lastCaptureElapsedMs: -1
   };
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainForceInstanceUpload=${terrainForceInstanceUpload} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
   if (shotVisualCaptureState.enabled) {
     logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
   }
@@ -4110,6 +4130,8 @@ async function runCapture(): Promise<void> {
   let finalFrameCount = 0;
   const consoleEntries: ConsoleEntry[] = [];
   const runtimeSamples: RuntimeSample[] = [];
+  let previousRendererDrawCalls: number | null = null;
+  let previousRendererFrameCount: number | null = null;
   let finalPresentationEpochs: Record<string, unknown>[] = [];
   let movementArtifacts: MovementArtifactReportForViewer | null = null;
   let movementViewerPayload: MovementViewerPayload | null = null;
@@ -4140,11 +4162,12 @@ async function runCapture(): Promise<void> {
   const disableVictoryQuery = disableVictory ? '&perfDisableVictory=1' : '';
   const disableNpcCloseModelsQuery = disableNpcCloseModels ? '&perfDisableNpcCloseModels=1' : '';
   const disableTerrainShadowsQuery = disableTerrainShadows ? '&perfDisableTerrainShadows=1' : '';
+  const boundedTerrainShadowPassQuery = boundedTerrainShadowPass ? '&perfBoundedTerrainShadowPass=1' : '';
   const terrainForceInstanceUploadQuery = terrainForceInstanceUpload ? '&terrainForceInstanceUpload=1' : '';
   const disableTerrainFarCanopyTintQuery = disableTerrainFarCanopyTint ? '&perfDisableTerrainFarCanopyTint=1' : '';
   const disableTerrainLowSunOcclusionQuery = disableTerrainLowSunOcclusion ? '&perfDisableTerrainLowSunOcclusion=1' : '';
   const disableWildlifeQuery = disableWildlife ? '&perfDisableWildlife=1' : '';
-  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${terrainForceInstanceUploadQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}`;
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainForceInstanceUploadQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}`;
   const query = sandboxMode
     ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`
     : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`;
@@ -4745,6 +4768,9 @@ async function runCapture(): Promise<void> {
           const terrainStreams = shouldIncludeDetails
             ? engine?.systemManager?.terrainSystem?.getStreamingMetrics?.() ?? null
             : null;
+          const vegetationDebug = shouldIncludeDetails
+            ? engine?.systemManager?.globalBillboardSystem?.getDebugInfo?.() ?? null
+            : null;
           const terrainRecoveryEvents = shouldIncludeDetails
             ? engine?.systemManager?.combatantSystem?.getRecentTerrainRecoveryEvents?.() ?? null
             : null;
@@ -4848,6 +4874,41 @@ async function runCapture(): Promise<void> {
           const objectOrNull = sampleHelpers.objectOrNull;
           const objectArray = sampleHelpers.objectArray;
           const normalizeRuntimeLiveness = sampleHelpers.normalizeRuntimeLiveness;
+          const normalizeVegetationDebug = (debug: any) => {
+            if (!debug || typeof debug !== 'object') return undefined;
+            const byType: Record<string, { active: number; highWater: number; free: number }> = {};
+            let activeTotal = 0;
+            let reservedTotal = 0;
+            let freeTotal = 0;
+            const ensureType = (typeId: string) => {
+              byType[typeId] ??= { active: 0, highWater: 0, free: 0 };
+              return byType[typeId];
+            };
+            for (const [key, rawValue] of Object.entries(debug)) {
+              const value = Number(rawValue ?? 0);
+              if (!Number.isFinite(value)) continue;
+              if (key.endsWith('Active')) {
+                const stats = ensureType(key.slice(0, -'Active'.length));
+                stats.active = value;
+                activeTotal += value;
+              } else if (key.endsWith('HighWater')) {
+                const stats = ensureType(key.slice(0, -'HighWater'.length));
+                stats.highWater = value;
+                reservedTotal += value;
+              } else if (key.endsWith('Free')) {
+                const stats = ensureType(key.slice(0, -'Free'.length));
+                stats.free = value;
+                freeTotal += value;
+              }
+            }
+            return {
+              activeTotal,
+              reservedTotal,
+              freeTotal,
+              chunksTracked: Number(debug.chunksTracked ?? 0),
+              byType
+            };
+          };
           let sceneAttribution: any[] | null = null;
           let sceneAttributionError: string | null = null;
           let renderSubmissions: any | null = null;
@@ -4921,6 +4982,7 @@ async function runCapture(): Promise<void> {
             heapUsedMb: memory?.usedJSHeapSize ? Number(memory.usedJSHeapSize) / (1024 * 1024) : undefined,
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
+            vegetation: normalizeVegetationDebug(vegetationDebug),
             closeModelStats: closeModelStats && typeof closeModelStats === 'object'
               ? {
                   closeRadiusMeters: Number(closeModelStats.closeRadiusMeters ?? 0),
@@ -5624,6 +5686,25 @@ async function runCapture(): Promise<void> {
       }
 
       if (sample) {
+        if (sample.renderer) {
+          const rendererDrawCalls = Number(sample.renderer.drawCalls ?? 0);
+          const rendererFrameCount = Number(sample.frameCount ?? 0);
+          if (Number.isFinite(rendererDrawCalls)) {
+            sample.renderer.drawCallsSinceLastSample =
+              previousRendererDrawCalls !== null && rendererDrawCalls >= previousRendererDrawCalls
+                ? rendererDrawCalls - previousRendererDrawCalls
+                : null;
+            const frameDelta = previousRendererFrameCount !== null && Number.isFinite(rendererFrameCount)
+              ? rendererFrameCount - previousRendererFrameCount
+              : 0;
+            sample.renderer.drawCallsPerFrameSinceLastSample =
+              sample.renderer.drawCallsSinceLastSample !== null && frameDelta > 0
+                ? sample.renderer.drawCallsSinceLastSample / frameDelta
+                : null;
+            previousRendererDrawCalls = rendererDrawCalls;
+            previousRendererFrameCount = rendererFrameCount;
+          }
+        }
         runtimeSamples.push(sample);
         finalFrameCount = sample.frameCount;
         await maybeCaptureShotVisualFrame(
@@ -5636,6 +5717,11 @@ async function runCapture(): Promise<void> {
         const denialRatePct = Number(sample.combatBreakdown?.raycastBudget?.denialRate ?? 0) * 100;
         const aiStarve = Number(sample.combatBreakdown?.aiScheduling?.aiBudgetExceededEvents ?? 0);
         const drawCalls = Number(sample.renderer?.drawCalls ?? 0);
+        const drawCallsSinceLastSample = nullableNumber(sample.renderer?.drawCallsSinceLastSample);
+        const drawCallsPerFrame = nullableNumber(sample.renderer?.drawCallsPerFrameSinceLastSample);
+        const drawCallsSuffix = drawCallsSinceLastSample !== null
+          ? `drawRaw=${drawCalls} drawDelta=${drawCallsSinceLastSample}${drawCallsPerFrame !== null ? ` drawPerFrame=${drawCallsPerFrame.toFixed(1)}` : ''}`
+          : `drawRaw=${drawCalls}`;
         const triangles = Number(sample.renderer?.triangles ?? 0);
         const recentLongTasks = Number(sample.browserStalls?.recent?.longTasks?.count ?? 0);
         const recentLoafs = Number(sample.browserStalls?.recent?.longAnimationFrames?.count ?? 0);
@@ -5646,6 +5732,17 @@ async function runCapture(): Promise<void> {
         const fireTerrainBlockedFrame = Number(combatFireBudget?.terrainBlockedThisFrame ?? 0);
         const fireTerrainBlockedTotal = Number(combatFireBudget?.totalTerrainBlocked ?? 0);
         const fireTerrainBlockRatePct = Number(combatFireBudget?.terrainBlockRate ?? 0) * 100;
+        const vegetation = sample.vegetation;
+        let vegetationSuffix = '';
+        if (vegetation) {
+          const topVegetationTypes = Object.entries(vegetation.byType ?? {})
+            .map(([type, stats]) => ({ type, active: Number(stats.active ?? 0) }))
+            .filter(entry => entry.active > 0)
+            .sort((a, b) => b.active - a.active)
+            .slice(0, 3)
+            .map(entry => `${entry.type}:${entry.active}`);
+          vegetationSuffix = ` veg=${Number(vegetation.activeTotal ?? 0)}/${Number(vegetation.reservedTotal ?? 0)} chunks=${Number(vegetation.chunksTracked ?? 0)}${topVegetationTypes.length > 0 ? ` top=${topVegetationTypes.join(',')}` : ''}`;
+        }
         const rafStutter25Count = Number(rafCadence?.stutter25Count ?? 0);
         const rafHitch33Count = Number(rafCadence?.hitch33Count ?? 0);
         const rafDropped60HzFrames = Number(rafCadence?.estimatedDropped60HzFrames ?? 0);
@@ -5737,6 +5834,14 @@ async function runCapture(): Promise<void> {
         const terrainSuffix = topTerrainStream
           ? ` terrain=${topTerrainStream.name}:${Number(topTerrainStream.timeMs ?? 0).toFixed(2)}ms/${Number(topTerrainStream.budgetMs ?? 0).toFixed(2)}ms pending=${Number(topTerrainStream.pendingUnits ?? 0)}`
           : '';
+        const renderTerrainStream = Array.isArray(sample.terrainStreams)
+          ? sample.terrainStreams.find(stream => stream.name === 'render')
+          : null;
+        const renderTerrainDebug = renderTerrainStream?.debug as Record<string, unknown> | undefined;
+        const lateSyncSubmissions = Number(renderTerrainDebug?.lateSyncInstanceSubmissions ?? 0);
+        const terrainSyncSuffix = renderTerrainDebug && lateSyncSubmissions > 0
+          ? ` terrainSync=late:${lateSyncSubmissions} same=${Number(renderTerrainDebug.lateSyncSameIdentitySubmissions ?? 0)} dyn=${Number(renderTerrainDebug.lateSyncDynamicsChangedSubmissions ?? 0)} tile=${Number(renderTerrainDebug.lateSyncTileSetChangedSubmissions ?? 0)} lastSel=${Number(renderTerrainDebug.lastSelectionMs ?? 0).toFixed(2)}ms lastUpload=${Number(renderTerrainDebug.lastUpdateInstancesMs ?? 0).toFixed(2)}ms`
+          : '';
         const closeModelSuffix = closeStats
           ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
           : '';
@@ -5759,7 +5864,7 @@ async function runCapture(): Promise<void> {
         const fireTerrainBlockSuffix = fireTerrainBlockedFrame > 0 || fireTerrainBlockedTotal > 0
           ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}%`
           : '';
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} draw=${drawCalls} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${closeModelSuffix}${driverSuffix}`);
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${vegetationSuffix}${closeModelSuffix}${driverSuffix}`);
         // harness-lifecycle-halt-on-match-end: latch the first match-end
         // observation, then break the loop after MATCH_END_TAIL_MS so we
         // finalize close to the moment the engine declared a winner instead
@@ -6105,6 +6210,7 @@ async function runCapture(): Promise<void> {
           victoryConditionsDisabled: disableVictory,
           npcCloseModelsDisabled: disableNpcCloseModels,
           terrainShadowsDisabled: disableTerrainShadows,
+          boundedTerrainShadowPassEnabled: boundedTerrainShadowPass,
           terrainForceInstanceUploadEnabled: terrainForceInstanceUpload,
           terrainFarCanopyTintDisabled: disableTerrainFarCanopyTint,
           terrainLowSunOcclusionDisabled: disableTerrainLowSunOcclusion,

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../core/PerfDiagnostics', () => ({
   isPerfDiagnosticsEnabled: vi.fn(() => false),
+  isPerfHarnessEnabled: vi.fn(() => false),
 }));
 
 // Mock Three.js
@@ -111,11 +112,12 @@ vi.mock('three', () => {
   };
 });
 
-import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import { isPerfDiagnosticsEnabled, isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import { CDLODRenderer, createTileGeometry } from './CDLODRenderer';
 import type { CDLODTile } from './CDLODQuadtree';
 
 const mockIsPerfDiagnosticsEnabled = vi.mocked(isPerfDiagnosticsEnabled);
+const mockIsPerfHarnessEnabled = vi.mocked(isPerfHarnessEnabled);
 
 function setRuntimeSearch(search: string): void {
   Object.defineProperty(globalThis, 'window', {
@@ -131,6 +133,7 @@ describe('CDLODRenderer', () => {
 
   beforeEach(() => {
     mockIsPerfDiagnosticsEnabled.mockReturnValue(false);
+    mockIsPerfHarnessEnabled.mockReturnValue(false);
     setRuntimeSearch('');
     renderer = new CDLODRenderer({} as any, 33, 256);
   });
@@ -331,13 +334,68 @@ describe('CDLODRenderer', () => {
   });
 
   it('disables only terrain shadow casting under the perf isolation flag', () => {
-    mockIsPerfDiagnosticsEnabled.mockReturnValue(true);
+    mockIsPerfHarnessEnabled.mockReturnValue(true);
     setRuntimeSearch('?perf=1&perfDisableTerrainShadows=1');
 
     const isolatedRenderer = new CDLODRenderer({} as any, 33, 256);
 
     expect(isolatedRenderer.getMesh().castShadow).toBe(false);
     expect(isolatedRenderer.getMesh().receiveShadow).toBe(true);
+  });
+
+  it('keeps the full visible terrain instance count in shadow passes by default', () => {
+    renderer.updateInstances([
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
+      { x: 512, z: 0, size: 256, lodLevel: 3, morphFactor: 0.5, edgeMorphMask: 0 },
+    ]);
+
+    const mesh: any = renderer.getMesh();
+    mesh.onBeforeShadow();
+
+    expect(mesh.count).toBe(2);
+    expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
+      boundedShadowPassEnabled: false,
+      shadowPrefixInstances: 2,
+      lastMainPassInstances: 2,
+      lastShadowPassInstances: 2,
+      shadowPassReductions: 0,
+    });
+  });
+
+  it('bounds only the shadow-pass instance count when the perf candidate flag is enabled', () => {
+    mockIsPerfHarnessEnabled.mockReturnValue(true);
+    setRuntimeSearch('?perf=1&perfBoundedTerrainShadowPass=1');
+    const boundedRenderer = new CDLODRenderer({} as any, 33, 256);
+    boundedRenderer.configureBoundedShadowPass(0, 0, 96);
+
+    boundedRenderer.updateInstances([
+      { x: 512, z: 0, size: 128, lodLevel: 3, morphFactor: 0.5, edgeMorphMask: 0 },
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 3 },
+      { x: -640, z: 0, size: 256, lodLevel: 4, morphFactor: 0.75, edgeMorphMask: 0 },
+    ]);
+
+    const mesh: any = boundedRenderer.getMesh();
+    const params0 = mesh.geometry.attributes.tileParams0.array as Float32Array;
+    expect(mesh.count).toBe(3);
+    expect(Array.from(params0.slice(0, 8))).toEqual([
+      0, 0, 64, 0,
+      512, 0, 128, 3,
+    ]);
+
+    mesh.onBeforeShadow();
+
+    expect(mesh.count).toBe(1);
+    expect(boundedRenderer.getShadowPassStatsForDebug()).toMatchObject({
+      boundedShadowPassEnabled: true,
+      shadowPrefixInstances: 1,
+      lastMainPassInstances: 3,
+      lastShadowPassInstances: 1,
+      shadowPassReductions: 1,
+    });
+
+    mesh.onAfterShadow();
+
+    expect(mesh.count).toBe(3);
   });
 
 });

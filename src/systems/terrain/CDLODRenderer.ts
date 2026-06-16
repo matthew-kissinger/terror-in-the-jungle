@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import type { CDLODTile } from './CDLODQuadtree';
 
 /**
@@ -103,8 +103,22 @@ function readBooleanQueryFlag(name: string): boolean {
 
 export function isTerrainShadowPerfIsolationEnabled(): boolean {
   return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
-    && isPerfDiagnosticsEnabled()
+    && isPerfHarnessEnabled()
     && readBooleanQueryFlag('perfDisableTerrainShadows');
+}
+
+export function isTerrainBoundedShadowPassEnabled(): boolean {
+  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
+    && isPerfHarnessEnabled()
+    && readBooleanQueryFlag('perfBoundedTerrainShadowPass');
+}
+
+export interface CDLODRendererShadowPassStats {
+  boundedShadowPassEnabled: boolean;
+  shadowPrefixInstances: number;
+  lastMainPassInstances: number;
+  lastShadowPassInstances: number;
+  shadowPassReductions: number;
 }
 
 /**
@@ -121,6 +135,16 @@ export class CDLODRenderer {
   private tileParams0Attr: THREE.InstancedBufferAttribute;
   private tileParams1Attr: THREE.InstancedBufferAttribute;
   private readonly maxInstances: number;
+  private boundedShadowPassEnabled = false;
+  private shadowCenterX = 0;
+  private shadowCenterZ = 0;
+  private shadowRadiusMeters = 180;
+  private shadowRadiusSq = this.shadowRadiusMeters * this.shadowRadiusMeters;
+  private shadowPrefixInstances = 0;
+  private lastMainPassInstances = 0;
+  private lastShadowPassInstances = 0;
+  private shadowPassReductions = 0;
+  private restoreShadowCount: number | null = null;
 
   // Scratch matrix for setting instance transforms
   private readonly _matrix = new THREE.Matrix4();
@@ -165,6 +189,20 @@ export class CDLODRenderer {
     // rest of the scene's shadow contract.
     this.mesh.castShadow = !isTerrainShadowPerfIsolationEnabled();
     this.mesh.receiveShadow = true;
+    this.mesh.onBeforeShadow = () => {
+      this.restoreShadowCount = this.mesh.count;
+      if (this.boundedShadowPassEnabled && this.shadowPrefixInstances < this.mesh.count) {
+        this.mesh.count = this.shadowPrefixInstances;
+        this.shadowPassReductions += 1;
+      }
+      this.lastShadowPassInstances = this.mesh.count;
+    };
+    this.mesh.onAfterShadow = () => {
+      if (this.restoreShadowCount !== null) {
+        this.mesh.count = this.restoreShadowCount;
+        this.restoreShadowCount = null;
+      }
+    };
   }
 
   /**
@@ -172,6 +210,14 @@ export class CDLODRenderer {
    */
   getMesh(): THREE.InstancedMesh {
     return this.mesh;
+  }
+
+  configureBoundedShadowPass(centerX: number, centerZ: number, radiusMeters = 180): void {
+    this.boundedShadowPassEnabled = isTerrainBoundedShadowPassEnabled();
+    this.shadowCenterX = centerX;
+    this.shadowCenterZ = centerZ;
+    this.shadowRadiusMeters = Math.max(1, radiusMeters);
+    this.shadowRadiusSq = this.shadowRadiusMeters * this.shadowRadiusMeters;
   }
 
   /**
@@ -182,45 +228,74 @@ export class CDLODRenderer {
     const count = Math.min(tiles.length, this.maxInstances);
     this.mesh.count = count;
     this.mesh.visible = count > 0;
+    this.lastMainPassInstances = count;
     this.clearAttributeUpdateRanges(this.mesh.instanceMatrix);
     this.clearAttributeUpdateRanges(this.tileParams0Attr);
     this.clearAttributeUpdateRanges(this.tileParams1Attr);
 
-    for (let i = 0; i < count; i++) {
-      const tile = tiles[i];
-      const base = i * 4;
-      const tileX = Math.fround(tile.x);
-      const tileZ = Math.fround(tile.z);
-      const tileSize = Math.fround(tile.size);
-      const lodLevel = Math.fround(tile.lodLevel);
-
-      // Keep matrix and tileParams0 coherent. The vertex node combines both:
-      // matrix supplies rendered XZ placement while tileParams0 supplies the
-      // world-space heightmap sample. Sparse uploads can leave one buffer newer
-      // than the other on renderer backends, which manifests as terrain bands
-      // or inverted/see-through CDLOD tiles.
-      this._matrix.makeScale(tileSize, 1, tileSize);
-      this._matrix.setPosition(tileX, 0, tileZ);
-      this.mesh.setMatrixAt(i, this._matrix);
-
-      const morphFactor = Math.fround(tile.morphFactor);
-      const edgeMorphMask = Math.fround(Number(tile.edgeMorphMask ?? 0));
-      this.writeTileParams(
-        this.tileParams0Attr,
-        this.tileParams1Attr,
-        base,
-        tileX,
-        tileZ,
-        tileSize,
-        lodLevel,
-        morphFactor,
-        edgeMorphMask,
-      );
+    let writeIndex = 0;
+    if (this.boundedShadowPassEnabled) {
+      for (let i = 0; i < count; i++) {
+        const tile = tiles[i];
+        if (this.tileIntersectsShadowRadius(tile)) {
+          this.writeTileInstance(writeIndex++, tile);
+        }
+      }
+      this.shadowPrefixInstances = writeIndex;
+      for (let i = 0; i < count; i++) {
+        const tile = tiles[i];
+        if (!this.tileIntersectsShadowRadius(tile)) {
+          this.writeTileInstance(writeIndex++, tile);
+        }
+      }
+    } else {
+      this.shadowPrefixInstances = count;
+      for (let i = 0; i < count; i++) {
+        this.writeTileInstance(i, tiles[i]);
+      }
     }
 
     this.mesh.instanceMatrix.needsUpdate = true;
     this.tileParams0Attr.needsUpdate = true;
     this.tileParams1Attr.needsUpdate = true;
+  }
+
+  private writeTileInstance(index: number, tile: CDLODTile): void {
+    const base = index * 4;
+    const tileX = Math.fround(tile.x);
+    const tileZ = Math.fround(tile.z);
+    const tileSize = Math.fround(tile.size);
+    const lodLevel = Math.fround(tile.lodLevel);
+
+    // Keep matrix and tileParams0 coherent. The vertex node combines both:
+    // matrix supplies rendered XZ placement while tileParams0 supplies the
+    // world-space heightmap sample. Sparse uploads can leave one buffer newer
+    // than the other on renderer backends, which manifests as terrain bands
+    // or inverted/see-through CDLOD tiles.
+    this._matrix.makeScale(tileSize, 1, tileSize);
+    this._matrix.setPosition(tileX, 0, tileZ);
+    this.mesh.setMatrixAt(index, this._matrix);
+
+    const morphFactor = Math.fround(tile.morphFactor);
+    const edgeMorphMask = Math.fround(Number(tile.edgeMorphMask ?? 0));
+    this.writeTileParams(
+      this.tileParams0Attr,
+      this.tileParams1Attr,
+      base,
+      tileX,
+      tileZ,
+      tileSize,
+      lodLevel,
+      morphFactor,
+      edgeMorphMask,
+    );
+  }
+
+  private tileIntersectsShadowRadius(tile: CDLODTile): boolean {
+    const halfSize = tile.size / 2;
+    const dx = Math.max(Math.abs(this.shadowCenterX - tile.x) - halfSize, 0);
+    const dz = Math.max(Math.abs(this.shadowCenterZ - tile.z) - halfSize, 0);
+    return (dx * dx + dz * dz) <= this.shadowRadiusSq;
   }
 
   private writeTileParams(
@@ -257,6 +332,16 @@ export class CDLODRenderer {
    */
   setMaterial(material: THREE.Material): void {
     this.mesh.material = material;
+  }
+
+  getShadowPassStatsForDebug(): CDLODRendererShadowPassStats {
+    return {
+      boundedShadowPassEnabled: this.boundedShadowPassEnabled,
+      shadowPrefixInstances: this.shadowPrefixInstances,
+      lastMainPassInstances: this.lastMainPassInstances,
+      lastShadowPassInstances: this.lastShadowPassInstances,
+      shadowPassReductions: this.shadowPassReductions,
+    };
   }
 
   dispose(): void {

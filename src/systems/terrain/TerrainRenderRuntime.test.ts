@@ -25,7 +25,15 @@ vi.mock('./CDLODQuadtree', () => ({
 vi.mock('./CDLODRenderer', () => ({
   CDLODRenderer: class {
     getMesh = vi.fn().mockReturnValue({});
+    configureBoundedShadowPass = vi.fn();
     updateInstances = mockUpdateInstances;
+    getShadowPassStatsForDebug = vi.fn().mockReturnValue({
+      boundedShadowPassEnabled: false,
+      shadowPrefixInstances: 0,
+      lastMainPassInstances: 0,
+      lastShadowPassInstances: 0,
+      shadowPassReductions: 0,
+    });
     dispose = vi.fn();
   },
 }));
@@ -486,9 +494,20 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.projectionChanged).toBe(false);
+    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.submissionClassification).toBe('same-identity');
     expect(result.rotationDeltaDeg).toBeGreaterThan(4);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      regularInstanceSubmissions: 1,
+      lateSyncInstanceSubmissions: 1,
+      lateSyncSameIdentitySubmissions: 1,
+      lateSyncDynamicsChangedSubmissions: 0,
+      lateSyncTileSetChangedSubmissions: 0,
+      lastSubmissionOrigin: 'late-sync',
+      lastSubmissionClassification: 'same-identity',
+    });
   });
 
   it('resubmits CDLOD selection on sub-degree render-camera rotation for GPU-buffer coherency', () => {
@@ -517,6 +536,8 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.projectionChanged).toBe(false);
+    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.submissionClassification).toBe('same-identity');
     expect(result.rotationDeltaDeg).toBeGreaterThan(0.2);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
@@ -556,9 +577,19 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.projectionChanged).toBe(false);
+    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.submissionClassification).toBe('dynamics-changed');
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([morphedTile]);
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      lateSyncInstanceSubmissions: 1,
+      lateSyncSameIdentitySubmissions: 0,
+      lateSyncDynamicsChangedSubmissions: 1,
+      lateSyncTileSetChangedSubmissions: 0,
+      lastSubmissionOrigin: 'late-sync',
+      lastSubmissionClassification: 'dynamics-changed',
+    });
   });
 
   it('rechecks sub-meter render-camera translations before render and resubmits changed terrain selection', () => {
@@ -590,6 +621,8 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.positionDeltaMeters).toBeCloseTo(0.25);
+    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.submissionClassification).toBe('tile-set-changed');
     expect(result.rotationDeltaDeg).toBe(0);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);

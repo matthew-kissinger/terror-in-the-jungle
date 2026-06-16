@@ -300,7 +300,7 @@ export class TerrainSystem implements GameSystem {
         positionDeltaMeters: 0,
         rotationDeltaDeg: 0,
         tileCount: 0,
-        tileSelectionSaturated: false,
+        tileSelectionSaturated: false, terrainBufferSubmitted: false, submissionClassification: null,
       };
     }
     return this.renderRuntime.syncSelectionForCamera(camera);

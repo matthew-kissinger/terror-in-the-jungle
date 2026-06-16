@@ -32,14 +32,40 @@ export interface TerrainRenderSelectionSyncResult {
   rotationDeltaDeg: number;
   tileCount: number;
   tileSelectionSaturated?: boolean;
+  terrainBufferSubmitted: boolean;
+  submissionClassification: TerrainRenderSubmissionClassification | null;
 }
+
+export type TerrainRenderSubmissionOrigin = 'regular' | 'late-sync';
+export type TerrainRenderSubmissionClassification =
+  | 'initial'
+  | 'forced'
+  | 'tile-set-changed'
+  | 'dynamics-changed'
+  | 'same-identity';
 
 export interface TerrainRenderSubmissionStats {
   instanceSubmissions: number;
+  regularInstanceSubmissions: number;
+  lateSyncInstanceSubmissions: number;
+  lateSyncSameIdentitySubmissions: number;
+  lateSyncDynamicsChangedSubmissions: number;
+  lateSyncTileSetChangedSubmissions: number;
   unchangedSubmissionSkips: number;
   lastSubmissionSkipped: boolean;
+  lastSubmissionOrigin: TerrainRenderSubmissionOrigin | null;
+  lastSubmissionClassification: TerrainRenderSubmissionClassification | null;
+  regularSelectionCount: number;
+  lateSyncSelectionRechecks: number;
+  lastSelectionMs: number;
+  lastUpdateInstancesMs: number;
   forceInstanceUploadEnabled: boolean;
   forcedInstanceSubmissions: number;
+  boundedShadowPassEnabled: boolean;
+  shadowPrefixInstances: number;
+  lastMainPassInstances: number;
+  lastShadowPassInstances: number;
+  shadowPassReductions: number;
 }
 
 const CAMERA_RENDER_SYNC_POSITION_EPSILON_METERS = 0;
@@ -62,6 +88,12 @@ function readBooleanQueryFlag(name: string): boolean {
 export function isTerrainForceInstanceUploadEnabled(): boolean {
   return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
     && readBooleanQueryFlag('terrainForceInstanceUpload');
+}
+
+function nowMs(): number {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function'
+    ? performance.now()
+    : Date.now();
 }
 
 /**
@@ -95,8 +127,19 @@ export class TerrainRenderRuntime {
   private lastSelectionCamera: THREE.Camera | null = null;
   private hasSelectionPose = false;
   private instanceSubmissions = 0;
+  private regularInstanceSubmissions = 0;
+  private lateSyncInstanceSubmissions = 0;
+  private lateSyncSameIdentitySubmissions = 0;
+  private lateSyncDynamicsChangedSubmissions = 0;
+  private lateSyncTileSetChangedSubmissions = 0;
   private unchangedSubmissionSkips = 0;
   private lastSubmissionSkipped = false;
+  private lastSubmissionOrigin: TerrainRenderSubmissionOrigin | null = null;
+  private lastSubmissionClassification: TerrainRenderSubmissionClassification | null = null;
+  private regularSelectionCount = 0;
+  private lateSyncSelectionRechecks = 0;
+  private lastSelectionMs = 0;
+  private lastUpdateInstancesMs = 0;
   private forcedInstanceSubmissions = 0;
   private lastTileSelectionSaturated = false;
 
@@ -121,21 +164,27 @@ export class TerrainRenderRuntime {
 
   update(): void {
     const camera = this.getSelectionCamera();
-    const tiles = this.selectTiles(camera);
+    const tiles = this.selectTilesTimed(camera, 'regular');
     const forceInstanceUpload = isTerrainForceInstanceUploadEnabled();
+    const hasSubmittedSelection = this.hasSelectionPose;
+    const sameTileSet = hasSubmittedSelection && this.matchesLastSubmittedTileSet(tiles);
+    const sameDynamics = sameTileSet && this.matchesLastSubmittedTileDynamics(tiles);
     if (
       !forceInstanceUpload
-      &&
-      this.hasSelectionPose
-      && this.matchesLastSubmittedTileSet(tiles)
-      && this.matchesLastSubmittedTileDynamics(tiles)
+      && hasSubmittedSelection
+      && sameTileSet
+      && sameDynamics
     ) {
       this.rememberSelectionPose(camera);
       this.unchangedSubmissionSkips += 1;
       this.lastSubmissionSkipped = true;
       return;
     }
-    this.submitTiles(camera, tiles, forceInstanceUpload && this.hasSelectionPose);
+    this.submitTiles(camera, tiles, {
+      forced: forceInstanceUpload && hasSubmittedSelection,
+      origin: 'regular',
+      classification: this.classifySubmission(hasSubmittedSelection, sameTileSet, sameDynamics, forceInstanceUpload),
+    });
   }
 
   syncSelectionForCamera(camera: THREE.Camera | null | undefined): TerrainRenderSelectionSyncResult {
@@ -163,23 +212,48 @@ export class TerrainRenderRuntime {
       return this.buildSyncResult(false, 'current', positionDelta, rotationDelta);
     }
 
-    const tiles = this.selectTiles(camera);
+    const tiles = this.selectTilesTimed(camera, 'late-sync');
     const recheckContext = {
       selectionRechecked: true,
       poseWasStale,
       projectionChanged,
     };
-    if (this.matchesLastSubmittedTileSet(tiles)) {
-      if (!this.matchesLastSubmittedTileDynamics(tiles)) {
-        this.submitTiles(camera, tiles);
-        return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, recheckContext);
-      }
-      this.submitTiles(camera, tiles);
-      return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, recheckContext);
+    const sameTileSet = this.matchesLastSubmittedTileSet(tiles);
+    const sameDynamics = sameTileSet && this.matchesLastSubmittedTileDynamics(tiles);
+    const classification = this.classifySubmission(this.hasSelectionPose, sameTileSet, sameDynamics, false);
+    if (sameTileSet) {
+      this.submitTiles(camera, tiles, {
+        origin: 'late-sync',
+        classification,
+      });
+      return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, {
+        ...recheckContext,
+        terrainBufferSubmitted: true,
+        submissionClassification: classification,
+      });
     }
 
-    this.submitTiles(camera, tiles);
-    return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, recheckContext);
+    this.submitTiles(camera, tiles, {
+      origin: 'late-sync',
+      classification,
+    });
+    return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, {
+      ...recheckContext,
+      terrainBufferSubmitted: true,
+      submissionClassification: classification,
+    });
+  }
+
+  private selectTilesTimed(camera: THREE.Camera, origin: TerrainRenderSubmissionOrigin): readonly CDLODTile[] {
+    const startedAt = nowMs();
+    const tiles = this.selectTiles(camera);
+    this.lastSelectionMs = nowMs() - startedAt;
+    if (origin === 'late-sync') {
+      this.lateSyncSelectionRechecks += 1;
+    } else {
+      this.regularSelectionCount += 1;
+    }
+    return tiles;
   }
 
   private selectTiles(camera: THREE.Camera): readonly CDLODTile[] {
@@ -195,15 +269,53 @@ export class TerrainRenderRuntime {
     return tiles;
   }
 
-  private submitTiles(camera: THREE.Camera, tiles: readonly CDLODTile[], forced = false): void {
+  private submitTiles(
+    camera: THREE.Camera,
+    tiles: readonly CDLODTile[],
+    options: {
+      forced?: boolean;
+      origin: TerrainRenderSubmissionOrigin;
+      classification: TerrainRenderSubmissionClassification;
+    },
+  ): void {
     this.copySelectedTilesForDebug(tiles);
+    this.renderer.configureBoundedShadowPass(camera.position.x, camera.position.z);
+    const updateStartedAt = nowMs();
     this.renderer.updateInstances(tiles);
+    this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
     this.instanceSubmissions += 1;
-    if (forced) {
+    if (options.origin === 'late-sync') {
+      this.lateSyncInstanceSubmissions += 1;
+      if (options.classification === 'same-identity') {
+        this.lateSyncSameIdentitySubmissions += 1;
+      } else if (options.classification === 'dynamics-changed') {
+        this.lateSyncDynamicsChangedSubmissions += 1;
+      } else if (options.classification === 'tile-set-changed') {
+        this.lateSyncTileSetChangedSubmissions += 1;
+      }
+    } else {
+      this.regularInstanceSubmissions += 1;
+    }
+    if (options.forced) {
       this.forcedInstanceSubmissions += 1;
     }
     this.lastSubmissionSkipped = false;
+    this.lastSubmissionOrigin = options.origin;
+    this.lastSubmissionClassification = options.classification;
     this.rememberSelectionPose(camera);
+  }
+
+  private classifySubmission(
+    hasSubmittedSelection: boolean,
+    sameTileSet: boolean,
+    sameDynamics: boolean,
+    forced: boolean,
+  ): TerrainRenderSubmissionClassification {
+    if (!hasSubmittedSelection) return 'initial';
+    if (forced) return 'forced';
+    if (!sameTileSet) return 'tile-set-changed';
+    if (!sameDynamics) return 'dynamics-changed';
+    return 'same-identity';
   }
 
   private rememberSelectionPose(camera: THREE.Camera): void {
@@ -278,12 +390,29 @@ export class TerrainRenderRuntime {
   }
 
   getSubmissionStatsForDebug(): TerrainRenderSubmissionStats {
+    const shadowStats = this.renderer.getShadowPassStatsForDebug();
     return {
       instanceSubmissions: this.instanceSubmissions,
+      regularInstanceSubmissions: this.regularInstanceSubmissions,
+      lateSyncInstanceSubmissions: this.lateSyncInstanceSubmissions,
+      lateSyncSameIdentitySubmissions: this.lateSyncSameIdentitySubmissions,
+      lateSyncDynamicsChangedSubmissions: this.lateSyncDynamicsChangedSubmissions,
+      lateSyncTileSetChangedSubmissions: this.lateSyncTileSetChangedSubmissions,
       unchangedSubmissionSkips: this.unchangedSubmissionSkips,
       lastSubmissionSkipped: this.lastSubmissionSkipped,
+      lastSubmissionOrigin: this.lastSubmissionOrigin,
+      lastSubmissionClassification: this.lastSubmissionClassification,
+      regularSelectionCount: this.regularSelectionCount,
+      lateSyncSelectionRechecks: this.lateSyncSelectionRechecks,
+      lastSelectionMs: this.lastSelectionMs,
+      lastUpdateInstancesMs: this.lastUpdateInstancesMs,
       forceInstanceUploadEnabled: isTerrainForceInstanceUploadEnabled(),
       forcedInstanceSubmissions: this.forcedInstanceSubmissions,
+      boundedShadowPassEnabled: shadowStats.boundedShadowPassEnabled,
+      shadowPrefixInstances: shadowStats.shadowPrefixInstances,
+      lastMainPassInstances: shadowStats.lastMainPassInstances,
+      lastShadowPassInstances: shadowStats.lastShadowPassInstances,
+      shadowPassReductions: shadowStats.shadowPassReductions,
     };
   }
 
@@ -395,7 +524,11 @@ export class TerrainRenderRuntime {
     rotationDeltaRad: number,
     diagnostics: Partial<Pick<
       TerrainRenderSelectionSyncResult,
-      'selectionRechecked' | 'poseWasStale' | 'projectionChanged'
+      | 'selectionRechecked'
+      | 'poseWasStale'
+      | 'projectionChanged'
+      | 'terrainBufferSubmitted'
+      | 'submissionClassification'
     >> = {},
   ): TerrainRenderSelectionSyncResult {
     return {
@@ -410,6 +543,8 @@ export class TerrainRenderRuntime {
         : 0,
       tileCount: this.lastSelectedTiles.length,
       tileSelectionSaturated: this.lastTileSelectionSaturated,
+      terrainBufferSubmitted: Boolean(diagnostics.terrainBufferSubmitted),
+      submissionClassification: diagnostics.submissionClassification ?? null,
     };
   }
 }
