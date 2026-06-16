@@ -4,6 +4,7 @@
 const PERF_HARNESS_QUERY_FLAGS = ['sandbox', 'perf'] as const;
 const PERF_DIAGNOSTICS_QUERY_FLAGS = ['telemetry', 'diagnostics', 'perfDetails', 'perfAttribution'] as const;
 const PERF_ATTRIBUTION_QUERY_FLAGS = ['diagnostics', 'perfDetails', 'perfAttribution'] as const;
+const PERF_VEGETATION_DENSITY_SCALE_PARAM = 'perfVegetationDensityScale';
 
 function readBooleanFlag(value: string | null): boolean {
   if (value === null) return false;
@@ -117,6 +118,26 @@ export function isDiagEnabled(): boolean {
   try {
     return new URLSearchParams(window.location.search).get('diag') === '1';
   } catch { return false; }
+}
+
+export function getPerfVegetationDensityScale(): number {
+  if (!(import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') || !isPerfHarnessEnabled()) {
+    return 1;
+  }
+  if (typeof window === 'undefined' || !window.location?.search) {
+    return 1;
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get(PERF_VEGETATION_DENSITY_SCALE_PARAM);
+    if (raw === null) return 1;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.max(0, Math.min(1, parsed));
+  } catch {
+    return 1;
+  }
 }
 
 export function isPerfUserTimingEnabled(): boolean {

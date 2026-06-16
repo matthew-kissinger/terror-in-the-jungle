@@ -65,6 +65,8 @@ describe('PresentationEpochRecorder', () => {
         rotationDeltaDeg: 10,
         tileCount: 2,
         tileSelectionSaturated: true,
+        terrainBufferSubmitted: true,
+        submissionClassification: 'dynamics-changed',
       },
       rendererStats: {
         drawCalls: 42,
@@ -116,6 +118,8 @@ describe('PresentationEpochRecorder', () => {
       rotationDeltaDeg: 10,
       tileCount: 2,
       tileSelectionSaturated: true,
+      terrainBufferSubmitted: true,
+      submissionClassification: 'dynamics-changed',
     });
     expect(context?.terrain?.tileHash).toMatch(/^[0-9a-f]{8}$/);
     expect(context?.renderer).toMatchObject({

@@ -360,6 +360,8 @@ describe('computeTailAttribution', () => {
               selectionRechecked: true,
               poseWasStale: false,
               projectionChanged: true,
+              terrainBufferSubmitted: true,
+              submissionClassification: 'dynamics-changed',
             },
             terrainByStage: {
               'after-simulation': {
@@ -431,6 +433,8 @@ describe('computeTailAttribution', () => {
       terrainSyncSelectionRechecked: true,
       terrainSyncPoseWasStale: false,
       terrainSyncProjectionChanged: true,
+      terrainSyncBufferSubmitted: true,
+      terrainSyncSubmissionClassification: 'dynamics-changed',
       terrainAfterSimulationTileHash: 'aaa11111',
       terrainBeforeRenderTileHash: 'bbb22222',
       terrainStageTileHashChanged: true,
@@ -463,6 +467,7 @@ describe('computeTailAttribution', () => {
     expect(a.conclusion).toContain('over-budget 38.3ms');
     expect(a.conclusion).toContain('terrain saturation terrain=true terrainSync=false');
     expect(a.conclusion).toContain('terrain sync rechecked=true poseStale=false projectionChanged=true');
+    expect(a.conclusion).toContain('submitted=true class=dynamics-changed');
     expect(a.conclusion).toContain('terrain stage afterSim=19/aaa11111 beforeRender=21/bbb22222 changed=true');
     expect(a.conclusion).toContain('camera terrain clearance terrain=-0.75m effective=-2.00m');
     expect(a.conclusion).toContain('hasTerrain=true areaReady=false');

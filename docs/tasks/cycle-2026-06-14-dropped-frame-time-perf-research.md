@@ -971,3 +971,41 @@ Update 2026-06-16 00:28 UTC / 20:28 EDT:
 - No `terrainShadowLayerProxy` / `terrainShadowProxy` source or harness flag
   remains. Keep pursuing terrain/shadow cost from a cleaner design rather than
   another hidden duplicate terrain mesh.
+
+Update 2026-06-16 03:36 UTC / 23:36 EDT:
+
+- Fixed a perf-capture sampling defect where `tsx`/esbuild serialized
+  `page.evaluate` callbacks with a browser-missing `__name` helper. The
+  harness now installs a page-context shim on the Playwright context and active
+  page, restoring runtime sample collection after the earlier
+  `ReferenceError: __name is not defined` / `TypeError: __name is not a
+  function` failures.
+- Added `--vegetation-density-scale <0..1>` as a perf-harness-only A/B control
+  (`?perf=1&perfVegetationDensityScale=`). It scales biome vegetation density
+  at runtime for diagnosis only; default and retail behavior remain `1.0`.
+- Short A Shau controls after the shim collected samples again, but still
+  failed measurement trust and dropped-frame gates. The vegetation-off A/B did
+  not clear the dropped-frame tail and removed visible jungle content, so it is
+  not a candidate fix. Vegetation remains a visual/noise and load suspect, not
+  the sole driver.
+- A later A Shau retry with the new terrain-sync classification failed before
+  gameplay because the required remote DEM fetch hit `ERR_CONNECTION_RESET`.
+  That artifact is startup/network evidence only, not perf evidence:
+  `artifacts/perf/2026-06-16T03-27-40-867Z`.
+- Trusted Open Frontier control
+  `artifacts/perf/2026-06-16T03-30-05-022Z` passed measurement trust
+  (probe avg `16.07ms`, p95 `27ms`) but still failed dropped-frame thresholds:
+  `165.2ms` dropped-frame time over `15s` (`11.01ms/s`) and `13` estimated
+  dropped 60Hz frames. Tail attribution remained render-dominated
+  (`RenderMain.renderer.render` was the slowest segment).
+- Terrain presentation diagnostics now preserve whether late sync submitted a
+  terrain buffer and classify the submission (`same-identity`,
+  `dynamics-changed`, `tile-set-changed`). The Open Frontier control showed
+  cumulative terrain late sync was mostly CDLOD dynamics churn, not tile-set
+  swaps (`late=969`, `same=17`, `dyn=912`, `tile=40` by frame 1045). This
+  points the next optimization pass at camera/terrain timing and CDLOD morph
+  update policy, not broad content deletion.
+- Verification passed: focused tests for `PerfDiagnostics`,
+  `PresentationEpochRecorder`, `TerrainBiomeRuntimeConfig`, and tail
+  attribution; targeted ESLint on all touched harness/diagnostics files;
+  `npm run build:perf`; and `npm run validate:fast`.

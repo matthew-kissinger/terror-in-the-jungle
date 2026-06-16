@@ -84,6 +84,8 @@ export interface PresentationTerrainSyncEpoch {
   rotationDeltaDeg: number;
   tileCount: number;
   tileSelectionSaturated?: boolean;
+  terrainBufferSubmitted?: boolean;
+  submissionClassification?: string | null;
 }
 
 export interface PresentationEpochContext {
@@ -352,6 +354,10 @@ function sanitizeTerrainSync(input: PresentationTerrainSyncEpoch): PresentationT
     rotationDeltaDeg: finiteNumber(input.rotationDeltaDeg),
     tileCount: finiteNumber(input.tileCount),
     tileSelectionSaturated: Boolean(input.tileSelectionSaturated),
+    terrainBufferSubmitted: Boolean(input.terrainBufferSubmitted),
+    submissionClassification: input.submissionClassification === null || input.submissionClassification === undefined
+      ? null
+      : String(input.submissionClassification),
   };
 }
 

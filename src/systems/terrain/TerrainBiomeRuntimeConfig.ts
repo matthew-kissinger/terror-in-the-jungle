@@ -4,6 +4,7 @@
 import type { AssetLoader } from '../assets/AssetLoader';
 import { getBiome, type BiomeClassificationRule, type BiomeVegetationEntry } from '../../config/biomes';
 import type { TerrainBiomeMaterialConfig, TerrainBiomeRuleConfig } from './TerrainMaterial';
+import { getPerfVegetationDensityScale } from '../../core/PerfDiagnostics';
 
 interface TerrainVegetationRuntimeConfig {
   biomeIds: string[];
@@ -29,6 +30,17 @@ function getConfiguredBiomeIds(
   return biomeIds;
 }
 
+function scaleVegetationPalette(
+  palette: readonly BiomeVegetationEntry[],
+  densityScale: number,
+): BiomeVegetationEntry[] {
+  if (densityScale === 1) return palette.slice();
+  return palette.map((entry) => ({
+    ...entry,
+    densityMultiplier: entry.densityMultiplier * densityScale,
+  }));
+}
+
 export function buildTerrainVegetationRuntimeConfig(
   defaultBiomeId: string,
   biomeRules: BiomeClassificationRule[],
@@ -36,8 +48,9 @@ export function buildTerrainVegetationRuntimeConfig(
 ): TerrainVegetationRuntimeConfig {
   const biomeIds = getConfiguredBiomeIds(defaultBiomeId, biomeRules, extraBiomeIds);
   const biomePalettes = new Map<string, BiomeVegetationEntry[]>();
+  const densityScale = getPerfVegetationDensityScale();
   for (const biomeId of biomeIds) {
-    biomePalettes.set(biomeId, getBiome(biomeId).vegetationPalette);
+    biomePalettes.set(biomeId, scaleVegetationPalette(getBiome(biomeId).vegetationPalette, densityScale));
   }
   return { biomeIds, biomePalettes };
 }

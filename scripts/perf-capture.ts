@@ -1176,6 +1176,13 @@ const TRACE_STOP_TIMEOUT_MS = 15_000;
 const SCENARIO_SETUP_TIMEOUT_MS = 10_000;
 const POST_CAPTURE_HARD_TIMEOUT_MS = 120_000;
 const PERF_SERVER_HOST = '127.0.0.1';
+const PAGE_EVALUATE_HELPER_SHIM_SOURCE = `
+(() => {
+  if (typeof globalThis.__name !== 'function') {
+    globalThis.__name = function(target) { return target; };
+  }
+})();
+`;
 // harness-lifecycle-halt-on-match-end: load the pure helpers from the driver's
 // CJS surface so the regression test (scripts/perf-harness/...) and the live
 // capture both consume the same `shouldFinalizeAfterMatchEnd` definition. The
@@ -1219,6 +1226,24 @@ async function safeAwait<T>(label: string, promise: Promise<T>, timeoutMs: numbe
     logStep(`⚠ ${label} failed/timed out: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
+}
+
+async function installPageEvaluateHelperShim(context: BrowserContext): Promise<void> {
+  // tsx/esbuild can serialize page.evaluate callbacks with a `__name` helper
+  // that exists in Node but not in the browser page context.
+  await withTimeout(
+    'install page evaluate helper shim',
+    context.addInitScript({ content: PAGE_EVALUATE_HELPER_SHIM_SOURCE }),
+    STEP_TIMEOUT_MS
+  );
+}
+
+async function ensurePageEvaluateHelperShim(page: Page): Promise<void> {
+  await withTimeout(
+    'ensure page evaluate helper shim',
+    page.evaluate(PAGE_EVALUATE_HELPER_SHIM_SOURCE),
+    5_000
+  );
 }
 
 async function foregroundCapturePage(page: Page): Promise<void> {
@@ -1712,6 +1737,7 @@ Common options:
   --disable-terrain-far-canopy-tint
   --disable-terrain-low-sun-occlusion
   --disable-wildlife
+  --vegetation-density-scale <0..1>
   --deep-diagnostics
   --deep-cdp
   --cdp-profiler <true|false>
@@ -3380,6 +3406,8 @@ async function getStartupProbe(page: Page): Promise<{
   hidden: boolean;
   visibilityState: string;
   activeViewTransition: boolean;
+  uiTransitionEnabled: boolean;
+  uiTransitionReason: string | null;
   startupElapsedMs?: number;
   startupLastMark?: string;
   startupLastMarkMs?: number;
@@ -4064,6 +4092,10 @@ async function runCapture(): Promise<void> {
   const disableTerrainFarCanopyTint = parseBooleanFlag('disable-terrain-far-canopy-tint', false);
   const disableTerrainLowSunOcclusion = parseBooleanFlag('disable-terrain-low-sun-occlusion', false);
   const disableWildlife = parseBooleanFlag('disable-wildlife', false);
+  const vegetationDensityScaleArg = parseNumberFlag('vegetation-density-scale', Number.NaN);
+  const vegetationDensityScale = Number.isFinite(vegetationDensityScaleArg)
+    ? Math.max(0, Math.min(1, vegetationDensityScaleArg))
+    : null;
   const sandboxMode = parseBooleanFlag(
     'sandbox',
     requestedMode === 'ai_sandbox' ? true : DEFAULT_SANDBOX_MODE
@@ -4114,7 +4146,7 @@ async function runCapture(): Promise<void> {
     seenKeys: new Set<string>(),
     lastCaptureElapsedMs: -1
   };
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
   if (shotVisualCaptureState.enabled) {
     logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
   }
@@ -4167,7 +4199,10 @@ async function runCapture(): Promise<void> {
   const disableTerrainFarCanopyTintQuery = disableTerrainFarCanopyTint ? '&perfDisableTerrainFarCanopyTint=1' : '';
   const disableTerrainLowSunOcclusionQuery = disableTerrainLowSunOcclusion ? '&perfDisableTerrainLowSunOcclusion=1' : '';
   const disableWildlifeQuery = disableWildlife ? '&perfDisableWildlife=1' : '';
-  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainForceInstanceUploadQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}`;
+  const vegetationDensityScaleQuery = vegetationDensityScale !== null
+    ? `&perfVegetationDensityScale=${vegetationDensityScale}`
+    : '';
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainForceInstanceUploadQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}${vegetationDensityScaleQuery}`;
   const query = sandboxMode
     ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`
     : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`;
@@ -4337,7 +4372,6 @@ async function runCapture(): Promise<void> {
     logStep(`🌐 Launching browser (${headed ? 'headed' : 'headless'})`);
     context = await chromium.launchPersistentContext(browserProfileDir, {
       headless: !headed,
-      devtools: headed && devtools,
       args: [
         '--disable-dev-shm-usage',
         '--no-sandbox',
@@ -4350,11 +4384,13 @@ async function runCapture(): Promise<void> {
         '--window-position=0,0',
         '--window-size=1920,1080',
         '--force-device-scale-factor=1',
+        ...(headed && devtools ? ['--auto-open-devtools-for-tabs'] : []),
         ...(rendererMode.toLowerCase().includes('webgpu') ? ['--enable-unsafe-webgpu'] : []),
       ],
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 1,
     });
+    await installPageEvaluateHelperShim(context);
     stage = 'start-playwright-trace';
     if (playwrightTrace) {
       await context.tracing.start({ screenshots: false, snapshots: false, sources: false });
@@ -4365,6 +4401,7 @@ async function runCapture(): Promise<void> {
     page = context.pages()[0] ?? await context.newPage();
     page.setDefaultTimeout(STEP_TIMEOUT_MS);
     page.setDefaultNavigationTimeout(navTimeoutMs);
+    await ensurePageEvaluateHelperShim(page);
     await withTimeout(
       'install browser perf observers',
       page.addInitScript({ path: join(process.cwd(), 'scripts', 'perf-browser-observers.js') }),
@@ -4509,6 +4546,7 @@ async function runCapture(): Promise<void> {
     stage = 'navigate-and-startup';
     logStep(`📍 Navigating to ${url}`);
     await withTimeout('page.goto', page.goto(url, { waitUntil: 'commit' }), navTimeoutMs);
+    await ensurePageEvaluateHelperShim(page);
     await foregroundCapturePage(page);
     if (requestedMode !== 'ai_sandbox') {
       await startRequestedMode(page, requestedMode, startupTimeoutSeconds);

@@ -933,6 +933,12 @@
       tileSelectionSaturated: typeof value.tileSelectionSaturated === 'boolean'
         ? value.tileSelectionSaturated
         : null,
+      terrainBufferSubmitted: typeof value.terrainBufferSubmitted === 'boolean'
+        ? value.terrainBufferSubmitted
+        : null,
+      submissionClassification: typeof value.submissionClassification === 'string'
+        ? value.submissionClassification
+        : null,
     };
   }
 

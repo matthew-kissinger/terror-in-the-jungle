@@ -298,6 +298,8 @@ export type TailAttribution = {
     terrainSyncSelectionRechecked: boolean | null;
     terrainSyncPoseWasStale: boolean | null;
     terrainSyncProjectionChanged: boolean | null;
+    terrainSyncBufferSubmitted: boolean | null;
+    terrainSyncSubmissionClassification: string | null;
     terrainAfterSimulationTileHash: string | null;
     terrainBeforeRenderTileHash: string | null;
     terrainStageTileHashChanged: boolean | null;
@@ -619,6 +621,8 @@ function presentationTerrainSaturation(entry: Record<string, unknown>): {
   terrainSyncSelectionRechecked: boolean | null;
   terrainSyncPoseWasStale: boolean | null;
   terrainSyncProjectionChanged: boolean | null;
+  terrainSyncBufferSubmitted: boolean | null;
+  terrainSyncSubmissionClassification: string | null;
 } {
   const context = objectOrNull(entry.presentationContext);
   const terrain = objectOrNull(context?.terrain);
@@ -638,6 +642,12 @@ function presentationTerrainSaturation(entry: Record<string, unknown>): {
     ),
     terrainSyncProjectionChanged: booleanOrNull(
       terrainSync?.projectionChanged ?? context?.terrainSyncProjectionChanged
+    ),
+    terrainSyncBufferSubmitted: booleanOrNull(
+      terrainSync?.terrainBufferSubmitted ?? context?.terrainSyncBufferSubmitted
+    ),
+    terrainSyncSubmissionClassification: stringOrNull(
+      terrainSync?.submissionClassification ?? context?.terrainSyncSubmissionClassification
     ),
   };
 }
@@ -795,6 +805,8 @@ function summarizePresentationGapContext(
     terrainSyncSelectionRechecked: nearest.terrainSyncSelectionRechecked,
     terrainSyncPoseWasStale: nearest.terrainSyncPoseWasStale,
     terrainSyncProjectionChanged: nearest.terrainSyncProjectionChanged,
+    terrainSyncBufferSubmitted: nearest.terrainSyncBufferSubmitted,
+    terrainSyncSubmissionClassification: nearest.terrainSyncSubmissionClassification,
     terrainAfterSimulationTileHash: nearest.terrainAfterSimulationTileHash,
     terrainBeforeRenderTileHash: nearest.terrainBeforeRenderTileHash,
     terrainStageTileHashChanged: nearest.terrainStageTileHashChanged,
@@ -1028,7 +1040,9 @@ export function computeTailAttribution(
       `terrainSync=${presentationGapContext.terrainSyncTileSelectionSaturated ?? 'n/a'}, ` +
       `terrain sync rechecked=${gapValue(presentationGapContext.terrainSyncSelectionRechecked)} ` +
       `poseStale=${gapValue(presentationGapContext.terrainSyncPoseWasStale)} ` +
-      `projectionChanged=${gapValue(presentationGapContext.terrainSyncProjectionChanged)}, ` +
+      `projectionChanged=${gapValue(presentationGapContext.terrainSyncProjectionChanged)} ` +
+      `submitted=${gapValue(presentationGapContext.terrainSyncBufferSubmitted)} ` +
+      `class=${gapValue(presentationGapContext.terrainSyncSubmissionClassification)}, ` +
       `terrain stage afterSim=${gapValue(presentationGapContext.terrainAfterSimulationTileCount)}` +
       `/${gapValue(presentationGapContext.terrainAfterSimulationTileHash)} ` +
       `beforeRender=${gapValue(presentationGapContext.terrainBeforeRenderTileCount)}` +

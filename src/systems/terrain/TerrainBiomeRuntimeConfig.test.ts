@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as THREE from 'three';
-import { buildTerrainBiomeMaterialConfig } from './TerrainBiomeRuntimeConfig';
+import { buildTerrainBiomeMaterialConfig, buildTerrainVegetationRuntimeConfig } from './TerrainBiomeRuntimeConfig';
 import { createTerrainMaterial } from './TerrainMaterial';
 import { getBiome } from '../../config/biomes';
 import { getGameModeConfig } from '../../config/gameModes';
@@ -18,6 +18,16 @@ const ALL_GAME_MODES: readonly GameMode[] = [
   GameMode.AI_SANDBOX,
   GameMode.A_SHAU_VALLEY,
 ];
+
+const originalWindow = globalThis.window;
+
+afterEach(() => {
+  Object.defineProperty(globalThis, 'window', {
+    value: originalWindow,
+    writable: true,
+    configurable: true,
+  });
+});
 
 function getBiomeIdsForMode(mode: GameMode, includeMaterialAccentBiomes = false): string[] {
   const config = getGameModeConfig(mode);
@@ -97,6 +107,22 @@ describe('TerrainBiomeRuntimeConfig', () => {
       'riverbank',
       'highland',
     ]);
+  });
+
+  it('scales vegetation palettes for perf-only density A/B captures', () => {
+    Object.defineProperty(globalThis, 'window', {
+      value: { location: { search: '?perf=1&perfVegetationDensityScale=0.5' } },
+      writable: true,
+      configurable: true,
+    });
+
+    const config = buildTerrainVegetationRuntimeConfig('denseJungle', []);
+    const scaledPalette = config.biomePalettes.get('denseJungle');
+    const basePalette = getBiome('denseJungle').vegetationPalette;
+
+    expect(scaledPalette).toBeDefined();
+    expect(scaledPalette).not.toBe(basePalette);
+    expect(scaledPalette?.[0].densityMultiplier).toBeCloseTo(basePalette[0].densityMultiplier * 0.5);
   });
 
   it('creates live terrain materials for every shipped game mode', () => {

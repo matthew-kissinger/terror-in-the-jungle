@@ -67,4 +67,22 @@ describe('PerfDiagnostics', () => {
     expect(mod.isPerfDiagnosticsEnabled()).toBe(true);
     expect(mod.isPerfAttributionEnabled()).toBe(true);
   });
+
+  it('reads perf-only vegetation density scale for A/B captures', async () => {
+    const mod = await loadModule({ search: '?perf=1&perfVegetationDensityScale=0.25' });
+    expect(mod.getPerfVegetationDensityScale()).toBe(0.25);
+  });
+
+  it('keeps vegetation density unchanged outside harness access', async () => {
+    const mod = await loadModule({ search: '?perfVegetationDensityScale=0' });
+    expect(mod.getPerfVegetationDensityScale()).toBe(1);
+  });
+
+  it('clamps perf vegetation density scale to the supported range', async () => {
+    const over = await loadModule({ search: '?perf=1&perfVegetationDensityScale=3' });
+    expect(over.getPerfVegetationDensityScale()).toBe(1);
+
+    const under = await loadModule({ search: '?perf=1&perfVegetationDensityScale=-2' });
+    expect(under.getPerfVegetationDensityScale()).toBe(0);
+  });
 });
