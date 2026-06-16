@@ -246,10 +246,17 @@ export class TerrainRenderRuntime {
     const sameDynamics = sameTileSet && this.matchesLastSubmittedTileDynamics(tiles);
     const classification = this.classifySubmission(this.hasSelectionPose, sameTileSet, sameDynamics, false);
     if (sameTileSet) {
-      this.submitTiles(camera, tiles, {
-        origin: 'late-sync',
-        classification,
-      });
+      if (sameDynamics) {
+        this.resubmitCurrentTileBuffers(camera, {
+          origin: 'late-sync',
+          classification,
+        });
+      } else {
+        this.submitTiles(camera, tiles, {
+          origin: 'late-sync',
+          classification,
+        });
+      }
       return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, {
         ...recheckContext,
         terrainBufferSubmitted: true,
@@ -310,6 +317,31 @@ export class TerrainRenderRuntime {
     const updateStartedAt = nowMs();
     this.renderer.updateInstances(tiles);
     this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
+    this.recordSubmission(options);
+    this.rememberSelectionPose(camera);
+  }
+
+  private resubmitCurrentTileBuffers(
+    camera: THREE.Camera,
+    options: {
+      forced?: boolean;
+      origin: TerrainRenderSubmissionOrigin;
+      classification: TerrainRenderSubmissionClassification;
+    },
+  ): void {
+    this.renderer.configureBoundedShadowPass(camera.position.x, camera.position.z);
+    const updateStartedAt = nowMs();
+    this.renderer.resubmitCurrentInstances();
+    this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
+    this.recordSubmission(options);
+    this.rememberSelectionPose(camera);
+  }
+
+  private recordSubmission(options: {
+    forced?: boolean;
+    origin: TerrainRenderSubmissionOrigin;
+    classification: TerrainRenderSubmissionClassification;
+  }): void {
     this.instanceSubmissions += 1;
     if (options.origin === 'late-sync') {
       this.lateSyncInstanceSubmissions += 1;
@@ -329,7 +361,6 @@ export class TerrainRenderRuntime {
     this.lastSubmissionSkipped = false;
     this.lastSubmissionOrigin = options.origin;
     this.lastSubmissionClassification = options.classification;
-    this.rememberSelectionPose(camera);
   }
 
   private classifySubmission(

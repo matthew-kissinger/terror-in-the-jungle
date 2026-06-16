@@ -260,6 +260,15 @@ export class CDLODRenderer {
     this.tileParams1Attr.needsUpdate = true;
   }
 
+  resubmitCurrentInstances(): void {
+    this.clearAttributeUpdateRanges(this.mesh.instanceMatrix);
+    this.clearAttributeUpdateRanges(this.tileParams0Attr);
+    this.clearAttributeUpdateRanges(this.tileParams1Attr);
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.tileParams0Attr.needsUpdate = true;
+    this.tileParams1Attr.needsUpdate = true;
+  }
+
   private writeTileInstance(index: number, tile: CDLODTile): void {
     const base = index * 4;
     const tileX = Math.fround(tile.x);

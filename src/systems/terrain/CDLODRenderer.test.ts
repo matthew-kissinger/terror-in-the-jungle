@@ -254,6 +254,35 @@ describe('CDLODRenderer', () => {
     expect(params1[5]).toBe(12);
   });
 
+  it('resubmits current terrain buffers without rewriting instance data', () => {
+    const tiles: CDLODTile[] = [
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0.1, edgeMorphMask: 5 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.2, edgeMorphMask: 10 },
+    ];
+    renderer.updateInstances(tiles);
+
+    const mesh: any = renderer.getMesh();
+    expect(mesh.matrixWriteCount).toBe(2);
+    mesh.instanceMatrix.needsUpdate = false;
+    mesh.geometry.attributes.tileParams0.needsUpdate = false;
+    mesh.geometry.attributes.tileParams1.needsUpdate = false;
+    mesh.instanceMatrix.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams0.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams1.clearUpdateRanges();
+
+    renderer.resubmitCurrentInstances();
+
+    expect(mesh.count).toBe(2);
+    expect(mesh.visible).toBe(true);
+    expect(mesh.matrixWriteCount).toBe(2);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
+    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+  });
+
   it('rewrites the active terrain prefix when any tile identity changes', () => {
     const tiles: CDLODTile[] = [
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0.1, edgeMorphMask: 5 },

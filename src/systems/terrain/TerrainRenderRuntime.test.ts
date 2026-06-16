@@ -8,12 +8,14 @@ const {
   mockQuadtreeCtor,
   mockSelectTiles,
   mockUpdateInstances,
+  mockResubmitCurrentInstances,
   mockWasLastSelectionSaturated,
   mockGetLastSelectionStats,
 } = vi.hoisted(() => ({
   mockQuadtreeCtor: vi.fn(),
   mockSelectTiles: vi.fn().mockReturnValue([]),
   mockUpdateInstances: vi.fn(),
+  mockResubmitCurrentInstances: vi.fn(),
   mockWasLastSelectionSaturated: vi.fn().mockReturnValue(false),
   mockGetLastSelectionStats: vi.fn().mockReturnValue({
     selectedTiles: 0,
@@ -51,6 +53,7 @@ vi.mock('./CDLODRenderer', () => ({
     getMesh = vi.fn().mockReturnValue({});
     configureBoundedShadowPass = vi.fn();
     updateInstances = mockUpdateInstances;
+    resubmitCurrentInstances = mockResubmitCurrentInstances;
     getShadowPassStatsForDebug = vi.fn().mockReturnValue({
       boundedShadowPassEnabled: false,
       shadowPrefixInstances: 0,
@@ -80,6 +83,7 @@ describe('TerrainRenderRuntime', () => {
     mockSelectTiles.mockClear();
     mockSelectTiles.mockReturnValue([]);
     mockUpdateInstances.mockClear();
+    mockResubmitCurrentInstances.mockClear();
     mockWasLastSelectionSaturated.mockClear();
     mockWasLastSelectionSaturated.mockReturnValue(false);
     mockGetLastSelectionStats.mockClear();
@@ -622,7 +626,8 @@ describe('TerrainRenderRuntime', () => {
     expect(result.submissionClassification).toBe('same-identity');
     expect(result.rotationDeltaDeg).toBeGreaterThan(4);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
-    expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       regularInstanceSubmissions: 1,
       lateSyncInstanceSubmissions: 1,
@@ -664,12 +669,14 @@ describe('TerrainRenderRuntime', () => {
     expect(result.submissionClassification).toBe('same-identity');
     expect(result.rotationDeltaDeg).toBeGreaterThan(0.2);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
-    expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
 
     const secondResult = runtime.syncSelectionForCamera(camera);
     expect(secondResult.reason).toBe('current');
     expect(secondResult.selectionRechecked).toBe(false);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
+    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
   });
 
   it('resubmits same terrain tiles when the late render-camera sync changes morph data', () => {
@@ -705,6 +712,7 @@ describe('TerrainRenderRuntime', () => {
     expect(result.submissionClassification).toBe('dynamics-changed');
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
     expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([morphedTile]);
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       lateSyncInstanceSubmissions: 1,
@@ -750,6 +758,7 @@ describe('TerrainRenderRuntime', () => {
     expect(result.rotationDeltaDeg).toBe(0);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
     expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([nextTile]);
   });
 
@@ -784,6 +793,7 @@ describe('TerrainRenderRuntime', () => {
     expect(result.projectionChanged).toBe(false);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
   });
 
   it('surfaces CDLOD tile selection saturation in sync diagnostics', () => {
@@ -840,7 +850,8 @@ describe('TerrainRenderRuntime', () => {
     expect(result.poseWasStale).toBe(false);
     expect(result.projectionChanged).toBe(true);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
-    expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
   });
 
   it('rechecks CDLOD selection when render-camera projection changes without a pose change', () => {
@@ -877,6 +888,7 @@ describe('TerrainRenderRuntime', () => {
     expect(result.rotationDeltaDeg).toBe(0);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
     expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([nextTile]);
   });
 });
