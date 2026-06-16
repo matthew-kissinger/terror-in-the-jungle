@@ -66,6 +66,16 @@ need the same release shepherding before they are called shipped.
   terrain readiness/clearance, and fire-vs-nonfire counts. Use this aggregate
   before writing another one-off parser or trusting the last 32 sample contexts
   as the whole run.
+- Rejected spike: a morph-only CDLOD buffer update path for
+  `dynamics-changed` terrain submissions was tried locally and removed. In
+  `artifacts/perf/2026-06-16T05-22-22-473Z` it engaged heavily
+  (`terrainDynOnly=871`) but did not improve A Shau; validation failed with
+  394 estimated dropped 60 Hz frames, about 4964 ms dropped-frame time over
+  20 s, max rAF gap about 182 ms, and the tail was still dominated by
+  `RenderMain.renderer.render`. Do not revive this as a default fix without
+  new evidence. The next measured path should split CPU/GPU attribution and
+  target terrain render, shadow, fragment, triangle, or presentation cost
+  rather than assuming full terrain-buffer writes are the bottleneck.
 - Non-terrain sidecar blind spots remain in scope after terrain: WebGPU texture
   upload timing around Pixel Forge atlas residency, explicit static vehicle /
   wildlife / NPC / vegetation perf-category labels, world-static template and
