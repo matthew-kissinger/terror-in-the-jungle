@@ -7,6 +7,7 @@ import {
   type ExpectedModelDimensions,
   type ModelPlacementProfile,
 } from './ModelPlacementProfiles';
+import { repairKnownAircraftRotorGeometry } from './AircraftRotorGeometryRepair';
 
 const _bounds = new THREE.Box3();
 const _size = new THREE.Vector3();
@@ -19,6 +20,7 @@ interface PreparedModelPlacement {
 }
 
 export function prepareModelForPlacement(root: THREE.Object3D, modelPath: string): PreparedModelPlacement {
+  repairKnownAircraftRotorGeometry(root, modelPath);
   const profile = getModelPlacementProfile(modelPath);
   normalizeModel(root, profile);
   const bounds = computeWorldBounds(root);

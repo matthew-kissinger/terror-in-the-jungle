@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { modelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
+import { repairKnownAircraftRotorGeometry } from '../assets/AircraftRotorGeometryRepair';
 import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
 import type { WarAssetEntry, WarAssetJoint } from '../assets/modelPaths';
 import { Logger } from '../../utils/Logger';
@@ -21,9 +22,6 @@ type RotorAnimationType = 'mainBlades' | 'tailBlades';
 type RotorSpinAxis = 'x' | 'y' | 'z';
 
 const HELICOPTER_PERF_CATEGORY = 'helicopters';
-const UH1_REPAIRED_MAIN_ROTOR_DIAMETER_M = 10.8;
-const UH1_REPAIRED_MAIN_ROTOR_CHORD_M = 0.32;
-const UH1_REPAIRED_MAIN_ROTOR_THICKNESS_M = 0.06;
 
 const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
   UH1_HUEY:      { modelPath: AircraftModels.UH1_HUEY,      displayName: 'UH-1 Huey',      faction: 'US' },
@@ -222,75 +220,7 @@ export function optimizeRotorJointDrawCalls(root: THREE.Object3D, aircraftKey: s
   }
 }
 
-/**
- * Targeted runtime repair for known-bad repaint rotor geometry.
- *
- * The 2026-06 UH-1H source keeps a canonical `Joint_MainRotor`, but its blade
- * meshes are broad diagonal chunks (`Mesh_BladeFwd` / `Mesh_BladeAft`) plus an
- * over-visible stabilizer bar and end weights. In-game this reads as detached
- * blade pieces near the Open Frontier starter helipad. Keep the accepted joint
- * contract and hub, but replace only those blade meshes with a clean two-blade
- * bar under the same pivot so procedural rotor spin still uses the
- * catalog-declared joint.
- */
-export function repairKnownAircraftRotorGeometry(root: THREE.Object3D, aircraftKey: string): void {
-  if (aircraftKey !== 'UH1_HUEY') return;
-
-  const mainRotor = root.getObjectByName('Joint_MainRotor');
-  if (!mainRotor) return;
-
-  const bladeMaterial = findFirstRotorMaterial(mainRotor);
-  const namesToRemove = new Set([
-    'mesh_bladefwd',
-    'mesh_bladeaft',
-    'mesh_stabbar',
-    'mesh_stabweightr',
-    'mesh_stabweightl',
-  ]);
-  const childrenToRemove = mainRotor.children.filter((child) => namesToRemove.has(child.name.toLowerCase()));
-  for (const child of childrenToRemove) {
-    child.removeFromParent();
-    disposeGeometryOnly(child);
-  }
-
-  if (mainRotor.getObjectByName('Mesh_UH1RuntimeMainRotorBlades')) return;
-
-  const blade = new THREE.Mesh(
-    new THREE.BoxGeometry(
-      UH1_REPAIRED_MAIN_ROTOR_DIAMETER_M,
-      UH1_REPAIRED_MAIN_ROTOR_THICKNESS_M,
-      UH1_REPAIRED_MAIN_ROTOR_CHORD_M,
-    ),
-    bladeMaterial ?? new THREE.MeshStandardMaterial({
-      color: 0x202423,
-      roughness: 0.85,
-      metalness: 0.15,
-    }),
-  );
-  blade.name = 'Mesh_UH1RuntimeMainRotorBlades';
-  blade.castShadow = true;
-  blade.receiveShadow = false;
-  blade.userData.runtimeRotorRepair = 'uh1-main-rotor';
-  mainRotor.add(blade);
-}
-
-function findFirstRotorMaterial(root: THREE.Object3D): THREE.Material | null {
-  let material: THREE.Material | null = null;
-  root.traverse((child) => {
-    if (material) return;
-    if (!(child instanceof THREE.Mesh) && (child as THREE.Object3D & { isMesh?: boolean }).isMesh !== true) return;
-    const meshMaterial = (child as THREE.Mesh).material;
-    material = Array.isArray(meshMaterial) ? meshMaterial[0] ?? null : meshMaterial;
-  });
-  return material;
-}
-
-function disposeGeometryOnly(root: THREE.Object3D): void {
-  root.traverse((child) => {
-    if (!(child instanceof THREE.Mesh) && (child as THREE.Object3D & { isMesh?: boolean }).isMesh !== true) return;
-    (child as THREE.Mesh).geometry.dispose();
-  });
-}
+export { repairKnownAircraftRotorGeometry } from '../assets/AircraftRotorGeometryRepair';
 
 function markAircraftPerfCategory(root: THREE.Object3D): void {
   root.traverse((child) => {

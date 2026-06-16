@@ -18,6 +18,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { chromium, type Page } from 'playwright';
+import * as THREE from 'three';
 import { startServer, stopServer } from './preview-server';
 
 type ModeId = 'open_frontier' | 'a_shau_valley';
@@ -56,6 +57,13 @@ interface CameraSnapshot {
 interface FacingSnapshot {
   forward: PlainPoint;
   right: PlainPoint;
+}
+
+interface QuaternionSnapshot {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
 }
 
 interface SteeringSnapshot {
@@ -496,7 +504,7 @@ async function getVehiclePosition(page: Page, vehicleId: string): Promise<PlainP
 }
 
 async function getVehicleFacingSnapshot(page: Page, vehicleId: string): Promise<FacingSnapshot | null> {
-  return page.evaluate((id) => {
+  const quat = await page.evaluate((id): QuaternionSnapshot | null => {
     const vehicles = (window as HarnessWindow).__engine?.systemManager?.vehicleManager?.getAllVehicles?.() ?? [];
     const vehicle = vehicles.find((candidate) => candidate.vehicleId === id);
     const q = vehicle?.getQuaternion?.();
@@ -508,29 +516,25 @@ async function getVehicleFacingSnapshot(page: Page, vehicleId: string): Promise<
       w: Number(q.w ?? q._w ?? 1),
     };
     if (![quat.x, quat.y, quat.z, quat.w].every(Number.isFinite)) return null;
-
-    const fix = -quat.y;
-    const fiy = quat.x;
-    const fiz = -quat.w;
-    const fiw = quat.z;
-    const rix = quat.w;
-    const riy = quat.z;
-    const riz = -quat.y;
-    const riw = -quat.x;
-
-    return {
-      forward: {
-        x: fix * quat.w + fiw * -quat.x + fiy * -quat.z - fiz * -quat.y,
-        y: fiy * quat.w + fiw * -quat.y + fiz * -quat.x - fix * -quat.z,
-        z: fiz * quat.w + fiw * -quat.z + fix * -quat.y - fiy * -quat.x,
-      },
-      right: {
-        x: rix * quat.w + riw * -quat.x + riy * -quat.z - riz * -quat.y,
-        y: riy * quat.w + riw * -quat.y + riz * -quat.x - rix * -quat.z,
-        z: riz * quat.w + riw * -quat.z + rix * -quat.y - riy * -quat.x,
-      },
-    };
+    return quat;
   }, vehicleId);
+  return quat ? facingFromQuaternion(quat) : null;
+}
+
+const _facingQuat = new THREE.Quaternion();
+const _facingForward = new THREE.Vector3();
+const _facingRight = new THREE.Vector3();
+
+function facingFromQuaternion(quat: QuaternionSnapshot): FacingSnapshot {
+  _facingQuat.set(quat.x, quat.y, quat.z, quat.w).normalize();
+  return {
+    forward: plainPointFromVector(_facingForward.set(0, 0, -1).applyQuaternion(_facingQuat)),
+    right: plainPointFromVector(_facingRight.set(1, 0, 0).applyQuaternion(_facingQuat)),
+  };
+}
+
+function plainPointFromVector(vector: THREE.Vector3): PlainPoint {
+  return { x: vector.x, y: vector.y, z: vector.z };
 }
 
 async function getCameraSnapshot(page: Page, vehicleId: string): Promise<CameraSnapshot | null> {

@@ -24,6 +24,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { modelLoader } from '../../systems/assets/ModelLoader';
+import { repairKnownAircraftRotorGeometry } from '../../systems/assets/AircraftRotorGeometryRepair';
 import type { WarAssetEntry } from '../../config/generated/warAssetCatalog';
 import {
   buildGalleryGroups,
@@ -161,6 +162,7 @@ export class AssetGalleryApp {
         modelLoader.disposeInstance(model);
         return;
       }
+      repairKnownAircraftRotorGeometry(model, entry.path);
       this.currentModel = model;
       this.assetRoot.add(model);
       this.collectSpinningJoints(model, entry);
