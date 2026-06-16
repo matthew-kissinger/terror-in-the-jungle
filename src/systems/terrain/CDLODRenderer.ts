@@ -260,18 +260,14 @@ export class CDLODRenderer {
       }
     }
 
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.tileParams0Attr.needsUpdate = true;
-    this.tileParams1Attr.needsUpdate = true;
+    this.markActivePrefixNeedsUpdate(count);
   }
 
   resubmitCurrentInstances(): void {
     this.clearAttributeUpdateRanges(this.mesh.instanceMatrix);
     this.clearAttributeUpdateRanges(this.tileParams0Attr);
     this.clearAttributeUpdateRanges(this.tileParams1Attr);
-    this.mesh.instanceMatrix.needsUpdate = true;
-    this.tileParams0Attr.needsUpdate = true;
-    this.tileParams1Attr.needsUpdate = true;
+    this.markActivePrefixNeedsUpdate(this.mesh.count);
   }
 
   private writeTileInstance(index: number, tile: CDLODTile): void {
@@ -339,6 +335,23 @@ export class CDLODRenderer {
     if (typeof attribute.clearUpdateRanges === 'function') {
       attribute.clearUpdateRanges();
     }
+  }
+
+  private markActivePrefixNeedsUpdate(count: number): void {
+    if (count <= 0) return;
+    this.markAttributePrefixNeedsUpdate(this.mesh.instanceMatrix, count * 16);
+    this.markAttributePrefixNeedsUpdate(this.tileParams0Attr, count * 4);
+    this.markAttributePrefixNeedsUpdate(this.tileParams1Attr, count * 4);
+  }
+
+  private markAttributePrefixNeedsUpdate(
+    attribute: THREE.BufferAttribute | THREE.InstancedBufferAttribute,
+    componentCount: number,
+  ): void {
+    if (typeof attribute.addUpdateRange === 'function') {
+      attribute.addUpdateRange(0, componentCount);
+    }
+    attribute.needsUpdate = true;
   }
 
   /**

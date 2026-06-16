@@ -722,42 +722,41 @@ function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
 }
 
 function terrainLowSunOcclusionMask(terrainNormal: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
-  const strength = tslClamp(
-    tslReference('float', uniforms.atmosphereLowSunOcclusionStrength),
-    tslFloat(0),
-    tslFloat(1),
-  );
-  const lightDirection = normalize(tslReference('vec3', uniforms.atmosphereDirectLightDirection)) as TslNode;
-  const sunXz = tslVec2(lightDirection.x, lightDirection.z);
-  const horizontalLength = tslMax(tslLength(sunXz), tslFloat(0.001));
-  const sunHorizontal = sunXz.div(horizontalLength);
-  const nDotL = tslClamp(dot(terrainNormal, lightDirection), tslFloat(0), tslFloat(1));
-  const shadowFacing = tslFloat(1).sub(smoothstep(tslFloat(0.05), tslFloat(0.38), nDotL));
-  const slopeMask = tslFloat(1).sub(smoothstep(tslFloat(0.72), tslFloat(0.97), terrainNormal.y));
-  const ridgeElevationMask = smoothstep(tslFloat(80), tslFloat(620), worldPos.y);
-  // Per-fragment jitter on the march distances. The blocker samples the
-  // heightmap texture, and a fixed-step march creases along the bilinear
-  // texel grid under grazing sun — the "black grid lines around dawn"
-  // (owner report, 2026-06-10). Scaling each tap by a hash-derived factor
-  // in [0.85, 1.15] turns any residual grid-aligned crease into
-  // unstructured noise the eye reads as terrain texture.
-  const marchJitter = tslFloat(0.85).add(hashUvNode(worldPos.xz.mul(0.37)).mul(0.3));
-  let horizonBlocker = tslFloat(0);
-  for (const sampleDistance of TERRAIN_HORIZON_SHADOW_SAMPLE_DISTANCES) {
-    horizonBlocker = tslMax(
-      horizonBlocker,
-      terrainHorizonBlockerSample(
-        worldPos, lightDirection, sunHorizontal, horizontalLength, sampleDistance, uniforms, marchJitter,
-      ),
-    );
-  }
-  horizonBlocker = horizonBlocker.mul(tslFloat(1).sub(smoothstep(tslFloat(0.22), tslFloat(0.52), lightDirection.y)));
-  const reliefMask = tslClamp(
-    tslMax(slopeMask, ridgeElevationMask.mul(0.92)).mul(tslMix(tslFloat(0.62), tslFloat(1), shadowFacing)),
-    tslFloat(0),
-    tslFloat(1),
-  );
-  return strength.mul(tslClamp(tslMax(reliefMask, horizonBlocker), tslFloat(0), tslFloat(1)));
+  const gated = Fn(([normalArg, worldPosArg]: TslNode[]) => {
+    const strength = tslClamp(tslReference('float', uniforms.atmosphereLowSunOcclusionStrength), tslFloat(0), tslFloat(1));
+    const result = tslFloat(0).toVar();
+
+    If(strength.greaterThan(0), () => {
+      const lightDirection = normalize(tslReference('vec3', uniforms.atmosphereDirectLightDirection)) as TslNode;
+      const sunXz = tslVec2(lightDirection.x, lightDirection.z);
+      const horizontalLength = tslMax(tslLength(sunXz), tslFloat(0.001));
+      const sunHorizontal = sunXz.div(horizontalLength);
+      const nDotL = tslClamp(dot(normalArg, lightDirection), tslFloat(0), tslFloat(1));
+      const shadowFacing = tslFloat(1).sub(smoothstep(tslFloat(0.05), tslFloat(0.38), nDotL));
+      const slopeMask = tslFloat(1).sub(smoothstep(tslFloat(0.72), tslFloat(0.97), normalArg.y));
+      const ridgeElevationMask = smoothstep(tslFloat(80), tslFloat(620), worldPosArg.y);
+      // Jitter the blocker march to break grazing-sun bilinear grid creases
+      // into unstructured terrain texture noise (owner report, 2026-06-10).
+      const marchJitter = tslFloat(0.85).add(hashUvNode(worldPosArg.xz.mul(0.37)).mul(0.3));
+      let horizonBlocker = tslFloat(0);
+      for (const sampleDistance of TERRAIN_HORIZON_SHADOW_SAMPLE_DISTANCES) {
+        horizonBlocker = tslMax(
+          horizonBlocker,
+          terrainHorizonBlockerSample(worldPosArg, lightDirection, sunHorizontal, horizontalLength, sampleDistance, uniforms, marchJitter),
+        );
+      }
+      horizonBlocker = horizonBlocker.mul(tslFloat(1).sub(smoothstep(tslFloat(0.22), tslFloat(0.52), lightDirection.y)));
+      const reliefMask = tslClamp(
+        tslMax(slopeMask, ridgeElevationMask.mul(0.92)).mul(tslMix(tslFloat(0.62), tslFloat(1), shadowFacing)),
+        tslFloat(0), tslFloat(1),
+      );
+      result.assign(strength.mul(tslClamp(tslMax(reliefMask, horizonBlocker), tslFloat(0), tslFloat(1))));
+    });
+
+    return result;
+  });
+
+  return gated(terrainNormal, worldPos) as TslNode;
 }
 
 function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: TerrainUniforms): void {
