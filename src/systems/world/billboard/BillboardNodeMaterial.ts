@@ -169,6 +169,11 @@ export type BillboardNodeMaterial = MeshBasicNodeMaterial & {
 
 type TslNode = any;
 
+interface BillboardAtlasOptions {
+  sampleNormalAtlas: boolean;
+  stableAtlasColumn: number | null;
+}
+
 const tslFloat = (value: number): TslNode => float(value) as TslNode;
 const tslVec2 = (...args: TslNode[]): TslNode => (vec2 as (...values: TslNode[]) => TslNode)(...args);
 const tslVec3 = (...args: TslNode[]): TslNode => (vec3 as (...values: TslNode[]) => TslNode)(...args);
@@ -190,15 +195,19 @@ export function createBillboardNodeMaterial(
   scaleAttribute: THREE.InstancedBufferAttribute,
   rotationAttribute: THREE.InstancedBufferAttribute,
 ): BillboardNodeMaterial {
+  const usesNormalAtlas = Boolean(config.normalTexture && config.shaderProfile === 'normal-lit');
+  const stableAtlasColumn = Number.isFinite(config.imposterAtlas?.stableAzimuthColumn)
+    ? config.imposterAtlas!.stableAzimuthColumn!
+    : null;
   const uniforms: BillboardMaterialUniforms = {
     map: { value: config.texture },
     normalMap: { value: config.normalTexture ?? config.texture },
-    normalMapEnabled: { value: Boolean(config.normalTexture && config.shaderProfile === 'normal-lit') },
+    normalMapEnabled: { value: usesNormalAtlas },
     imposterAtlasEnabled: { value: Boolean(config.imposterAtlas) },
     imposterTiles: { value: new THREE.Vector2(config.imposterAtlas?.tilesX ?? 1, config.imposterAtlas?.tilesY ?? 1) },
     imposterUvBounds: { value: new THREE.Vector4(alphaCrop.minU, alphaCrop.minV, alphaCrop.maxU, alphaCrop.maxV) },
-    stableAtlasAzimuth: { value: Number.isFinite(config.imposterAtlas?.stableAzimuthColumn) },
-    stableAtlasColumn: { value: config.imposterAtlas?.stableAzimuthColumn ?? 0 },
+    stableAtlasAzimuth: { value: stableAtlasColumn !== null },
+    stableAtlasColumn: { value: stableAtlasColumn ?? 0 },
     maxAtlasElevationRow: { value: config.imposterAtlas?.maxElevationRow ?? -1 },
     time: { value: 0 },
     cameraPosition: { value: new THREE.Vector3() },
@@ -329,9 +338,17 @@ export function createBillboardNodeMaterial(
     .add(swayOffset)
     .add(imprintOffset);
 
-  const atlas = createBillboardAtlasNodes(config.texture, config.normalTexture ?? config.texture, uniforms, instancePosition);
+  const atlas = createBillboardAtlasNodes(
+    config.texture,
+    usesNormalAtlas ? config.normalTexture! : null,
+    uniforms,
+    instancePosition,
+    {
+      sampleNormalAtlas: usesNormalAtlas,
+      stableAtlasColumn,
+    },
+  );
   const texColor = atlas.color as TslNode;
-  const normalColor = atlas.normal as TslNode;
   const fadeFactor = createBillboardFadeNode(cameraDistance, nearFadeDistance, fadeDistance, maxDistance, lodFactor);
   const nearAlphaSolidDistance = tslReference('float', uniforms.nearAlphaSolidDistance);
   const nearAlphaBlend = tslFloat(1).sub(
@@ -363,9 +380,10 @@ export function createBillboardNodeMaterial(
   const colorManaged = tslMix(tslVec3(foliageLuma), tintedColor, vegetationSaturation);
   const litColor = createBillboardLightingNode(
     colorManaged,
-    normalColor,
+    atlas.normal,
     cameraDistance,
     uniforms,
+    usesNormalAtlas,
   );
   const foggedColor = createBillboardFogNode(
     litColor.mul(vegetationExposure).mul(nearLightBoost),
@@ -384,80 +402,91 @@ export function createBillboardNodeMaterial(
 
 function createBillboardAtlasNodes(
   colorTexture: THREE.Texture,
-  normalTexture: THREE.Texture,
+  normalTexture: THREE.Texture | null,
   uniforms: BillboardMaterialUniforms,
   instancePosition: TslNode,
+  options: BillboardAtlasOptions,
 ) {
   const baseUv = uv() as TslNode;
   const bounds = tslReference('vec4', uniforms.imposterUvBounds);
   const croppedUv = mix(bounds.xy, bounds.zw, baseUv) as TslNode;
-  const atlasEnabled = tslReference('bool', uniforms.imposterAtlasEnabled);
-  const tiles = tslReference('vec2', uniforms.imposterTiles);
-  const invTiles = tiles.reciprocal();
-  const toCamera = cameraPosition.sub(instancePosition);
-  const fullDistance = tslMax(length(toCamera), tslFloat(0.0001));
-  const elevation = asin(tslClamp(toCamera.y.div(fullDistance), tslFloat(0), tslFloat(1)));
-  const rows = tiles.y;
-  const elevationDegrees = elevation.mul(57.295779513);
-  const rowForTwo = select(elevationDegrees.greaterThanEqual(35), tslFloat(0), tslFloat(1));
-  const rowForFour = select(
-    elevationDegrees.greaterThanEqual(72.5),
-    tslFloat(0),
-    select(
-      elevationDegrees.greaterThanEqual(45),
-      tslMin(tslFloat(1), rows.sub(1)),
-      select(elevationDegrees.greaterThanEqual(17.5), tslMin(tslFloat(2), rows.sub(1)), rows.sub(1)),
-    ),
-  );
-  const atlasRow = select(rows.lessThanEqual(1.5), tslFloat(0), select(rows.lessThan(3), rowForTwo, rowForFour));
-  const maxAtlasElevationRow = tslReference('float', uniforms.maxAtlasElevationRow);
-  const tileY = select(
-    maxAtlasElevationRow.greaterThanEqual(0),
-    tslMin(atlasRow, maxAtlasElevationRow),
-    atlasRow,
-  );
-  const stableAtlasAzimuth = tslReference('bool', uniforms.stableAtlasAzimuth);
-  const stableAtlasColumn = tslReference('float', uniforms.stableAtlasColumn);
-  const stableTileX = tslClamp(floor(stableAtlasColumn.add(0.5)), tslFloat(0), tiles.x.sub(1));
-  const azimuthRaw = atan(toCamera.z, toCamera.x);
-  const azimuth = select(azimuthRaw.lessThan(0), azimuthRaw.add(6.283185307), azimuthRaw);
-  const azimuthTile = azimuth.div(6.283185307).mul(tiles.x);
-  const dynamicTileX = floor(azimuthTile).mod(tiles.x);
-  const dynamicNextTileX = dynamicTileX.add(1).mod(tiles.x);
-  const tileX = select(stableAtlasAzimuth, stableTileX, dynamicTileX) as TslNode;
-  const nextTileX = select(stableAtlasAzimuth, stableTileX, dynamicNextTileX) as TslNode;
-  const atlasBlend = select(
-    stableAtlasAzimuth,
-    tslFloat(0),
-    smoothstep(tslFloat(0), tslFloat(1), fract(azimuthTile) as TslNode),
-  ) as TslNode;
-  const sampleUv = select(
-    atlasEnabled,
-    tslVec2(
-      tileX.add(croppedUv.x).mul(invTiles.x),
-      tslFloat(1).sub(invTiles.y).sub(tileY.mul(invTiles.y)).add(croppedUv.y.mul(invTiles.y)),
-    ),
-    croppedUv,
-  ) as TslNode;
-  const nextSampleUv = select(
-    atlasEnabled,
-    tslVec2(
-      nextTileX.add(croppedUv.x).mul(invTiles.x),
-      tslFloat(1).sub(invTiles.y).sub(tileY.mul(invTiles.y)).add(croppedUv.y.mul(invTiles.y)),
-    ),
-    croppedUv,
-  ) as TslNode;
-  const shouldBlend = atlasEnabled.and(tiles.x.greaterThan(1.5));
-  const color = mix(
-    tslTexture(colorTexture, sampleUv),
-    tslTexture(colorTexture, nextSampleUv),
-    select(shouldBlend, atlasBlend, tslFloat(0)),
-  ) as TslNode;
-  const normal = mix(
-    tslTexture(normalTexture, sampleUv),
-    tslTexture(normalTexture, nextSampleUv),
-    select(shouldBlend, atlasBlend, tslFloat(0)),
-  ) as TslNode;
+  let sampleUv = croppedUv;
+  let nextSampleUv: TslNode | null = null;
+  let blendWeight: TslNode | null = null;
+
+  if (uniforms.imposterAtlasEnabled.value) {
+    const atlasEnabled = tslReference('bool', uniforms.imposterAtlasEnabled);
+    const tiles = tslReference('vec2', uniforms.imposterTiles);
+    const invTiles = tiles.reciprocal();
+    const toCamera = cameraPosition.sub(instancePosition);
+    const fullDistance = tslMax(length(toCamera), tslFloat(0.0001));
+    const elevation = asin(tslClamp(toCamera.y.div(fullDistance), tslFloat(0), tslFloat(1)));
+    const rows = tiles.y;
+    const elevationDegrees = elevation.mul(57.295779513);
+    const rowForTwo = select(elevationDegrees.greaterThanEqual(35), tslFloat(0), tslFloat(1));
+    const rowForFour = select(
+      elevationDegrees.greaterThanEqual(72.5),
+      tslFloat(0),
+      select(
+        elevationDegrees.greaterThanEqual(45),
+        tslMin(tslFloat(1), rows.sub(1)),
+        select(elevationDegrees.greaterThanEqual(17.5), tslMin(tslFloat(2), rows.sub(1)), rows.sub(1)),
+      ),
+    );
+    const atlasRow = select(rows.lessThanEqual(1.5), tslFloat(0), select(rows.lessThan(3), rowForTwo, rowForFour));
+    const maxAtlasElevationRow = tslReference('float', uniforms.maxAtlasElevationRow);
+    const tileY = select(
+      maxAtlasElevationRow.greaterThanEqual(0),
+      tslMin(atlasRow, maxAtlasElevationRow),
+      atlasRow,
+    );
+    let tileX: TslNode;
+
+    if (options.stableAtlasColumn !== null) {
+      tileX = tslClamp(floor(tslFloat(options.stableAtlasColumn).add(0.5)), tslFloat(0), tiles.x.sub(1));
+    } else {
+      const azimuthRaw = atan(toCamera.z, toCamera.x);
+      const azimuth = select(azimuthRaw.lessThan(0), azimuthRaw.add(6.283185307), azimuthRaw);
+      const azimuthTile = azimuth.div(6.283185307).mul(tiles.x);
+      tileX = floor(azimuthTile).mod(tiles.x);
+      const nextTileX = tileX.add(1).mod(tiles.x);
+      const shouldBlend = atlasEnabled.and(tiles.x.greaterThan(1.5));
+      blendWeight = select(
+        shouldBlend,
+        smoothstep(tslFloat(0), tslFloat(1), fract(azimuthTile) as TslNode),
+        tslFloat(0),
+      ) as TslNode;
+      nextSampleUv = select(
+        atlasEnabled,
+        tslVec2(
+          nextTileX.add(croppedUv.x).mul(invTiles.x),
+          tslFloat(1).sub(invTiles.y).sub(tileY.mul(invTiles.y)).add(croppedUv.y.mul(invTiles.y)),
+        ),
+        croppedUv,
+      ) as TslNode;
+    }
+
+    sampleUv = select(
+      atlasEnabled,
+      tslVec2(
+        tileX.add(croppedUv.x).mul(invTiles.x),
+        tslFloat(1).sub(invTiles.y).sub(tileY.mul(invTiles.y)).add(croppedUv.y.mul(invTiles.y)),
+      ),
+      croppedUv,
+    ) as TslNode;
+  }
+
+  const colorSample = tslTexture(colorTexture, sampleUv);
+  const color = nextSampleUv && blendWeight
+    ? mix(colorSample, tslTexture(colorTexture, nextSampleUv), blendWeight) as TslNode
+    : colorSample;
+  let normal: TslNode | null = null;
+  if (options.sampleNormalAtlas && normalTexture) {
+    const normalSample = tslTexture(normalTexture, sampleUv);
+    normal = nextSampleUv && blendWeight
+      ? mix(normalSample, tslTexture(normalTexture, nextSampleUv), blendWeight) as TslNode
+      : normalSample;
+  }
 
   return { color, normal, sampleUv };
 }
@@ -485,9 +514,10 @@ function createBillboardFadeNode(
 
 function createBillboardLightingNode(
   baseColor: TslNode,
-  normalColor: TslNode,
+  normalColor: TslNode | null,
   _cameraDistance: TslNode,
   uniforms: BillboardMaterialUniforms,
+  usesNormalAtlas: boolean,
 ) {
   // Unified-rig lighting is the ONLY path (`legacy-path-deletion`). The legacy
   // hemisphere-blend + the [0.40, 0.78] `minVegetationLight`/`maxVegetationLight`
@@ -498,7 +528,9 @@ function createBillboardLightingNode(
   // midnight foliage is allowed to go dark, dawn allowed to warm with terrain.
   // See docs/rearch/LIGHTING_RIG_SPIKE_2026-06-09.md §2c.
   const normalMapEnabled = tslReference('bool', uniforms.normalMapEnabled);
-  const imposterNormal = normalColor.rgb.mul(2).sub(1).normalize();
+  const imposterNormal = usesNormalAtlas && normalColor
+    ? normalColor.rgb.mul(2).sub(1).normalize()
+    : null;
   const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
   const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
   const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
@@ -508,7 +540,9 @@ function createBillboardLightingNode(
   const rigSunElevationSin = tslReference('float', lightingRigBindings.sunElevationSin);
   // Card normal: the camera-facing impostor normal where present, else the
   // up-biased card normal (foliage cards lack true geometric normals).
-  const cardNormal = tslSelect(normalMapEnabled, imposterNormal, tslVec3(0, 1, 0));
+  const cardNormal = imposterNormal
+    ? tslSelect(normalMapEnabled, imposterNormal, tslVec3(0, 1, 0))
+    : tslVec3(0, 1, 0);
   const wrap = tslFloat(RIG_WRAP);
   const nl = tslMax(cardNormal.dot(rigSunDir), wrap.negate());
   const diff = nl.add(wrap).div(tslFloat(1).add(wrap));
