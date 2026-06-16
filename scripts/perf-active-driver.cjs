@@ -1797,7 +1797,7 @@
       // negative — the bot holds and shoots instead of back-pedalling or
       // charging through a crowded target cluster.
       pushInDistance: Math.max(8, Number(profile.retreatDistance || 0)),
-      aimLerpRate: 1,
+      aimLerpRate: 0.2,
       engageStrafeAmplitude: 0,
       engageStrafePeriodMs: 750,
       minEngageStateMs: 700,
