@@ -10,11 +10,12 @@ copyable finish-line statement lives in
 `docs/tasks/overnight-dropped-frame-goal-statement.txt`.
 
 Release alignment: the 2026-06-15 local stabilization pass shipped at
-`5684df747f2092c9095ad1bd5e868abacfd5ab77`. Focused tests,
-`npm run validate:fast`, `npm run build`, exact-head CI run `27587079042`,
-deploy run `27587371780`, and `npm run check:live-release` passed. Live proof
-is
-`artifacts/perf/2026-06-16T01-17-17-966Z/projekt-143-live-release-proof/release-proof.json`.
+`5684df747f2092c9095ad1bd5e868abacfd5ab77`. The follow-up owner hotfix for
+land-vehicle steering direction and the detached Huey rotor/stabilizer mesh
+shipped at `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`. Focused proof passed
+for the hotfix, exact-head CI run `27594724546`, deploy run `27594906745`, and
+`npm run check:live-release` passed. Live proof is
+`artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`.
 Local proof and production proof are separate; future optimization slices still
 need the same release shepherding before they are called shipped.
 
@@ -47,6 +48,29 @@ need the same release shepherding before they are called shipped.
   helpers, camera target jumps, and missing pixel-stability coverage.
   `perf-capture` now warns on relocated actors, world-space movement, large
   pre-clamp view turns, and shot-time render-camera/terrain anomalies.
+- Current-head A Shau evidence remains a failure, not a finish line:
+  `artifacts/perf/2026-06-16T04-57-34-868Z` ran on `d7fdd9c` after the owner
+  hotfix and produced 323 rAF presentation gaps, about 4992 ms of 60 Hz
+  dropped-frame time, and a max rAF gap of about 170 ms. The terrain/CDLOD
+  aggregate over those gaps is: `dynamics-changed=218`,
+  `tile-set-changed=50`, `same-identity=50`, `none=5`, average selected
+  terrain tiles about 282, average morphing tiles about 257, and every recorded
+  gap below the 2.5 m low-clearance threshold. This makes terrain/CDLOD
+  presentation scheduling, morph uploads, render pressure, and A Shau terrain
+  scale the next measured suspect set; it does not justify deleting world
+  content to pass a metric.
+- `perf-capture` now summarizes run-level presentation-gap terrain context in
+  `summary.json` under `presentationGapContexts.terrain`: terrain-sync
+  submission classification counts, dropped-frame time by classification,
+  tile/morph/edge-morph stats, LOD histograms, stage hash/tile-count churn,
+  terrain readiness/clearance, and fire-vs-nonfire counts. Use this aggregate
+  before writing another one-off parser or trusting the last 32 sample contexts
+  as the whole run.
+- Non-terrain sidecar blind spots remain in scope after terrain: WebGPU texture
+  upload timing around Pixel Forge atlas residency, explicit static vehicle /
+  wildlife / NPC / vegetation perf-category labels, world-static template and
+  shadow policy, vegetation sectoring or forced-critical-cell generation
+  timing, and KTX2/Basis asset-pipeline experiments with human visual parity.
 - CDLOD reference pass: local-only clones were placed under ignored
   `examples/reference/cdlod-fstrugar` and
   `examples/reference/terrain-cdlod-three`. Strugar's original implementation

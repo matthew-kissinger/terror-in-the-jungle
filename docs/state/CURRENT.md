@@ -1,6 +1,6 @@
 # Current State
 
-Last aligned: 2026-06-16 UTC (2026-06-15 local): dropped-frame stabilization shipped at `5684df747f2092c9095ad1bd5e868abacfd5ab77` after the terrain coherency fix, dense vegetation-ring rollback, and dropped-frame harness alignment. Exact-head CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke passed in `npm run check:live-release` at `artifacts/perf/2026-06-16T01-17-17-966Z/projekt-143-live-release-proof/release-proof.json`. The active goal remains dropped-frame time / visible-stutter reduction without shrinking Open Frontier or A Shau; runtime completion is not claimed until fresh quiet-machine capture and owner playtest pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-06-16 UTC (2026-06-15 local): dropped-frame stabilization shipped at `5684df747f2092c9095ad1bd5e868abacfd5ab77` after the terrain coherency fix, dense vegetation-ring rollback, and dropped-frame harness alignment, then owner playtest fixes for land-vehicle steering and the detached Huey rotor/stabilizer mesh shipped at `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`. Exact-head CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke passed for `d7fdd9c` in CI run `27594724546`, deploy run `27594906745`, and `artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`. The active goal remains dropped-frame time / visible-stutter reduction without shrinking Open Frontier or A Shau; runtime completion is not claimed until fresh quiet-machine capture and owner playtest pass. Fresh current-head A Shau evidence at `artifacts/perf/2026-06-16T04-57-34-868Z` still fails the goal and points at terrain/CDLOD presentation churn plus render pressure, not completion. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,8 +30,9 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
-- **2026-06-15 local / 2026-06-16 UTC — dropped-frame stabilization release**
-  (`5684df747f2092c9095ad1bd5e868abacfd5ab77`, branch
+- **2026-06-15 local / 2026-06-16 UTC — dropped-frame stabilization and owner hotfix release**
+  (`5684df747f2092c9095ad1bd5e868abacfd5ab77` stabilization, followed by
+  `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`, branch
   `task/dropped-frame-perf-harness`): the active goal is to reduce
   player-visible dropped-frame time and stutter while preserving combat
   pressure, terrain/vegetation readability, wildlife/animals where enabled,
@@ -41,10 +42,14 @@ The most recent shipped work, newest first:
   handoff in
   `docs/tasks/cycle-2026-06-14-dropped-frame-time-perf-research.md`.
   Stabilization proof is green: focused tests, `validate:fast`, `build`,
-  exact-head CI run `27587079042`, deploy run `27587371780`, and
-  `check:live-release` all passed, with live manifest SHA matching the release
-  head. Static cleanups since the last failed seeded A Shau run are still not
-  completion proof.
+  exact-head CI/deploy/live-release for the stabilization head passed, and the
+  owner steering / Huey mesh hotfix was also pushed to `master`, deployed, and
+  live-verified at exact head `d7fdd9c` (`27594724546`, `27594906745`,
+  `artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`).
+  Static cleanups and the later current-head A Shau diagnostic are still not
+  completion proof: `artifacts/perf/2026-06-16T04-57-34-868Z` failed with
+  heavy rAF dropped-frame time and showed terrain/CDLOD presentation churn in
+  the gap epochs.
   When perf capture resumes, agents should inspect `summary.json`,
   `presentation-epochs.json`, tail attribution, browser stall entries, and
   driver trust fields before making further broad optimization changes. Runtime

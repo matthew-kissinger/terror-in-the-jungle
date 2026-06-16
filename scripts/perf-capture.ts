@@ -22,6 +22,10 @@ import {
   type MovementArtifactReportForViewer,
   type MovementTerrainOverlayArtifact,
 } from './perfMovementViewerTemplate';
+import {
+  summarizePresentationGapContexts,
+  type PresentationGapContextSummary,
+} from './perf-presentation-gap-summary';
 import { computeTailAttribution, type TailAttribution } from './perf-tail-attribution';
 import {
   PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE,
@@ -954,29 +958,6 @@ type MaterializationTierEventSummary = {
     byTransition: Record<string, number>;
     byReason: Record<string, number>;
   };
-};
-
-type PresentationGapContextSummary = {
-  sampleCount: number;
-  gapCount: number;
-  maxGapMs: number;
-  latest: Array<{
-    seq?: number;
-    startAtMs?: number;
-    endAtMs?: number;
-    atMs?: number;
-    gapMs: number;
-    estimatedDropped60HzFrames: number;
-    overBudget60HzMs?: number;
-    droppedFrameTime60HzMs?: number;
-    engineFrameCount?: number | null;
-    wallAtMs?: number | null;
-    visibilityState?: string | null;
-    presentationContext?: Record<string, unknown> | null;
-    harnessContext?: Record<string, unknown> | null;
-    sampleTs?: string;
-    sampleFrameCount?: number;
-  }>;
 };
 
 type ShotPresentationContextStats = {
@@ -2258,74 +2239,6 @@ function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): Ma
     byReason,
     byToRender,
     peakSample,
-  };
-}
-
-function summarizePresentationGapContexts(
-  runtimeSamples: RuntimeSample[],
-  finalPresentationEpochs: Record<string, unknown>[] = [],
-): PresentationGapContextSummary | undefined {
-  const gaps: PresentationGapContextSummary['latest'] = [];
-
-  for (const entry of finalPresentationEpochs) {
-    const gapMs = Number(entry.gapMs ?? 0);
-    if (!Number.isFinite(gapMs) || gapMs <= 0) continue;
-    gaps.push({
-      seq: Number.isFinite(Number(entry.seq)) ? Number(entry.seq) : undefined,
-      startAtMs: Number.isFinite(Number(entry.startAtMs)) ? Number(entry.startAtMs) : undefined,
-      endAtMs: Number.isFinite(Number(entry.endAtMs)) ? Number(entry.endAtMs) : undefined,
-      gapMs,
-      estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
-      overBudget60HzMs: Number(entry.overBudget60HzMs ?? 0),
-      droppedFrameTime60HzMs: Number(entry.droppedFrameTime60HzMs ?? 0),
-      engineFrameCount: Number.isFinite(Number(entry.engineFrameCount)) ? Number(entry.engineFrameCount) : null,
-      wallAtMs: Number.isFinite(Number(entry.wallAtMs)) ? Number(entry.wallAtMs) : null,
-      visibilityState: typeof entry.visibilityState === 'string' ? entry.visibilityState : null,
-      presentationContext: objectOrNull(entry.presentationContext),
-      harnessContext: objectOrNull(entry.harnessContext),
-    });
-  }
-
-  if (gaps.length === 0) {
-    for (const sample of runtimeSamples) {
-      const entries = sample.browserStalls?.recent?.rafCadence?.entries ?? [];
-      for (const entry of entries) {
-        const gapMs = Number(entry.gapMs ?? 0);
-        if (!Number.isFinite(gapMs) || gapMs <= 0) continue;
-        gaps.push({
-          atMs: Number(entry.atMs ?? 0),
-          gapMs,
-          estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
-          overBudget60HzMs: Number(entry.overBudget60HzMs ?? 0),
-          droppedFrameTime60HzMs: Number(entry.droppedFrameTime60HzMs ?? 0),
-          presentationContext: entry.presentationContext ?? null,
-          harnessContext: entry.harnessContext ?? null,
-          sampleTs: sample.ts,
-          sampleFrameCount: sample.frameCount,
-        });
-      }
-    }
-  }
-
-  if (gaps.length === 0) {
-    return undefined;
-  }
-
-  const latest = gaps
-    .slice()
-    .sort((a, b) => {
-      const aSeq = Number(a.seq ?? -1);
-      const bSeq = Number(b.seq ?? -1);
-      if (aSeq !== bSeq) return aSeq - bSeq;
-      return Number(a.endAtMs ?? a.atMs ?? 0) - Number(b.endAtMs ?? b.atMs ?? 0);
-    })
-    .slice(-32);
-
-  return {
-    sampleCount: runtimeSamples.length,
-    gapCount: gaps.length,
-    maxGapMs: gaps.reduce((max, entry) => Math.max(max, Number(entry.gapMs ?? 0)), 0),
-    latest,
   };
 }
 
