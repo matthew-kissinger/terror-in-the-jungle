@@ -20,6 +20,7 @@ export interface TerrainDebugTile {
   lodLevel: number;
   morphFactor: number;
   edgeMorphMask?: number;
+  edgeSkirtMask?: number;
 }
 
 interface TerrainRenderRuntimeConfig {
@@ -161,6 +162,7 @@ export class TerrainRenderRuntime {
   private readonly lastSelectionQuaternion = new THREE.Quaternion();
   private readonly lastSelectionProjectionMatrix = new THREE.Matrix4();
   private readonly lastSelectedTileEdgeMorphMasks: number[] = [];
+  private readonly lastSelectedTileEdgeSkirtMasks: number[] = [];
   private lastSelectionCamera: THREE.Camera | null = null;
   private hasSelectionPose = false;
   private instanceSubmissions = 0;
@@ -448,6 +450,7 @@ export class TerrainRenderRuntime {
       lodLevel: t.lodLevel,
       morphFactor: t.morphFactor,
       edgeMorphMask: t.edgeMorphMask,
+      edgeSkirtMask: t.edgeSkirtMask,
     }));
   }
 
@@ -596,6 +599,7 @@ export class TerrainRenderRuntime {
   private copySelectedTilesForDebug(tiles: readonly TerrainDebugTile[]): void {
     this.lastSelectedTiles.length = tiles.length;
     this.lastSelectedTileEdgeMorphMasks.length = tiles.length;
+    this.lastSelectedTileEdgeSkirtMasks.length = tiles.length;
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i];
       const target = this.debugTilePool[i] ?? {
@@ -612,8 +616,10 @@ export class TerrainRenderRuntime {
       target.lodLevel = tile.lodLevel;
       target.morphFactor = tile.morphFactor;
       target.edgeMorphMask = Number(tile.edgeMorphMask ?? 0);
+      target.edgeSkirtMask = Number(tile.edgeSkirtMask ?? tile.edgeMorphMask ?? 0);
       this.lastSelectedTiles[i] = target;
       this.lastSelectedTileEdgeMorphMasks[i] = Number(tile.edgeMorphMask ?? 0);
+      this.lastSelectedTileEdgeSkirtMasks[i] = Number(tile.edgeSkirtMask ?? tile.edgeMorphMask ?? 0);
     }
   }
 
@@ -639,6 +645,9 @@ export class TerrainRenderRuntime {
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i];
       if (Number(tile.edgeMorphMask ?? 0) !== Number(this.lastSelectedTileEdgeMorphMasks[i] ?? 0)) {
+        return false;
+      }
+      if (Number(tile.edgeSkirtMask ?? tile.edgeMorphMask ?? 0) !== Number(this.lastSelectedTileEdgeSkirtMasks[i] ?? 0)) {
         return false;
       }
     }

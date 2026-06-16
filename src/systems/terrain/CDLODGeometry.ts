@@ -103,7 +103,9 @@ export function createTileGeometry(
 /**
  * Edge-only skirt geometry for the default sparse-skirt path. It uses the same
  * terrain material and per-instance tile params as the main tile mesh, but only
- * draws a single skirt wall for edges flagged by `edgeMorphMask`.
+ * draws a single skirt wall for edges selected by the quadtree's visual
+ * `edgeSkirtMask` contract. The shader still receives only `edgeMorphMask`
+ * for true LOD-transition force-morphing.
  */
 export function createEdgeSkirtGeometry(
   tileResolution: number,

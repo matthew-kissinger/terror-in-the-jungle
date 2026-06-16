@@ -136,7 +136,8 @@ export class CDLODRenderer {
 
     // Shared base geometry: a flat XZ plane with 1x1 dimensions. The default
     // path moves seam skirts into separate edge-only instanced meshes so tiles
-    // pay skirt triangles only where `edgeMorphMask` marks a LOD transition.
+    // pay skirt triangles only where the quadtree marks an edge as needing
+    // visual crack cover.
     const skirtMode = getTerrainSkirtMode();
     const includeSkirts = skirtMode === 'full';
     this.sparseEdgeSkirtsEnabled = skirtMode === 'sparse-edge';
@@ -305,11 +306,11 @@ export class CDLODRenderer {
 
   private writeEdgeSkirtInstances(tile: CDLODTile): void {
     if (!this.sparseEdgeSkirtsEnabled) return;
-    const edgeMorphMask = Number(tile.edgeMorphMask ?? 0);
-    if (edgeMorphMask === 0) return;
+    const edgeSkirtMask = Number(tile.edgeSkirtMask ?? tile.edgeMorphMask ?? 0);
+    if (edgeSkirtMask === 0) return;
 
     for (const edgeSkirt of this.edgeSkirts) {
-      if ((edgeMorphMask & edgeSkirt.bit) === 0) continue;
+      if ((edgeSkirtMask & edgeSkirt.bit) === 0) continue;
       const index = edgeSkirt.mesh.count;
       if (index >= this.maxInstances) continue;
       edgeSkirt.mesh.count = index + 1;

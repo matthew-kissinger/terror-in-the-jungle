@@ -51,24 +51,28 @@ need the same release shepherding before they are called shipped.
 
 ## Latest Static Sidecar Findings
 
-- Sparse CDLOD edge-skirt candidate:
-  `CDLODRenderer` now defaults to an interior terrain tile mesh plus four
-  edge-only skirt instanced meshes, populated only for edges whose
-  `edgeMorphMask` marks a LOD transition. The old full-perimeter skirt path is
-  available with `?terrainFullTerrainSkirts=1`, and `perf-capture` exposes it
-  as `--terrain-full-skirts` for controlled A/B. The existing
-  `--disable-terrain-skirts` no-skirt diagnostic remains available and is still
-  not a gameplay candidate. This preserves map size, terrain LOD ranges,
-  heightmap sampling, morph rules, seam skirts where LOD transitions require
-  them, shadows, vegetation, wildlife, weather, war assets, combat pressure,
-  and player flow. Verification passed: focused terrain/recorder/perf-summary
-  tests, perf-active-driver tests, `npm run typecheck`, targeted ESLint, and
-  `npm run build:perf`.
-- First sparse-skirt runtime artifact:
+- Sparse CDLOD edge-skirt correction:
+  The first sparse-skirt pass was too narrow: it populated edge-only skirt
+  meshes only from `edgeMorphMask`, so it preserved coarser-neighbor
+  T-junction coverage but weakened the older full-perimeter skirt safety net
+  for same-LOD morph divergence, selected/frustum/height-bound edges,
+  world-boundary edges, and adjacent finer-child coverage. The source fix
+  separates the two contracts: `edgeMorphMask` remains shader-only force-morph
+  authority for true LOD transitions, while `edgeSkirtMask` drives sparse
+  visual crack-cover geometry. `TerrainRenderRuntime` now treats changed
+  `edgeSkirtMask` values as terrain dynamics, so camera/selection sync cannot
+  skip a skirt-coverage update. Verification so far is deterministic source
+  proof, not visual acceptance: focused terrain tests assert the seam-cover
+  invariant across representative and A Shau-scale camera positions, including
+  the owner-captured coordinate family near `x=1950,z=2649`. The old
+  full-perimeter skirt path remains available with
+  `?terrainFullTerrainSkirts=1` / `--terrain-full-skirts`; the no-skirt flag
+  remains diagnostic-only and is not a gameplay candidate.
+- Pre-correction sparse-skirt runtime artifact:
   `artifacts/perf/2026-06-16T18-37-52-915Z` ran headed A Shau 60 NPC active
   combat with `TIJ_QUIET_MACHINE=1` and WebGPU, but measurement trust failed
-  (`probeAvg=151.6ms`, `probeP95=211ms`), so it is diagnostic-only. It did
-  confirm the sparse path and reduced average main terrain triangles from the
+  (`probeAvg=151.6ms`, `probeP95=211ms`), so it is diagnostic-only. It
+  confirmed the original sparse path and reduced average main terrain triangles from the
   prior full-skirt diagnostic neighborhood of about `681.9k/frame` to about
   `543.7k/frame`, while edge-transition skirt triangles averaged about
   `9.0k/frame` instead of full skirts averaging about `133.7k/frame`.
@@ -76,7 +80,8 @@ need the same release shepherding before they are called shipped.
   remained render-bound (`RenderMain.renderer.render` about `38ms` in the
   selected slow callback). Final-frame inspection showed dense A Shau
   bamboo/rain/HUD/combat without the earlier sky-ribbon terrain artifact, but
-  it is not comprehensive visual acceptance.
+  that visual sample was not comprehensive acceptance and did not prove the
+  topology contract that the owner later saw fail.
 - Harness trust remains a first-order risk. A 2026-06-15 static sidecar scan
   found driver/player mismatches in direct view-angle writes, world-space route
   movement, default frontline compression, target/LOS selection, sustainment
