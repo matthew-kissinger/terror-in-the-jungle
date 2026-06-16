@@ -56,11 +56,15 @@ vi.mock('three', () => {
       setUsage(usage: unknown) { this.usage = usage; return this; },
     };
     matrixWriteCount = 0;
+    children: any[] = [];
     private matrices: Float32Array;
     constructor(geo: MockBufferGeometry, mat: any, maxCount: number) {
       this.geometry = geo;
       this.material = mat;
       this.matrices = new Float32Array(maxCount * 16);
+    }
+    add(...objects: any[]) {
+      this.children.push(...objects);
     }
     setMatrixAt(i: number, matrix: any) {
       this.matrixWriteCount++;
@@ -113,7 +117,8 @@ vi.mock('three', () => {
 });
 
 import { isPerfDiagnosticsEnabled, isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
-import { CDLODRenderer, computeTileGeometryStats, createTileGeometry } from './CDLODRenderer';
+import { computeTileGeometryStats, createEdgeSkirtGeometry, createTileGeometry } from './CDLODGeometry';
+import { CDLODRenderer } from './CDLODRenderer';
 import type { CDLODTile } from './CDLODQuadtree';
 
 const mockIsPerfDiagnosticsEnabled = vi.mocked(isPerfDiagnosticsEnabled);
@@ -358,6 +363,48 @@ describe('CDLODRenderer', () => {
     expect(renderer.getMesh().receiveShadow).toBe(true);
   });
 
+  it('uses sparse edge skirts by default so only LOD-transition edges pay skirt triangles', () => {
+    renderer.updateInstances([
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5, edgeMorphMask: 3 },
+      { x: 0, z: 64, size: 128, lodLevel: 2, morphFactor: 0.8, edgeMorphMask: 8 },
+    ]);
+
+    const mesh: any = renderer.getMesh();
+    const edgeSkirtCounts = mesh.children.map((child: any) => child.count);
+
+    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33);
+    expect(edgeSkirtCounts).toEqual([1, 1, 0, 1]);
+    expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
+      sparseEdgeSkirtsEnabled: true,
+      lastMainPassInstances: 3,
+      lastMainPassEdgeSkirtInstances: 3,
+      tileInteriorTriangles: 2048,
+      tileSkirtTriangles: 0,
+      tileSkirtTrianglesPerEdge: 128,
+      tileTotalTriangles: 2048,
+      tileFullSkirtTriangles: 512,
+      lastMainPassTriangleEstimate: (3 * 2048) + (3 * 128),
+    });
+  });
+
+  it('can restore legacy full perimeter skirts with the full-skirt query fallback', () => {
+    setRuntimeSearch('?terrainFullTerrainSkirts=1');
+
+    const fullSkirtRenderer = new CDLODRenderer({} as any, 33, 256);
+    const mesh: any = fullSkirtRenderer.getMesh();
+
+    expect(mesh.children).toHaveLength(0);
+    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33 + 4 * 33 - 4);
+    expect(fullSkirtRenderer.getShadowPassStatsForDebug()).toMatchObject({
+      sparseEdgeSkirtsEnabled: false,
+      tileInteriorTriangles: 2048,
+      tileSkirtTriangles: 512,
+      tileSkirtTrianglesPerEdge: 128,
+      tileTotalTriangles: 2560,
+    });
+  });
+
   it('disables only terrain shadow casting under the perf isolation flag', () => {
     mockIsPerfHarnessEnabled.mockReturnValue(true);
     setRuntimeSearch('?perf=1&perfDisableTerrainShadows=1');
@@ -378,6 +425,7 @@ describe('CDLODRenderer', () => {
     expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33);
     expect(mesh.geometry.index.array.length).toBe((32 * 32 * 2) * 3);
     expect(isolatedRenderer.getShadowPassStatsForDebug()).toMatchObject({
+      sparseEdgeSkirtsEnabled: false,
       tileInteriorTriangles: 2048,
       tileSkirtTriangles: 0,
       tileSkirtTrianglesPerEdge: 0,
@@ -569,5 +617,41 @@ describe('createTileGeometry', () => {
     const e2x = cx - ax, e2z = cz - az;
     const ny = e1z * e2x - e1x * e2z;
     expect(ny).toBeGreaterThan(0);
+  });
+});
+
+describe('createEdgeSkirtGeometry', () => {
+  it('creates one two-sided skirt wall for a single terrain edge', () => {
+    const N = 5;
+    const geo: any = createEdgeSkirtGeometry(N, 1);
+    const pos = geo.attributes.position.array as Float32Array;
+    const isSkirt = geo.attributes.isSkirt.array as Float32Array;
+    const idx = Array.from(geo.index.array as Uint16Array | Uint32Array);
+
+    expect(pos.length / 3).toBe(N * 2);
+    expect(idx.length).toBe((N - 1) * 4 * 3);
+    expect(Array.from(isSkirt.slice(0, N))).toEqual([0, 0, 0, 0, 0]);
+    expect(Array.from(isSkirt.slice(N))).toEqual([1, 1, 1, 1, 1]);
+    expect(pos[2]).toBeCloseTo(0.5);
+    expect(pos[((N - 1) * 3) + 2]).toBeCloseTo(0.5);
+    expect(pos[(N * 3) + 2]).toBeCloseTo(0.5);
+  });
+
+  it('places sparse edge skirt vertices on the requested CDLOD edge', () => {
+    const N = 5;
+    const east: any = createEdgeSkirtGeometry(N, 2);
+    const south: any = createEdgeSkirtGeometry(N, 4);
+    const west: any = createEdgeSkirtGeometry(N, 8);
+
+    const eastPos = east.attributes.position.array as Float32Array;
+    const southPos = south.attributes.position.array as Float32Array;
+    const westPos = west.attributes.position.array as Float32Array;
+
+    expect(eastPos[0]).toBeCloseTo(0.5);
+    expect(eastPos[((N - 1) * 3)]).toBeCloseTo(0.5);
+    expect(southPos[2]).toBeCloseTo(-0.5);
+    expect(southPos[((N - 1) * 3) + 2]).toBeCloseTo(-0.5);
+    expect(westPos[0]).toBeCloseTo(-0.5);
+    expect(westPos[((N - 1) * 3)]).toBeCloseTo(-0.5);
   });
 });

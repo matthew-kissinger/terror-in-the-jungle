@@ -7,7 +7,9 @@ Completion requires quiet-machine captures with real combat and representative
 world content passing the dropped-frame gate through the enriched harness. A
 static optimization, green build, or narrower metric is not completion. The
 copyable finish-line statement lives in
-`docs/tasks/overnight-dropped-frame-goal-statement.txt`.
+`docs/tasks/overnight-dropped-frame-goal-statement.txt`. The quantitative
+pass/fail scaffold for future loops lives in
+`docs/tasks/dropped-frame-ears-criteria.md`.
 
 Release alignment: the 2026-06-15 local stabilization pass shipped at
 `5684df747f2092c9095ad1bd5e868abacfd5ab77`. The owner hotfix for
@@ -23,6 +25,9 @@ need the same release shepherding before they are called shipped.
 
 ## Operating Guardrails
 
+- Use `docs/tasks/dropped-frame-ears-criteria.md` as the current EARS-style
+  quantitative loop contract. A candidate that passes static checks but lacks
+  trusted completion-lane captures is source-stable, not complete.
 - Preserve combat pressure, terrain/vegetation readability, wildlife/animals
   where enabled, war-asset visuals, weather/atmosphere, draw distance, mode
   startup/deploy flow, and normal player flow.
@@ -36,14 +41,42 @@ need the same release shepherding before they are called shipped.
 - Do not trust a single timing row, stale doc claim, or harness output that does
   not match visible play. If data looks strange, treat the harness or wiring as
   suspect instead of forcing an optimization story.
-- No perf, browser, or gameplay captures are currently being run under the
-  owner pause. Static/build/test checks are allowed.
+- Perf/browser captures may run when the owner indicates the machine is quiet
+  enough for the current goal. If a capture lacks quiet-machine attestation or
+  fails measurement trust, keep it diagnostic-only even when it explains a
+  useful render-cost direction.
 - When captures resume, inspect `summary.json`, `presentation-epochs.json`,
   tail attribution, browser stall entries, and driver trust fields before
   making more broad performance changes.
 
 ## Latest Static Sidecar Findings
 
+- Sparse CDLOD edge-skirt candidate:
+  `CDLODRenderer` now defaults to an interior terrain tile mesh plus four
+  edge-only skirt instanced meshes, populated only for edges whose
+  `edgeMorphMask` marks a LOD transition. The old full-perimeter skirt path is
+  available with `?terrainFullTerrainSkirts=1`, and `perf-capture` exposes it
+  as `--terrain-full-skirts` for controlled A/B. The existing
+  `--disable-terrain-skirts` no-skirt diagnostic remains available and is still
+  not a gameplay candidate. This preserves map size, terrain LOD ranges,
+  heightmap sampling, morph rules, seam skirts where LOD transitions require
+  them, shadows, vegetation, wildlife, weather, war assets, combat pressure,
+  and player flow. Verification passed: focused terrain/recorder/perf-summary
+  tests, perf-active-driver tests, `npm run typecheck`, targeted ESLint, and
+  `npm run build:perf`.
+- First sparse-skirt runtime artifact:
+  `artifacts/perf/2026-06-16T18-37-52-915Z` ran headed A Shau 60 NPC active
+  combat with `TIJ_QUIET_MACHINE=1` and WebGPU, but measurement trust failed
+  (`probeAvg=151.6ms`, `probeP95=211ms`), so it is diagnostic-only. It did
+  confirm the sparse path and reduced average main terrain triangles from the
+  prior full-skirt diagnostic neighborhood of about `681.9k/frame` to about
+  `543.7k/frame`, while edge-transition skirt triangles averaged about
+  `9.0k/frame` instead of full skirts averaging about `133.7k/frame`.
+  Validation still failed badly on rAF/dropped-frame output and the tail
+  remained render-bound (`RenderMain.renderer.render` about `38ms` in the
+  selected slow callback). Final-frame inspection showed dense A Shau
+  bamboo/rain/HUD/combat without the earlier sky-ribbon terrain artifact, but
+  it is not comprehensive visual acceptance.
 - Harness trust remains a first-order risk. A 2026-06-15 static sidecar scan
   found driver/player mismatches in direct view-angle writes, world-space route
   movement, default frontline compression, target/LOS selection, sustainment
