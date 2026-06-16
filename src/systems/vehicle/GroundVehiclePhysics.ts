@@ -215,6 +215,12 @@ export class GroundVehiclePhysics {
     this.worldHalfExtent = halfExtent;
   }
 
+  setQuaternion(q: THREE.Quaternion): void {
+    this.state.quaternion.copy(q).normalize();
+    this.state.angularVelocity.set(0, 0, 0);
+    this.snapshotPrevious();
+  }
+
   /**
    * Terrain-clamp the chassis to rest on the surface at the current X/Z so the
    * vehicle is grounded from frame 0 instead of waiting for the first

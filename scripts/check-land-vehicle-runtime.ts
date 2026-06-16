@@ -15,7 +15,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { startServer, stopServer } from './preview-server';
@@ -51,6 +51,22 @@ interface CameraSnapshot {
   horizontalDistance: number;
   heightAboveVehicle: number;
   downAngleDeg: number;
+}
+
+interface FacingSnapshot {
+  forward: PlainPoint;
+  right: PlainPoint;
+}
+
+interface SteeringSnapshot {
+  before: FacingSnapshot | null;
+  afterRight: FacingSnapshot | null;
+  beforeLeft: FacingSnapshot | null;
+  afterLeft: FacingSnapshot | null;
+  rightDelta: number | null;
+  leftDelta: number | null;
+  framesObserved: number;
+  passed: boolean;
 }
 
 interface VehicleDebugSnapshot {
@@ -91,6 +107,7 @@ interface TargetResult {
   afterPosition: PlainPoint | null;
   travelMeters: number | null;
   driveFramesObserved: number;
+  steering: SteeringSnapshot | null;
   cameraAfterBoard: CameraSnapshot | null;
   cameraAfterDrive: CameraSnapshot | null;
   debug: VehicleDebugSnapshot[];
@@ -164,6 +181,7 @@ interface HarnessVehicle {
   category?: string;
   faction?: string;
   getPosition?: () => PlainPoint;
+  getQuaternion?: () => { x?: number; y?: number; z?: number; w?: number; _x?: number; _y?: number; _z?: number; _w?: number };
   isDestroyed?: () => boolean;
   getPhysics?: () => {
     getState?: () => unknown;
@@ -178,6 +196,9 @@ const VIEWPORT = { width: 1600, height: 900 };
 const STARTUP_TIMEOUT_MS = 120_000;
 const DEFAULT_PORT = 9146;
 const OUT_DIR = join(process.cwd(), 'artifacts', 'playtests', 'land-vehicle-runtime-proof');
+const STEERING_PROOF_FRAMES = 10;
+const STEERING_RECENTER_FRAMES = 30;
+const MIN_STEERING_SIDE_DELTA = 0.01;
 
 const TARGETS: Array<{ mode: ModeId; kind: VehicleKind }> = [
   { mode: 'open_frontier', kind: 'm151' },
@@ -413,6 +434,44 @@ async function getVehiclePosition(page: Page, vehicleId: string): Promise<PlainP
   }, vehicleId);
 }
 
+async function getVehicleFacingSnapshot(page: Page, vehicleId: string): Promise<FacingSnapshot | null> {
+  return page.evaluate((id) => {
+    const vehicles = (window as HarnessWindow).__engine?.systemManager?.vehicleManager?.getAllVehicles?.() ?? [];
+    const vehicle = vehicles.find((candidate) => candidate.vehicleId === id);
+    const q = vehicle?.getQuaternion?.();
+    if (!q) return null;
+    const quat = {
+      x: Number(q.x ?? q._x ?? 0),
+      y: Number(q.y ?? q._y ?? 0),
+      z: Number(q.z ?? q._z ?? 0),
+      w: Number(q.w ?? q._w ?? 1),
+    };
+    if (![quat.x, quat.y, quat.z, quat.w].every(Number.isFinite)) return null;
+
+    const fix = -quat.y;
+    const fiy = quat.x;
+    const fiz = -quat.w;
+    const fiw = quat.z;
+    const rix = quat.w;
+    const riy = quat.z;
+    const riz = -quat.y;
+    const riw = -quat.x;
+
+    return {
+      forward: {
+        x: fix * quat.w + fiw * -quat.x + fiy * -quat.z - fiz * -quat.y,
+        y: fiy * quat.w + fiw * -quat.y + fiz * -quat.x - fix * -quat.z,
+        z: fiz * quat.w + fiw * -quat.z + fix * -quat.y - fiy * -quat.x,
+      },
+      right: {
+        x: rix * quat.w + riw * -quat.x + riy * -quat.z - riz * -quat.y,
+        y: riy * quat.w + riw * -quat.y + riz * -quat.x - rix * -quat.z,
+        z: riz * quat.w + riw * -quat.z + rix * -quat.y - riy * -quat.x,
+      },
+    };
+  }, vehicleId);
+}
+
 async function getCameraSnapshot(page: Page, vehicleId: string): Promise<CameraSnapshot | null> {
   return page.evaluate((id) => {
     const engine = (window as HarnessWindow).__engine;
@@ -594,6 +653,85 @@ async function advanceHarnessTime(page: Page, durationMs: number): Promise<{ adv
   }, durationMs);
 }
 
+async function advanceVehicleInputFrames(page: Page, frames: number): Promise<number> {
+  const deterministic = await advanceHarnessTime(page, frames * (1000 / 60));
+  if (deterministic.advanced) return deterministic.frames;
+  return waitForAnimationFrames(page, frames, Math.max(3000, frames * 250));
+}
+
+function pointDot(a: PlainPoint, b: PlainPoint): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function pointDelta(a: PlainPoint, b: PlainPoint): PlainPoint {
+  return {
+    x: a.x - b.x,
+    y: a.y - b.y,
+    z: a.z - b.z,
+  };
+}
+
+async function proveSteering(page: Page, vehicleId: string, notes: string[]): Promise<SteeringSnapshot> {
+  const before = await getVehicleFacingSnapshot(page, vehicleId);
+  let framesObserved = 0;
+  let afterRight: FacingSnapshot | null = null;
+  let beforeLeft: FacingSnapshot | null = null;
+  let afterLeft: FacingSnapshot | null = null;
+
+  try {
+    await page.keyboard.down('w');
+    await page.keyboard.down('d');
+    framesObserved += await advanceVehicleInputFrames(page, STEERING_PROOF_FRAMES);
+    afterRight = await getVehicleFacingSnapshot(page, vehicleId);
+  } finally {
+    await page.keyboard.up('d').catch(() => {});
+    await page.keyboard.up('w').catch(() => {});
+  }
+
+  try {
+    await page.keyboard.down('w');
+    framesObserved += await advanceVehicleInputFrames(page, STEERING_RECENTER_FRAMES);
+    beforeLeft = await getVehicleFacingSnapshot(page, vehicleId);
+  } finally {
+    await page.keyboard.up('w').catch(() => {});
+  }
+
+  try {
+    await page.keyboard.down('w');
+    await page.keyboard.down('a');
+    framesObserved += await advanceVehicleInputFrames(page, STEERING_PROOF_FRAMES);
+    afterLeft = await getVehicleFacingSnapshot(page, vehicleId);
+  } finally {
+    await page.keyboard.up('a').catch(() => {});
+    await page.keyboard.up('w').catch(() => {});
+  }
+
+  const rightDelta = before && afterRight
+    ? pointDot(pointDelta(afterRight.forward, before.forward), before.right)
+    : null;
+  const leftDelta = beforeLeft && afterLeft
+    ? pointDot(pointDelta(afterLeft.forward, beforeLeft.forward), beforeLeft.right)
+    : null;
+  const passed = rightDelta !== null
+    && leftDelta !== null
+    && rightDelta > MIN_STEERING_SIDE_DELTA
+    && leftDelta < -MIN_STEERING_SIDE_DELTA;
+  if (!passed) {
+    notes.push(`Steering response did not pass short-window direction check: rightDelta=${rightDelta}, leftDelta=${leftDelta}.`);
+  }
+
+  return {
+    before,
+    afterRight,
+    beforeLeft,
+    afterLeft,
+    rightDelta,
+    leftDelta,
+    framesObserved,
+    passed,
+  };
+}
+
 async function proveTarget(page: Page, mode: ModeId, kind: VehicleKind): Promise<TargetResult> {
   const notes: string[] = [];
   const screenshots: string[] = [];
@@ -610,6 +748,7 @@ async function proveTarget(page: Page, mode: ModeId, kind: VehicleKind): Promise
       afterPosition: null,
       travelMeters: null,
       driveFramesObserved: 0,
+      steering: null,
       cameraAfterBoard: null,
       cameraAfterDrive: null,
       debug,
@@ -654,6 +793,11 @@ async function proveTarget(page: Page, mode: ModeId, kind: VehicleKind): Promise
   const driveShot = await screenshot(page, `${mode}-${kind}-after-drive.png`, notes);
   if (driveShot) screenshots.push(driveShot);
 
+  const steering = boarded ? await proveSteering(page, target.id, notes) : null;
+  if (steering) {
+    debug.push(await getVehicleDebugSnapshot(page, target.id, 'after-steering'));
+  }
+
   const exited = await exitVehicle(page);
   await page.waitForTimeout(300);
 
@@ -667,6 +811,7 @@ async function proveTarget(page: Page, mode: ModeId, kind: VehicleKind): Promise
     afterPosition,
     travelMeters: beforePosition && afterPosition ? pointDistance(beforePosition, afterPosition) : null,
     driveFramesObserved,
+    steering,
     cameraAfterBoard,
     cameraAfterDrive,
     debug,
@@ -694,6 +839,7 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
 
   const driveRows = results.filter((result) => result.boarded && result.travelMeters !== null);
   const cameraRows = results.filter((result) => result.boarded && result.cameraAfterBoard !== null);
+  const steeringRows = results.filter((result) => result.boarded && result.steering !== null);
   const weaponRows = results
     .filter((result) => result.boarded)
     .flatMap((result) => result.debug
@@ -748,6 +894,7 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
   rows.push(
     check('exits_cleanly', results.filter((result) => result.boarded).every((result) => result.exited), results.map((result) => ({ mode: result.mode, kind: result.kind, boarded: result.boarded, exited: result.exited })), 'Every successfully boarded land vehicle exits through PlayerController.handleExitVehicle.'),
     check('drive_rows_have_motion', driveRows.every((result) => (result.travelMeters ?? 0) >= MIN_TRAVEL_METERS[result.kind]), driveRows.map((result) => ({ mode: result.mode, kind: result.kind, travelMeters: result.travelMeters })), 'All boarded drive rows clear the movement threshold for their vehicle class.'),
+    check('steering_rows_directional', steeringRows.length > 0 && steeringRows.every((result) => result.steering?.passed === true), steeringRows.map((result) => ({ mode: result.mode, kind: result.kind, steering: result.steering })), 'All boarded land vehicles turn right for W+D and left for W+A in a short-window live input check.'),
     check('camera_rows_in_framing_band', cameraRows.every((result) => cameraDownAngleInBand(result.kind, result.cameraAfterBoard)), cameraRows.map((result) => ({ mode: result.mode, kind: result.kind, camera: result.cameraAfterBoard })), 'All boarded land vehicles use elevated-but-forward third-person camera framing.'),
     check('weapon_overlay_hidden_in_vehicles', weaponRows.length > 0 && weaponRows.every((row) =>
       row.weapon.inAnyVehicle === true
@@ -785,10 +932,10 @@ function markdown(report: Report): string {
     '',
     '## Runtime Rows',
     '',
-    '| Mode | Kind | Vehicle | Boarded | Drive Frames | Travel M | Camera Height | Camera Angle | Exited |',
-    '| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |',
+    '| Mode | Kind | Vehicle | Boarded | Drive Frames | Travel M | Steer R | Steer L | Camera Height | Camera Angle | Exited |',
+    '| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |',
     ...report.results.map((result) =>
-      `| ${result.mode} | ${result.kind} | ${result.targetId ?? 'n/a'} | ${result.boarded ? 'yes' : 'no'} | ${result.driveFramesObserved} | ${fmt(result.travelMeters)} | ${fmt(result.cameraAfterBoard?.heightAboveVehicle)} | ${fmt(result.cameraAfterBoard?.downAngleDeg)} | ${result.exited ? 'yes' : 'no'} |`),
+      `| ${result.mode} | ${result.kind} | ${result.targetId ?? 'n/a'} | ${result.boarded ? 'yes' : 'no'} | ${result.driveFramesObserved} | ${fmt(result.travelMeters)} | ${fmt(result.steering?.rightDelta)} | ${fmt(result.steering?.leftDelta)} | ${fmt(result.cameraAfterBoard?.heightAboveVehicle)} | ${fmt(result.cameraAfterBoard?.downAngleDeg)} | ${result.exited ? 'yes' : 'no'} |`),
     '',
     '## Screenshots',
     '',
@@ -879,6 +1026,7 @@ async function main(): Promise<void> {
       afterPosition: null,
       travelMeters: null,
       driveFramesObserved: 0,
+      steering: null,
       cameraAfterBoard: null,
       cameraAfterDrive: null,
       debug: [],

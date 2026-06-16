@@ -128,6 +128,7 @@ const DEFAULT_M48_SEATS: VehicleSeat[] = [
 ];
 
 const _scratchPos = new THREE.Vector3();
+const _scratchQuat = new THREE.Quaternion();
 
 export class Tank implements IVehicle {
   readonly category = 'ground' as const;
@@ -188,9 +189,8 @@ export class Tank implements IVehicle {
     // pattern GroundVehicle uses for the M151.
     object.getWorldPosition(_scratchPos);
     this.physics = new TrackedVehiclePhysics(_scratchPos, physicsConfig);
-    if (object.quaternion) {
-      this.physics.setQuaternion(object.quaternion);
-    }
+    object.getWorldQuaternion(_scratchQuat);
+    this.physics.setQuaternion(_scratchQuat);
 
     // Mount the turret rig as a child of the chassis object. The turret
     // owns its yaw + pitch nodes and parents them under `object`; cycle

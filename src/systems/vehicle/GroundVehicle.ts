@@ -154,6 +154,7 @@ export function createGroundVehicleForModelPath(
 }
 
 const _scratchPos = new THREE.Vector3();
+const _scratchQuat = new THREE.Quaternion();
 
 export class GroundVehicle implements IVehicle {
   readonly category = 'ground' as const;
@@ -182,9 +183,11 @@ export class GroundVehicle implements IVehicle {
     }));
 
     // Seed physics state from the object's current world transform so the first
-    // update doesn't snap the vehicle to the origin.
+    // update doesn't snap the vehicle to the origin or discard placed yaw.
     object.getWorldPosition(_scratchPos);
     this.physics = new GroundVehiclePhysics(_scratchPos, physicsConfig);
+    object.getWorldQuaternion(_scratchQuat);
+    this.physics.setQuaternion(_scratchQuat);
   }
 
   // ---------- Terrain wiring ----------

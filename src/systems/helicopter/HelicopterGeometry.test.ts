@@ -97,6 +97,8 @@ describe('HelicopterGeometry rotor exclusion', () => {
     joint.add(makeMesh('Mesh_BladeFwd'));
     joint.add(makeMesh('Mesh_BladeAft'));
     joint.add(makeMesh('Mesh_StabBar'));
+    joint.add(makeMesh('Mesh_StabWeightR'));
+    joint.add(makeMesh('Mesh_StabWeightL'));
     root.add(joint);
 
     repairKnownAircraftRotorGeometry(root, 'UH1_HUEY');
@@ -104,6 +106,8 @@ describe('HelicopterGeometry rotor exclusion', () => {
     expect(joint.getObjectByName('Mesh_BladeFwd')).toBeUndefined();
     expect(joint.getObjectByName('Mesh_BladeAft')).toBeUndefined();
     expect(joint.getObjectByName('Mesh_StabBar')).toBeUndefined();
+    expect(joint.getObjectByName('Mesh_StabWeightR')).toBeUndefined();
+    expect(joint.getObjectByName('Mesh_StabWeightL')).toBeUndefined();
     expect(joint.position.toArray()).toEqual([1, 3, 2]);
 
     const repaired = joint.getObjectByName('Mesh_UH1RuntimeMainRotorBlades');

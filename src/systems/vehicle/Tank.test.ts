@@ -155,6 +155,46 @@ describe('Tank IVehicle', () => {
       expect(tank.getForwardSpeed()).toBeGreaterThan(0.5);
     });
 
+    it('preserves placed yaw so forward drive follows the visible chassis heading', () => {
+      const scene = new THREE.Scene();
+      const object = new THREE.Object3D();
+      object.position.set(0, 1, 0);
+      object.rotation.y = Math.PI * 0.5;
+      object.updateWorldMatrix(true, true);
+      scene.add(object);
+      const expectedFacing = new THREE.Vector3(0, 0, -1).applyQuaternion(object.quaternion);
+
+      const tank = new Tank('t_yawed_drive', object, Faction.US);
+      tank.setTerrain(makeFlatTerrain(0));
+
+      tank.setControls(1.0, 0, false);
+      const start = tank.getPosition().clone();
+      for (let i = 0; i < 180; i += 1) tank.update(0.02);
+
+      const travel = tank.getPosition().clone().sub(start);
+      expect(travel.dot(expectedFacing)).toBeGreaterThan(1.0);
+    });
+
+    it('turns right for positive driver turn input and left for negative driver turn input', () => {
+      const flat = makeFlatTerrain(0);
+
+      function forwardXAfterTurn(turnAxis: number): number {
+        const object = new THREE.Object3D();
+        object.position.set(0, 1, 0);
+        const tank = new Tank(`t_turn_${turnAxis}`, object, Faction.US);
+        tank.setTerrain(flat);
+        for (let i = 0; i < 30; i += 1) tank.update(0.02);
+
+        tank.setControls(0, turnAxis, false);
+        for (let i = 0; i < 10; i += 1) tank.update(0.02);
+
+        return new THREE.Vector3(0, 0, -1).applyQuaternion(tank.getQuaternion()).x;
+      }
+
+      expect(forwardXAfterTurn(1.0)).toBeGreaterThan(0.05);
+      expect(forwardXAfterTurn(-1.0)).toBeLessThan(-0.05);
+    });
+
     it('pivots in place when the driver commands pure turn', () => {
       const scene = new THREE.Scene();
       const object = new THREE.Object3D();

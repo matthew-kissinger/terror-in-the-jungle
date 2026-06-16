@@ -112,6 +112,59 @@ describe('GroundVehicle', () => {
     expect(vehicle.getHealthPercent()).toBe(0);
   });
 
+  it('seeds physics from placed yaw so steering and camera stay aligned with the chassis', () => {
+    const object = new THREE.Object3D();
+    object.position.set(4, 2, -6);
+    object.rotation.y = Math.PI * 0.5;
+    object.updateWorldMatrix(true, true);
+    const expectedFacing = new THREE.Vector3(0, 0, -1).applyQuaternion(object.quaternion);
+    const vehicle = new GroundVehicle('m151_yawed', object, Faction.US);
+    const terrain = makeTerrain();
+
+    vehicle.setTerrain(terrain as any);
+
+    const physicsFacing = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(vehicle.getPhysics().getState().quaternion);
+    expect(physicsFacing.dot(expectedFacing)).toBeGreaterThan(0.99);
+
+    vehicle.setEngineActive(true);
+    vehicle.setControls({ throttle: 1 });
+    const start = vehicle.getPosition().clone();
+    for (let i = 0; i < 180; i += 1) {
+      vehicle.update(0.02);
+    }
+
+    const travel = vehicle.getPosition().clone().sub(start);
+    expect(travel.dot(expectedFacing)).toBeGreaterThan(1);
+  });
+
+  it('turns right for positive steering and left for negative steering', () => {
+    const terrain = makeTerrain();
+
+    function forwardXAfterSteer(steerAngle: number): number {
+      const object = new THREE.Object3D();
+      object.position.set(0, 1, 0);
+      const vehicle = new GroundVehicle(`m151_steer_${steerAngle}`, object, Faction.US);
+      vehicle.setTerrain(terrain as any);
+      vehicle.setEngineActive(true);
+
+      vehicle.setControls({ throttle: 0.8, steerAngle: 0 });
+      for (let i = 0; i < 180; i += 1) {
+        vehicle.update(0.02);
+      }
+
+      vehicle.setControls({ throttle: 0.8, steerAngle });
+      for (let i = 0; i < 120; i += 1) {
+        vehicle.update(0.02);
+      }
+
+      return new THREE.Vector3(0, 0, -1).applyQuaternion(vehicle.getQuaternion()).x;
+    }
+
+    expect(forwardXAfterSteer(0.35)).toBeGreaterThan(0.05);
+    expect(forwardXAfterSteer(-0.35)).toBeLessThan(-0.05);
+  });
+
   it('applies damage to the M151 without removing the object from the scene', () => {
     const scene = new THREE.Scene();
     const object = new THREE.Object3D();

@@ -227,10 +227,11 @@ export function optimizeRotorJointDrawCalls(root: THREE.Object3D, aircraftKey: s
  *
  * The 2026-06 UH-1H source keeps a canonical `Joint_MainRotor`, but its blade
  * meshes are broad diagonal chunks (`Mesh_BladeFwd` / `Mesh_BladeAft`) plus an
- * over-visible stabilizer bar. In-game this reads as a detached blade piece near
- * the Open Frontier starter helipad. Keep the accepted joint contract and hub,
- * but replace only those blade meshes with a clean two-blade bar under the same
- * pivot so procedural rotor spin still uses the catalog-declared joint.
+ * over-visible stabilizer bar and end weights. In-game this reads as detached
+ * blade pieces near the Open Frontier starter helipad. Keep the accepted joint
+ * contract and hub, but replace only those blade meshes with a clean two-blade
+ * bar under the same pivot so procedural rotor spin still uses the
+ * catalog-declared joint.
  */
 export function repairKnownAircraftRotorGeometry(root: THREE.Object3D, aircraftKey: string): void {
   if (aircraftKey !== 'UH1_HUEY') return;
@@ -239,7 +240,13 @@ export function repairKnownAircraftRotorGeometry(root: THREE.Object3D, aircraftK
   if (!mainRotor) return;
 
   const bladeMaterial = findFirstRotorMaterial(mainRotor);
-  const namesToRemove = new Set(['mesh_bladefwd', 'mesh_bladeaft', 'mesh_stabbar']);
+  const namesToRemove = new Set([
+    'mesh_bladefwd',
+    'mesh_bladeaft',
+    'mesh_stabbar',
+    'mesh_stabweightr',
+    'mesh_stabweightl',
+  ]);
   const childrenToRemove = mainRotor.children.filter((child) => namesToRemove.has(child.name.toLowerCase()));
   for (const child of childrenToRemove) {
     child.removeFromParent();
