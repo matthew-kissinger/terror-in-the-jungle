@@ -52,7 +52,10 @@ const _scratchMuzzle = new THREE.Vector3();
 const _scratchForward = new THREE.Vector3();
 const _scratchTracerEnd = new THREE.Vector3();
 const _scratchOrigin = new THREE.Vector3();
+const _scratchShotRay = new THREE.Ray();
+const _scratchHitNormal = new THREE.Vector3();
 const _scratchWorldQuat = new THREE.Quaternion();
+const resolveM2HBDamage = (): number => M2HB_STATS.damagePerRound;
 
 export class M2HBEmplacementSystem implements GameSystem {
   private readonly scene: THREE.Scene;
@@ -196,15 +199,17 @@ export class M2HBEmplacementSystem implements GameSystem {
   }
 
   private executeShot(binding: M2HBBinding, origin: THREE.Vector3, aimDir: THREE.Vector3): void {
-    const ray = new THREE.Ray(origin.clone(), aimDir.clone().normalize());
+    const ray = _scratchShotRay;
+    ray.origin.copy(origin);
+    ray.direction.copy(aimDir).normalize();
     let hitPoint: THREE.Vector3 | null = null;
     let hitNormal: THREE.Vector3 | null = null;
 
     if (this.combatantSystem) {
-      const result = this.combatantSystem.handlePlayerShot(ray, () => M2HB_STATS.damagePerRound, 'rifle');
+      const result = this.combatantSystem.handlePlayerShot(ray, resolveM2HBDamage, 'rifle');
       if (result.hit) {
-        hitPoint = result.point.clone();
-        hitNormal = ray.direction.clone().negate();
+        hitPoint = result.point;
+        hitNormal = _scratchHitNormal.copy(ray.direction).negate();
       }
     }
 
@@ -218,7 +223,7 @@ export class M2HBEmplacementSystem implements GameSystem {
     }
 
     if (this.audioManager && binding.weapon.consumeAudioGate()) {
-      this.audioManager.play(M2HB_STATS.audioCue, origin.clone(), 0.7);
+      this.audioManager.play(M2HB_STATS.audioCue, origin, 0.7);
     }
   }
 

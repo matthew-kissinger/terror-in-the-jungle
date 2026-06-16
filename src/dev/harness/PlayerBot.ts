@@ -28,6 +28,7 @@ import {
   PlayerBotStateContext,
 } from './playerBot/types';
 import { stepState } from './playerBot/states';
+import { BoundedRingBuffer } from '../../core/BoundedRingBuffer';
 
 /** Observation bundle the driver supplies each tick. */
 export interface PlayerBotObservation {
@@ -64,8 +65,8 @@ export class PlayerBot {
   private timeInStateMs = 0;
   private currentTarget: BotTarget | null = null;
   private readonly config: PlayerBotConfig;
-  private readonly transitionLog: PlayerBotTransition[] = [];
   private static readonly TRANSITION_LOG_CAP = 128;
+  private readonly transitionLog = new BoundedRingBuffer<PlayerBotTransition>(PlayerBot.TRANSITION_LOG_CAP);
   private readonly histogram: PlayerBotStateHistogram = {
     PATROL: 0,
     ALERT: 0,
@@ -91,7 +92,7 @@ export class PlayerBot {
   }
 
   getTransitionLog(): ReadonlyArray<PlayerBotTransition> {
-    return this.transitionLog;
+    return this.transitionLog.snapshotLatest();
   }
 
   getStateHistogram(): Readonly<PlayerBotStateHistogram> {
@@ -184,9 +185,6 @@ export class PlayerBot {
   private transitionTo(next: PlayerBotState, atMs: number): void {
     if (this.state === next) return;
     this.transitionLog.push({ from: this.state, to: next, atMs });
-    if (this.transitionLog.length > PlayerBot.TRANSITION_LOG_CAP) {
-      this.transitionLog.shift();
-    }
     this.state = next;
     this.timeInStateMs = 0;
   }

@@ -13,6 +13,7 @@ import {
   disposeCombatantMeshes,
   getPixelForgeNpcBucketKey,
   getPixelForgeNpcClipForCombatant,
+  markPixelForgeNpcImpostorAttributesDirty,
   reportBucketOverflow,
   setPixelForgeNpcImpostorAttributes,
   updateCombatantTexture,
@@ -89,6 +90,14 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function markInstancedMatrixDirty(mesh: THREE.InstancedMesh, activeCount: number): void {
+  const attribute = mesh.instanceMatrix;
+  if (activeCount > 0 && typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(0, activeCount * attribute.itemSize);
+  }
+  attribute.needsUpdate = true;
+}
+
 function getCombatantDeathProgress(combatant: Combatant): number {
   if (!combatant.isDying) return 0;
   return clamp01(combatant.deathProgress ?? 0);
@@ -161,6 +170,48 @@ interface CloseModelCandidate {
   priorityScore: number;
 }
 
+function compareCloseModelCandidates(a: CloseModelCandidate, b: CloseModelCandidate): number {
+  return b.priorityScore - a.priorityScore
+    || a.distanceSq - b.distanceSq
+    || a.combatant.id.localeCompare(b.combatant.id);
+}
+
+function selectPreferredCloseModelCandidates(
+  candidates: CloseModelCandidate[],
+  limit: number,
+  target: CloseModelCandidate[] = [],
+): CloseModelCandidate[] {
+  const boundedLimit = Math.max(0, Math.floor(limit));
+  target.length = 0;
+  if (boundedLimit === 0 || candidates.length === 0) return target;
+  if (candidates.length <= boundedLimit) {
+    for (const candidate of candidates) {
+      target.push(candidate);
+    }
+    target.sort(compareCloseModelCandidates);
+    return target;
+  }
+
+  for (const candidate of candidates) {
+    let insertAt = target.length;
+    while (
+      insertAt > 0
+      && compareCloseModelCandidates(candidate, target[insertAt - 1]) < 0
+    ) {
+      insertAt--;
+    }
+    if (insertAt >= boundedLimit && target.length >= boundedLimit) continue;
+
+    const nextLength = Math.min(target.length + 1, boundedLimit);
+    for (let i = nextLength - 1; i > insertAt; i--) {
+      target[i] = target[i - 1];
+    }
+    target[insertAt] = candidate;
+    target.length = nextLength;
+  }
+  return target;
+}
+
 export interface CloseModelFallbackRecord {
   combatantId: string;
   poolKey: PixelForgeNpcPoolKey;
@@ -230,17 +281,43 @@ export interface CombatantMaterializationRow {
 
 export interface CloseModelPrewarmOptions {
   maxActive?: number;
+  primeFactionAssets?: boolean;
 }
 
 export interface CloseModelPrewarmSummary {
   skippedReason: 'none' | 'perf-isolation' | 'no-candidates';
   candidatesWithinCloseRadius: number;
   requestedPoolTargets: Record<string, number>;
+  primedAssetPaths: number;
   renderedCloseModels: number;
   fallbackCount: number;
   fallbackCounts: Record<CloseModelFallbackReason, number>;
   poolLoads: number;
   durationMs: number;
+}
+
+export interface BillboardUpdateProfile {
+  walkFrameMs: number;
+  closeModelMs: number;
+  bucketResetMs: number;
+  impostorWriteMs: number;
+  finalizeMs: number;
+  hitboxDebugMs: number;
+  materializationEventsMs: number;
+  shaderUniformMs: number;
+}
+
+function createEmptyBillboardUpdateProfile(): BillboardUpdateProfile {
+  return {
+    walkFrameMs: 0,
+    closeModelMs: 0,
+    bucketResetMs: 0,
+    impostorWriteMs: 0,
+    finalizeMs: 0,
+    hitboxDebugMs: 0,
+    materializationEventsMs: 0,
+    shaderUniformMs: 0,
+  };
 }
 
 function createCloseModelFallbackCounts(): Record<CloseModelFallbackReason, number> {
@@ -292,6 +369,12 @@ interface CloseModelMetrics {
   visualScale: number;
 }
 
+interface WeaponPoseAxes {
+  forward: THREE.Vector3;
+  cleanUp: THREE.Vector3;
+  actorRight: THREE.Vector3;
+}
+
 interface CombatantRendererBillboardOptions {
   eagerCloseModelPools?: boolean;
 }
@@ -325,6 +408,12 @@ export class CombatantRenderer {
   private readonly closeModelOverflowLastLog = new Map<string, number>();
   private readonly closeModelOverflowReportedThisUpdate = new Set<string>();
   private readonly closeModelFallbackRecords = new Map<string, CloseModelFallbackRecord>();
+  private readonly closeModelSelectedIds = new Set<string>();
+  private readonly closeModelSuppressedImpostorIds = new Set<string>();
+  private readonly closeModelProspectiveIds = new Set<string>();
+  private readonly closeModelPreferredCandidates: CloseModelCandidate[] = [];
+  private readonly closeModelDemandByPool = new Map<PixelForgeNpcPoolKey, number>();
+  private readonly stableHashByCombatantId = new Map<string, number>();
   // Tracks the most recent wall-clock time (ms) at which each combatant was on-screen.
   // Used by the close-model priority score to debounce rapid in/out frustum flicker.
   private readonly lastVisibleAtMsByCombatant = new Map<string, number>();
@@ -342,6 +431,7 @@ export class CombatantRenderer {
    * {@link emitMaterializationTierTransitions}).
    */
   private readonly previousRenderModes = new Map<string, CombatantMaterializationRenderMode>();
+  private readonly materializationSeenIds = new Set<string>();
   private disposed = false;
 
   // Walk animation state
@@ -378,8 +468,59 @@ export class CombatantRenderer {
   private readonly scratchFrustum = new THREE.Frustum();
   private readonly scratchFrustumMatrix = new THREE.Matrix4();
   private readonly scratchOnScreenSphere = new THREE.Sphere();
+  private readonly scratchWeaponRightHand = new THREE.Vector3();
+  private readonly scratchWeaponLeftShoulder = new THREE.Vector3();
+  private readonly scratchWeaponRightShoulder = new THREE.Vector3();
+  private readonly scratchWeaponTravelForward = new THREE.Vector3();
+  private readonly scratchWeaponTorsoForward = new THREE.Vector3();
+  private readonly scratchWeaponForward = new THREE.Vector3();
+  private readonly scratchWeaponActorRight = new THREE.Vector3();
+  private readonly scratchWeaponShoulderSpan = new THREE.Vector3();
+  private readonly scratchWeaponCleanUp = new THREE.Vector3();
+  private readonly scratchWeaponWorldMatrix = new THREE.Matrix4();
+  private readonly scratchWeaponWorldQuaternion = new THREE.Quaternion();
+  private readonly scratchWeaponPitchQuaternion = new THREE.Quaternion();
+  private readonly scratchWeaponParentQuaternion = new THREE.Quaternion();
+  private readonly scratchWeaponObjectQuaternion = new THREE.Quaternion();
+  private readonly scratchWeaponPitchAxis = new THREE.Vector3(0, 0, 1);
+  private readonly scratchWeaponShoulderCenter = new THREE.Vector3();
+  private readonly scratchWeaponShoulderPocket = new THREE.Vector3();
+  private readonly scratchWeaponStockOffset = new THREE.Vector3();
+  private readonly scratchWeaponStockWorldOffset = new THREE.Vector3();
+  private readonly scratchWeaponStockAnchoredGrip = new THREE.Vector3();
+  private readonly scratchWeaponDesiredWorldPosition = new THREE.Vector3();
+  private readonly scratchWeaponLocalPosition = new THREE.Vector3();
+  private readonly scratchWeaponSupportOffset = new THREE.Vector3();
+  private readonly scratchWeaponSupportTarget = new THREE.Vector3();
+  private readonly scratchWeaponTemp = new THREE.Vector3();
+  private readonly scratchWeaponStockFallback = new THREE.Vector3(-0.28, 0.04, 0);
+  private readonly scratchWeaponSupportFallback = new THREE.Vector3(0.28, 0.02, 0);
+  private readonly scratchWeaponAxes: WeaponPoseAxes = {
+    forward: this.scratchWeaponForward,
+    cleanUp: this.scratchWeaponCleanUp,
+    actorRight: this.scratchWeaponActorRight,
+  };
+  private readonly scratchArmShoulder = new THREE.Vector3();
+  private readonly scratchArmElbowNow = new THREE.Vector3();
+  private readonly scratchArmHandNow = new THREE.Vector3();
+  private readonly scratchArmTargetVector = new THREE.Vector3();
+  private readonly scratchArmDirection = new THREE.Vector3();
+  private readonly scratchArmClampedTarget = new THREE.Vector3();
+  private readonly scratchArmPole = new THREE.Vector3();
+  private readonly scratchArmPlaneNormal = new THREE.Vector3();
+  private readonly scratchArmBendDirection = new THREE.Vector3();
+  private readonly scratchArmElbow = new THREE.Vector3();
+  private readonly scratchArmElbowWorld = new THREE.Vector3();
+  private readonly scratchArmUpperDirection = new THREE.Vector3();
+  private readonly scratchArmForeDirection = new THREE.Vector3();
+  private readonly scratchArmTemp = new THREE.Vector3();
+  private readonly scratchBoneDirection = new THREE.Vector3();
+  private readonly scratchBoneParentQuaternion = new THREE.Quaternion();
+  private readonly scratchBoneTargetLocal = new THREE.Vector3();
+  private readonly scratchBoneLocalForward = new THREE.Vector3(0, 1, 0);
   private readonly renderWriteCounts = new Map<string, number>();
   private readonly renderCombatStates = new Map<string, number>();
+  private readonly dirtyImpostorAttributeBuckets = new Set<string>();
   private readonly hitboxDebugEnabled = isHitboxDebugEnabled();
   private readonly closeModelPerfIsolationEnabled = isNpcCloseModelPerfIsolationEnabled();
   private readonly hitboxDebugGroup = new THREE.Group();
@@ -399,6 +540,7 @@ export class CombatantRenderer {
     wireframe: true,
     depthTest: false,
   });
+  private lastBillboardUpdateProfile = createEmptyBillboardUpdateProfile();
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -411,12 +553,17 @@ export class CombatantRenderer {
   }
 
   private stableHash01(id: string): number {
+    const cached = this.stableHashByCombatantId.get(id);
+    if (cached !== undefined) return cached;
+
     let hash = 2166136261;
     for (let i = 0; i < id.length; i++) {
       hash ^= id.charCodeAt(i);
       hash = Math.imul(hash, 16777619);
     }
-    return ((hash >>> 0) % 1000) / 1000;
+    const stableHash = ((hash >>> 0) % 1000) / 1000;
+    this.stableHashByCombatantId.set(id, stableHash);
+    return stableHash;
   }
 
   async createFactionBillboards(options: CombatantRendererBillboardOptions = {}): Promise<void> {
@@ -470,6 +617,10 @@ export class CombatantRenderer {
 
   getCloseModelFallbackRecords(): CloseModelFallbackRecord[] {
     return Array.from(this.closeModelFallbackRecords.values()).map((record) => ({ ...record }));
+  }
+
+  getLastBillboardUpdateProfile(): BillboardUpdateProfile {
+    return { ...this.lastBillboardUpdateProfile };
   }
 
   getNearestCombatantMaterializationRows(
@@ -551,10 +702,12 @@ export class CombatantRenderer {
     const emptySummary = (
       skippedReason: CloseModelPrewarmSummary['skippedReason'],
       candidatesWithinCloseRadius = 0,
+      primedAssetPaths = 0,
     ): CloseModelPrewarmSummary => ({
       skippedReason,
       candidatesWithinCloseRadius,
       requestedPoolTargets: {},
+      primedAssetPaths,
       renderedCloseModels: this.closeModelRuntimeStats.renderedCloseModels,
       fallbackCount: this.closeModelRuntimeStats.fallbackCount,
       fallbackCounts: { ...this.closeModelRuntimeStats.fallbackCounts },
@@ -566,21 +719,29 @@ export class CombatantRenderer {
       return emptySummary('perf-isolation');
     }
 
+    const primedAssetPaths = options.primeFactionAssets
+      ? await this.preloadCloseModelFactionAssets()
+      : 0;
     const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     this.refreshFrustum();
     const candidates = this.collectCloseModelCandidates(combatants, playerPosition, nowMs);
     if (candidates.length === 0) {
-      return emptySummary('no-candidates');
+      return emptySummary('no-candidates', 0, primedAssetPaths);
     }
 
     const maxActive = this.resolveCloseModelActiveCap(candidates, options.maxActive);
     if (maxActive <= 0) {
-      return emptySummary('perf-isolation', candidates.length);
+      return emptySummary('perf-isolation', candidates.length, primedAssetPaths);
     }
 
     const requestedPoolTargets: Record<string, number> = {};
     const requestedByPool = new Map<PixelForgeNpcPoolKey, number>();
-    for (const candidate of candidates.slice(0, maxActive)) {
+    const preferredCandidates = selectPreferredCloseModelCandidates(
+      candidates,
+      maxActive,
+      this.closeModelPreferredCandidates,
+    );
+    for (const candidate of preferredCandidates) {
       requestedByPool.set(candidate.poolKey, (requestedByPool.get(candidate.poolKey) ?? 0) + 1);
     }
 
@@ -601,12 +762,28 @@ export class CombatantRenderer {
       skippedReason: 'none',
       candidatesWithinCloseRadius: stats.candidatesWithinCloseRadius,
       requestedPoolTargets,
+      primedAssetPaths,
       renderedCloseModels: stats.renderedCloseModels,
       fallbackCount: stats.fallbackCount,
       fallbackCounts: stats.fallbackCounts,
       poolLoads: stats.poolLoads,
       durationMs: performance.now() - startMs,
     };
+  }
+
+  private async preloadCloseModelFactionAssets(): Promise<number> {
+    const paths = new Set<string>();
+    for (const config of PIXEL_FORGE_NPC_RUNTIME_FACTIONS) {
+      paths.add(config.modelPath);
+      paths.add(config.weapon.modelPath);
+    }
+    const squadConfig = getPixelForgeNpcRuntimeFaction('SQUAD');
+    paths.add(squadConfig.modelPath);
+    paths.add(squadConfig.weapon.modelPath);
+
+    const preloadPaths = [...paths];
+    await modelLoader.preload(preloadPaths);
+    return preloadPaths.length;
   }
 
   private async createCloseModelPools(): Promise<void> {
@@ -1078,6 +1255,9 @@ export class CombatantRenderer {
   ): { closeModelIds: Set<string>; suppressedImpostorIds: Set<string> } {
     this.closeModelOverflowReportedThisUpdate.clear();
     this.closeModelFallbackRecords.clear();
+    this.closeModelSelectedIds.clear();
+    this.closeModelSuppressedImpostorIds.clear();
+    this.closeModelProspectiveIds.clear();
 
     const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     this.refreshFrustum();
@@ -1091,12 +1271,19 @@ export class CombatantRenderer {
         this.recordCloseModelFallback(candidate, 'perf-isolation');
       }
       this.captureCloseModelRuntimeStats(candidates.length, 0);
-      return { closeModelIds: new Set(), suppressedImpostorIds: new Set() };
+      return {
+        closeModelIds: this.closeModelSelectedIds,
+        suppressedImpostorIds: this.closeModelSuppressedImpostorIds,
+      };
     }
 
-    const selected = new Set<string>();
-    const suppressedImpostorIds = new Set<string>();
+    const selected = this.closeModelSelectedIds;
     const effectiveActiveCap = this.resolveCloseModelActiveCap(candidates);
+    const prospectiveCandidates = selectPreferredCloseModelCandidates(
+      candidates,
+      effectiveActiveCap,
+      this.closeModelPreferredCandidates,
+    );
 
     // Pre-pass: release any active close model whose combatant is not in this
     // frame's top-`effectiveActiveCap` prospective set. The candidates list is
@@ -1106,17 +1293,19 @@ export class CombatantRenderer {
     // the released slot would have served them. Pre-releasing eliminates that
     // cross-frame churn artifact without changing the overall behavior for
     // steady-state frames (no actives outside prospective ⇒ no releases here).
-    const prospectiveIds = new Set<string>();
-    for (let i = 0; i < candidates.length && prospectiveIds.size < effectiveActiveCap; i++) {
-      prospectiveIds.add(candidates[i].combatant.id);
-    }
+    const prospectiveIds = this.closeModelProspectiveIds;
+    for (const candidate of prospectiveCandidates) prospectiveIds.add(candidate.combatant.id);
     this.activeCloseModels.forEach((instance, combatantId) => {
       if (!prospectiveIds.has(combatantId)) {
         this.releaseCloseModel(combatantId, instance);
       }
     });
 
-    for (const candidate of candidates) {
+    const orderedCandidates = this.canServeCloseModelCandidates(prospectiveCandidates)
+      ? prospectiveCandidates
+      : candidates.sort(compareCloseModelCandidates);
+
+    for (const candidate of orderedCandidates) {
       if (selected.size >= effectiveActiveCap) {
         this.recordCloseModelFallback(candidate, 'total-cap');
         this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'total-cap');
@@ -1137,6 +1326,14 @@ export class CombatantRenderer {
       this.updateCloseModelInstance(instance, candidate.combatant, candidate.poolKey);
     }
 
+    if (orderedCandidates === prospectiveCandidates && selected.size >= effectiveActiveCap) {
+      for (const candidate of candidates) {
+        if (selected.has(candidate.combatant.id)) continue;
+        this.recordCloseModelFallback(candidate, 'total-cap');
+        this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'total-cap');
+      }
+    }
+
     // Second release pass catches active models that lost their slot during
     // iteration (e.g., total-cap displaced them after the pre-pass admitted
     // them). The pre-pass handles most cases; this guards against the edge
@@ -1148,7 +1345,10 @@ export class CombatantRenderer {
     });
 
     this.captureCloseModelRuntimeStats(candidates.length, selected.size, effectiveActiveCap);
-    return { closeModelIds: selected, suppressedImpostorIds };
+    return {
+      closeModelIds: selected,
+      suppressedImpostorIds: this.closeModelSuppressedImpostorIds,
+    };
   }
 
   private collectCloseModelCandidates(
@@ -1199,12 +1399,23 @@ export class CombatantRenderer {
         priorityScore,
       });
     });
-    candidates.sort((a, b) =>
-      b.priorityScore - a.priorityScore
-      || a.distanceSq - b.distanceSq
-      || a.combatant.id.localeCompare(b.combatant.id)
-    );
     return candidates;
+  }
+
+  private canServeCloseModelCandidates(candidates: CloseModelCandidate[]): boolean {
+    const demandByPool = this.closeModelDemandByPool;
+    demandByPool.clear();
+    for (const candidate of candidates) {
+      const active = this.activeCloseModels.get(candidate.combatant.id);
+      if (active?.poolKey === candidate.poolKey) continue;
+      demandByPool.set(candidate.poolKey, (demandByPool.get(candidate.poolKey) ?? 0) + 1);
+    }
+
+    for (const [poolKey, demand] of demandByPool) {
+      const available = this.closeModelPools.get(poolKey)?.length ?? 0;
+      if (available < demand) return false;
+    }
+    return true;
   }
 
   private resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requestedMaxActive?: number): number {
@@ -1427,103 +1638,129 @@ export class CombatantRenderer {
       return;
     }
 
-    const right = this.getBoneWorldPosition(instance, instance.factionConfig.rightHandSocket);
-    const leftShoulder = this.getBoneWorldPosition(instance, 'LeftArm') ?? this.getBoneWorldPosition(instance, 'LeftShoulder');
-    const rightShoulder = this.getBoneWorldPosition(instance, 'RightArm') ?? this.getBoneWorldPosition(instance, 'RightShoulder');
+    const right = this.getBoneWorldPosition(instance, instance.factionConfig.rightHandSocket, this.scratchWeaponRightHand);
+    const leftShoulder = this.getBoneWorldPosition(instance, 'LeftArm', this.scratchWeaponLeftShoulder)
+      ?? this.getBoneWorldPosition(instance, 'LeftShoulder', this.scratchWeaponLeftShoulder);
+    const rightShoulder = this.getBoneWorldPosition(instance, 'RightArm', this.scratchWeaponRightShoulder)
+      ?? this.getBoneWorldPosition(instance, 'RightShoulder', this.scratchWeaponRightShoulder);
     if (!right) {
       instance.hasWeapon = false;
       return;
     }
 
-    const up = new THREE.Vector3(0, 1, 0);
-    const travelForward = this.getRootForward(instance.root);
+    const travelForward = this.getRootForward(instance.root, this.scratchWeaponTravelForward);
     travelForward.y = 0;
     if (travelForward.lengthSq() < 0.0001) travelForward.set(0, 0, 1);
     travelForward.normalize();
 
-    const torsoForward = this.getBodyForward(instance);
+    const torsoForward = this.getBodyForward(instance, this.scratchWeaponTorsoForward);
     torsoForward.y = 0;
     if (torsoForward.lengthSq() < 0.0001) torsoForward.set(0, 0, 1);
     torsoForward.normalize();
 
-    const forward = instance.weaponConfig.socketMode === 'shouldered-forward' ? travelForward : torsoForward;
-    let actorRight = new THREE.Vector3().crossVectors(forward, up).normalize();
+    const forward = this.scratchWeaponForward.copy(
+      instance.weaponConfig.socketMode === 'shouldered-forward' ? travelForward : torsoForward,
+    );
+    const actorRight = this.scratchWeaponActorRight.crossVectors(forward, this.scratchUp).normalize();
     if (leftShoulder && rightShoulder) {
-      const shoulderSpan = rightShoulder.clone().sub(leftShoulder);
+      const shoulderSpan = this.scratchWeaponShoulderSpan.copy(rightShoulder).sub(leftShoulder);
       shoulderSpan.y = 0;
       if (shoulderSpan.lengthSq() > 0.0001) {
         shoulderSpan.normalize();
         if (shoulderSpan.dot(actorRight) < 0) shoulderSpan.multiplyScalar(-1);
-        actorRight = shoulderSpan;
+        actorRight.copy(shoulderSpan);
       }
     }
-    const cleanUp = new THREE.Vector3().crossVectors(actorRight, forward).normalize();
-    const worldMatrix = new THREE.Matrix4().makeBasis(forward, cleanUp, actorRight);
-    const worldQuaternion = new THREE.Quaternion().setFromRotationMatrix(worldMatrix);
+    const cleanUp = this.scratchWeaponCleanUp.crossVectors(actorRight, forward).normalize();
+    const worldMatrix = this.scratchWeaponWorldMatrix.makeBasis(forward, cleanUp, actorRight);
+    const worldQuaternion = this.scratchWeaponWorldQuaternion.setFromRotationMatrix(worldMatrix);
     if (instance.weaponConfig.pitchTrimDeg) {
-      worldQuaternion.multiply(new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 0, 1),
+      worldQuaternion.multiply(this.scratchWeaponPitchQuaternion.setFromAxisAngle(
+        this.scratchWeaponPitchAxis,
         THREE.MathUtils.degToRad(instance.weaponConfig.pitchTrimDeg),
       ));
     }
 
     const parent = instance.weaponPivot.parent ?? instance.root;
     parent.updateMatrixWorld(true);
-    const parentQuaternion = parent.getWorldQuaternion(new THREE.Quaternion());
+    const parentQuaternion = parent.getWorldQuaternion(this.scratchWeaponParentQuaternion);
     instance.weaponPivot.quaternion.copy(parentQuaternion.invert().multiply(worldQuaternion));
 
     const shoulder = rightShoulder ?? right;
-    const shoulderCenter = leftShoulder && rightShoulder
-      ? leftShoulder.clone().lerp(rightShoulder, 0.5)
-      : shoulder.clone().sub(actorRight.clone().multiplyScalar(0.12));
-    const shoulderPocket = shoulder.clone()
+    const shoulderCenter = this.scratchWeaponShoulderCenter;
+    if (leftShoulder && rightShoulder) {
+      shoulderCenter.copy(leftShoulder).lerp(rightShoulder, 0.5);
+    } else {
+      shoulderCenter.copy(shoulder).sub(this.scratchWeaponTemp.copy(actorRight).multiplyScalar(0.12));
+    }
+    const shoulderPocket = this.scratchWeaponShoulderPocket.copy(shoulder)
       .lerp(shoulderCenter, 0.42)
-      .add(cleanUp.clone().multiplyScalar(-0.035));
-    const stockOffset = this.getWeaponOffset(instance.weaponRoot, 'stockOffset', new THREE.Vector3(-0.28, 0.04, 0));
-    const stockWorldOffset = stockOffset.applyQuaternion(worldQuaternion);
-    const stockAnchoredGrip = shoulderPocket.clone()
-      .add(forward.clone().multiplyScalar(instance.weaponConfig.forwardHold + instance.weaponConfig.gripOffset))
+      .add(this.scratchWeaponTemp.copy(cleanUp).multiplyScalar(-0.035));
+    const stockOffset = this.getWeaponOffset(
+      instance.weaponRoot,
+      'stockOffset',
+      this.scratchWeaponStockFallback,
+      this.scratchWeaponStockOffset,
+    );
+    const stockWorldOffset = this.scratchWeaponStockWorldOffset.copy(stockOffset).applyQuaternion(worldQuaternion);
+    const stockAnchoredGrip = this.scratchWeaponStockAnchoredGrip.copy(shoulderPocket)
+      .add(this.scratchWeaponTemp.copy(forward).multiplyScalar(instance.weaponConfig.forwardHold + instance.weaponConfig.gripOffset))
       .sub(stockWorldOffset);
-    const desiredWorldPosition = stockAnchoredGrip.add(actorRight.clone().multiplyScalar(0.006));
-    instance.weaponPivot.position.copy(parent.worldToLocal(desiredWorldPosition.clone()));
+    const desiredWorldPosition = this.scratchWeaponDesiredWorldPosition.copy(stockAnchoredGrip)
+      .add(this.scratchWeaponTemp.copy(actorRight).multiplyScalar(0.006));
+    instance.weaponPivot.position.copy(parent.worldToLocal(this.scratchWeaponLocalPosition.copy(desiredWorldPosition)));
     instance.weaponPivot.updateMatrixWorld(true);
 
-    const supportOffset = this.getWeaponOffset(instance.weaponRoot, 'supportOffset', new THREE.Vector3(0.28, 0.02, 0));
-    const supportTarget = desiredWorldPosition.clone().add(supportOffset.applyQuaternion(worldQuaternion));
-    const axes = { forward, cleanUp, actorRight };
-    this.solveArmToTarget(instance, 'Right', desiredWorldPosition, axes);
-    this.solveArmToTarget(instance, 'Left', supportTarget, axes);
+    const supportOffset = this.getWeaponOffset(
+      instance.weaponRoot,
+      'supportOffset',
+      this.scratchWeaponSupportFallback,
+      this.scratchWeaponSupportOffset,
+    );
+    const supportTarget = this.scratchWeaponSupportTarget.copy(desiredWorldPosition)
+      .add(supportOffset.applyQuaternion(worldQuaternion));
+    this.solveArmToTarget(instance, 'Right', desiredWorldPosition, this.scratchWeaponAxes);
+    this.solveArmToTarget(instance, 'Left', supportTarget, this.scratchWeaponAxes);
     instance.root.updateMatrixWorld(true);
     instance.weaponPivot.updateMatrixWorld(true);
     instance.hasWeapon = true;
   }
 
-  private getWeaponOffset(root: THREE.Object3D, key: 'stockOffset' | 'supportOffset', fallback: THREE.Vector3): THREE.Vector3 {
+  private getWeaponOffset(
+    root: THREE.Object3D,
+    key: 'stockOffset' | 'supportOffset',
+    fallback: THREE.Vector3,
+    out: THREE.Vector3,
+  ): THREE.Vector3 {
     const value = root.userData[key];
-    return value instanceof THREE.Vector3 ? value.clone() : fallback;
+    return out.copy(value instanceof THREE.Vector3 ? value : fallback);
   }
 
-  private getBoneWorldPosition(instance: CloseModelInstance, name: string): THREE.Vector3 | undefined {
+  private getBoneWorldPosition(
+    instance: CloseModelInstance,
+    name: string,
+    out: THREE.Vector3,
+  ): THREE.Vector3 | undefined {
     const bone = instance.bones.get(name);
-    return bone ? bone.getWorldPosition(new THREE.Vector3()) : undefined;
+    return bone ? bone.getWorldPosition(out) : undefined;
   }
 
-  private getRootForward(root: THREE.Object3D): THREE.Vector3 {
-    const quaternion = root.getWorldQuaternion(new THREE.Quaternion());
-    return new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion).normalize();
+  private getRootForward(root: THREE.Object3D, out: THREE.Vector3): THREE.Vector3 {
+    const quaternion = root.getWorldQuaternion(this.scratchWeaponObjectQuaternion);
+    return out.set(0, 0, 1).applyQuaternion(quaternion).normalize();
   }
 
-  private getBodyForward(instance: CloseModelInstance): THREE.Vector3 {
+  private getBodyForward(instance: CloseModelInstance, out: THREE.Vector3): THREE.Vector3 {
     const body = instance.bones.get('Hips') ?? instance.bones.get('Spine') ?? instance.root;
-    const quaternion = body.getWorldQuaternion(new THREE.Quaternion());
-    return new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion).normalize();
+    const quaternion = body.getWorldQuaternion(this.scratchWeaponObjectQuaternion);
+    return out.set(0, 0, 1).applyQuaternion(quaternion).normalize();
   }
 
   private solveArmToTarget(
     instance: CloseModelInstance,
     side: 'Right' | 'Left',
     target: THREE.Vector3,
-    axes: { forward: THREE.Vector3; cleanUp: THREE.Vector3; actorRight: THREE.Vector3 },
+    axes: WeaponPoseAxes,
   ): void {
     const upper = instance.bones.get(`${side}Arm`);
     const fore = instance.bones.get(`${side}ForeArm`);
@@ -1531,52 +1768,58 @@ export class CombatantRenderer {
     if (!upper || !fore || !hand) return;
 
     instance.root.updateMatrixWorld(true);
-    const shoulder = upper.getWorldPosition(new THREE.Vector3());
-    const elbowNow = fore.getWorldPosition(new THREE.Vector3());
-    const handNow = hand.getWorldPosition(new THREE.Vector3());
+    const shoulder = upper.getWorldPosition(this.scratchArmShoulder);
+    const elbowNow = fore.getWorldPosition(this.scratchArmElbowNow);
+    const handNow = hand.getWorldPosition(this.scratchArmHandNow);
     const upperLength = Math.max(0.001, shoulder.distanceTo(elbowNow));
     const foreLength = Math.max(0.001, elbowNow.distanceTo(handNow));
     const reach = Math.max(0.08, upperLength + foreLength - 0.025);
-    const targetVector = target.clone().sub(shoulder);
+    const targetVector = this.scratchArmTargetVector.copy(target).sub(shoulder);
     const distance = targetVector.length();
     if (distance < 0.001) return;
 
-    const direction = targetVector.clone().normalize();
-    const clampedTarget = distance > reach
-      ? shoulder.clone().add(direction.clone().multiplyScalar(reach))
-      : target.clone();
+    const direction = this.scratchArmDirection.copy(targetVector).normalize();
+    const clampedTarget = this.scratchArmClampedTarget;
+    if (distance > reach) {
+      clampedTarget.copy(shoulder).add(this.scratchArmTemp.copy(direction).multiplyScalar(reach));
+    } else {
+      clampedTarget.copy(target);
+    }
     const clampedDistance = Math.min(distance, reach);
     const sideSign = side === 'Right' ? 1 : -1;
-    const pole = shoulder.clone()
-      .add(axes.cleanUp.clone().multiplyScalar(-0.24))
-      .add(axes.actorRight.clone().multiplyScalar(0.22 * sideSign))
-      .add(axes.forward.clone().multiplyScalar(0.04));
-    let planeNormal = direction.clone().cross(pole.clone().sub(shoulder)).normalize();
+    const pole = this.scratchArmPole.copy(shoulder)
+      .add(this.scratchArmTemp.copy(axes.cleanUp).multiplyScalar(-0.24))
+      .add(this.scratchArmTemp.copy(axes.actorRight).multiplyScalar(0.22 * sideSign))
+      .add(this.scratchArmTemp.copy(axes.forward).multiplyScalar(0.04));
+    const planeNormal = this.scratchArmPlaneNormal
+      .crossVectors(direction, this.scratchArmTemp.copy(pole).sub(shoulder))
+      .normalize();
     if (planeNormal.lengthSq() < 0.0001) {
-      planeNormal = axes.actorRight.clone().multiplyScalar(sideSign);
+      planeNormal.copy(axes.actorRight).multiplyScalar(sideSign);
     }
-    const bendDirection = planeNormal.clone().cross(direction).normalize();
+    const bendDirection = this.scratchArmBendDirection.crossVectors(planeNormal, direction).normalize();
     const along = (upperLength * upperLength - foreLength * foreLength + clampedDistance * clampedDistance)
       / (2 * clampedDistance);
     const height = Math.sqrt(Math.max(0, upperLength * upperLength - along * along));
-    const elbow = shoulder.clone()
-      .add(direction.clone().multiplyScalar(along))
+    const elbow = this.scratchArmElbow.copy(shoulder)
+      .add(this.scratchArmTemp.copy(direction).multiplyScalar(along))
       .add(bendDirection.multiplyScalar(height));
 
-    this.setBoneDirectionWorld(upper, elbow.clone().sub(shoulder));
+    this.setBoneDirectionWorld(upper, this.scratchArmUpperDirection.copy(elbow).sub(shoulder));
     instance.root.updateMatrixWorld(true);
-    const elbowWorld = fore.getWorldPosition(new THREE.Vector3());
-    this.setBoneDirectionWorld(fore, clampedTarget.clone().sub(elbowWorld));
+    const elbowWorld = fore.getWorldPosition(this.scratchArmElbowWorld);
+    this.setBoneDirectionWorld(fore, this.scratchArmForeDirection.copy(clampedTarget).sub(elbowWorld));
     instance.root.updateMatrixWorld(true);
   }
 
   private setBoneDirectionWorld(bone: THREE.Object3D, directionWorld: THREE.Vector3): void {
     if (!bone.parent) return;
-    const direction = directionWorld.clone().normalize();
+    const direction = this.scratchBoneDirection.copy(directionWorld);
     if (direction.lengthSq() < 0.0001) return;
-    const parentInv = bone.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-    const targetLocal = direction.applyQuaternion(parentInv).normalize();
-    bone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), targetLocal);
+    direction.normalize();
+    const parentInv = bone.parent.getWorldQuaternion(this.scratchBoneParentQuaternion).invert();
+    const targetLocal = this.scratchBoneTargetLocal.copy(direction).applyQuaternion(parentInv).normalize();
+    bone.quaternion.setFromUnitVectors(this.scratchBoneLocalForward, targetLocal);
     bone.updateMatrixWorld(true);
   }
 
@@ -1634,7 +1877,12 @@ export class CombatantRenderer {
   }
 
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
+    const profile = createEmptyBillboardUpdateProfile();
+    const closeModelStart = performance.now();
     const { closeModelIds, suppressedImpostorIds } = this.updateCloseModels(combatants, playerPosition);
+    profile.closeModelMs = performance.now() - closeModelStart;
+
+    const bucketResetStart = performance.now();
     this.factionMeshes.forEach(mesh => {
       mesh.count = 0;
       mesh.visible = false;
@@ -1650,10 +1898,12 @@ export class CombatantRenderer {
     const RENDER_DISTANCE_SQ = 400 * 400;
     this.renderWriteCounts.clear();
     this.renderCombatStates.clear();
+    this.dirtyImpostorAttributeBuckets.clear();
     this.factionMeshes.forEach((_mesh, key) => {
       this.renderWriteCounts.set(key, 0);
       this.renderCombatStates.set(key, 0);
     });
+    profile.bucketResetMs = performance.now() - bucketResetStart;
 
     // Pull the deltaTime accumulated since the last `updateBillboards` call.
     // `updateWalkFrame` accepts the authoritative game-loop dt and feeds the
@@ -1675,6 +1925,7 @@ export class CombatantRenderer {
     this.camera.getWorldDirection(this.scratchCameraDir);
     const cameraAngle = Math.atan2(this.scratchCameraDir.x, this.scratchCameraDir.z);
 
+    const impostorWriteStart = performance.now();
     combatants.forEach(combatant => {
       if (closeModelIds.has(combatant.id)) return;
       if (suppressedImpostorIds.has(combatant.id)) {
@@ -1927,7 +2178,9 @@ export class CombatantRenderer {
         viewTile.row,
         impostorAnimationProgress,
         deathOpacity,
+        false,
       );
+      this.dirtyImpostorAttributeBuckets.add(key);
       combatant.billboardIndex = index;
 
       const outlineMesh = this.factionAuraMeshes.get(key);
@@ -1960,14 +2213,19 @@ export class CombatantRenderer {
       }
       this.renderCombatStates.set(key, combatStateWeight);
     });
+    profile.impostorWriteMs = performance.now() - impostorWriteStart;
 
+    const finalizeStart = performance.now();
     this.factionMeshes.forEach((mesh, key) => {
       const written = this.renderWriteCounts.get(key) ?? 0;
       const previousCount = mesh.count;
       mesh.count = written;
       mesh.visible = written > 0;
       if (written > 0 || previousCount !== written) {
-        mesh.instanceMatrix.needsUpdate = true;
+        markInstancedMatrixDirty(mesh, written);
+      }
+      if (written > 0 && this.dirtyImpostorAttributeBuckets.has(key)) {
+        markPixelForgeNpcImpostorAttributesDirty(mesh, written);
       }
       const outlineMesh = this.factionAuraMeshes.get(key);
       if (outlineMesh) {
@@ -1975,7 +2233,7 @@ export class CombatantRenderer {
         outlineMesh.count = written;
         outlineMesh.visible = written > 0;
         if (written > 0 || previousOutlineCount !== written) {
-          outlineMesh.instanceMatrix.needsUpdate = true;
+          markInstancedMatrixDirty(outlineMesh, written);
         }
       }
       const markerMesh = this.factionGroundMarkers.get(key);
@@ -1984,7 +2242,7 @@ export class CombatantRenderer {
         markerMesh.count = written;
         markerMesh.visible = written > 0;
         if (written > 0 || previousMarkerCount !== written) {
-          markerMesh.instanceMatrix.needsUpdate = true;
+          markInstancedMatrixDirty(markerMesh, written);
         }
       }
       const outlineMaterial = this.factionMaterials.get(key);
@@ -1992,9 +2250,15 @@ export class CombatantRenderer {
         outlineMaterial.uniforms.combatState.value = this.renderCombatStates.get(key) ?? 0;
       }
     });
+    profile.finalizeMs = performance.now() - finalizeStart;
 
+    const hitboxDebugStart = performance.now();
     this.updateHitboxDebugOverlay(combatants, playerPosition);
+    profile.hitboxDebugMs = performance.now() - hitboxDebugStart;
+    const materializationEventsStart = performance.now();
     this.emitMaterializationTierTransitions(combatants, playerPosition);
+    profile.materializationEventsMs = performance.now() - materializationEventsStart;
+    this.lastBillboardUpdateProfile = profile;
   }
 
   /**
@@ -2012,7 +2276,8 @@ export class CombatantRenderer {
     combatants: Map<string, Combatant>,
     playerPosition: THREE.Vector3,
   ): void {
-    const seen = new Set<string>();
+    const seen = this.materializationSeenIds;
+    seen.clear();
     combatants.forEach((combatant) => {
       const id = combatant.id;
       seen.add(id);
@@ -2056,7 +2321,10 @@ export class CombatantRenderer {
     // Prune entries for combatants no longer present this frame.
     if (this.previousRenderModes.size > seen.size) {
       this.previousRenderModes.forEach((_value, id) => {
-        if (!seen.has(id)) this.previousRenderModes.delete(id);
+        if (!seen.has(id)) {
+          this.previousRenderModes.delete(id);
+          this.stableHashByCombatantId.delete(id);
+        }
       });
     }
   }

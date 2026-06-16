@@ -26,8 +26,11 @@ type WeatherSystemAny = WeatherSystem & {
   transitionTimer: number;
   cycleTimer: number;
   rainCount: number;
+  activeRainCount: number;
   rainVelocities: Float32Array;
   rainPositions: Float32Array;
+  lastSurfaceWetness: number;
+  rainInactive: boolean;
   rainMesh?: THREE.InstancedMesh;
   baseFogDensity: number;
   baseAmbientIntensity: number;
@@ -137,6 +140,14 @@ describe('WeatherSystem', () => {
       const systemAny = system as WeatherSystemAny;
       expect(systemAny.rainVelocities.length).toBe(8000);
       expect(systemAny.rainPositions.length).toBe(24000);
+    });
+
+    it('tags the rain mesh for render attribution', async () => {
+      const { system } = createSystemWithRainCount(3);
+      await system.init();
+      const systemAny = system as WeatherSystemAny;
+      expect(systemAny.rainMesh?.name).toBe('WeatherRain');
+      expect(systemAny.rainMesh?.userData.perfCategory).toBe('weather_rain');
     });
   });
 
@@ -421,20 +432,40 @@ describe('WeatherSystem', () => {
       await system.init();
       vi.mocked(getBlendedRainIntensity).mockReturnValue(0);
       const systemAny = system as WeatherSystemAny;
+      systemAny.rainInactive = false;
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.visible).toBe(false);
       expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
     });
 
-    it('shows rain and sets opacity based on intensity', async () => {
+    it('skips redundant dry rain mesh and wetness writes while already inactive', async () => {
       const { system, terrainRuntime } = createSystemWithRainCount(3);
       await system.init();
-      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.5);
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0);
+      const systemAny = system as WeatherSystemAny;
+
+      systemAny.updateRain(1);
+      vi.clearAllMocks();
+      systemAny.updateRain(1);
+
+      expect(terrainRuntime.setSurfaceWetness).not.toHaveBeenCalled();
+      expect(systemAny.rainMesh?.visible).toBe(false);
+      expect(systemAny.rainMesh?.count).toBe(0);
+      expect(systemAny.activeRainCount).toBe(0);
+    });
+
+    it('scales active rain count while preserving aggregate intensity', async () => {
+      const { system, terrainRuntime } = createSystemWithRainCount(10);
+      await system.init();
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.3);
       const systemAny = system as WeatherSystemAny;
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.visible).toBe(true);
-      expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.3, 5);
-      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0.5);
+      expect(systemAny.rainMesh?.count).toBe(5);
+      expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.36, 5);
+      expect(systemAny.rainMesh!.count * (systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity)
+        .toBeCloseTo(10 * 0.6 * 0.3, 5);
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0.3);
     });
 
     it('applies storm wind strength', async () => {
@@ -447,8 +478,28 @@ describe('WeatherSystem', () => {
       systemAny.rainPositions[1] = 10;
       systemAny.rainPositions[2] = 0;
       systemAny.rainVelocities[0] = 0;
+      systemAny.activeRainCount = 1;
       systemAny.updateRain(1);
       expect(systemAny.rainPositions[0]).toBeCloseTo(5, 5);
+    });
+
+    it('writes updated rain translations into the instance matrix buffer', async () => {
+      const { system } = createSystemWithRainCount(1);
+      await system.init();
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(1);
+      const systemAny = system as WeatherSystemAny;
+      systemAny.currentState = WeatherState.STORM;
+      systemAny.rainPositions[0] = 0;
+      systemAny.rainPositions[1] = 10;
+      systemAny.rainPositions[2] = 0;
+      systemAny.rainVelocities[0] = 0;
+
+      systemAny.updateRain(1);
+
+      const matrixArray = systemAny.rainMesh!.instanceMatrix.array;
+      expect(matrixArray[12]).toBeCloseTo(systemAny.rainPositions[0], 5);
+      expect(matrixArray[13]).toBeCloseTo(systemAny.rainPositions[1], 5);
+      expect(matrixArray[14]).toBeCloseTo(systemAny.rainPositions[2], 5);
     });
 
     it('wraps raindrops below the camera', async () => {
@@ -461,6 +512,7 @@ describe('WeatherSystem', () => {
       systemAny.rainPositions[1] = -20;
       systemAny.rainPositions[2] = 0;
       systemAny.rainVelocities[0] = 0;
+      systemAny.activeRainCount = 1;
       vi.spyOn(Math, 'random').mockReturnValue(0.5);
       systemAny.updateRain(1);
       expect(systemAny.rainPositions[1]).toBe(20);
@@ -478,6 +530,7 @@ describe('WeatherSystem', () => {
       systemAny.rainPositions[1] = 10;
       systemAny.rainPositions[2] = -30;
       systemAny.rainVelocities[0] = 0;
+      systemAny.activeRainCount = 1;
       systemAny.updateRain(1);
       expect(systemAny.rainPositions[0]).toBeCloseTo(-19.9, 4);
       expect(systemAny.rainPositions[2]).toBeCloseTo(19.9, 4);
@@ -492,6 +545,21 @@ describe('WeatherSystem', () => {
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.instanceMatrix.version).toBeGreaterThan(initialVersion);
     });
+
+    it('limits instance matrix update ranges to the active rain prefix', async () => {
+      const { system } = createSystemWithRainCount(10);
+      await system.init();
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.3);
+      const systemAny = system as WeatherSystemAny;
+
+      systemAny.updateRain(1);
+
+      expect(systemAny.rainMesh?.count).toBe(5);
+      expect(systemAny.rainMesh?.instanceMatrix.updateRanges.at(-1)).toEqual({
+        start: 0,
+        count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
+      });
+    });
   });
 
   describe('update', () => {
@@ -502,6 +570,14 @@ describe('WeatherSystem', () => {
       system.update(1);
       expect(updateLightning).not.toHaveBeenCalled();
       expect(updateAtmosphere).not.toHaveBeenCalled();
+      expect(terrainRuntime.setSurfaceWetness).not.toHaveBeenCalled();
+    });
+
+    it('writes dry terrain wetness once when disabled before config initializes it', () => {
+      const { system, terrainRuntime } = createSystem();
+      system.update(1);
+      system.update(1);
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledTimes(1);
       expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
     });
 

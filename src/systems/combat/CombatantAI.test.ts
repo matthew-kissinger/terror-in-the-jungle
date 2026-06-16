@@ -933,16 +933,16 @@ describe('CombatantAI', () => {
     })
   })
 
-  describe('perf-diagnostics gating', () => {
+  describe('perf-attribution gating', () => {
     // ai-timing-gate: withAiMethodTiming + the per-update breakdown spread are
     // diagnostic-only. Default OFF in prod: no timing wrapper bookkeeping runs
-    // and AI decisions are unchanged. Flipping the perf-diagnostics global ON
-    // (what the perf-capture harness does) must restore the full methodMs feed
-    // that scripts/perf-tail-attribution.ts consumes.
-    const flag = globalThis as { __ENABLE_PERF_DIAGNOSTICS__?: boolean }
+    // and AI decisions are unchanged. Flipping the heavy-attribution global ON
+    // must restore the full methodMs feed that scripts/perf-tail-attribution.ts
+    // consumes in deep diagnostic captures.
+    const flag = globalThis as { __ENABLE_PERF_ATTRIBUTION__?: boolean }
 
     afterEach(() => {
-      delete flag.__ENABLE_PERF_DIAGNOSTICS__
+      delete flag.__ENABLE_PERF_ATTRIBUTION__
     })
 
     function makeAi(): CombatantAI {
@@ -952,7 +952,7 @@ describe('CombatantAI', () => {
     }
 
     it('does not populate method timing when diagnostics are OFF (default)', () => {
-      flag.__ENABLE_PERF_DIAGNOSTICS__ = false
+      flag.__ENABLE_PERF_ATTRIBUTION__ = false
       const offAi = makeAi()
       const c = createMockCombatant({ state: CombatantState.PATROLLING })
 
@@ -968,7 +968,7 @@ describe('CombatantAI', () => {
     })
 
     it('populates method timing + breakdown when diagnostics are ON', () => {
-      flag.__ENABLE_PERF_DIAGNOSTICS__ = true
+      flag.__ENABLE_PERF_ATTRIBUTION__ = true
       const onAi = makeAi()
       const c = createMockCombatant({ state: CombatantState.PATROLLING })
 
@@ -998,7 +998,7 @@ describe('CombatantAI', () => {
       } as Squad]])
 
       const runOnce = (enabled: boolean): { state: CombatantState; target: unknown } => {
-        flag.__ENABLE_PERF_DIAGNOSTICS__ = enabled
+        flag.__ENABLE_PERF_ATTRIBUTION__ = enabled
         const runAi = makeAi()
         runAi.setSquads(buildSquad())
         const c = createMockCombatant({

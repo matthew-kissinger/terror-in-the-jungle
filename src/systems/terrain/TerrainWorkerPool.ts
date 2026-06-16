@@ -86,6 +86,7 @@ export class TerrainWorkerPool {
   // Tasks waiting for a free worker. A busy pool queues here instead of
   // mis-dispatching onto an already-busy worker slot.
   private taskQueue: QueuedTask[] = [];
+  private taskQueueHead = 0;
   private nextRequestId = 1;
   private workerCount: number;
   private disposed = false;
@@ -309,16 +310,43 @@ export class TerrainWorkerPool {
    * Dispatch queued tasks onto any free workers.
    */
   private pumpQueue(): void {
-    while (this.taskQueue.length > 0) {
+    while (this.getQueuedTaskCount() > 0) {
       const workerIdx = this.findFreeWorker();
       if (workerIdx < 0) {
         // No free worker — leave the rest queued until one frees.
+        this.compactTaskQueueIfNeeded();
         return;
       }
 
-      const task = this.taskQueue.shift()!;
+      const task = this.taskQueue[this.taskQueueHead++];
       this.dispatchTask(workerIdx, task);
     }
+    this.compactTaskQueueIfNeeded();
+  }
+
+  private getQueuedTaskCount(): number {
+    return this.taskQueue.length - this.taskQueueHead;
+  }
+
+  private compactTaskQueueIfNeeded(): void {
+    if (this.taskQueueHead === 0) {
+      return;
+    }
+    if (this.taskQueueHead >= this.taskQueue.length) {
+      this.taskQueue.length = 0;
+      this.taskQueueHead = 0;
+      return;
+    }
+    if (this.taskQueueHead < 32 || this.taskQueueHead * 2 < this.taskQueue.length) {
+      return;
+    }
+
+    let writeIndex = 0;
+    for (let readIndex = this.taskQueueHead; readIndex < this.taskQueue.length; readIndex++) {
+      this.taskQueue[writeIndex++] = this.taskQueue[readIndex];
+    }
+    this.taskQueue.length = writeIndex;
+    this.taskQueueHead = 0;
   }
 
   private dispatchTask(workerIdx: number, task: QueuedTask): void {
@@ -368,7 +396,7 @@ export class TerrainWorkerPool {
   } {
     return {
       enabled: true,
-      queueLength: this.pendingTasks.size + this.taskQueue.length,
+      queueLength: this.pendingTasks.size + this.getQueuedTaskCount(),
       busyWorkers: this.busyWorkers.size,
       totalWorkers: this.workerCount,
     };
@@ -390,7 +418,7 @@ export class TerrainWorkerPool {
       avgGenerationTimeMs: this.totalTasksCompleted > 0 ? this.totalTaskTimeMs / this.totalTasksCompleted : 0,
       workersReady: this.readyWorkers.size,
       duplicatesAvoided: 0,
-      queueLength: this.pendingTasks.size + this.taskQueue.length,
+      queueLength: this.pendingTasks.size + this.getQueuedTaskCount(),
       busyWorkers: this.busyWorkers.size,
       inFlightChunks: this.busyWorkers.size,
     };
@@ -408,10 +436,11 @@ export class TerrainWorkerPool {
     }
 
     // Reject anything still waiting for a worker slot.
-    const queued = this.taskQueue.splice(0, this.taskQueue.length);
-    for (const task of queued) {
-      task.reject(disposeError);
+    for (let i = this.taskQueueHead; i < this.taskQueue.length; i++) {
+      this.taskQueue[i].reject(disposeError);
     }
+    this.taskQueue.length = 0;
+    this.taskQueueHead = 0;
 
     for (const worker of this.workers) {
       worker.terminate();

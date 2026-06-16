@@ -4,6 +4,15 @@
 Status: R1 engineering complete; owner vegetation visual walk deferred to
 `docs/PLAYTEST_PENDING.md`. Perf risk is accepted for this vegetation cycle as
 an existing non-vegetation frame-tail residual, not as a clean p99 pass.
+Owner feedback on 2026-06-14: "what new vegetation ring?" The owner does not
+see a visible material difference. Treat `JungleGroundRing` as an internal
+near-field ground-cover ownership/LOD split for existing fern / elephant-ear
+billboard coverage, not a player-facing vegetation feature, unless a fresh
+before/after visual review proves otherwise.
+Owner feedback on 2026-06-15 rejected the dense vegetation circle as
+unnecessary and asked for the plants to feel like they did before. Normal
+runtime now keeps `JungleGroundRing` dormant and routes accepted ground-cover
+plants back through `VegetationScatterer`.
 This is a full vegetation pass: add/remove/change vegetation assets and runtime
 tiers until TIJ reads as dense jungle at infantry, vehicle, and flight
 distances. Use Fable5 as strategy, not assets; target aggregate LOD while
@@ -76,12 +85,12 @@ preserving TIJ terrain, placement, lighting, and startup authority.
 
 ## R1 Implementation Status
 - Done: R0 baseline evidence and inventory burn list.
-- Done: `JungleGroundRing` runtime slice. Near ground-cover density now uses a
-  camera-following ring through `GlobalBillboardSystem`, while
-  `VegetationScatterer` keeps non-ground-cover mid/canopy vegetation ownership.
-  The ring adapts the Fable5 `GroundRing` strategy with TIJ-authored
-  deterministic cells, biome sampling, slope checks, exclusions, distance
-  thinning, and existing billboard rendering.
+- Superseded: `JungleGroundRing` runtime slice. The ring adapted the Fable5
+  `GroundRing` strategy with TIJ-authored deterministic cells, biome sampling,
+  slope checks, exclusions, distance thinning, and existing billboard
+  rendering. Owner follow-up rejected the dense camera-following vegetation
+  circle, so normal runtime now keeps `JungleGroundRing` dormant and routes
+  accepted ground-cover plants back through `VegetationScatterer`.
 - Done: focused behavior coverage for ring chunk prefixing, budget-throttled
   critical cells, route/base exclusions, removals, and TerrainSystem ownership
   split.

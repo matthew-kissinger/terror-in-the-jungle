@@ -27,6 +27,13 @@ export const PROMPT_RADIUS_M = 6;
 export const CHECK_INTERVAL_S = 0.1;
 
 type DrivableCategory = Extract<VehicleCategory, 'ground' | 'watercraft' | 'emplacement'>;
+type GroundVehicleProximitySource = Pick<VehicleManager, 'getVehiclesInRadius'> & {
+  forEachVehicleInRadius?: (
+    center: THREE.Vector3,
+    radius: number,
+    visitor: (vehicle: IVehicle) => void,
+  ) => void;
+};
 
 const DRIVABLE_CATEGORIES: ReadonlySet<DrivableCategory> = new Set([
   'ground',
@@ -86,7 +93,7 @@ interface ProximityCheckerOptions {
 }
 
 export class GroundVehicleProximityChecker {
-  private readonly vehicleManager: VehicleManager;
+  private readonly vehicleManager: GroundVehicleProximitySource;
   private readonly getPlayerPosition: () => THREE.Vector3 | null;
   private readonly isPlayerInVehicle: () => boolean;
   private hudSystem: IHUDSystem | null = null;
@@ -96,7 +103,7 @@ export class GroundVehicleProximityChecker {
   private lastShownVehicleId: string | null = null;
 
   constructor(
-    vehicleManager: VehicleManager,
+    vehicleManager: GroundVehicleProximitySource,
     getPlayerPosition: () => THREE.Vector3 | null,
     isPlayerInVehicle: () => boolean,
     options: ProximityCheckerOptions = {},
@@ -170,15 +177,11 @@ export class GroundVehicleProximityChecker {
   }
 
   private findNearestDrivable(playerPos: THREE.Vector3): IVehicle | null {
-    const candidates = this.vehicleManager.getVehiclesInRadius(
-      playerPos,
-      this.promptRadiusMeters,
-    );
     let best: IVehicle | null = null;
     let bestDistanceSq = Infinity;
-    for (const vehicle of candidates) {
-      if (!DRIVABLE_CATEGORIES.has(vehicle.category as DrivableCategory)) continue;
-      if (vehicle.isDestroyed()) continue;
+    const considerVehicle = (vehicle: IVehicle): void => {
+      if (!DRIVABLE_CATEGORIES.has(vehicle.category as DrivableCategory)) return;
+      if (vehicle.isDestroyed()) return;
       // getPosition() allocates a Vector3 in current IVehicle impls; we
       // accept the small per-tick cost (≤ N candidates at 10 Hz).
       const vehiclePos = vehicle.getPosition();
@@ -188,6 +191,22 @@ export class GroundVehicleProximityChecker {
       if (distanceSq < bestDistanceSq) {
         bestDistanceSq = distanceSq;
         best = vehicle;
+      }
+    };
+
+    if (this.vehicleManager.forEachVehicleInRadius) {
+      this.vehicleManager.forEachVehicleInRadius(
+        playerPos,
+        this.promptRadiusMeters,
+        considerVehicle,
+      );
+    } else {
+      const candidates = this.vehicleManager.getVehiclesInRadius(
+        playerPos,
+        this.promptRadiusMeters,
+      );
+      for (const vehicle of candidates) {
+        considerVehicle(vehicle);
       }
     }
     return best;

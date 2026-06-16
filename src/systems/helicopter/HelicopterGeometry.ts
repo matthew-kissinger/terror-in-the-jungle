@@ -20,6 +20,8 @@ interface AircraftInfo {
 type RotorAnimationType = 'mainBlades' | 'tailBlades';
 type RotorSpinAxis = 'x' | 'y' | 'z';
 
+const HELICOPTER_PERF_CATEGORY = 'helicopters';
+
 const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
   UH1_HUEY:      { modelPath: AircraftModels.UH1_HUEY,      displayName: 'UH-1 Huey',      faction: 'US' },
   UH1C_GUNSHIP:  { modelPath: AircraftModels.UH1C_GUNSHIP,  displayName: 'UH-1C Gunship',  faction: 'US' },
@@ -74,6 +76,7 @@ export async function createHelicopterGeometry(
   helicopterGroup.add(scene);
 
   wireRotorJoints(scene, helicopterGroup, modelPath);
+  optimizeRotorJointDrawCalls(scene, aircraftKey);
   optimizeAircraftScene(scene, aircraftKey);
 
   helicopterGroup.userData = {
@@ -81,7 +84,9 @@ export async function createHelicopterGeometry(
     model: displayName,
     faction,
     id: helicopterId,
+    perfCategory: HELICOPTER_PERF_CATEGORY,
   };
+  markAircraftPerfCategory(helicopterGroup);
 
   return helicopterGroup;
 }
@@ -189,6 +194,34 @@ function optimizeAircraftScene(scene: THREE.Group, aircraftKey: string): void {
       `Optimized ${aircraftKey} draw calls: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} batches`,
     );
   }
+}
+
+export function optimizeRotorJointDrawCalls(root: THREE.Object3D, aircraftKey: string): void {
+  const rotorRoots: THREE.Object3D[] = [];
+  root.traverse((child) => {
+    if (child.userData.type === 'mainBlades' || child.userData.type === 'tailBlades') {
+      rotorRoots.push(child);
+    }
+  });
+
+  for (const rotorRoot of rotorRoots) {
+    const result = optimizeStaticModelDrawCalls(rotorRoot, {
+      batchNamePrefix: `${aircraftKey.toLowerCase()}_${String(rotorRoot.userData.type).toLowerCase()}`,
+      minBucketSize: 2,
+    });
+    if (result.mergedMeshCount > 0) {
+      Logger.debug(
+        'helicopter',
+        `Optimized ${aircraftKey} ${String(rotorRoot.userData.type)} rotor: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} batch(es)`,
+      );
+    }
+  }
+}
+
+function markAircraftPerfCategory(root: THREE.Object3D): void {
+  root.traverse((child) => {
+    child.userData.perfCategory ??= HELICOPTER_PERF_CATEGORY;
+  });
 }
 
 /**

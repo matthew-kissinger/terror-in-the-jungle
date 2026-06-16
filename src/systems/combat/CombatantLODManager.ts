@@ -22,6 +22,7 @@ import { resetCoverSearchBudget } from './ai/CoverSearchBudget';
 import { Logger } from '../../utils/Logger';
 import { NpcLodConfig } from '../../config/CombatantConfig';
 import { DESTINATION_ARRIVAL_RADIUS } from './CombatantMovementStates';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 const DESTINATION_ARRIVAL_RADIUS_SQ = DESTINATION_ARRIVAL_RADIUS * DESTINATION_ARRIVAL_RADIUS;
 
@@ -122,6 +123,10 @@ export class CombatantLODManager {
   private readonly AI_FRAME_BUDGET_MS = 6.0;
   private readonly AI_SEVERE_OVER_BUDGET_MULTIPLIER = 2.5;
   private readonly AI_SOFT_BUDGET_RATIO = 0.65;
+  private readonly AI_PROJECTED_BUDGET_RATIO = 0.85;
+  private readonly HIGH_FULL_UPDATE_COST_EMA_ALPHA = 0.15;
+  private readonly HIGH_FULL_UPDATE_COST_PEAK_DECAY = 0.995;
+  private readonly HIGH_FULL_UPDATE_COST_BY_ID_LIMIT = 512;
   private readonly CULLED_LOOP_BUDGET_MS = 1.5;
   /** Live-tunable distant-sim cadence (ms). See NpcLodConfig.culledDistantSimIntervalMs. */
   private get CULLED_DISTANT_SIM_INTERVAL_MS(): number {
@@ -131,9 +136,13 @@ export class CombatantLODManager {
   private maxMediumFullUpdatesPerFrame = 24;
   private highFullUpdatesThisFrame = 0;
   private mediumFullUpdatesThisFrame = 0;
+  private projectedHighFullUpdateDeferralsThisFrame = 0;
   private aiBudgetExceededEventsThisFrame = 0;
   private aiSevereOverBudgetEventsThisFrame = 0;
   private aiBudgetMs = this.AI_FRAME_BUDGET_MS;
+  private highFullUpdateCostEmaMs = 0.5;
+  private highFullUpdateCostPeakMs = 0.5;
+  private readonly highFullUpdateCostById = new Map<string, number>();
 
   // Module dependencies
   private combatantAI: CombatantAI;
@@ -319,276 +328,307 @@ export class CombatantLODManager {
     let culledLoopMs = 0;
     const aiFrameStart = performance.now();
     const deathStart = performance.now();
-    this.updateDeathAnimations(deltaTime);
+    this.trackCombatAiPhase('Combat.AI.Death', () => {
+      this.updateDeathAnimations(deltaTime);
+    });
     deathMs = performance.now() - deathStart;
 
-    if (enableAI) {
-      // Reset per-frame budgets
-      resetRaycastBudget();
-      this.combatantMovement.resetPathQueryBudget();
-      // Adaptive cap: reduce expensive NPC fire terrain checks when interval scale rises.
-      const fireRaycastCap = Math.max(4, Math.min(24, Math.round(16 / Math.max(1, this.intervalScale))));
-      setMaxCombatFireRaycastsPerFrame(fireRaycastCap);
-      resetCombatFireRaycastBudget();
-      resetCoverSearchBudget();
+    let now = 0;
+    let worldSize = 4000;
+    let isLargeWorldMode = true;
+    let highLODRangeSq = 0;
+    let mediumLODRangeSq = 0;
+    let lowLODRangeSq = 0;
 
-      // Clear stale LOS cache entries
-      this.combatantAI.clearLOSCache();
-      this.combatantAI.beginFrame?.(deltaTime);
-    }
+    this.trackCombatAiPhase('Combat.AI.FrameSetup', () => {
+      if (enableAI) {
+        // Reset per-frame budgets
+        resetRaycastBudget();
+        this.combatantMovement.resetPathQueryBudget();
+        // Adaptive cap: reduce expensive NPC fire terrain checks when interval scale rises.
+        const fireRaycastCap = Math.max(4, Math.min(24, Math.round(16 / Math.max(1, this.intervalScale))));
+        setMaxCombatFireRaycastsPerFrame(fireRaycastCap);
+        resetCombatFireRaycastBudget();
+        resetCoverSearchBudget();
 
-    // Increment frame counter for AI staggering
-    this.frameCounter++;
-    this.staggeredSkipCount = 0;
-    this.spatiallyUpdatedIds.clear();
-    this.highFullUpdatesThisFrame = 0;
-    this.mediumFullUpdatesThisFrame = 0;
-    this.aiBudgetExceededEventsThisFrame = 0;
-    this.aiSevereOverBudgetEventsThisFrame = 0;
-    this.aiBudgetMs = Math.max(CombatantLODManager.MIN_AI_BUDGET_MS, this.AI_FRAME_BUDGET_MS * this.intervalScale);
+        // Clear stale LOS cache entries
+        this.combatantAI.clearLOSCache();
+        this.combatantAI.beginFrame?.(deltaTime);
+      }
 
-    const now = Date.now();
-    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
-    const isLargeWorldMode = worldSize >= 1000;
-    // Refresh cached interval params once per frame so the per-combatant
-    // computeDynamicIntervalMs* calls below read scalars (worldSize only
-    // actually changes on a mode switch, but this stays correct if it drifts).
-    this.refreshDynamicIntervalParams();
+      // Increment frame counter for AI staggering
+      this.frameCounter++;
+      this.staggeredSkipCount = 0;
+      this.spatiallyUpdatedIds.clear();
+      this.highFullUpdatesThisFrame = 0;
+      this.mediumFullUpdatesThisFrame = 0;
+      this.projectedHighFullUpdateDeferralsThisFrame = 0;
+      this.aiBudgetExceededEventsThisFrame = 0;
+      this.aiSevereOverBudgetEventsThisFrame = 0;
+      this.aiBudgetMs = Math.max(CombatantLODManager.MIN_AI_BUDGET_MS, this.AI_FRAME_BUDGET_MS * this.intervalScale);
 
-    this.lodHighCount = 0;
-    this.lodMediumCount = 0;
-    this.lodLowCount = 0;
-    this.lodCulledCount = 0;
+      now = Date.now();
+      worldSize = this.gameModeManager?.getWorldSize() || 4000;
+      isLargeWorldMode = worldSize >= 1000;
+      // Refresh cached interval params once per frame so the per-combatant
+      // computeDynamicIntervalMs* calls below read scalars (worldSize only
+      // actually changes on a mode switch, but this stays correct if it drifts).
+      this.refreshDynamicIntervalParams();
 
-    const highLODRangeSq = this.highLODRange * this.highLODRange;
-    const mediumLODRangeSq = this.mediumLODRange * this.mediumLODRange;
-    const lowLODRangeSq = this.lowLODRange * this.lowLODRange;
+      this.lodHighCount = 0;
+      this.lodMediumCount = 0;
+      this.lodLowCount = 0;
+      this.lodCulledCount = 0;
 
-    this.highBucket.length = 0;
-    this.mediumBucket.length = 0;
-    this.lowBucket.length = 0;
-    this.culledBucket.length = 0;
+      highLODRangeSq = this.highLODRange * this.highLODRange;
+      mediumLODRangeSq = this.mediumLODRange * this.mediumLODRange;
+      lowLODRangeSq = this.lowLODRange * this.lowLODRange;
+
+      this.highBucket.length = 0;
+      this.mediumBucket.length = 0;
+      this.lowBucket.length = 0;
+      this.culledBucket.length = 0;
+    });
 
     const classifyStart = performance.now();
-    this.combatants.forEach(combatant => {
-      if (combatant.state === CombatantState.DEAD) {
-        // Death animation/rendering is handled separately; dead actors should not
-        // consume AI/movement/spatial update budget or stay queryable in octree.
-        this.spatialGridManager.removeEntity(combatant.id);
-        return;
-      }
+    this.trackCombatAiPhase('Combat.AI.Classify', () => {
+      this.combatants.forEach(combatant => {
+        if (combatant.state === CombatantState.DEAD) {
+          // Death animation/rendering is handled separately; dead actors should not
+          // consume AI/movement/spatial update budget or stay queryable in octree.
+          this.spatialGridManager.removeEntity(combatant.id);
+          return;
+        }
 
-      if (Math.abs(combatant.position.x) > worldSize ||
-          Math.abs(combatant.position.z) > worldSize) {
-        this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
-        combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
-        combatant.simLane = 'culled';
-        this.lodCulledCount++;
-        return;
-      }
+        if (Math.abs(combatant.position.x) > worldSize ||
+            Math.abs(combatant.position.z) > worldSize) {
+          this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
+          combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
+          combatant.simLane = 'culled';
+          this.lodCulledCount++;
+          return;
+        }
 
-      const distSq = combatant.position.distanceToSquared(this.playerPosition);
-      combatant.distanceSq = distSq;
+        const distSq = combatant.position.distanceToSquared(this.playerPosition);
+        combatant.distanceSq = distSq;
 
-      if (distSq < highLODRangeSq) {
-        this.highBucket.push(combatant);
-      } else if (distSq < mediumLODRangeSq) {
-        this.mediumBucket.push(combatant);
-      } else if (distSq < lowLODRangeSq) {
-        this.lowBucket.push(combatant);
-      } else {
-        this.culledBucket.push(combatant);
-      }
+        if (distSq < highLODRangeSq) {
+          this.highBucket.push(combatant);
+        } else if (distSq < mediumLODRangeSq) {
+          this.mediumBucket.push(combatant);
+        } else if (distSq < lowLODRangeSq) {
+          this.lowBucket.push(combatant);
+        } else {
+          this.culledBucket.push(combatant);
+        }
+      });
     });
     classifyMs = performance.now() - classifyStart;
 
     const highStart = performance.now();
-    this.highBucket.forEach((combatant, index) => {
-      combatant.simLane = 'high';
-      this.lodHighCount++;
+    this.trackCombatAiPhase('Combat.AI.High', () => {
+      this.highBucket.forEach((combatant, index) => {
+        combatant.simLane = 'high';
+        this.lodHighCount++;
 
-      // Stagger AI decisions before consulting the budget guard. Off-frame
-      // combatants were already due for visual continuity only; counting them
-      // as budget-starved would overstate actual AI denial under stress.
-      if (this.frameCounter % STAGGER_HIGH !== index % STAGGER_HIGH) {
-        this.updateCombatantVisualOnly(combatant, deltaTime);
+        // Stagger AI decisions before consulting the budget guard. Off-frame
+        // combatants were already due for visual continuity only; counting them
+        // as budget-starved would overstate actual AI denial under stress.
+        if (this.frameCounter % STAGGER_HIGH !== index % STAGGER_HIGH) {
+          this.updateCombatantVisualOnly(combatant, deltaTime);
+          combatant.lastUpdateTime = now;
+          this.staggeredSkipCount++;
+          return;
+        }
+
+        if (this.highFullUpdatesThisFrame >= this.maxHighFullUpdatesPerFrame) {
+          this.updateCombatantVisualOnly(combatant, deltaTime);
+          this.staggeredSkipCount++;
+          return;
+        }
+
+        // Flat cascade for scheduled full-AI candidates:
+        // severe -> hard exceeded -> soft defer -> full update.
+        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+          this.updateCombatantUltraLight(combatant, deltaTime);
+          combatant.lastUpdateTime = now;
+          this.staggeredSkipCount++;
+          return;
+        }
+        if (!enableAI || this.isAIBudgetExceeded(aiFrameStart) || this.isAISoftBudgetExceeded(aiFrameStart)) {
+          this.updateCombatantVisualOnly(combatant, deltaTime);
+          combatant.lastUpdateTime = now;
+          this.staggeredSkipCount++;
+          return;
+        }
+
+        if (this.shouldDeferProjectedHighFullUpdate(aiFrameStart, combatant)) {
+          this.updateCombatantVisualOnly(combatant, deltaTime);
+          combatant.lastUpdateTime = now;
+          this.projectedHighFullUpdateDeferralsThisFrame++;
+          this.staggeredSkipCount++;
+          return;
+        }
+
+        const fullUpdateMs = this.updateCombatantFull(combatant, deltaTime);
+        this.recordHighFullUpdateCost(combatant, fullUpdateMs);
         combatant.lastUpdateTime = now;
-        this.staggeredSkipCount++;
-        return;
-      }
-
-      if (this.highFullUpdatesThisFrame >= this.maxHighFullUpdatesPerFrame) {
-        this.updateCombatantVisualOnly(combatant, deltaTime);
-        this.staggeredSkipCount++;
-        return;
-      }
-
-      // Flat cascade for scheduled full-AI candidates:
-      // severe -> hard exceeded -> soft defer -> full update.
-      if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-        this.updateCombatantUltraLight(combatant, deltaTime);
-        combatant.lastUpdateTime = now;
-        this.staggeredSkipCount++;
-        return;
-      }
-      if (!enableAI || this.isAIBudgetExceeded(aiFrameStart) || this.isAISoftBudgetExceeded(aiFrameStart)) {
-        this.updateCombatantVisualOnly(combatant, deltaTime);
-        combatant.lastUpdateTime = now;
-        this.staggeredSkipCount++;
-        return;
-      }
-
-      this.updateCombatantFull(combatant, deltaTime);
-      combatant.lastUpdateTime = now;
-      this.highFullUpdatesThisFrame++;
+        this.highFullUpdatesThisFrame++;
+      });
     });
     highLoopMs = performance.now() - highStart;
 
     const mediumStart = performance.now();
-    this.mediumBucket.forEach((combatant, index) => {
-      combatant.simLane = 'medium';
-      this.lodMediumCount++;
-      const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
-      const elapsedMs = now - (combatant.lastUpdateTime || 0);
+    this.trackCombatAiPhase('Combat.AI.Medium', () => {
+      this.mediumBucket.forEach((combatant, index) => {
+        combatant.simLane = 'medium';
+        this.lodMediumCount++;
+        const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
+        const elapsedMs = now - (combatant.lastUpdateTime || 0);
 
-      if (elapsedMs > dynamicIntervalMs) {
-        if (this.frameCounter % STAGGER_MEDIUM !== index % STAGGER_MEDIUM) {
-          this.staggeredSkipCount++;
-          return;
-        }
+        if (elapsedMs > dynamicIntervalMs) {
+          if (this.frameCounter % STAGGER_MEDIUM !== index % STAGGER_MEDIUM) {
+            this.staggeredSkipCount++;
+            return;
+          }
 
-        if (this.mediumFullUpdatesThisFrame >= this.maxMediumFullUpdatesPerFrame) {
-          this.staggeredSkipCount++;
-          return;
-        }
+          if (this.mediumFullUpdatesThisFrame >= this.maxMediumFullUpdatesPerFrame) {
+            this.staggeredSkipCount++;
+            return;
+          }
 
-        // Flat cascade for scheduled medium LOD candidates
-        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-          this.updateCombatantUltraLight(combatant, deltaTime);
+          // Flat cascade for scheduled medium LOD candidates
+          if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+            this.updateCombatantUltraLight(combatant, deltaTime);
+            combatant.lastUpdateTime = now;
+            this.staggeredSkipCount++;
+            return;
+          }
+          if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
+            this.updateCombatantBasic(combatant, deltaTime);
+            combatant.lastUpdateTime = now;
+            this.staggeredSkipCount++;
+            return;
+          }
+          if (this.isAISoftBudgetExceeded(aiFrameStart)) {
+            this.updateCombatantBasic(combatant, deltaTime);
+            combatant.lastUpdateTime = now;
+            this.staggeredSkipCount++;
+            return;
+          }
+
+          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
+          this.updateCombatantMedium(combatant, effectiveDelta);
+          this.mediumFullUpdatesThisFrame++;
           combatant.lastUpdateTime = now;
-          this.staggeredSkipCount++;
-          return;
         }
-        if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
-          this.updateCombatantBasic(combatant, deltaTime);
-          combatant.lastUpdateTime = now;
-          this.staggeredSkipCount++;
-          return;
-        }
-        if (this.isAISoftBudgetExceeded(aiFrameStart)) {
-          this.updateCombatantBasic(combatant, deltaTime);
-          combatant.lastUpdateTime = now;
-          this.staggeredSkipCount++;
-          return;
-        }
-
-        const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
-        this.updateCombatantMedium(combatant, effectiveDelta);
-        this.mediumFullUpdatesThisFrame++;
-        combatant.lastUpdateTime = now;
-      }
+      });
     });
     mediumLoopMs = performance.now() - mediumStart;
 
     const lowStart = performance.now();
-    this.lowBucket.forEach((combatant, index) => {
-      combatant.simLane = 'low';
-      this.lodLowCount++;
-      if (isLargeWorldMode && this.frameCounter % STAGGER_LOW !== index % STAGGER_LOW) {
-        this.staggeredSkipCount++;
-        return;
-      }
-      const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
-      const elapsedMs = now - (combatant.lastUpdateTime || 0);
-      
-      if (elapsedMs > dynamicIntervalMs) {
-        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-          this.updateCombatantUltraLight(combatant, deltaTime);
-          combatant.lastUpdateTime = now;
+    this.trackCombatAiPhase('Combat.AI.Low', () => {
+      this.lowBucket.forEach((combatant, index) => {
+        combatant.simLane = 'low';
+        this.lodLowCount++;
+        if (isLargeWorldMode && this.frameCounter % STAGGER_LOW !== index % STAGGER_LOW) {
           this.staggeredSkipCount++;
           return;
         }
-        const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
-        const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
-        this.updateCombatantBasic(combatant, effectiveDelta, { lowCost: isLargeWorldMode });
-        combatant.lastUpdateTime = now;
-      }
-    });
-    lowLoopMs = performance.now() - lowStart;
+        const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
+        const elapsedMs = now - (combatant.lastUpdateTime || 0);
 
-    const culledStart = performance.now();
-    let culledDeferred = 0;
-    for (let index = 0; index < this.culledBucket.length; index++) {
-      const combatant = this.culledBucket[index];
-      combatant.simLane = 'culled';
-      this.lodCulledCount++;
-      if (isLargeWorldMode) {
-        const culledElapsedMs = performance.now() - culledStart;
-        const culledBudgetMs = this.CULLED_LOOP_BUDGET_MS * Math.max(1.0, this.intervalScale);
-        if (culledElapsedMs > culledBudgetMs) {
-          culledDeferred += (this.culledBucket.length - index);
-          break;
-        }
-      }
-      const distanceSq = combatant.distanceSq!;
-      const distance = Math.sqrt(distanceSq);
-      const SIMULATION_THRESHOLD = this.lowLODRange + 200;
-      if (!combatant.lastUpdateTime) {
-        combatant.lastUpdateTime = now - this.getStablePhaseOffsetMs(combatant.id, this.CULLED_DISTANT_SIM_INTERVAL_MS);
-      }
-      
-      const elapsedMs = now - (combatant.lastUpdateTime || 0);
-      if (distance > SIMULATION_THRESHOLD) {
-        if (elapsedMs > this.CULLED_DISTANT_SIM_INTERVAL_MS) {
-          const unitStart = performance.now();
-          if (enableAI && !this.isAIBudgetExceeded(aiFrameStart)) {
-            this.simulateDistantAI(combatant);
-          } else if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-            this.updateCombatantUltraLight(combatant, deltaTime);
-          }
-          const unitMs = performance.now() - unitStart;
-          if (unitMs > 100 && (performance.now() - this.lastCulledUnitSpikeLogMs) > this.AI_LOG_THROTTLE_MS) {
-            this.lastCulledUnitSpikeLogMs = performance.now();
-            Logger.warn(
-              'combat-ai',
-              `[LOD culled-unit spike] path=distant id=${combatant.id} ms=${unitMs.toFixed(1)} dist=${distance.toFixed(1)} elapsed=${elapsedMs.toFixed(1)}`
-            );
-          }
-          combatant.lastUpdateTime = now;
-        }
-      } else {
-        if (isLargeWorldMode && this.frameCounter % STAGGER_CULLED_NEAR !== index % STAGGER_CULLED_NEAR) {
-          this.staggeredSkipCount++;
-          continue;
-        }
-        const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(distanceSq) * this.intervalScale;
         if (elapsedMs > dynamicIntervalMs) {
           if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
             this.updateCombatantUltraLight(combatant, deltaTime);
             combatant.lastUpdateTime = now;
             this.staggeredSkipCount++;
-            continue;
+            return;
           }
-          const maxEff = Math.min(3.0, dynamicIntervalMs / 1000 * 3);
+          const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
           const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
-          const sparseSpatialSync = !isLargeWorldMode;
-          const unitStart = performance.now();
-          this.updateCombatantBasic(combatant, effectiveDelta, {
-            lowCost: isLargeWorldMode,
-            updateSpatial: sparseSpatialSync
-          });
-          const unitMs = performance.now() - unitStart;
-          if (unitMs > 100 && (performance.now() - this.lastCulledUnitSpikeLogMs) > this.AI_LOG_THROTTLE_MS) {
-            this.lastCulledUnitSpikeLogMs = performance.now();
-            Logger.warn(
-              'combat-ai',
-              `[LOD culled-unit spike] path=near id=${combatant.id} ms=${unitMs.toFixed(1)} dist=${distance.toFixed(1)} elapsed=${elapsedMs.toFixed(1)} sync=${sparseSpatialSync ? 1 : 0}`
-            );
-          }
+          this.updateCombatantBasic(combatant, effectiveDelta, { lowCost: isLargeWorldMode });
           combatant.lastUpdateTime = now;
         }
+      });
+    });
+    lowLoopMs = performance.now() - lowStart;
+
+    const culledStart = performance.now();
+    let culledDeferred = 0;
+    this.trackCombatAiPhase('Combat.AI.Culled', () => {
+      for (let index = 0; index < this.culledBucket.length; index++) {
+        const combatant = this.culledBucket[index];
+        combatant.simLane = 'culled';
+        this.lodCulledCount++;
+        if (isLargeWorldMode) {
+          const culledElapsedMs = performance.now() - culledStart;
+          const culledBudgetMs = this.CULLED_LOOP_BUDGET_MS * Math.max(1.0, this.intervalScale);
+          if (culledElapsedMs > culledBudgetMs) {
+            culledDeferred += (this.culledBucket.length - index);
+            break;
+          }
+        }
+        const distanceSq = combatant.distanceSq!;
+        const distance = Math.sqrt(distanceSq);
+        const SIMULATION_THRESHOLD = this.lowLODRange + 200;
+        if (!combatant.lastUpdateTime) {
+          combatant.lastUpdateTime = now - this.getStablePhaseOffsetMs(combatant.id, this.CULLED_DISTANT_SIM_INTERVAL_MS);
+        }
+
+        const elapsedMs = now - (combatant.lastUpdateTime || 0);
+        if (distance > SIMULATION_THRESHOLD) {
+          if (elapsedMs > this.CULLED_DISTANT_SIM_INTERVAL_MS) {
+            const unitStart = performance.now();
+            if (enableAI && !this.isAIBudgetExceeded(aiFrameStart)) {
+              this.simulateDistantAI(combatant);
+            } else if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+              this.updateCombatantUltraLight(combatant, deltaTime);
+            }
+            const unitMs = performance.now() - unitStart;
+            if (unitMs > 100 && (performance.now() - this.lastCulledUnitSpikeLogMs) > this.AI_LOG_THROTTLE_MS) {
+              this.lastCulledUnitSpikeLogMs = performance.now();
+              Logger.warn(
+                'combat-ai',
+                `[LOD culled-unit spike] path=distant id=${combatant.id} ms=${unitMs.toFixed(1)} dist=${distance.toFixed(1)} elapsed=${elapsedMs.toFixed(1)}`
+              );
+            }
+            combatant.lastUpdateTime = now;
+          }
+        } else {
+          if (isLargeWorldMode && this.frameCounter % STAGGER_CULLED_NEAR !== index % STAGGER_CULLED_NEAR) {
+            this.staggeredSkipCount++;
+            continue;
+          }
+          const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(distanceSq) * this.intervalScale;
+          if (elapsedMs > dynamicIntervalMs) {
+            if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+              this.updateCombatantUltraLight(combatant, deltaTime);
+              combatant.lastUpdateTime = now;
+              this.staggeredSkipCount++;
+              continue;
+            }
+            const maxEff = Math.min(3.0, dynamicIntervalMs / 1000 * 3);
+            const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
+            const sparseSpatialSync = !isLargeWorldMode;
+            const unitStart = performance.now();
+            this.updateCombatantBasic(combatant, effectiveDelta, {
+              lowCost: isLargeWorldMode,
+              updateSpatial: sparseSpatialSync
+            });
+            const unitMs = performance.now() - unitStart;
+            if (unitMs > 100 && (performance.now() - this.lastCulledUnitSpikeLogMs) > this.AI_LOG_THROTTLE_MS) {
+              this.lastCulledUnitSpikeLogMs = performance.now();
+              Logger.warn(
+                'combat-ai',
+                `[LOD culled-unit spike] path=near id=${combatant.id} ms=${unitMs.toFixed(1)} dist=${distance.toFixed(1)} elapsed=${elapsedMs.toFixed(1)} sync=${sparseSpatialSync ? 1 : 0}`
+              );
+            }
+            combatant.lastUpdateTime = now;
+          }
+        }
       }
-    }
+    });
     if (culledDeferred > 0) {
       this.staggeredSkipCount += culledDeferred;
     }
@@ -608,7 +648,21 @@ export class CombatantLODManager {
       );
     }
 
-    this.renderInterpolator.update(this.combatants, deltaTime);
+    this.trackCombatAiPhase('Combat.AI.RenderInterpolation', () => {
+      this.renderInterpolator.update(this.combatants, deltaTime);
+    });
+  }
+
+  private trackCombatAiPhase<T>(name: string, fn: () => T): T {
+    if (!performanceTelemetry.isEnabled()) {
+      return fn();
+    }
+    performanceTelemetry.beginSystem(name);
+    try {
+      return fn();
+    } finally {
+      performanceTelemetry.endSystem(name);
+    }
   }
 
   private isAIBudgetExceeded(aiFrameStart: number): boolean {
@@ -638,7 +692,55 @@ export class CombatantLODManager {
     return (performance.now() - aiFrameStart) > (this.aiBudgetMs * this.AI_SOFT_BUDGET_RATIO);
   }
 
-  private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
+  private shouldDeferProjectedHighFullUpdate(aiFrameStart: number, combatant: Combatant): boolean {
+    if (this.highFullUpdatesThisFrame === 0) return false;
+    const projectedMs = performance.now() - aiFrameStart + this.estimateHighFullUpdateCost(combatant);
+    return projectedMs > this.aiBudgetMs * this.AI_PROJECTED_BUDGET_RATIO;
+  }
+
+  private estimateHighFullUpdateCost(combatant: Combatant): number {
+    const knownActorCost = this.highFullUpdateCostById.get(combatant.id) ?? 0;
+    const decayedPeakEstimate = Math.min(this.highFullUpdateCostPeakMs, this.aiBudgetMs * 0.5);
+    return Math.max(0.1, knownActorCost, this.highFullUpdateCostEmaMs, decayedPeakEstimate);
+  }
+
+  private recordHighFullUpdateCost(combatant: Combatant, durationMs: number): void {
+    if (!Number.isFinite(durationMs) || durationMs < 0) return;
+    this.highFullUpdateCostEmaMs =
+      this.highFullUpdateCostEmaMs * (1 - this.HIGH_FULL_UPDATE_COST_EMA_ALPHA)
+      + durationMs * this.HIGH_FULL_UPDATE_COST_EMA_ALPHA;
+    this.highFullUpdateCostPeakMs = Math.max(
+      durationMs,
+      this.highFullUpdateCostPeakMs * this.HIGH_FULL_UPDATE_COST_PEAK_DECAY
+    );
+
+    const previousActorCost = this.highFullUpdateCostById.get(combatant.id);
+    this.highFullUpdateCostById.set(
+      combatant.id,
+      previousActorCost === undefined
+        ? durationMs
+        : previousActorCost * (1 - this.HIGH_FULL_UPDATE_COST_EMA_ALPHA)
+          + durationMs * this.HIGH_FULL_UPDATE_COST_EMA_ALPHA
+    );
+    this.pruneHighFullUpdateCostCache();
+  }
+
+  private pruneHighFullUpdateCostCache(): void {
+    if (this.highFullUpdateCostById.size <= this.HIGH_FULL_UPDATE_COST_BY_ID_LIMIT) return;
+    for (const id of this.highFullUpdateCostById.keys()) {
+      if (!this.combatants.has(id)) {
+        this.highFullUpdateCostById.delete(id);
+      }
+      if (this.highFullUpdateCostById.size <= this.HIGH_FULL_UPDATE_COST_BY_ID_LIMIT) return;
+    }
+    while (this.highFullUpdateCostById.size > this.HIGH_FULL_UPDATE_COST_BY_ID_LIMIT) {
+      const oldest = this.highFullUpdateCostById.keys().next().value;
+      if (oldest === undefined) break;
+      this.highFullUpdateCostById.delete(oldest);
+    }
+  }
+
+  private updateCombatantFull(combatant: Combatant, deltaTime: number): number {
     const fullStart = performance.now();
     const aiStart = performance.now();
     this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGridManager, 'high');
@@ -669,9 +771,6 @@ export class CombatantLODManager {
       this.squadManager.getAllSquads()
     );
     const combatMs = performance.now() - combatStart;
-    const renderStart = performance.now();
-    this.combatantRenderer.updateCombatantTexture(combatant);
-    const renderMs = performance.now() - renderStart;
     this.combatantMovement.updateRotation(combatant, deltaTime);
     const spatialStart = performance.now();
     this.recordSpatialUpdate(combatant);
@@ -682,9 +781,10 @@ export class CombatantLODManager {
       this.lastFullUpdateSpikeLogMs = now;
       Logger.warn(
         'combat-ai',
-        `[AI full-update spike] total=${totalMs.toFixed(1)}ms ai=${aiMs.toFixed(1)} move=${moveMs.toFixed(1)} combat=${combatMs.toFixed(1)} render=${renderMs.toFixed(1)} spatial=${spatialMs.toFixed(1)} combatant=${combatant.id} state=${combatant.state} lod=${combatant.simLane}`
+        `[AI full-update spike] total=${totalMs.toFixed(1)}ms ai=${aiMs.toFixed(1)} move=${moveMs.toFixed(1)} combat=${combatMs.toFixed(1)} spatial=${spatialMs.toFixed(1)} combatant=${combatant.id} state=${combatant.state} lod=${combatant.simLane}`
       );
     }
+    return totalMs;
   }
 
   private updateCombatantMedium(combatant: Combatant, deltaTime: number): void {
@@ -740,7 +840,7 @@ export class CombatantLODManager {
   }
 
   /**
-   * Visual-only update for staggered frames: movement, rotation, texture, spatial.
+   * Visual-only update for staggered frames: movement, rotation, spatial.
    * AI decisions and combat are skipped to save budget.
    */
   private updateCombatantVisualOnly(combatant: Combatant, deltaTime: number): void {
@@ -751,7 +851,6 @@ export class CombatantLODManager {
       this.combatants
     );
     this.integrateVisualVelocityIfMoving(combatant, deltaTime);
-    this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
     this.recordSpatialUpdate(combatant);
   }
@@ -784,7 +883,6 @@ export class CombatantLODManager {
    * Keeps billboard-facing continuity while skipping movement/combat/spatial updates.
    */
   private updateCombatantUltraLight(combatant: Combatant, deltaTime: number): void {
-    this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
   }
 
@@ -815,6 +913,7 @@ export class CombatantLODManager {
 
     toRemove.forEach(id => {
       this.combatants.delete(id);
+      this.highFullUpdateCostById.delete(id);
       this.spatialGridManager.removeEntity(id);
     });
   }
@@ -826,6 +925,9 @@ export class CombatantLODManager {
     staggeredSkips: number;
     highFullUpdates: number;
     mediumFullUpdates: number;
+    projectedHighFullUpdateDeferrals: number;
+    highFullUpdateCostEmaMs: number;
+    highFullUpdateCostPeakMs: number;
     maxHighFullUpdatesPerFrame: number;
     maxMediumFullUpdatesPerFrame: number;
     aiBudgetExceededEvents: number;
@@ -838,6 +940,9 @@ export class CombatantLODManager {
       staggeredSkips: this.staggeredSkipCount,
       highFullUpdates: this.highFullUpdatesThisFrame,
       mediumFullUpdates: this.mediumFullUpdatesThisFrame,
+      projectedHighFullUpdateDeferrals: this.projectedHighFullUpdateDeferralsThisFrame,
+      highFullUpdateCostEmaMs: this.highFullUpdateCostEmaMs,
+      highFullUpdateCostPeakMs: this.highFullUpdateCostPeakMs,
       maxHighFullUpdatesPerFrame: this.maxHighFullUpdatesPerFrame,
       maxMediumFullUpdatesPerFrame: this.maxMediumFullUpdatesPerFrame,
       aiBudgetExceededEvents: this.aiBudgetExceededEventsThisFrame,
@@ -868,24 +973,21 @@ export class CombatantLODManager {
     const distanceToMove = DISTANT_SIM_SPEED * DISTANT_SIM_TIME_STEP;
 
     const zones = this.zoneQuery.getAllZones();
-    const targetZones = zones.filter(zone => {
-      return !zone.isHomeBase && (
-        zone.owner !== combatant.faction || zone.state === 'contested'
-      );
-    });
-
-    if (targetZones.length === 0) return;
-
-    let nearestZone = targetZones[0];
-    let minDistance = combatant.position.distanceTo(nearestZone.position);
-
-    for (const zone of targetZones) {
+    let nearestZone: (typeof zones)[number] | null = null;
+    let minDistance = Number.POSITIVE_INFINITY;
+    for (const zone of zones) {
+      if (zone.isHomeBase || (
+        zone.owner === combatant.faction && zone.state !== 'contested'
+      )) {
+        continue;
+      }
       const distance = combatant.position.distanceTo(zone.position);
       if (distance < minDistance) {
         minDistance = distance;
         nearestZone = zone;
       }
     }
+    if (!nearestZone) return;
 
     // Try navmesh path for first waypoint direction (avoids beelining through mountains)
     const navSystem = this.navmeshSystem;

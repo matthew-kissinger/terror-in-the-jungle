@@ -115,6 +115,7 @@
  */
 
 import { chromium, type Page, type ConsoleMessage } from 'playwright';
+import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import sharp from 'sharp';
@@ -1050,6 +1051,20 @@ function printSummary(label: string, curves: FamilyCurve[]): void {
   }
 }
 
+function gitOutputOrFallback(args: string[], fallback: string): string {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+  } catch {
+    return fallback;
+  }
+}
+
+function gitStatus(): string[] {
+  return gitOutputOrFallback(['status', '--short'], '')
+    .split(/\r?\n/)
+    .filter(Boolean);
+}
+
 // ----- Main -----
 
 async function main(): Promise<void> {
@@ -1174,6 +1189,8 @@ function writeVerdict(outDir: string, verdict: GateVerdict, curvesFile: CurvesFi
   const path = join(outDir, 'verdict.json');
   const payload = {
     createdAt: new Date().toISOString(),
+    sourceGitSha: gitOutputOrFallback(['rev-parse', 'HEAD'], 'unknown'),
+    sourceGitStatus: gitStatus(),
     label: curvesFile.label,
     scenario: curvesFile.scenario,
     todHours: curvesFile.todHours,

@@ -100,6 +100,18 @@ describe('ClusterManager', () => {
       expect(force.z).toBe(0)
     })
 
+    it('should not apply force at the exact friendly spacing boundary', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
+      const boundary = createMockCombatant('c2', Faction.US, new THREE.Vector3(4, 0, 0))
+      allCombatants.set('c1', combatant)
+      allCombatants.set('c2', boundary)
+      const spatialGrid = createMockSpatialGrid(['c1', 'c2'])
+
+      const force = clusterManager.calculateSpacingForce(combatant, allCombatants, spatialGrid)
+
+      expect(force.length()).toBe(0)
+    })
+
     it('should ignore dead combatants', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
       const deadNearby = createMockCombatant('c2', Faction.US, new THREE.Vector3(2, 0, 0), CombatantState.DEAD)

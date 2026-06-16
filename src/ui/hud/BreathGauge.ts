@@ -18,10 +18,34 @@ import styles from './BreathGauge.module.css';
 /** Below this fraction of capacity, the gauge turns critical (red + pulse). */
 const CRITICAL_FRACTION = 0.25;
 
+interface BreathGaugeViewState {
+  fillWidth: string;
+  remainingText: string;
+  critical: boolean;
+}
+
+function getBreathGaugeViewState(remainingSeconds: number, capacitySeconds: number): BreathGaugeViewState {
+  const capacity = Math.max(0.001, capacitySeconds);
+  const fraction = Math.max(0, Math.min(1, remainingSeconds / capacity));
+  return {
+    fillWidth: `${(fraction * 100).toFixed(1)}%`,
+    remainingText: `${Math.max(0, Math.ceil(remainingSeconds))}s`,
+    critical: fraction <= CRITICAL_FRACTION,
+  };
+}
+
+function isSameBreathGaugeViewState(a: BreathGaugeViewState, b: BreathGaugeViewState): boolean {
+  return a.fillWidth === b.fillWidth &&
+    a.remainingText === b.remainingText &&
+    a.critical === b.critical;
+}
+
 export class BreathGauge extends UIComponent {
-  private remainingSeconds = this.signal(45);
-  private capacitySeconds = this.signal(45);
+  private viewState = this.signal(getBreathGaugeViewState(45, 45));
   private visible = this.signal(false);
+  private fillEl?: HTMLElement;
+  private textEl?: HTMLElement;
+  private labelEl?: HTMLElement;
 
   protected build(): void {
     this.root.className = styles.container;
@@ -35,6 +59,10 @@ export class BreathGauge extends UIComponent {
   }
 
   protected onMount(): void {
+    this.fillEl = this.$('[data-ref="fill"]') ?? undefined;
+    this.textEl = this.$('[data-ref="text"]') ?? undefined;
+    this.labelEl = this.$('[data-ref="label"]') ?? undefined;
+
     // Effect: visibility.
     this.effect(() => {
       this.toggleClass(styles.visible, this.visible.value);
@@ -42,21 +70,25 @@ export class BreathGauge extends UIComponent {
 
     // Effect: fill width + text + critical state.
     this.effect(() => {
-      const remaining = this.remainingSeconds.value;
-      const capacity = Math.max(0.001, this.capacitySeconds.value);
-      const fraction = Math.max(0, Math.min(1, remaining / capacity));
-      const fillEl = this.$('[data-ref="fill"]');
-      const textEl = this.$('[data-ref="text"]');
-      const labelEl = this.$('[data-ref="label"]');
-      if (!fillEl || !textEl || !labelEl) return;
+      const viewState = this.viewState.value;
+      if (!this.fillEl || !this.textEl || !this.labelEl) return;
 
-      fillEl.style.width = `${(fraction * 100).toFixed(1)}%`;
-      textEl.textContent = `${Math.max(0, Math.ceil(remaining))}s`;
+      if (this.fillEl.style.width !== viewState.fillWidth) {
+        this.fillEl.style.width = viewState.fillWidth;
+      }
+      if (this.textEl.textContent !== viewState.remainingText) {
+        this.textEl.textContent = viewState.remainingText;
+      }
 
-      const critical = fraction <= CRITICAL_FRACTION;
-      fillEl.classList.toggle(styles.fillCritical, critical);
-      labelEl.classList.toggle(styles.labelCritical, critical);
+      this.fillEl.classList.toggle(styles.fillCritical, viewState.critical);
+      this.labelEl.classList.toggle(styles.labelCritical, viewState.critical);
     });
+  }
+
+  protected onUnmount(): void {
+    this.fillEl = undefined;
+    this.textEl = undefined;
+    this.labelEl = undefined;
   }
 
   // --- Public API ---
@@ -80,7 +112,8 @@ export class BreathGauge extends UIComponent {
    * component.
    */
   setBreath(remainingSeconds: number, capacitySeconds: number): void {
-    this.remainingSeconds.value = remainingSeconds;
-    this.capacitySeconds.value = capacitySeconds;
+    const nextViewState = getBreathGaugeViewState(remainingSeconds, capacitySeconds);
+    if (isSameBreathGaugeViewState(this.viewState.value, nextViewState)) return;
+    this.viewState.value = nextViewState;
   }
 }

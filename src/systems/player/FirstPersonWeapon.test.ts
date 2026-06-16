@@ -12,6 +12,7 @@ import { InventoryManager, WeaponSlot } from './InventoryManager';
 import { AmmoState } from '../weapons/AmmoManager';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import { Faction } from '../combat/types';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 // Create mock instances
 let mockRigManager: any;
@@ -187,9 +188,11 @@ describe('FirstPersonWeapon', () => {
       setAudioManager: vi.fn(),
     };
 
+    const weaponScene = new THREE.Scene();
+    const weaponCamera = new THREE.PerspectiveCamera();
     mockModel = {
-      getWeaponScene: vi.fn(() => new THREE.Scene()),
-      getWeaponCamera: vi.fn(() => new THREE.PerspectiveCamera()),
+      getWeaponScene: vi.fn(() => weaponScene),
+      getWeaponCamera: vi.fn(() => weaponCamera),
       updateTransform: vi.fn(),
       render: vi.fn(),
       dispose: vi.fn(),
@@ -225,6 +228,7 @@ describe('FirstPersonWeapon', () => {
     };
 
     mockMuzzleFlashSystem = {
+      preparePlayerOverlayScene: vi.fn(),
       update: vi.fn(),
       dispose: vi.fn(),
     };
@@ -314,6 +318,12 @@ describe('FirstPersonWeapon', () => {
     it('should wire up input callbacks during construction', () => {
       expect(mockInput.setOnFireStart).toHaveBeenCalledWith(expect.any(Function));
       expect(mockInput.setOnReloadStart).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    it('should prepare player muzzle flash overlay before first fire', () => {
+      expect(mockMuzzleFlashSystem.preparePlayerOverlayScene).toHaveBeenCalledWith(
+        mockModel.getWeaponScene.mock.results[0].value,
+      );
     });
   });
 
@@ -408,6 +418,58 @@ describe('FirstPersonWeapon', () => {
 
       expect(mockAmmoManager.canFire).toHaveBeenCalled();
     });
+
+    it('does not enter weapon telemetry spans when telemetry is disabled', () => {
+      const isEnabledSpy = vi.spyOn(performanceTelemetry, 'isEnabled').mockReturnValue(false);
+      const beginSystemSpy = vi.spyOn(performanceTelemetry, 'beginSystem').mockImplementation(() => undefined);
+      const endSystemSpy = vi.spyOn(performanceTelemetry, 'endSystem').mockImplementation(() => undefined);
+
+      try {
+        weapon.update(0.016);
+
+        expect(isEnabledSpy).toHaveBeenCalledTimes(1);
+        expect(beginSystemSpy).not.toHaveBeenCalled();
+        expect(endSystemSpy).not.toHaveBeenCalled();
+        expect(mockAnimations.update).toHaveBeenCalled();
+      } finally {
+        isEnabledSpy.mockRestore();
+        beginSystemSpy.mockRestore();
+        endSystemSpy.mockRestore();
+      }
+    });
+
+    it('keeps weapon phase telemetry spans when telemetry is enabled', () => {
+      const isEnabledSpy = vi.spyOn(performanceTelemetry, 'isEnabled').mockReturnValue(true);
+      const beginSystemSpy = vi.spyOn(performanceTelemetry, 'beginSystem').mockImplementation(() => undefined);
+      const endSystemSpy = vi.spyOn(performanceTelemetry, 'endSystem').mockImplementation(() => undefined);
+
+      try {
+        weapon.update(0.016);
+
+        expect(beginSystemSpy.mock.calls.map(([name]) => name)).toEqual([
+          'Player.Weapon.Suppression',
+          'Player.Weapon.Ammo',
+          'Player.Weapon.Animations',
+          'Player.Weapon.Reload',
+          'Player.Weapon.Transform',
+          'Player.Weapon.Cooldown',
+          'Player.Weapon.Effects',
+        ]);
+        expect(endSystemSpy.mock.calls.map(([name]) => name)).toEqual([
+          'Player.Weapon.Suppression',
+          'Player.Weapon.Ammo',
+          'Player.Weapon.Animations',
+          'Player.Weapon.Reload',
+          'Player.Weapon.Transform',
+          'Player.Weapon.Cooldown',
+          'Player.Weapon.Effects',
+        ]);
+      } finally {
+        isEnabledSpy.mockRestore();
+        beginSystemSpy.mockRestore();
+        endSystemSpy.mockRestore();
+      }
+    });
   });
 
   describe('Firing Logic', () => {
@@ -492,6 +554,16 @@ describe('FirstPersonWeapon', () => {
 
       expect(mockPlayerController.applyRecoil).toHaveBeenCalled();
       expect(mockPlayerController.applyRecoilShake).toHaveBeenCalled();
+    });
+
+    it('starts recoil shake before immediate camera recoil refresh', () => {
+      mockInput.isFiringActive.mockReturnValue(true);
+      weapon.update(0.016);
+
+      expect(mockPlayerController.applyRecoilShake).toHaveBeenCalledTimes(1);
+      expect(mockPlayerController.applyRecoil).toHaveBeenCalledTimes(1);
+      expect(mockPlayerController.applyRecoilShake.mock.invocationCallOrder[0])
+        .toBeLessThan(mockPlayerController.applyRecoil.mock.invocationCallOrder[0]);
     });
 
     it('should start pump animation for shotgun', () => {

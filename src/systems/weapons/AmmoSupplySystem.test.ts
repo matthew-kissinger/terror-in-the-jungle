@@ -322,6 +322,28 @@ describe('AmmoSupplySystem', () => {
       expect(mockInventoryManager.addSandbags).not.toHaveBeenCalled();
     });
 
+    it('should resupply at the exact proximity boundary', () => {
+      camera.position.set(0, 0, 5);
+
+      mockInventoryManager.getState.mockReturnValue({
+        grenades: 0,
+        maxGrenades: 5,
+        sandbags: 0,
+        maxSandbags: 10,
+      });
+      mockFirstPersonWeapon.getAmmoState.mockReturnValue({
+        currentMagazine: 30,
+        maxMagazine: 30,
+        reserveAmmo: 90,
+        maxReserve: 90,
+      });
+
+      system.update(0.016);
+
+      expect(mockInventoryManager.addGrenades).toHaveBeenCalledWith(3);
+      expect(mockInventoryManager.addSandbags).toHaveBeenCalledWith(5);
+    });
+
     it('should not resupply when player is already fully supplied', () => {
       camera.position.set(0, 0, 3);
 

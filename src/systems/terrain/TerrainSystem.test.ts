@@ -22,6 +22,7 @@ const {
   mockJungleGroundRingConfigure,
   mockJungleGroundRingSetWorldBounds,
   mockJungleGroundRingRegenerateAll,
+  mockJungleGroundRingClear,
   mockJungleGroundRingSetExclusionZones,
   mockJungleGroundRingUpdateBudgeted,
   mockJungleGroundRingPendingCounts,
@@ -65,6 +66,7 @@ const {
   mockJungleGroundRingConfigure: vi.fn(),
   mockJungleGroundRingSetWorldBounds: vi.fn(),
   mockJungleGroundRingRegenerateAll: vi.fn(),
+  mockJungleGroundRingClear: vi.fn(),
   mockJungleGroundRingSetExclusionZones: vi.fn(),
   mockJungleGroundRingUpdateBudgeted: vi.fn().mockReturnValue(false),
   mockJungleGroundRingPendingCounts: vi.fn().mockReturnValue({ adds: 0, removals: 0 }),
@@ -202,7 +204,7 @@ vi.mock('./JungleGroundRing', () => ({
     updateBudgeted = mockJungleGroundRingUpdateBudgeted;
     getPendingCounts = mockJungleGroundRingPendingCounts;
     getDebugInfo = mockJungleGroundRingDebugInfo;
-    clear = vi.fn();
+    clear = mockJungleGroundRingClear;
     regenerateAll = mockJungleGroundRingRegenerateAll;
     dispose = vi.fn();
   },
@@ -234,6 +236,20 @@ function makeMockCamera(): THREE.PerspectiveCamera {
     projectionMatrix: new THREE.Matrix4(),
     matrixWorldInverse: new THREE.Matrix4(),
   } as any;
+}
+
+function setRuntimeSearch(search: string): void {
+  const normalized = search.startsWith('?') ? search : search ? `?${search}` : '';
+  if (typeof window !== 'undefined' && window.history) {
+    window.history.replaceState({}, '', `http://localhost/${normalized}`);
+    return;
+  }
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      location: { search: normalized },
+    },
+  });
 }
 
 function makeMockAssetLoader(): any {
@@ -274,6 +290,7 @@ describe('TerrainSystem', () => {
   let scene: THREE.Scene;
 
   beforeEach(() => {
+    setRuntimeSearch('');
     mockProviderGetHeightAt.mockClear();
     mockCacheGetHeightAt.mockClear();
     mockSampleHeight.mockClear();
@@ -289,6 +306,7 @@ describe('TerrainSystem', () => {
     mockJungleGroundRingConfigure.mockClear();
     mockJungleGroundRingSetWorldBounds.mockClear();
     mockJungleGroundRingRegenerateAll.mockClear();
+    mockJungleGroundRingClear.mockClear();
     mockJungleGroundRingSetExclusionZones.mockClear();
     mockJungleGroundRingUpdateBudgeted.mockClear();
     mockJungleGroundRingPendingCounts.mockClear();
@@ -376,6 +394,24 @@ describe('TerrainSystem', () => {
       expect(lighting.lowSunOcclusionStrength).toBeLessThan(0.85);
     });
 
+    it('lets perf isolation disable low-sun terrain occlusion without deleting the default path', async () => {
+      setRuntimeSearch('?perfDisableTerrainLowSunOcclusion=1');
+      await terrain.init();
+
+      terrain.setAtmosphereLighting({
+        skyColor: new THREE.Color(0.01, 0.012, 0.02),
+        groundColor: new THREE.Color(0.008, 0.01, 0.014),
+        ambientColor: new THREE.Color(0.055, 0.07, 0.105),
+        directLightDirection: new THREE.Vector3(1, 0.18, 0),
+        daylightFactor: 0.8,
+        nightBlend: 1,
+        sunAboveHorizon: true,
+      });
+
+      const lighting = mockUpdateAtmosphereLighting.mock.calls.at(-1)?.[1];
+      expect(lighting.lowSunOcclusionStrength).toBe(0);
+    });
+
     it('does not apply low-sun terrain occlusion for high sun or sub-horizon light', async () => {
       await terrain.init();
 
@@ -402,6 +438,27 @@ describe('TerrainSystem', () => {
       });
       lighting = mockUpdateAtmosphereLighting.mock.calls.at(-1)?.[1];
       expect(lighting.lowSunOcclusionStrength).toBe(0);
+    });
+
+    it('skips duplicate atmosphere lighting snapshots after normalization', async () => {
+      await terrain.init();
+      const snapshot = {
+        skyColor: new THREE.Color(0.01, 0.012, 0.02),
+        groundColor: new THREE.Color(0.008, 0.01, 0.014),
+        ambientColor: new THREE.Color(0.055, 0.07, 0.105),
+        directLightDirection: new THREE.Vector3(2, 0.36, 0),
+        daylightFactor: 0.8,
+        nightBlend: 1,
+        sunAboveHorizon: true,
+      };
+
+      terrain.setAtmosphereLighting(snapshot);
+      terrain.setAtmosphereLighting({
+        ...snapshot,
+        directLightDirection: new THREE.Vector3(4, 0.72, 0),
+      });
+
+      expect(mockUpdateAtmosphereLighting).toHaveBeenCalledTimes(1);
     });
 
     it('explicit setWorldSize is stable across chunk config changes', async () => {
@@ -490,10 +547,11 @@ describe('TerrainSystem', () => {
       await terrain.init();
       terrain.setBiomeConfig('highland', []);
       expect(mockVegetationRegenerateAll).toHaveBeenCalled();
-      expect(mockJungleGroundRingRegenerateAll).toHaveBeenCalled();
+      expect(mockJungleGroundRingRegenerateAll).not.toHaveBeenCalled();
+      expect(mockJungleGroundRingClear).toHaveBeenCalled();
     });
 
-    it('keeps near ground cover in JungleGroundRing while scatterer receives mid and canopy types', async () => {
+    it('routes ground cover through the scatterer instead of the dormant dense near ring', async () => {
       const billboard = makeMockBillboard();
       billboard.getActiveVegetationTypes.mockReturnValue([
         { id: 'fern', tier: 'groundCover' },
@@ -511,17 +569,14 @@ describe('TerrainSystem', () => {
       await terrain.init();
 
       expect(mockJungleGroundRingConfigure).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ id: 'fern', tier: 'groundCover' }),
-          expect.objectContaining({ id: 'fanPalm', tier: 'midLevel' }),
-          expect.objectContaining({ id: 'banyan', tier: 'canopy' }),
-        ]),
+        [],
         'denseJungle',
         expect.any(Map),
         [],
       );
       expect(mockVegetationConfigure).toHaveBeenCalledWith(
         [
+          expect.objectContaining({ id: 'fern', tier: 'groundCover' }),
           expect.objectContaining({ id: 'fanPalm', tier: 'midLevel' }),
           expect.objectContaining({ id: 'banyan', tier: 'canopy' }),
         ],
@@ -564,6 +619,25 @@ describe('TerrainSystem', () => {
           enabled: true,
           startDistance: 560,
           endDistance: 1250,
+        }),
+      );
+    });
+
+    it('lets perf isolation disable far-canopy tint without changing mode config', async () => {
+      setRuntimeSearch('?perfDisableTerrainFarCanopyTint=1');
+      await terrain.init();
+
+      terrain.setFarCanopyTint({
+        enabled: true,
+        startDistance: 560,
+        endDistance: 1250,
+        strength: 0.28,
+      });
+
+      expect(mockUpdateFarCanopyTint).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          enabled: false,
         }),
       );
     });

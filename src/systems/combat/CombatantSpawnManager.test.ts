@@ -329,6 +329,27 @@ describe('CombatantSpawnManager', () => {
       spawnManager.update(1.1, true);
       expect(combatants.size).toBe(drainedCount);
     });
+
+    it('compacts consumed queued spawns in place without reordering remaining entries', () => {
+      const entries = Array.from({ length: 10 }, (_, index) => ({
+        faction: index % 2 === 0 ? Faction.US : Faction.NVA,
+        position: new THREE.Vector3(index, 0, -index),
+        size: index + 1,
+      }));
+      const expectedRemaining = entries.slice(8);
+      const managerAny = spawnManager as any;
+      managerAny.progressiveSpawnQueue = entries;
+      managerAny.progressiveSpawnQueueHead = 8;
+      const spliceSpy = vi.spyOn(entries, 'splice');
+
+      managerAny.compactProgressiveSpawnQueueIfNeeded();
+
+      expect(spliceSpy).not.toHaveBeenCalled();
+      spliceSpy.mockRestore();
+      expect(managerAny.progressiveSpawnQueue).toBe(entries);
+      expect(managerAny.progressiveSpawnQueueHead).toBe(0);
+      expect(entries).toEqual(expectedRemaining);
+    });
   });
 
   describe('reinforcement / refill policy', () => {

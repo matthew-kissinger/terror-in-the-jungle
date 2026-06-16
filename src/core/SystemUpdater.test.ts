@@ -268,4 +268,80 @@ describe('SystemUpdater', () => {
     expect(playerIdx).toBeGreaterThanOrEqual(0);
     expect(vehiclesIdx).toBeLessThan(playerIdx);
   });
+
+  it('records child timings for player controller and weapon attribution', () => {
+    const updater = new SystemUpdater();
+    const refs = createRefs({
+      firstPersonWeapon: { update: vi.fn() },
+      playerController: {
+        getPosition: vi.fn(() => new THREE.Vector3(0, 2, 0)),
+        setPosition: vi.fn(),
+        update: vi.fn(),
+      },
+    } as unknown as Partial<SystemKeyToType>);
+
+    updater.updateSystems(refs, [], undefined, 0.016, true);
+
+    const timingNames = updater.getSystemTimings().map((timing) => timing.name);
+    expect(timingNames).toContain('Player');
+    expect(timingNames).toContain('Player.Controller');
+    expect(timingNames).toContain('Player.Weapon');
+    const playerTiming = updater.getSystemTimings().find((timing) => timing.name === 'Player');
+    expect(playerTiming).toMatchObject({
+      lastMs: expect.any(Number),
+      emaMs: expect.any(Number),
+      timeMs: expect.any(Number),
+    });
+    expect(playerTiming?.timeMs).toBe(playerTiming?.emaMs);
+  });
+
+  it('returns bounded top system timings by last frame without full-array materialization', () => {
+    const updater = new SystemUpdater();
+    const seededUpdater = updater as unknown as {
+      systemTimings: Map<string, { name: string; budgetMs: number; lastMs: number; emaMs: number }>;
+    };
+    seededUpdater.systemTimings = new Map();
+    for (let index = 0; index < 20; index++) {
+      seededUpdater.systemTimings.set(`System.${index}`, {
+        name: `System.${index}`,
+        budgetMs: index > 17 ? 1 : 0,
+        lastMs: index,
+        emaMs: index / 2,
+      });
+    }
+    seededUpdater.systemTimings.set('System.invalid', {
+      name: 'System.invalid',
+      budgetMs: 0,
+      lastMs: -1,
+      emaMs: 0,
+    });
+
+    const arrayFromSpy = vi.spyOn(Array, 'from');
+    const sortSpy = vi.spyOn(Array.prototype, 'sort');
+
+    const top = updater.getTopSystemTimingsByLast(5);
+    const arrayFromCalls = arrayFromSpy.mock.calls.length;
+    const sortCalls = sortSpy.mock.calls.length;
+
+    arrayFromSpy.mockRestore();
+    sortSpy.mockRestore();
+
+    expect(arrayFromCalls).toBe(0);
+    expect(sortCalls).toBe(0);
+    expect(top.map((timing) => timing.name)).toEqual([
+      'System.19',
+      'System.18',
+      'System.17',
+      'System.16',
+      'System.15',
+    ]);
+    expect(top.some((timing) => timing.name === 'System.invalid')).toBe(false);
+    expect(top[0]).toMatchObject({
+      name: 'System.19',
+      lastMs: 19,
+      emaMs: 9.5,
+      timeMs: 9.5,
+      budgetMs: 1,
+    });
+  });
 });

@@ -6,13 +6,23 @@
  */
 export class WeaponSwitchFeedback {
   private container: HTMLDivElement;
+  private iconElement: HTMLDivElement;
+  private nameElement: HTMLDivElement;
+  private ammoElement: HTMLDivElement;
   private fadeOutTimer?: number;
+  private hideTimer?: number;
   private readonly DISPLAY_DURATION = 2000; // 2 seconds
   private readonly FADE_DURATION = 500; // 500ms fade
   private styleId = 'weapon-switch-feedback-styles';
 
   constructor() {
     this.container = this.createContainer();
+    this.iconElement = this.createChild('weapon-switch-icon');
+    this.nameElement = this.createChild('weapon-switch-name');
+    this.ammoElement = this.createChild('weapon-switch-ammo');
+    this.container.appendChild(this.iconElement);
+    this.container.appendChild(this.nameElement);
+    this.container.appendChild(this.ammoElement);
     this.injectStyles();
   }
 
@@ -28,6 +38,12 @@ export class WeaponSwitchFeedback {
       margin: 0 auto;
     `;
     return container;
+  }
+
+  private createChild(className: string): HTMLDivElement {
+    const element = document.createElement('div');
+    element.className = className;
+    return element;
   }
 
   private injectStyles(): void {
@@ -107,20 +123,16 @@ export class WeaponSwitchFeedback {
   }
 
   show(weaponName: string, weaponIcon: string, currentAmmo?: string): void {
-    // Clear any existing timeout
-    if (this.fadeOutTimer !== undefined) {
-      window.clearTimeout(this.fadeOutTimer);
-    }
+    this.clearTimers();
 
     // Remove fade-out class if it exists
     this.container.classList.remove('fade-out');
 
     // Update content
-    this.container.innerHTML = `
-      <div class="weapon-switch-icon">${weaponIcon}</div>
-      <div class="weapon-switch-name">${weaponName}</div>
-      ${currentAmmo ? `<div class="weapon-switch-ammo">${currentAmmo}</div>` : ''}
-    `;
+    this.setTextIfChanged(this.iconElement, weaponIcon);
+    this.setTextIfChanged(this.nameElement, weaponName);
+    this.setTextIfChanged(this.ammoElement, currentAmmo ?? '');
+    this.ammoElement.style.display = currentAmmo ? '' : 'none';
 
     // Show the container
     this.container.style.display = 'flex';
@@ -128,18 +140,18 @@ export class WeaponSwitchFeedback {
     // Schedule fade out
     this.fadeOutTimer = window.setTimeout(() => {
       this.container.classList.add('fade-out');
+      this.fadeOutTimer = undefined;
 
       // Hide after fade animation completes
-      window.setTimeout(() => {
+      this.hideTimer = window.setTimeout(() => {
         this.container.style.display = 'none';
+        this.hideTimer = undefined;
       }, this.FADE_DURATION);
     }, this.DISPLAY_DURATION);
   }
 
   hide(): void {
-    if (this.fadeOutTimer !== undefined) {
-      window.clearTimeout(this.fadeOutTimer);
-    }
+    this.clearTimers();
     this.container.style.display = 'none';
     this.container.classList.remove('fade-out');
   }
@@ -149,9 +161,7 @@ export class WeaponSwitchFeedback {
   }
 
   dispose(): void {
-    if (this.fadeOutTimer !== undefined) {
-      window.clearTimeout(this.fadeOutTimer);
-    }
+    this.clearTimers();
 
     if (this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
@@ -161,6 +171,23 @@ export class WeaponSwitchFeedback {
     const styleElement = document.getElementById(this.styleId);
     if (styleElement) {
       styleElement.remove();
+    }
+  }
+
+  private clearTimers(): void {
+    if (this.fadeOutTimer !== undefined) {
+      window.clearTimeout(this.fadeOutTimer);
+      this.fadeOutTimer = undefined;
+    }
+    if (this.hideTimer !== undefined) {
+      window.clearTimeout(this.hideTimer);
+      this.hideTimer = undefined;
+    }
+  }
+
+  private setTextIfChanged(element: HTMLElement, text: string): void {
+    if (element.textContent !== text) {
+      element.textContent = text;
     }
   }
 }

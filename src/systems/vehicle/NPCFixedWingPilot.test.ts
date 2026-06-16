@@ -532,6 +532,22 @@ describe('NPCFixedWingPilot — transition log', () => {
       lastT = entry.missionTimeSec;
     }
   });
+
+  it('keeps only the latest transition-log entries in chronological order', () => {
+    const pilot = new NPCFixedWingPilot();
+    for (let index = 0; index < 40; index++) {
+      pilot.setMission(makeMission());
+      pilot.update(0.1, baseSnapshot());
+      pilot.clearMission();
+    }
+
+    const log = pilot.getTransitionLog();
+    expect(log).toHaveLength(64);
+    for (let index = 1; index < log.length; index++) {
+      expect(log[index].missionTimeSec).toBeGreaterThanOrEqual(0);
+    }
+    expect(log[log.length - 1].to).toBe('COLD');
+  });
 });
 
 // ── helpers ─────────────────────────────────────────────────────────────────

@@ -70,8 +70,11 @@ export class PerformanceOverlay implements DebugPanel {
   private systemBars: BudgetBarRefs[] = [];
 
   private visible = false;
-  private fpsHistory: number[] = [];
   private readonly maxHistory = 60;
+  private readonly fpsHistory: Array<number | undefined> = new Array(this.maxHistory);
+  private fpsHistoryWriteIndex = 0;
+  private fpsHistoryCount = 0;
+  private fpsHistorySum = 0;
 
   constructor() {
     this.container = document.createElement('div');
@@ -294,22 +297,33 @@ export class PerformanceOverlay implements DebugPanel {
   dispose(): void {
     this.hide();
     this.unmount();
-    this.fpsHistory = [];
+    this.clearFpsHistory();
   }
 
   private pushFps(value: number): void {
     if (!Number.isFinite(value)) return;
-    this.fpsHistory.push(value);
-    if (this.fpsHistory.length > this.maxHistory) {
-      this.fpsHistory.shift();
+    const previous = this.fpsHistory[this.fpsHistoryWriteIndex];
+    if (previous !== undefined) {
+      this.fpsHistorySum -= previous;
+    } else {
+      this.fpsHistoryCount++;
     }
+    this.fpsHistory[this.fpsHistoryWriteIndex] = value;
+    this.fpsHistorySum += value;
+    this.fpsHistoryWriteIndex = (this.fpsHistoryWriteIndex + 1) % this.maxHistory;
   }
 
   private getAverageFps(): number {
-    if (this.fpsHistory.length === 0) {
+    if (this.fpsHistoryCount === 0) {
       return 0;
     }
-    const sum = this.fpsHistory.reduce((total, val) => total + val, 0);
-    return sum / this.fpsHistory.length;
+    return this.fpsHistorySum / this.fpsHistoryCount;
+  }
+
+  private clearFpsHistory(): void {
+    this.fpsHistory.fill(undefined);
+    this.fpsHistoryWriteIndex = 0;
+    this.fpsHistoryCount = 0;
+    this.fpsHistorySum = 0;
   }
 }

@@ -72,6 +72,9 @@ interface FixedWingWeaponState {
 const _gunMuzzle = new THREE.Vector3();
 const _gunForward = new THREE.Vector3();
 const _gunTracerEnd = new THREE.Vector3();
+const _gunRay = new THREE.Ray();
+const _gunSpreadRight = new THREE.Vector3();
+const _gunSpreadUp = new THREE.Vector3();
 
 interface AircraftRuntime {
   airframe: Airframe;
@@ -880,9 +883,10 @@ export class FixedWingModel implements GameSystem {
 
       this.applyGunSpread(_gunForward, gun.spreadDeg);
 
-      const ray = new THREE.Ray(_gunMuzzle.clone(), _gunForward.clone());
+      _gunRay.origin.copy(_gunMuzzle);
+      _gunRay.direction.copy(_gunForward);
       const result = this.combatantSystem.handlePlayerShot(
-        ray,
+        _gunRay,
         () => gun.damage,
         'fixedwing_gun',
         weapon.faction,
@@ -894,12 +898,12 @@ export class FixedWingModel implements GameSystem {
 
       if (weapon.roundsSinceTracer >= gun.tracerInterval) {
         weapon.roundsSinceTracer = 0;
-        _gunTracerEnd.copy(
-          result.hit
-            ? result.point
-            : _gunMuzzle.clone().addScaledVector(_gunForward, FIXED_WING_GUN_TRACER_RANGE),
-        );
-        this.ensureTracerPool().spawn(_gunMuzzle.clone(), _gunTracerEnd.clone(), 120);
+        if (result.hit) {
+          _gunTracerEnd.copy(result.point);
+        } else {
+          _gunTracerEnd.copy(_gunMuzzle).addScaledVector(_gunForward, FIXED_WING_GUN_TRACER_RANGE);
+        }
+        this.ensureTracerPool().spawn(_gunMuzzle, _gunTracerEnd, 120);
       }
     }
   }
@@ -919,8 +923,8 @@ export class FixedWingModel implements GameSystem {
     const angle = Math.random() * spreadRad;
     const rotation = Math.random() * Math.PI * 2;
 
-    const up = _gunTracerEnd.set(0, 1, 0);
-    const right = new THREE.Vector3().crossVectors(direction, up);
+    const up = _gunSpreadUp.set(0, 1, 0);
+    const right = _gunSpreadRight.crossVectors(direction, up);
     if (right.lengthSq() < 0.001) {
       up.set(1, 0, 0);
       right.crossVectors(direction, up);

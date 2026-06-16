@@ -6,7 +6,12 @@ import { AssetInfo, AssetCategory, GameSystem } from '../../types';
 import { getAssetPath } from '../../config/paths';
 import { PixelPerfectUtils } from '../../utils/PixelPerfect';
 import { Logger } from '../../utils/Logger';
-import { PIXEL_FORGE_TEXTURE_ASSETS, type PixelForgeColorSpace } from '../../config/pixelForgeAssets';
+import {
+  PIXEL_FORGE_NPC_STARTUP_TEXTURE_NAMES,
+  PIXEL_FORGE_NPC_TEXTURE_NAMES,
+  PIXEL_FORGE_TEXTURE_ASSETS,
+  type PixelForgeColorSpace,
+} from '../../config/pixelForgeAssets';
 
 interface TextureAssetDefinition {
   name: string;
@@ -37,6 +42,11 @@ export interface TextureUploadWarmupSummary {
   missingNames: string[];
 }
 
+interface TextureLoadBatchOptions {
+  batchSize?: number;
+  afterBatch?: () => Promise<void> | void;
+}
+
 function getTextureDimensions(texture: THREE.Texture): { width: number; height: number } {
   const image = texture.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
   return {
@@ -58,16 +68,23 @@ function sanitizePerformanceName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.-]+/g, '-');
 }
 
+const PIXEL_FORGE_NPC_STARTUP_TEXTURE_NAME_SET = new Set(PIXEL_FORGE_NPC_STARTUP_TEXTURE_NAMES);
+
+function isPixelForgeNpcTextureName(name: string): boolean {
+  return name.startsWith('PixelForge.NPC.');
+}
+
 export class AssetLoader implements GameSystem {
   private assets: Map<string, AssetInfo> = new Map();
   private textureLoader = new THREE.TextureLoader();
   private loadedTextures: Map<string, THREE.Texture> = new Map();
+  private pendingTextures: Map<string, Promise<THREE.Texture | undefined>> = new Map();
   private textureColorSpaces: Map<string, PixelForgeColorSpace> = new Map();
 
   async init(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     THREE.Cache.enabled = true;
     await this.discoverAssets();
-    await this.loadTextures(onProgress);
+    await this.loadTextures(onProgress, this.getBootTextureAssets());
   }
 
   update(_deltaTime: number): void {
@@ -77,6 +94,7 @@ export class AssetLoader implements GameSystem {
   dispose(): void {
     this.loadedTextures.forEach(texture => texture.dispose());
     this.loadedTextures.clear();
+    this.pendingTextures.clear();
     this.assets.clear();
     this.textureColorSpaces.clear();
   }
@@ -123,38 +141,109 @@ export class AssetLoader implements GameSystem {
       Array.from(this.assets.values()).map(a => `${a.name} (${a.category})`));
   }
 
-  private async loadTextures(onProgress?: (loaded: number, total: number) => void): Promise<void> {
-    const assets = Array.from(this.assets.values());
+  private getBootTextureAssets(): AssetInfo[] {
+    return Array.from(this.assets.values()).filter((asset) => {
+      if (asset.category === AssetCategory.FOLIAGE) return false;
+      if (asset.category === AssetCategory.ENEMY && isPixelForgeNpcTextureName(asset.name)) {
+        return PIXEL_FORGE_NPC_STARTUP_TEXTURE_NAME_SET.has(asset.name);
+      }
+      return true;
+    });
+  }
+
+  private async loadTextures(
+    onProgress?: (loaded: number, total: number) => void,
+    assets: AssetInfo[] = Array.from(this.assets.values()),
+  ): Promise<void> {
     const total = assets.length;
     let loaded = 0;
 
     const loadPromises = assets.map(async (asset) => {
-      try {
-        const texture = await this.loadTexture(asset.path);
-
-        this.configureTextureForCategory(texture, asset.category, this.textureColorSpaces.get(asset.name));
-
-        // Downscale extremely large textures to avoid GPU memory exhaustion
-        const resized = this.downscaleIfNeeded(asset.name, texture);
-        const finalTexture = resized || texture;
-
-        asset.texture = finalTexture;
-        this.loadedTextures.set(asset.name, finalTexture);
-
-        const img = finalTexture.image as HTMLImageElement | HTMLCanvasElement | undefined;
-        if (img && img.width && img.height) {
-          Logger.debug('assets', `Loaded texture: ${asset.name} (${img.width}x${img.height})`);
-        } else {
-          Logger.debug('assets', `Loaded texture: ${asset.name}`);
-        }
-      } catch (error) {
-        Logger.warn('assets', `Failed to load texture: ${asset.path}`, error);
-      }
+      await this.loadTextureByName(asset.name);
       loaded++;
       onProgress?.(loaded, total);
     });
 
     await Promise.all(loadPromises);
+  }
+
+  async ensureTexturesLoaded(
+    names: readonly string[],
+    onProgress?: (loaded: number, total: number) => void,
+    options: TextureLoadBatchOptions = {},
+  ): Promise<void> {
+    const uniqueNames = Array.from(new Set(names));
+    const total = uniqueNames.length;
+    let loaded = 0;
+    const batchSize = Math.max(
+      1,
+      Math.floor(options.batchSize ?? Math.max(1, uniqueNames.length)),
+    );
+
+    for (let offset = 0; offset < uniqueNames.length; offset += batchSize) {
+      const batch = uniqueNames.slice(offset, offset + batchSize);
+      await Promise.all(batch.map(async (name) => {
+        await this.loadTextureByName(name);
+        loaded++;
+        onProgress?.(loaded, total);
+      }));
+      if (offset + batchSize < uniqueNames.length) {
+        await options.afterBatch?.();
+      }
+    }
+  }
+
+  async ensurePixelForgeNpcImpostorTexturesLoaded(
+    onProgress?: (loaded: number, total: number) => void,
+    options?: TextureLoadBatchOptions,
+  ): Promise<void> {
+    await this.ensureTexturesLoaded(PIXEL_FORGE_NPC_TEXTURE_NAMES, onProgress, options);
+  }
+
+  async loadTextureByName(name: string): Promise<THREE.Texture | undefined> {
+    const loaded = this.loadedTextures.get(name);
+    if (loaded) return loaded;
+
+    const pending = this.pendingTextures.get(name);
+    if (pending) return pending;
+
+    const asset = this.assets.get(name);
+    if (!asset) {
+      Logger.warn('assets', `Texture asset not registered: ${name}`);
+      return undefined;
+    }
+
+    const promise = this.loadTextureAsset(asset).finally(() => {
+      this.pendingTextures.delete(name);
+    });
+    this.pendingTextures.set(name, promise);
+    return promise;
+  }
+
+  private async loadTextureAsset(asset: AssetInfo): Promise<THREE.Texture | undefined> {
+    try {
+      const texture = await this.loadTexture(asset.path);
+
+      this.configureTextureForCategory(texture, asset.category, this.textureColorSpaces.get(asset.name));
+
+      // Downscale extremely large textures to avoid GPU memory exhaustion
+      const resized = this.downscaleIfNeeded(asset.name, texture);
+      const finalTexture = resized || texture;
+
+      asset.texture = finalTexture;
+      this.loadedTextures.set(asset.name, finalTexture);
+
+      const img = finalTexture.image as HTMLImageElement | HTMLCanvasElement | undefined;
+      if (img && img.width && img.height) {
+        Logger.debug('assets', `Loaded texture: ${asset.name} (${img.width}x${img.height})`);
+      } else {
+        Logger.debug('assets', `Loaded texture: ${asset.name}`);
+      }
+      return finalTexture;
+    } catch (error) {
+      Logger.warn('assets', `Failed to load texture: ${asset.path}`, error);
+      return undefined;
+    }
   }
 
   private configureTextureForCategory(texture: THREE.Texture, category: AssetCategory, colorSpace?: PixelForgeColorSpace): void {

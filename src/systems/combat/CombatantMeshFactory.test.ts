@@ -13,6 +13,7 @@ import {
   NPC_SPRITE_RENDER_Y_OFFSET,
   NPC_SPRITE_WIDTH,
   disposeCombatantMeshes,
+  markPixelForgeNpcImpostorAttributesDirty,
   reportBucketOverflow,
   resetBucketOverflowState,
   setPixelForgeNpcImpostorAttributes,
@@ -364,6 +365,60 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
     expect((geometry.getAttribute('instanceViewRow') as THREE.InstancedBufferAttribute).getX(0)).toBe(0);
     expect((geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.75);
     expect((geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute).getX(0)).toBeCloseTo(0.4);
+
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('can defer per-instance impostor attribute upload flags for bucket batching', () => {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(2), 1));
+    geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(2), 1));
+    geometry.setAttribute('instanceViewRow', new THREE.InstancedBufferAttribute(new Float32Array(2), 1));
+    geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(2), 1));
+    geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(2).fill(1), 1));
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.InstancedMesh(geometry, material, 2);
+    const phaseAttribute = geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute;
+    const opacityAttribute = geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute;
+
+    setPixelForgeNpcImpostorAttributes(mesh, 0, 0.25, 3, 0, 0.75, 0.4, false);
+    setPixelForgeNpcImpostorAttributes(mesh, 1, 0.5, 4, 1, 0.25, 0.8, false);
+
+    expect(phaseAttribute.getX(0)).toBeCloseTo(0.25);
+    expect(phaseAttribute.getX(1)).toBeCloseTo(0.5);
+    expect(opacityAttribute.getX(0)).toBeCloseTo(0.4);
+    expect(opacityAttribute.getX(1)).toBeCloseTo(0.8);
+    expect(phaseAttribute.version).toBe(0);
+    expect(opacityAttribute.version).toBe(0);
+
+    markPixelForgeNpcImpostorAttributesDirty(mesh);
+
+    expect(phaseAttribute.version).toBe(1);
+    expect(opacityAttribute.version).toBe(1);
+
+    geometry.dispose();
+    material.dispose();
+  });
+
+  it('can scope batched impostor attribute upload ranges to active instances', () => {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.setAttribute('instancePhase', new THREE.InstancedBufferAttribute(new Float32Array(4), 1));
+    geometry.setAttribute('instanceViewColumn', new THREE.InstancedBufferAttribute(new Float32Array(4), 1));
+    geometry.setAttribute('instanceViewRow', new THREE.InstancedBufferAttribute(new Float32Array(4), 1));
+    geometry.setAttribute('instanceAnimationProgress', new THREE.InstancedBufferAttribute(new Float32Array(4), 1));
+    geometry.setAttribute('instanceOpacity', new THREE.InstancedBufferAttribute(new Float32Array(4).fill(1), 1));
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.InstancedMesh(geometry, material, 4);
+    const phaseAttribute = geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute;
+    const opacityAttribute = geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute;
+
+    markPixelForgeNpcImpostorAttributesDirty(mesh, 2);
+
+    expect(phaseAttribute.updateRanges.at(-1)).toEqual({ start: 0, count: 2 });
+    expect(opacityAttribute.updateRanges.at(-1)).toEqual({ start: 0, count: 2 });
+    expect(phaseAttribute.version).toBe(1);
+    expect(opacityAttribute.version).toBe(1);
 
     geometry.dispose();
     material.dispose();

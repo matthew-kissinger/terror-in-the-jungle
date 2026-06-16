@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { SpatialGridManager } from './SpatialGridManager';
 import { Combatant, CombatantState } from './types';
@@ -25,6 +25,10 @@ describe('SpatialGridManager', () => {
 
   beforeEach(() => {
     manager = new SpatialGridManager();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('lifecycle', () => {
@@ -209,6 +213,24 @@ describe('SpatialGridManager', () => {
       expect(after.queriesThisFrame).toBe(0);
       expect(after.avgQueryTimeMs).toBe(preResetAvg);
       expect(after.initialized).toBe(true);
+    });
+
+    it('keeps query timing averages bounded to the latest samples', () => {
+      manager.initialize(4000);
+      manager.syncEntity('e1', new THREE.Vector3(100, 0, 100));
+
+      const nowValues: number[] = [];
+      for (let duration = 1; duration <= 105; duration++) {
+        nowValues.push(1000, 1000 + duration);
+      }
+      let nowIndex = 0;
+      vi.spyOn(performance, 'now').mockImplementation(() => nowValues[nowIndex++] ?? 0);
+
+      for (let duration = 1; duration <= 105; duration++) {
+        manager.queryRadius(new THREE.Vector3(100, 0, 100), 50);
+      }
+
+      expect(manager.getTelemetry().avgQueryTimeMs).toBeCloseTo(55.5);
     });
   });
 

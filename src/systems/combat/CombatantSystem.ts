@@ -21,9 +21,10 @@ import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
 import { CombatantCombat, CombatHitResult } from './CombatantCombat';
-import { CombatantMovement } from './CombatantMovement';
+import { CombatantMovement, type TerrainRecoveryEvent } from './CombatantMovement';
 import {
   CombatantRenderer,
+  type BillboardUpdateProfile,
   type CombatantMaterializationRow,
   type CloseModelPrewarmOptions,
   type CloseModelPrewarmSummary,
@@ -43,7 +44,7 @@ import { AILineOfSight } from './ai/AILineOfSight';
 import { clusterManager } from './ClusterManager';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
-import { isPerfDiagnosticsEnabled, isPerfUserTimingEnabled } from '../../core/PerfDiagnostics';
+import { isPerfDiagnosticsEnabled, isPerfHarnessEnabled, isPerfUserTimingEnabled } from '../../core/PerfDiagnostics';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
@@ -218,12 +219,15 @@ export class CombatantSystem implements GameSystem {
 
     // Expose profiling only for harness/dev diagnostics. Gate matches
     // src/core/PerfDiagnostics.ts: DEV or VITE_PERF_HARNESS build.
-    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && typeof window !== 'undefined' && (isPerfHarnessEnabled() || isPerfDiagnosticsEnabled())) {
+      const exposeCombatProfile = isPerfHarnessEnabled() || isPerfDiagnosticsEnabled();
       const diagnosticsWindow = window as Window & {
         combatProfile?: () => ReturnType<CombatantSystem['getCombatProfile']>;
         npcMaterializationProfile?: (limit?: number) => CombatantMaterializationProfile;
       };
-      diagnosticsWindow.combatProfile = () => this.getCombatProfile();
+      if (exposeCombatProfile) {
+        diagnosticsWindow.combatProfile = () => this.getCombatProfile();
+      }
       diagnosticsWindow.npcMaterializationProfile = (limit?: number) => this.getNearestCombatantMaterializationProfile(limit);
     }
 
@@ -238,6 +242,15 @@ export class CombatantSystem implements GameSystem {
   getCombatProfile() {
     return this.profiler.getCombatProfile();
   }
+
+  getRecentTerrainRecoveryEvents(): TerrainRecoveryEvent[] {
+    return this.combatantMovement.getRecentTerrainRecoveryEvents();
+  }
+
+  clearRecentTerrainRecoveryEvents(): void {
+    this.combatantMovement.clearRecentTerrainRecoveryEvents();
+  }
+
   update(deltaTime: number): void {
     // Update player position
     this.camera.getWorldPosition(this.playerPosition);
@@ -338,14 +351,25 @@ export class CombatantSystem implements GameSystem {
     // Update billboard rotations and walk animation
     t0 = performance.now();
     performanceTelemetry.beginSystem('Combat.Billboards');
+    let billboardWalkFrameMs = 0;
+    let billboardShaderUniformMs = 0;
     try {
+      const walkFrameStart = performance.now();
       this.combatantRenderer.updateWalkFrame(deltaTime);
+      billboardWalkFrameMs = performance.now() - walkFrameStart;
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
+      const shaderUniformStart = performance.now();
       this.combatantRenderer.updateShaderUniforms(deltaTime);
+      billboardShaderUniformMs = performance.now() - shaderUniformStart;
     } finally {
       performanceTelemetry.endSystem('Combat.Billboards');
     }
     this.profiler.profiling.billboardUpdateMs = performance.now() - t0;
+    this.profiler.profiling.billboardProfile = {
+      ...this.combatantRenderer.getLastBillboardUpdateProfile(),
+      walkFrameMs: billboardWalkFrameMs,
+      shaderUniformMs: billboardShaderUniformMs,
+    } satisfies BillboardUpdateProfile;
 
     // Update effect pools
     t0 = performance.now();
@@ -555,6 +579,10 @@ export class CombatantSystem implements GameSystem {
 
   getAllCombatants(): Combatant[] {
     return Array.from(this.combatants.values());
+  }
+
+  getCombatantById(id: string): Combatant | undefined {
+    return this.combatants.get(id);
   }
 
   querySpatialRadius(center: THREE.Vector3, radius: number): string[] {

@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
+import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from 'three-mesh-bvh';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 
 /**
@@ -16,6 +17,23 @@ interface MeshSlab {
   mesh: THREE.Mesh;
   positionBuffer: Float32Array;
   gridWidth: number;
+}
+
+let bvhExtensionsInstalled = false;
+
+function ensureBvhExtensionsInstalled(): void {
+  if (bvhExtensionsInstalled) {
+    return;
+  }
+
+  (THREE.Mesh.prototype as unknown as { raycast: typeof acceleratedRaycast }).raycast = acceleratedRaycast;
+  const geometryPrototype = THREE.BufferGeometry.prototype as unknown as {
+    computeBoundsTree: typeof computeBoundsTree;
+    disposeBoundsTree: typeof disposeBoundsTree;
+  };
+  geometryPrototype.computeBoundsTree = computeBoundsTree;
+  geometryPrototype.disposeBoundsTree = disposeBoundsTree;
+  bvhExtensionsInstalled = true;
 }
 
 /**
@@ -41,6 +59,7 @@ export class TerrainRaycastRuntime {
   private rebuildQueued = false;
 
   constructor(losAccelerator: LOSAccelerator) {
+    ensureBvhExtensionsInstalled();
     this.losAccelerator = losAccelerator;
   }
 
@@ -85,10 +104,12 @@ export class TerrainRaycastRuntime {
   dispose(): void {
     if (this.frontSlab) {
       this.losAccelerator.unregisterChunk('bvh_nearfield');
+      this.disposeBoundsTree(this.frontSlab.mesh.geometry);
       this.frontSlab.mesh.geometry.dispose();
       this.frontSlab = null;
     }
     if (this.backSlab) {
+      this.disposeBoundsTree(this.backSlab.mesh.geometry);
       this.backSlab.mesh.geometry.dispose();
       this.backSlab = null;
     }
@@ -160,6 +181,7 @@ export class TerrainRaycastRuntime {
       // raycast saw the previous, fully-consistent front slab.
       geometry.computeBoundingBox();
       geometry.computeBoundingSphere();
+      this.rebuildBoundsTree(geometry);
       this.swapInBackSlab();
       this.lastBvhCenter.copy(this.targetBvhCenter);
       this.rebuildQueued = false;
@@ -196,6 +218,7 @@ export class TerrainRaycastRuntime {
     }
 
     if (this.backSlab) {
+      this.disposeBoundsTree(this.backSlab.mesh.geometry);
       this.backSlab.mesh.geometry.dispose();
       this.backSlab = null;
     }
@@ -235,5 +258,16 @@ export class TerrainRaycastRuntime {
     mesh.visible = false;
 
     return { mesh, positionBuffer, gridWidth: gridW };
+  }
+
+  private rebuildBoundsTree(geometry: THREE.BufferGeometry): void {
+    this.disposeBoundsTree(geometry);
+    geometry.computeBoundsTree();
+  }
+
+  private disposeBoundsTree(geometry: THREE.BufferGeometry): void {
+    if (geometry.boundsTree) {
+      geometry.disposeBoundsTree();
+    }
   }
 }

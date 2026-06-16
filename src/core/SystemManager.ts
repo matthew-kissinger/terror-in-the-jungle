@@ -48,7 +48,7 @@ import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
 import { SystemInitializer, type MutableSystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
-import { SystemUpdater } from './SystemUpdater';
+import { SystemUpdater, type SystemTimingSnapshot } from './SystemUpdater';
 import { SystemDisposer } from './SystemDisposer';
 import { SystemRegistry, type SystemKeyToType } from './SystemRegistry';
 import { markStartup } from './StartupTelemetry';
@@ -170,8 +170,12 @@ export class SystemManager {
     this.updater.updateSystems(this.refs as SystemKeyToType, this.systems, this.scene, deltaTime, gameStarted);
   }
 
-  getSystemTimings(): Array<{ name: string; timeMs: number; budgetMs: number }> {
+  getSystemTimings(): SystemTimingSnapshot[] {
     return this.updater.getSystemTimings();
+  }
+
+  getTopSystemTimingsByLast(limit: number): SystemTimingSnapshot[] {
+    return this.updater.getTopSystemTimingsByLast(limit);
   }
 
   getSystems(): GameSystem[] {

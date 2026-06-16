@@ -148,6 +148,7 @@ export class AICoverFinding {
     const MAX_SEARCH_RADIUS = 30;
     const MAX_SEARCH_RADIUS_SQ = MAX_SEARCH_RADIUS * MAX_SEARCH_RADIUS;
     const SANDBAG_PREFERRED_DISTANCE = 15;
+    const SANDBAG_PREFERRED_DISTANCE_SQ = SANDBAG_PREFERRED_DISTANCE * SANDBAG_PREFERRED_DISTANCE;
     const cacheKey = this.getCoverSearchCacheKey(combatant.position, threatPosition);
     const now = Date.now();
     const cachedCover = this.getCachedCoverSearchResult(cacheKey, now);
@@ -186,15 +187,14 @@ export class AICoverFinding {
           if (this.isSandbagCover(_coverPos, _sandbagCenter, bounds, threatPosition)) {
             const distanceToCombatantSq = combatant.position.distanceToSquared(_coverPos);
             const distanceToCombatant = Math.sqrt(distanceToCombatantSq);
-            const distanceToSandbag = Math.sqrt(distanceToSandbagSq);
 
             let score = 1 / (distanceToCombatant + 1);
 
-            if (distanceToSandbag < SANDBAG_PREFERRED_DISTANCE) {
+            if (distanceToSandbagSq < SANDBAG_PREFERRED_DISTANCE_SQ) {
               score *= 2.0;
             }
 
-            if (distanceToCombatant < distanceToSandbag) {
+            if (distanceToCombatantSq < distanceToSandbagSq) {
               score *= 1.5;
             }
 
@@ -367,14 +367,12 @@ export class AICoverFinding {
         if (distanceSq > searchRadiusSq || distanceSq < 9) continue;
 
         const localHeight = this.terrainSystem.getHeightAt(samplePos.x, samplePos.z);
-        const surroundingHeights = [
-          this.terrainSystem.getHeightAt(samplePos.x + 2, samplePos.z),
-          this.terrainSystem.getHeightAt(samplePos.x - 2, samplePos.z),
-          this.terrainSystem.getHeightAt(samplePos.x, samplePos.z + 2),
-          this.terrainSystem.getHeightAt(samplePos.x, samplePos.z - 2)
-        ];
-
-        const avgHeight = surroundingHeights.reduce((a, b) => a + b, 0) / surroundingHeights.length;
+        const surroundingHeightTotal =
+          this.terrainSystem.getHeightAt(samplePos.x + 2, samplePos.z) +
+          this.terrainSystem.getHeightAt(samplePos.x - 2, samplePos.z) +
+          this.terrainSystem.getHeightAt(samplePos.x, samplePos.z + 2) +
+          this.terrainSystem.getHeightAt(samplePos.x, samplePos.z - 2);
+        const avgHeight = surroundingHeightTotal / 4;
         const heightVariation = Math.abs(localHeight - avgHeight);
 
         const hasHeightVariation = heightVariation > 0.8;

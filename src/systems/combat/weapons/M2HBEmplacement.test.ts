@@ -11,6 +11,7 @@ import {
   createM2HBEmplacement,
   buildM2HBTripod,
 } from './M2HBEmplacementSpawn';
+import { createNpcM2HBAdapter } from './NpcM2HBAdapter';
 import { Emplacement } from '../../vehicle/Emplacement';
 import { VehicleManager } from '../../vehicle/VehicleManager';
 import { Faction } from '../types';
@@ -183,6 +184,42 @@ describe('M2HBEmplacementSystem', () => {
     // Damage callback returns the M2HB per-round damage.
     const dmgFn = cs.handlePlayerShot.mock.calls[0][1];
     expect(dmgFn()).toBe(M2HB_STATS.damagePerRound);
+  });
+
+  it('routes M2HB fire through a normalized shot ray without mutating caller vectors', () => {
+    const cs = makeMockCombatantSystem({ hit: false });
+    const { emplacement, pitchNode } = makeEmplacementForSystem(scene, 'emp_npc_normalized');
+    const weapon = new M2HBWeapon();
+    system.setCombatantSystem(cs);
+    system.registerBinding({ vehicleId: 'emp_npc_normalized', emplacement, weapon, pitchNode });
+
+    const origin = new THREE.Vector3(3, 4, 5);
+    const aimDir = new THREE.Vector3(0, 0, -2);
+    const fired = system.tryFire('emp_npc_normalized', origin, aimDir);
+
+    expect(fired).toBe(true);
+    const ray = cs.handlePlayerShot.mock.calls[0][0] as THREE.Ray;
+    expect(ray.origin.toArray()).toEqual([3, 4, 5]);
+    expect(ray.direction.toArray()).toEqual([0, 0, -1]);
+    expect(origin.toArray()).toEqual([3, 4, 5]);
+    expect(aimDir.toArray()).toEqual([0, 0, -2]);
+  });
+
+  it('reuses the constant damage resolver across consecutive M2HB shots', () => {
+    const cs = makeMockCombatantSystem({ hit: false });
+    const { emplacement, pitchNode } = makeEmplacementForSystem(scene, 'emp_damage_resolver');
+    const weapon = new M2HBWeapon();
+    system.setCombatantSystem(cs);
+    system.registerBinding({ vehicleId: 'emp_damage_resolver', emplacement, weapon, pitchNode });
+
+    expect(system.tryFire('emp_damage_resolver', new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1))).toBe(true);
+    weapon.update(60 / M2HB_STATS.rpm);
+    expect(system.tryFire('emp_damage_resolver', new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1))).toBe(true);
+
+    const firstDamageResolver = cs.handlePlayerShot.mock.calls[0][1];
+    const secondDamageResolver = cs.handlePlayerShot.mock.calls[1][1];
+    expect(firstDamageResolver).toBe(secondDamageResolver);
+    expect(firstDamageResolver()).toBe(M2HB_STATS.damagePerRound);
   });
 
   it('routes a player fire-request from the bound adapter into a combatant raycast', () => {
@@ -368,6 +405,22 @@ describe('buildM2HBTripod gun visual (real-scale m2-browning re-proportion)', ()
     // Pitch node is a descendant of the yaw node so recoil-z and pitch compose.
     expect(pitchNode.parent).toBe(yawNode);
   });
+
+  it('uses a merged attributed tripod base instead of loose procedural leg meshes', () => {
+    const { root, pitchNode } = buildM2HBTripod();
+    const meshes: THREE.Mesh[] = [];
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshes.push(child);
+      }
+    });
+
+    expect(root.userData.perfCategory).toBe('emplacements');
+    expect(root.getObjectByName('m2hb_tripod_base')).toBeInstanceOf(THREE.Mesh);
+    expect(meshes).toHaveLength(4);
+    expect(meshes.every((mesh) => mesh.userData.perfCategory === 'emplacements')).toBe(true);
+    expect(pitchNode.children.filter((child) => child instanceof THREE.Mesh)).toHaveLength(3);
+  });
 });
 
 // ───────────────────────── VehicleManager surface ─────────────────────────
@@ -435,5 +488,36 @@ describe('VehicleManager.spawnScenarioM2HBEmplacements + emplacement queries', (
     // Occupy the only near US emplacement and re-query.
     vm.getVehicle('emp_us_near')!.enterVehicle('npc_1', 'gunner');
     expect(vm.getFreeEmplacementsByFaction(Faction.US, center, 50)).toHaveLength(0);
+  });
+
+  it('exposes an allocation-free radius iterator through the NPC M2HB adapter query', () => {
+    const scene = new THREE.Scene();
+    const vm = new VehicleManager();
+    const sys = new M2HBEmplacementSystem(scene);
+
+    createM2HBEmplacement(scene, vm, sys, {
+      vehicleId: 'emp_us_near',
+      position: new THREE.Vector3(5, 0, 0),
+      faction: Faction.US,
+    });
+    createM2HBEmplacement(scene, vm, sys, {
+      vehicleId: 'emp_us_far',
+      position: new THREE.Vector3(500, 0, 0),
+      faction: Faction.US,
+    });
+
+    const forEachSpy = vi.spyOn(vm, 'forEachVehicleInRadius');
+    const adapter = createNpcM2HBAdapter(vm, sys);
+    const visited: string[] = [];
+    adapter.query.forEachVehicleInRadius?.(
+      new THREE.Vector3(0, 0, 0),
+      50,
+      vehicle => {
+        visited.push(vehicle.vehicleId);
+      },
+    );
+
+    expect(forEachSpy).toHaveBeenCalledTimes(1);
+    expect(visited).toEqual(['emp_us_near']);
   });
 });

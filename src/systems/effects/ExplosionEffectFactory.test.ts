@@ -23,4 +23,18 @@ describe('createExplosionEffect', () => {
     expect((effect.fireParticles.material as THREE.PointsMaterial).map).toBeNull();
     expect((effect.debrisParticles.material as THREE.PointsMaterial).map).toBeNull();
   });
+
+  it('caches particle position attributes and arrays for pooled update paths', () => {
+    const smokeTexture = createTexture();
+    const flashTexture = createTexture();
+    const debrisTexture = createTexture();
+    const effect = createExplosionEffect(smokeTexture, flashTexture, debrisTexture);
+
+    expect(effect.smokePositionAttribute).toBe(effect.smokeParticles.geometry.getAttribute('position'));
+    expect(effect.firePositionAttribute).toBe(effect.fireParticles.geometry.getAttribute('position'));
+    expect(effect.debrisPositionAttribute).toBe(effect.debrisParticles.geometry.getAttribute('position'));
+    expect(effect.smokePositionArray).toBe(effect.smokePositionAttribute.array);
+    expect(effect.firePositionArray).toBe(effect.firePositionAttribute.array);
+    expect(effect.debrisPositionArray).toBe(effect.debrisPositionAttribute.array);
+  });
 });

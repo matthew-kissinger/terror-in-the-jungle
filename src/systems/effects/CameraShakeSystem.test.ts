@@ -81,6 +81,20 @@ describe('CameraShakeSystem', () => {
       expect(offset3.pitch).not.toBe(offset2.pitch);
     });
 
+    it('should not shift the next shake phase during idle updates', () => {
+      const freshSystem = new CameraShakeSystem();
+
+      system.update(10);
+      system.shake(1.0, 1.0, 25);
+      freshSystem.shake(1.0, 1.0, 25);
+
+      const afterIdle = system.getCurrentShakeOffset();
+      const baseline = freshSystem.getCurrentShakeOffset();
+
+      expect(afterIdle.pitch).toBeCloseTo(baseline.pitch, 12);
+      expect(afterIdle.yaw).toBeCloseTo(baseline.yaw, 12);
+    });
+
     it('should remove expired shakes (elapsed >= duration)', () => {
       system.shake(1.0, 0.5);
       expect(system.isShaking()).toBe(true);
@@ -142,9 +156,21 @@ describe('CameraShakeSystem', () => {
       const explosionPos = new THREE.Vector3(0, 0, 0);
       const playerPos = new THREE.Vector3(40, 0, 0);
       const maxRadius = 20;
+      const distanceTo = vi.spyOn(explosionPos, 'distanceTo');
 
       system.shakeFromExplosion(explosionPos, playerPos, maxRadius);
       expect(system.isShaking()).toBe(false);
+      expect(distanceTo).not.toHaveBeenCalled();
+    });
+
+    it('should keep the effective-radius boundary inclusive', () => {
+      const explosionPos = new THREE.Vector3(0, 0, 0);
+      const playerPos = new THREE.Vector3(30, 0, 0);
+      const maxRadius = 20;
+
+      system.shakeFromExplosion(explosionPos, playerPos, maxRadius);
+      expect(system.isShaking()).toBe(true);
+      expect(system.getTotalIntensity()).toBe(0);
     });
 
     it('should apply full intensity at epicenter (distance = 0)', () => {
@@ -255,9 +281,20 @@ describe('CameraShakeSystem', () => {
     it('should not shake beyond 20 units', () => {
       const deathPos = new THREE.Vector3(0, 0, 0);
       const playerPos = new THREE.Vector3(25, 0, 0);
+      const distanceTo = vi.spyOn(deathPos, 'distanceTo');
 
       system.shakeFromNearbyDeath(deathPos, playerPos);
       expect(system.isShaking()).toBe(false);
+      expect(distanceTo).not.toHaveBeenCalled();
+    });
+
+    it('should keep the death-shake boundary inclusive', () => {
+      const deathPos = new THREE.Vector3(0, 0, 0);
+      const playerPos = new THREE.Vector3(20, 0, 0);
+
+      system.shakeFromNearbyDeath(deathPos, playerPos);
+      expect(system.isShaking()).toBe(true);
+      expect(system.getTotalIntensity()).toBe(0);
     });
 
     it('should apply intensity 0.15 and duration 0.2 at distance 0', () => {
@@ -307,6 +344,17 @@ describe('CameraShakeSystem', () => {
       system.update(0.06);
       expect(system.isShaking()).toBe(false);
     });
+
+    it('should reset recurring recoil shakes after prior recoil expires', () => {
+      for (let i = 0; i < 5; i++) {
+        system.shakeFromRecoil();
+        expect(system.isShaking()).toBe(true);
+        expect(system.getTotalIntensity()).toBeCloseTo(0.08, 2);
+
+        system.update(0.06);
+        expect(system.isShaking()).toBe(false);
+      }
+    });
   });
 
   describe('getCurrentShakeOffset()', () => {
@@ -314,6 +362,21 @@ describe('CameraShakeSystem', () => {
       const offset = system.getCurrentShakeOffset();
       expect(offset.pitch).toBe(0);
       expect(offset.yaw).toBe(0);
+    });
+
+    it('should write into a caller-owned output object', () => {
+      const offset = { pitch: 99, yaw: 99 };
+      const result = system.getCurrentShakeOffset(offset);
+
+      expect(result).toBe(offset);
+      expect(offset.pitch).toBe(0);
+      expect(offset.yaw).toBe(0);
+
+      system.shake(1.0, 1.0);
+      const activeResult = system.getCurrentShakeOffset(offset);
+
+      expect(activeResult).toBe(offset);
+      expect(Math.abs(offset.pitch) + Math.abs(offset.yaw)).toBeGreaterThan(0);
     });
 
     it('should return non-zero values when shakes active', () => {
@@ -373,6 +436,17 @@ describe('CameraShakeSystem', () => {
       // Each component should be within bounds (noise is [-1, 1] range roughly)
       expect(Math.abs(offset.pitch)).toBeLessThanOrEqual(maxAngle * 2); // Allow for noise amplitude
       expect(Math.abs(offset.yaw)).toBeLessThanOrEqual(maxAngle * 2);
+    });
+
+    it('does not recompute angle conversion while sampling active shakes', () => {
+      const degToRadSpy = vi.spyOn(THREE.MathUtils, 'degToRad');
+
+      system.shake(1.0, 1.0);
+      system.getCurrentShakeOffset();
+      system.getCurrentShakeOffset();
+
+      expect(degToRadSpy).not.toHaveBeenCalled();
+      degToRadSpy.mockRestore();
     });
   });
 

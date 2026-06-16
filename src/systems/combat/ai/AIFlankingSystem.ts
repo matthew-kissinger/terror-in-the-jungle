@@ -67,6 +67,7 @@ export class AIFlankingSystem {
 
   // Cooldown tracking
   private flankingCooldowns: Map<string, number> = new Map()  // squadId -> lastFlankTime
+  private readonly aliveSquadMembersScratch: Combatant[] = []
 
   // Configuration
   private readonly MIN_SQUAD_SIZE = 3  // Minimum squad size for flanking
@@ -106,8 +107,7 @@ export class AIFlankingSystem {
     }
 
     // Check squad size
-    const aliveMembers = this.getAliveSquadMembers(squad, allCombatants)
-    if (aliveMembers.length < this.MIN_SQUAD_SIZE) {
+    if (this.countAliveSquadMembers(squad, allCombatants) < this.MIN_SQUAD_SIZE) {
       return false
     }
 
@@ -118,8 +118,8 @@ export class AIFlankingSystem {
     }
 
     // Check distance to target (flanking is mid-range tactic)
-    const leaderDistance = leader.position.distanceTo(targetPosition)
-    if (leaderDistance < 20 || leaderDistance > 80) {
+    const leaderDistanceSq = leader.position.distanceToSquared(targetPosition)
+    if (leaderDistanceSq < 400 || leaderDistanceSq > 6400) {
       return false
     }
 
@@ -138,7 +138,7 @@ export class AIFlankingSystem {
     allCombatants: Map<string, Combatant>,
     targetPosition: THREE.Vector3
   ): FlankingOperation | null {
-    const aliveMembers = this.getAliveSquadMembers(squad, allCombatants)
+    const aliveMembers = this.collectAliveSquadMembers(squad, allCombatants)
     if (aliveMembers.length < this.MIN_SQUAD_SIZE) {
       return null
     }
@@ -211,8 +211,7 @@ export class AIFlankingSystem {
     }
 
     // Update casualty count
-    const aliveMembers = this.getAliveSquadMembers(squad, allCombatants)
-    const currentCasualties = squad.members.length - aliveMembers.length
+    const currentCasualties = squad.members.length - this.countAliveSquadMembers(squad, allCombatants)
     operation.casualtiesDuringFlank = currentCasualties - operation.casualtiesBeforeFlank
 
     // Check for excessive casualties
@@ -293,10 +292,26 @@ export class AIFlankingSystem {
 
   // Private methods
 
-  private getAliveSquadMembers(squad: Squad, allCombatants: Map<string, Combatant>): Combatant[] {
-    return squad.members
-      .map(id => allCombatants.get(id))
-      .filter((c): c is Combatant => c !== undefined && c.state !== CombatantState.DEAD)
+  private collectAliveSquadMembers(squad: Squad, allCombatants: Map<string, Combatant>): Combatant[] {
+    this.aliveSquadMembersScratch.length = 0
+    for (const memberId of squad.members) {
+      const member = allCombatants.get(memberId)
+      if (member !== undefined && member.state !== CombatantState.DEAD) {
+        this.aliveSquadMembersScratch.push(member)
+      }
+    }
+    return this.aliveSquadMembersScratch
+  }
+
+  private countAliveSquadMembers(squad: Squad, allCombatants: Map<string, Combatant>): number {
+    let aliveCount = 0
+    for (const memberId of squad.members) {
+      const member = allCombatants.get(memberId)
+      if (member !== undefined && member.state !== CombatantState.DEAD) {
+        aliveCount++
+      }
+    }
+    return aliveCount
   }
 
   private hasRecentSquadDamage(squad: Squad, allCombatants: Map<string, Combatant>): boolean {
@@ -314,17 +329,16 @@ export class AIFlankingSystem {
 
   private isEngagementStalled(squad: Squad, allCombatants: Map<string, Combatant>): boolean {
     // Engagement is stalled if most members are engaging same target for > 10 seconds
-    const engagingMembers = squad.members
-      .map(id => allCombatants.get(id))
-      .filter(c => c && c.state === CombatantState.ENGAGING)
-
-    if (engagingMembers.length < 2) return false
-
     // Check if they've been engaging for a while (via lastShotTime)
     const now = Date.now()
+    let engagingCount = 0
     let stalledCount = 0
-    for (const member of engagingMembers) {
-      if (member && (now - member.lastShotTime) < 2000) {
+    for (const memberId of squad.members) {
+      const member = allCombatants.get(memberId)
+      if (!member || member.state !== CombatantState.ENGAGING) continue
+
+      engagingCount++
+      if ((now - member.lastShotTime) < 2000) {
         // Recently shot, check how long in combat
         if (member.target && (now - member.lastHitTime) > 8000) {
           stalledCount++
@@ -332,7 +346,7 @@ export class AIFlankingSystem {
       }
     }
 
-    return stalledCount >= 2
+    return engagingCount >= 2 && stalledCount >= 2
   }
 
 
@@ -348,8 +362,7 @@ export class AIFlankingSystem {
       }
 
       // Check if enough members are alive
-      const aliveCount = this.getAliveSquadMembers(squad, allCombatants).length
-      if (aliveCount < 2) {
+      if (this.countAliveSquadMembers(squad, allCombatants) < 2) {
         this.roleManager.abortFlank(operation, squad, allCombatants)
         this.activeOperations.delete(squad.id)
       }

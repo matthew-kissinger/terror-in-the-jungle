@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { FixedWingModel } from './FixedWingModel';
 import { FIXED_WING_CONFIGS } from './FixedWingConfigs';
+import { computeFixedWingShot, getFixedWingWeaponConfig } from './FixedWingArmament';
 import { AircraftModels } from '../assets/modelPaths';
 import { Faction } from '../combat/types';
 import type { CombatantSystem } from '../combat/CombatantSystem';
@@ -440,6 +441,48 @@ describe('FixedWingModel', () => {
       // The player aircraft fires as US; the shared IFF filter spares US/ARVN.
       const faction = (cs.handlePlayerShot as any).mock.calls[0][3];
       expect(faction).toBe(Faction.US);
+    });
+
+    it('routes fixed-wing fire through a normalized shot ray from the selected barrel', async () => {
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
+      try {
+        const cs = makeCombatantSystem();
+        const metadata = createSpawnMetadata();
+        model.setCombatantSystem(cs);
+        model.setPlayerController(makeAirbornePlayerController() as any);
+
+        await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+        model.setPilotedAircraft('fw1');
+        model.positionAircraftOnApproach('fw1');
+
+        model.startFiring('fw1');
+        model.update(0.001);
+
+        expect(cs.handlePlayerShot).toHaveBeenCalledTimes(1);
+        const [ray, damage, weaponType, shooterFaction] = (cs.handlePlayerShot as any).mock.calls[0] as [
+          THREE.Ray,
+          (distance: number, isHeadshot: boolean) => number,
+          string,
+          Faction,
+        ];
+        const aircraftPosition = new THREE.Vector3();
+        const aircraftQuaternion = new THREE.Quaternion();
+        const expectedMuzzle = new THREE.Vector3();
+        const expectedDirection = new THREE.Vector3();
+        model.getAircraftPositionTo('fw1', aircraftPosition);
+        model.getAircraftQuaternionTo('fw1', aircraftQuaternion);
+        const weaponConfig = getFixedWingWeaponConfig('A1_SKYRAIDER');
+        computeFixedWingShot(weaponConfig, aircraftPosition, aircraftQuaternion, 0, expectedMuzzle, expectedDirection);
+
+        expect(ray.origin.distanceTo(expectedMuzzle)).toBeLessThan(0.000001);
+        expect(ray.direction.length()).toBeCloseTo(1, 6);
+        expect(ray.direction.angleTo(expectedDirection)).toBeLessThan(0.000001);
+        expect(damage(100, false)).toBe(weaponConfig.damage);
+        expect(weaponType).toBe('fixedwing_gun');
+        expect(shooterFaction).toBe(Faction.US);
+      } finally {
+        randomSpy.mockRestore();
+      }
     });
 
     it('does not strafe while parked on the ground', async () => {

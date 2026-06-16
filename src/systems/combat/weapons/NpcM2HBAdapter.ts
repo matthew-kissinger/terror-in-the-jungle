@@ -150,6 +150,17 @@ export function createNpcM2HBAdapter(
       }
       return out;
     },
+    forEachVehicleInRadius(
+      center: THREE.Vector3,
+      radius: number,
+      visitor: (vehicle: INpcEmplacementVehicle) => void,
+    ): void {
+      vehicleManager.forEachVehicleInRadius(center, radius, vehicle => {
+        if (vehicle.category === 'emplacement') {
+          visitor(vehicle as unknown as INpcEmplacementVehicle);
+        }
+      });
+    },
   };
 
   function resolveWeapon(vehicleId: string): INpcEmplacementWeapon | null {

@@ -10,11 +10,11 @@ import { AnimalModels } from '../systems/assets/modelPaths';
  * animals that wander and flee the player. Values here are tuning constants —
  * keep behavior assertions in tests on observable outcomes, not these numbers.
  *
- * Perf posture: the roster is intentionally tiny and the cadence is low. Each
- * species is a single merged GLB (importer guarantees merge-safe buffers, no
- * skinned animation), so one active animal is ~one draw call. Combat-stress
- * harnesses (combat120 / AI Sandbox) are NOT in ALLOWED_MODES, so wildlife
- * never competes with the 120-NPC render path.
+ * Perf posture: the roster is intentionally tiny and the cadence is low.
+ * Runtime optimizes each static animal instance into merged draw-call buckets
+ * before it is added to the scene. Combat-stress harnesses (combat120 / AI
+ * Sandbox) are NOT in ALLOWED_MODES, so wildlife never competes with the
+ * AI Sandbox render path.
  */
 
 /** A spawnable ground-animal species drawn from the war-asset `animals` class. */
@@ -67,6 +67,12 @@ export const WILDLIFE_CONFIG = {
   fleeTriggerDistanceM: 25,
   /** Once a fleeing animal reaches this distance from the player, fade + despawn. */
   fleeDespawnDistanceM: 90,
+  /**
+   * Ambient animals remain fully visible at all spawn/despawn distances, but
+   * only close animals cast into the shadow map. Distant animal shadows are
+   * below useful gameplay/visual readability and cost an extra shadow pass.
+   */
+  shadowCastDistanceM: 120,
 
   /** Heading drift per second (radians) during idle wander. */
   wanderTurnRateRad: 0.6,
@@ -75,7 +81,6 @@ export const WILDLIFE_CONFIG = {
    * gradient are skipped so animals stay on walkable ground, not cliff faces.
    */
   maxWalkableSlope: 0.9,
-
   /** Spawn attempts per cadence tick when below the active cap. */
   spawnAttemptsPerTick: 1,
   /** Rejected-candidate retries inside a single spawn attempt. */

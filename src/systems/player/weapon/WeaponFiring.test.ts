@@ -11,9 +11,14 @@ import { MuzzleFlashSystem } from '../../effects/MuzzleFlashSystem'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
-import { ShotCommand } from './ShotCommand'
+import { ShotCommand, ShotCommandFactory } from './ShotCommand'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 import type { HUDSystem } from '../../../ui/hud/HUDSystem'
+import type { GrenadeSystem } from '../../weapons/GrenadeSystem'
+
+type WeaponFiringInternals = {
+  resolveTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3
+}
 
 // Mock dependencies
 vi.mock('../../weapons/GunplayCore')
@@ -237,9 +242,69 @@ describe('WeaponFiring', () => {
       expect(statsTracker.addDamage).toHaveBeenCalledWith(20)
     })
 
+    it('does not clone shotgun pellet directions during barrel-aligned visual tracing', () => {
+      command.weaponType = 'shotgun'
+      command.pelletRays = [
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.1, 0, -1)),
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.1, 0, -1))
+      ]
+      vi.mocked(combatantSystem.handlePlayerShot).mockReturnValue({
+        hit: false,
+        point: new THREE.Vector3(0, 0, -25),
+        damage: 0,
+        killed: false,
+        headshot: false
+      })
+      const cloneSpy = vi.spyOn(THREE.Vector3.prototype, 'clone')
+
+      try {
+        weaponFiring.executeShot(command)
+
+        expect(cloneSpy).not.toHaveBeenCalled()
+        expect(tracerPool.spawn).toHaveBeenCalled()
+      } finally {
+        cloneSpy.mockRestore()
+      }
+    })
+
     it('should record shot in telemetry', () => {
       weaponFiring.executeShot(command)
       expect(performanceTelemetry.recordShot).toHaveBeenCalled()
+    })
+
+    it('spawns launcher projectiles without cloning camera vectors', () => {
+      command.weaponType = 'launcher'
+      camera.position.set(2, 3, 4)
+      camera.lookAt(2, 3, 3)
+      camera.updateMatrixWorld(true)
+      const grenadeSystem = {
+        spawnProjectile: vi.fn(),
+      } as unknown as GrenadeSystem
+      weaponFiring.setGrenadeSystem(grenadeSystem)
+      const cloneSpy = vi.spyOn(THREE.Vector3.prototype, 'clone')
+
+      try {
+        const result = weaponFiring.executeShot(command)
+
+        expect(result).toEqual({ hit: false, killed: false, headshot: false, damageDealt: 0 })
+        expect(cloneSpy).not.toHaveBeenCalled()
+        expect(grenadeSystem.spawnProjectile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            x: expect.closeTo(2, 4),
+            y: expect.closeTo(3, 4),
+            z: expect.closeTo(2.5, 4),
+          }),
+          expect.objectContaining({
+            x: expect.closeTo(0, 4),
+            y: expect.closeTo(3, 4),
+            z: expect.closeTo(-40, 4),
+          }),
+          2.0
+        )
+        expect(combatantSystem.handlePlayerShot).not.toHaveBeenCalled()
+      } finally {
+        cloneSpy.mockRestore()
+      }
     })
 
     it('should track stats correctly when optional components are missing', () => {
@@ -253,7 +318,7 @@ describe('WeaponFiring', () => {
         overlayCamera,
       )
       basicWeaponFiring.setCombatantSystem(combatantSystem)
-      
+
       const result = basicWeaponFiring.executeShot(command)
       expect(result.hit).toBe(true)
       // Should not crash even if statsTracker/audioManager/hudSystem are missing
@@ -267,11 +332,6 @@ describe('WeaponFiring', () => {
         target.set(0.62, -0.28, -0.72)
         return target
       })
-      vi.mocked((combatantSystem as any).resolvePlayerAimPoint).mockReturnValue({
-        hit: false,
-        point: new THREE.Vector3(0, 0, -40),
-      })
-
       weaponFiring.executeShot(command)
 
       const expectedMuzzleNdc = new THREE.Vector3(0.62, -0.28, -0.72).project(overlayCamera)
@@ -289,6 +349,7 @@ describe('WeaponFiring', () => {
       expect(firedRay.direction.x).toBeCloseTo(0)
       expect(firedRay.direction.y).toBeCloseTo(0)
       expect(firedRay.direction.z).toBeCloseTo(-1)
+      expect(combatantSystem.resolvePlayerAimPoint).not.toHaveBeenCalled()
       expect(tracerPool.spawn).toHaveBeenCalledWith(
         expect.objectContaining({
           x: expect.closeTo(expectedTracerStart.x, 2),
@@ -298,6 +359,91 @@ describe('WeaponFiring', () => {
         expect.objectContaining({ x: 0, y: 0, z: -10 }),
         120
       )
+    })
+
+    it('resolves hip-fire tracer start from the camera basis without extra axis normalizations', () => {
+      camera.position.set(3, 4, 5)
+      camera.quaternion.setFromEuler(new THREE.Euler(0.2, 0.45, -0.1))
+      camera.updateMatrixWorld(true)
+
+      const expectedForward = new THREE.Vector3()
+      const expectedRight = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
+      const expectedUp = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion)
+      camera.getWorldDirection(expectedForward)
+      const expectedStart = camera.position.clone()
+        .addScaledVector(expectedRight, 0.18)
+        .addScaledVector(expectedUp, -0.14)
+        .addScaledVector(expectedForward, 1.35)
+
+      const target = new THREE.Vector3()
+      const normalizeSpy = vi.spyOn(THREE.Vector3.prototype, 'normalize')
+
+      try {
+        const result = (weaponFiring as unknown as WeaponFiringInternals).resolveTracerStart(target, false)
+
+        expect(result).toBe(target)
+        expect(normalizeSpy).toHaveBeenCalledTimes(1)
+        expect(target.x).toBeCloseTo(expectedStart.x)
+        expect(target.y).toBeCloseTo(expectedStart.y)
+        expect(target.z).toBeCloseTo(expectedStart.z)
+      } finally {
+        normalizeSpy.mockRestore()
+      }
+    })
+
+    it('spawns visual tracers without building another shot command', () => {
+      const createSingleShotSpy = vi.spyOn(ShotCommandFactory, 'createSingleShot')
+      const createShotgunShotSpy = vi.spyOn(ShotCommandFactory, 'createShotgunShot')
+
+      try {
+        weaponFiring.executeShot(command)
+
+        expect(createSingleShotSpy).not.toHaveBeenCalled()
+        expect(createShotgunShotSpy).not.toHaveBeenCalled()
+        expect(tracerPool.spawn).toHaveBeenCalledWith(
+          expect.any(THREE.Vector3),
+          expect.objectContaining({ x: 0, y: 0, z: -10 }),
+          120
+        )
+      } finally {
+        createSingleShotSpy.mockRestore()
+        createShotgunShotSpy.mockRestore()
+      }
+    })
+
+    it('spawns shotgun visual tracers without building a visual shotgun command', () => {
+      command.weaponType = 'shotgun'
+      command.pelletRays = [
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.1, 0, -1).normalize()),
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.1, 0, -1).normalize()),
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.1, -1).normalize()),
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -0.1, -1).normalize()),
+      ]
+      vi.mocked(combatantSystem.handlePlayerShot).mockReturnValue({
+        hit: false,
+        point: new THREE.Vector3(0, 0, -25),
+        damage: 0,
+        killed: false,
+        headshot: false
+      })
+      const createSingleShotSpy = vi.spyOn(ShotCommandFactory, 'createSingleShot')
+      const createShotgunShotSpy = vi.spyOn(ShotCommandFactory, 'createShotgunShot')
+
+      try {
+        weaponFiring.executeShot(command)
+
+        expect(createSingleShotSpy).not.toHaveBeenCalled()
+        expect(createShotgunShotSpy).not.toHaveBeenCalled()
+        expect(tracerPool.spawn).toHaveBeenCalledTimes(2)
+        expect(tracerPool.spawn).toHaveBeenCalledWith(
+          expect.any(THREE.Vector3),
+          expect.any(THREE.Vector3),
+          100
+        )
+      } finally {
+        createSingleShotSpy.mockRestore()
+        createShotgunShotSpy.mockRestore()
+      }
     })
   })
 

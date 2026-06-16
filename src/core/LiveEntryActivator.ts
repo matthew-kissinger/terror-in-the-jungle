@@ -20,6 +20,7 @@ import {
 
 const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
 const NPC_CLOSE_MODEL_PREWARM_TIMEOUT_MS = 1800;
+const RENDERER_PIPELINE_PREWARM_TIMEOUT_MS = 1500;
 const NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE =
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP;
 
@@ -47,7 +48,6 @@ export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.V
   }
   performanceTelemetry.setEnabled(
     engine.performanceOverlay.isVisible()
-    || engine.sandboxEnabled
     || ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
   );
 }
@@ -153,6 +153,16 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     markStartup('engine-init.startup-flow.npc-close-model-prewarm.skipped-mobile');
   }
 
+  markStepBegin('wildlife-asset-prewarm');
+  markPhase('wildlife-asset-prewarm', 'PRIMING WILDLIFE ASSETS', 'Preparing ambient animal models before renderer reveal...');
+  await prewarmWildlifeAssets(engine);
+  markStepEnd('wildlife-asset-prewarm');
+
+  markStepBegin('renderer-pipeline-prewarm');
+  markPhase('renderer-pipeline-prewarm', 'PRIMING RENDERER PIPELINES', 'Preparing terrain, foliage, shadows, and combat materials...');
+  await prewarmRendererPipelines(engine);
+  markStepEnd('renderer-pipeline-prewarm');
+
   void nextFrame().then((frameYield) => {
     markStartup(`engine-init.startup-flow.flush-chunk-update.post-reveal-yield-${frameYield}`);
     schedulePostRevealBackgroundTasks();
@@ -209,7 +219,10 @@ function setNpcCloseModelLazyLoadAllowed(allowed: boolean): void {
 
 async function prewarmNearbyNpcCloseModels(engine: GameEngine): Promise<void> {
   const prewarmPromise = engine.systemManager.combatantSystem
-    .prewarmCloseModelsNearPlayer({ maxActive: NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE })
+    .prewarmCloseModelsNearPlayer({
+      maxActive: NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE,
+      primeFactionAssets: true,
+    })
     .catch((error) => {
       Logger.warn('engine-init', 'NPC close-model prewarm failed:', error);
       return null;
@@ -231,14 +244,50 @@ async function prewarmNearbyNpcCloseModels(engine: GameEngine): Promise<void> {
     return;
   }
   markStartup(`engine-init.startup-flow.npc-close-model-prewarm.candidates-${result.candidatesWithinCloseRadius}`);
+  markStartup(`engine-init.startup-flow.npc-close-model-prewarm.primed-assets-${result.primedAssetPaths}`);
   markStartup(`engine-init.startup-flow.npc-close-model-prewarm.rendered-${result.renderedCloseModels}`);
   markStartup(`engine-init.startup-flow.npc-close-model-prewarm.fallbacks-${result.fallbackCount}`);
   Logger.info(
     'engine-init',
     `NPC close-model prewarm ${result.skippedReason}: candidates=${result.candidatesWithinCloseRadius}, `
+      + `primedAssets=${result.primedAssetPaths}, `
       + `rendered=${result.renderedCloseModels}, fallbacks=${result.fallbackCount}, `
       + `duration=${result.durationMs.toFixed(1)}ms`,
   );
+}
+
+async function prewarmWildlifeAssets(engine: GameEngine): Promise<void> {
+  const wildlifeSystem = engine.systemManager.getSystems()
+    .find((system) => typeof (system as { preloadCurrentModeAssets?: unknown }).preloadCurrentModeAssets === 'function') as
+      | { preloadCurrentModeAssets(): Promise<number> }
+      | undefined;
+  if (!wildlifeSystem) {
+    markStartup('engine-init.startup-flow.wildlife-asset-prewarm.unavailable');
+    return;
+  }
+
+  try {
+    const primedAssets = await wildlifeSystem.preloadCurrentModeAssets();
+    markStartup(`engine-init.startup-flow.wildlife-asset-prewarm.primed-assets-${primedAssets}`);
+    Logger.info('engine-init', `Wildlife asset prewarm primed ${primedAssets} model paths`);
+  } catch (error) {
+    markStartup('engine-init.startup-flow.wildlife-asset-prewarm.failed');
+    Logger.warn('engine-init', 'Wildlife asset prewarm failed:', error);
+  }
+}
+
+async function prewarmRendererPipelines(engine: GameEngine): Promise<void> {
+  try {
+    const result = await engine.renderer.precompileShadersAsync({
+      renderOnce: true,
+      timeoutMs: RENDERER_PIPELINE_PREWARM_TIMEOUT_MS,
+      reason: 'live-entry',
+    });
+    markStartup(`engine-init.startup-flow.renderer-pipeline-prewarm.${result}`);
+  } catch (error) {
+    markStartup('engine-init.startup-flow.renderer-pipeline-prewarm.failed');
+    Logger.warn('engine-init', 'Renderer pipeline prewarm failed:', error);
+  }
 }
 
 function nextFrame(): Promise<'raf' | 'timeout'> {

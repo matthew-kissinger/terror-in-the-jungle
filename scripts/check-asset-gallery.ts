@@ -27,6 +27,7 @@
  */
 
 import { chromium, type Page, type ConsoleMessage } from 'playwright';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { warAssetCatalog, type WarAssetEntry } from '../src/config/generated/warAssetCatalog';
@@ -66,6 +67,20 @@ function ts(): string {
 
 function log(msg: string): void {
   console.log(`[${new Date().toISOString()}] [asset-gallery] ${msg}`);
+}
+
+function gitOutputOrFallback(args: string[], fallback: string): string {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+  } catch {
+    return fallback;
+  }
+}
+
+function gitStatus(): string[] {
+  return gitOutputOrFallback(['status', '--short'], '')
+    .split(/\r?\n/)
+    .filter(Boolean);
 }
 
 function parseOnly(): Set<string> | null {
@@ -227,7 +242,13 @@ async function main(): Promise<void> {
     const failed = results.filter((r) => r.status === 'FAIL');
     writeFileSync(
       join(outDir, 'summary.json'),
-      JSON.stringify({ generatedAt: new Date().toISOString(), total: results.length, results }, null, 2),
+      JSON.stringify({
+        generatedAt: new Date().toISOString(),
+        sourceGitSha: gitOutputOrFallback(['rev-parse', 'HEAD'], 'unknown'),
+        sourceGitStatus: gitStatus(),
+        total: results.length,
+        results,
+      }, null, 2),
     );
     log(`done — ${passed.length} pass, ${failed.length} fail`);
     log(`  artifacts: ${outDir}`);

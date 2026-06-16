@@ -114,10 +114,18 @@
   // positive look height; combatant targets need a center-mass offset below
   // their actor anchor.
   const PLAYER_EYE_HEIGHT = 2.2;
-  // Mirrors the visual chest proxy center:
-  // NPC_PIXEL_FORGE_VISUAL_HEIGHT(2.95) * HIT_PROXY_HEIGHT_MULTIPLIER(1.16)
-  // * average chest ratio(0.59) - NPC_Y_OFFSET(2.2).
-  const TARGET_ACTOR_AIM_Y_OFFSET = -0.18;
+  // Mirrors the visual chest proxy center from CombatantConfig and
+  // CombatantBodyMetrics. Keep this formula aligned with
+  // src/dev/harness/playerBot/states.ts.
+  const NPC_PIXEL_FORGE_VISUAL_HEIGHT = 2.95 * 1.0;
+  const COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER = 1.16;
+  const COMBATANT_HIT_PROXY_CHEST_START_RATIO = 0.46;
+  const COMBATANT_HIT_PROXY_CHEST_END_RATIO = 0.72;
+  const TARGET_ACTOR_AIM_Y_OFFSET =
+    NPC_PIXEL_FORGE_VISUAL_HEIGHT
+    * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
+    * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
+    - PLAYER_EYE_HEIGHT;
   const TARGET_CHEST_HEIGHT = PLAYER_EYE_HEIGHT + TARGET_ACTOR_AIM_Y_OFFSET;
   const TARGET_LOS_HEIGHT = TARGET_CHEST_HEIGHT;
   const DEFAULT_BULLET_SPEED = 400;
@@ -137,8 +145,35 @@
   const ROUTE_PROGRESS_TIMEOUT_MS = 6000;
   const ROUTE_PROGRESS_MIN_TRAVEL = 60;
   const ROUTE_NO_PROGRESS_TARGET_COOLDOWN_MS = 8000;
+  const SHOT_EPOCH_HISTORY_LIMIT = 32;
+  const ROUTE_SNAP_EPOCH_HISTORY_LIMIT = 32;
+  const FIRING_RETARGET_EPOCH_HISTORY_LIMIT = 32;
   const NAVMESH_START_SNAP_RADIUS = 80;
   const NAVMESH_TARGET_SNAP_RADIUS = 80;
+  const NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE = 24;
+  // Humanized synthetic-camera slew cap. The driver used to allow 24 deg yaw /
+  // 8 deg pitch in one tick, which made route-to-fire handoffs look unlike a
+  // player mouse sweep and could perturb terrain/CDLOD presentation.
+  const DRIVER_VIEW_MAX_YAW_STEP_RAD = (12 * Math.PI) / 180;
+  const DRIVER_VIEW_MAX_PITCH_STEP_RAD = (4 * Math.PI) / 180;
+
+  function normalizeDriverSeed(raw) {
+    const seed = Number(raw);
+    if (!Number.isFinite(seed) || seed < 0) return null;
+    return Math.floor(seed) >>> 0;
+  }
+
+  function createSeededRandom(seed) {
+    let state = normalizeDriverSeed(seed);
+    if (state === null) return Math.random;
+    return function seededRandom() {
+      state = (state + 0x6D2B79F5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
 
   function isPathTrusted(opts) {
     const path = opts && opts.path;
@@ -400,12 +435,169 @@
     return { fire: true, reason: 'ok' };
   }
 
+  function sampleTerrainLineHeight(terrain, x, z) {
+    if (!terrain) return null;
+    const sample = typeof terrain.getEffectiveHeightAt === 'function'
+      ? terrain.getEffectiveHeightAt(x, z)
+      : typeof terrain.getHeightAt === 'function'
+        ? terrain.getHeightAt(x, z)
+        : null;
+    const height = Number(sample);
+    return Number.isFinite(height) ? height : null;
+  }
+
+  function findHeightProfileTerrainBlock(terrain, from, dir, distance, clearance) {
+    if (!terrain || (typeof terrain.getEffectiveHeightAt !== 'function' && typeof terrain.getHeightAt !== 'function')) {
+      return null;
+    }
+    if (!Number.isFinite(distance) || distance <= 0) return null;
+    const targetClearance = Number.isFinite(Number(clearance)) ? Math.max(0, Number(clearance)) : 0.75;
+    const endpointPadding = Math.min(8, Math.max(targetClearance, distance * 0.05));
+    const startDistance = Math.max(4, endpointPadding);
+    const stopDistance = distance - endpointPadding;
+    if (stopDistance <= startDistance) return null;
+    const step = Math.max(4, Math.min(8, distance / 48));
+    const occlusionMargin = -0.25;
+    for (let d = startDistance; d < stopDistance; d += step) {
+      const x = from.x + dir.x * d;
+      const y = from.y + dir.y * d;
+      const z = from.z + dir.z * d;
+      const terrainY = sampleTerrainLineHeight(terrain, x, z);
+      if (terrainY === null) continue;
+      if (terrainY - y >= occlusionMargin) {
+        return d;
+      }
+    }
+    return null;
+  }
+
+  function queryTerrainLineOfSight(terrain, fromPos, toPos, clearance) {
+    if (!terrain || typeof terrain.raycastTerrain !== 'function') {
+      return { status: 'unknown', clear: false, reason: 'missing_terrain_raycast' };
+    }
+    const from = {
+      x: Number(fromPos && fromPos.x),
+      y: Number((fromPos && fromPos.y) || 0),
+      z: Number(fromPos && fromPos.z),
+    };
+    const to = {
+      x: Number(toPos && toPos.x),
+      y: Number((toPos && toPos.y) || 0),
+      z: Number(toPos && toPos.z),
+    };
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dz = to.z - from.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (!Number.isFinite(distance)) {
+      return { status: 'unknown', clear: false, reason: 'invalid_query' };
+    }
+    if (distance < 0.001) {
+      return { status: 'clear', clear: true, reason: 'degenerate_distance' };
+    }
+    const dir = { x: dx / distance, y: dy / distance, z: dz / distance };
+    let hit;
+    try {
+      hit = terrain.raycastTerrain(from, dir, distance);
+    } catch (_error) {
+      return { status: 'unknown', clear: false, reason: 'raycast_error' };
+    }
+    const targetClearance = Number.isFinite(Number(clearance)) ? Math.max(0, Number(clearance)) : 0.75;
+    if (!hit || !hit.hit) {
+      const profileBlockDistance = findHeightProfileTerrainBlock(terrain, from, dir, distance, targetClearance);
+      if (profileBlockDistance !== null) {
+        return {
+          status: 'blocked',
+          clear: false,
+          reason: 'height_profile_blocked',
+          distance: profileBlockDistance,
+        };
+      }
+      return { status: 'clear', clear: true, reason: 'raycast_miss' };
+    }
+    if (!Number.isFinite(Number(hit.distance))) {
+      return { status: 'unknown', clear: false, reason: 'invalid_hit_distance' };
+    }
+    if (Number(hit.distance) < distance - targetClearance) {
+      return { status: 'blocked', clear: false, reason: 'terrain_hit_before_target' };
+    }
+    return { status: 'clear', clear: true, reason: 'hit_within_target_clearance' };
+  }
+
+  function hasClearTerrainLineOfSight(terrain, fromPos, toPos, clearance) {
+    return queryTerrainLineOfSight(terrain, fromPos, toPos, clearance).clear;
+  }
+
   function angularDistance(yaw1, pitch1, yaw2, pitch2) {
     let dy = Number(yaw2) - Number(yaw1);
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     const dp = Number(pitch2) - Number(pitch1);
     return Math.hypot(dy, dp);
+  }
+
+  function signedYawDelta(fromYaw, toYaw) {
+    let delta = Number(toYaw) - Number(fromYaw);
+    if (!Number.isFinite(delta)) return 0;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return delta;
+  }
+
+  function clampSigned(value, maxAbs) {
+    const v = Number(value);
+    const limit = Math.max(0, Number(maxAbs) || 0);
+    if (!Number.isFinite(v)) return 0;
+    if (v > limit) return limit;
+    if (v < -limit) return -limit;
+    return v;
+  }
+
+  function clampDriverPitch(p) {
+    if (!Number.isFinite(p)) return 0;
+    return Math.max(-AIM_PITCH_LIMIT_RAD, Math.min(AIM_PITCH_LIMIT_RAD, p));
+  }
+
+  function applyViewSlewLimit(currentYaw, currentPitch, targetYaw, targetPitch, limits) {
+    const yawLimit = Number.isFinite(Number(limits && limits.yaw))
+      ? Math.max(0, Number(limits.yaw))
+      : DRIVER_VIEW_MAX_YAW_STEP_RAD;
+    const pitchLimit = Number.isFinite(Number(limits && limits.pitch))
+      ? Math.max(0, Number(limits.pitch))
+      : DRIVER_VIEW_MAX_PITCH_STEP_RAD;
+    const yawDelta = signedYawDelta(currentYaw, targetYaw);
+    const pitchDelta = Number(targetPitch) - Number(currentPitch);
+    const clampedYawDelta = clampSigned(yawDelta, yawLimit);
+    const clampedPitchDelta = clampSigned(pitchDelta, pitchLimit);
+    const yaw = Number(currentYaw) + clampedYawDelta;
+    const pitch = clampDriverPitch(Number(currentPitch) + clampedPitchDelta);
+    return {
+      yaw,
+      pitch,
+      yawDelta,
+      pitchDelta,
+      remainingYawDelta: signedYawDelta(yaw, targetYaw),
+      remainingPitchDelta: Number(targetPitch) - pitch,
+      yawClamped: Math.abs(clampedYawDelta - yawDelta) > 1e-9,
+      pitchClamped: Math.abs(clampedPitchDelta - pitchDelta) > 1e-9,
+    };
+  }
+
+  function syncViewAnchorToActual(anchorYaw, anchorPitch, actualYaw, actualPitch, epsilonRad) {
+    const yawFallback = Number.isFinite(Number(anchorYaw)) ? Number(anchorYaw) : 0;
+    const pitchFallback = clampDriverPitch(Number.isFinite(Number(anchorPitch)) ? Number(anchorPitch) : 0);
+    const yaw = Number.isFinite(Number(actualYaw)) ? Number(actualYaw) : yawFallback;
+    const pitch = Number.isFinite(Number(actualPitch)) ? clampDriverPitch(Number(actualPitch)) : pitchFallback;
+    const yawDelta = signedYawDelta(yawFallback, yaw);
+    const pitchDelta = pitch - pitchFallback;
+    const epsilon = Number.isFinite(Number(epsilonRad)) ? Math.max(0, Number(epsilonRad)) : 1e-4;
+    return {
+      yaw,
+      pitch,
+      yawDelta,
+      pitchDelta,
+      changed: Math.abs(yawDelta) > epsilon || Math.abs(pitchDelta) > epsilon,
+    };
   }
 
   // ── Objective zone selector (pure, exported for Node-side regression tests). ──
@@ -609,6 +801,229 @@
     return nowMs - matchEndedAtMs >= tail;
   }
 
+  function appendBoundedEvent(buffer, event, limit) {
+    if (!Array.isArray(buffer)) return [];
+    const max = Math.max(1, Number.isFinite(Number(limit)) ? Math.floor(Number(limit)) : SHOT_EPOCH_HISTORY_LIMIT);
+    if (buffer.length < max) {
+      buffer.push(event);
+      return buffer;
+    }
+    if (buffer.length > max) {
+      const retainStart = buffer.length - max;
+      for (let i = 0; i < max; i++) {
+        buffer[i] = buffer[i + retainStart];
+      }
+      buffer.length = max;
+    }
+    buffer.copyWithin(0, 1, max);
+    buffer[max - 1] = event;
+    return buffer;
+  }
+
+  function finiteOrNull(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  function sanitizeVector3Like(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      x: finiteOrNull(value.x),
+      y: finiteOrNull(value.y),
+      z: finiteOrNull(value.z),
+    };
+  }
+
+  function sanitizeRotationDegLike(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      yaw: finiteOrNull(value.yaw),
+      pitch: finiteOrNull(value.pitch),
+      roll: finiteOrNull(value.roll),
+    };
+  }
+
+  function sanitizeQuaternionLike(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      x: finiteOrNull(value.x),
+      y: finiteOrNull(value.y),
+      z: finiteOrNull(value.z),
+      w: finiteOrNull(value.w),
+    };
+  }
+
+  function sanitizeCameraDeltaLike(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      positionMeters: finiteOrNull(value.positionMeters),
+      yawDeg: finiteOrNull(value.yawDeg),
+      pitchDeg: finiteOrNull(value.pitchDeg),
+      rollDeg: finiteOrNull(value.rollDeg),
+    };
+  }
+
+  function sanitizePresentationCameraEpoch(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      stage: typeof value.stage === 'string' ? value.stage : 'unknown',
+      frameCount: finiteOrNull(value.frameCount),
+      atMs: finiteOrNull(value.atMs),
+      cameraSource: typeof value.cameraSource === 'string' ? value.cameraSource : 'unknown',
+      position: sanitizeVector3Like(value.position),
+      rotationDeg: sanitizeRotationDegLike(value.rotationDeg),
+      quaternion: sanitizeQuaternionLike(value.quaternion),
+      deltaFromPrevious: sanitizeCameraDeltaLike(value.deltaFromPrevious),
+    };
+  }
+
+  function sanitizePresentationTerrainSample(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      terrainHeightAtCamera: finiteOrNull(value.terrainHeightAtCamera),
+      effectiveHeightAtCamera: finiteOrNull(value.effectiveHeightAtCamera),
+      clearanceMeters: finiteOrNull(value.clearanceMeters),
+      effectiveClearanceMeters: finiteOrNull(value.effectiveClearanceMeters),
+      hasTerrain: typeof value.hasTerrain === 'boolean' ? value.hasTerrain : null,
+      areaReady: typeof value.areaReady === 'boolean' ? value.areaReady : null,
+    };
+  }
+
+  function sanitizeStringNumberRecord(value) {
+    if (!value || typeof value !== 'object') return {};
+    const output = {};
+    for (const key in value) {
+      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+      const numeric = finiteOrNull(value[key]);
+      if (numeric !== null) output[String(key)] = numeric;
+    }
+    return output;
+  }
+
+  function sanitizePresentationTerrainEpoch(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      tileCount: finiteOrNull(value.tileCount),
+      tileSelectionSaturated: typeof value.tileSelectionSaturated === 'boolean'
+        ? value.tileSelectionSaturated
+        : null,
+      tileHash: typeof value.tileHash === 'string' ? value.tileHash : null,
+      lodCounts: sanitizeStringNumberRecord(value.lodCounts),
+      morphingTiles: finiteOrNull(value.morphingTiles),
+      maxMorphFactor: finiteOrNull(value.maxMorphFactor),
+      edgeMorphTiles: finiteOrNull(value.edgeMorphTiles),
+      edgeMorphMaskCounts: sanitizeStringNumberRecord(value.edgeMorphMaskCounts),
+      minTileSize: finiteOrNull(value.minTileSize),
+      maxTileSize: finiteOrNull(value.maxTileSize),
+      cameraSample: sanitizePresentationTerrainSample(value.cameraSample),
+    };
+  }
+
+  function sanitizePresentationTerrainSync(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      didSync: typeof value.didSync === 'boolean' ? value.didSync : null,
+      reason: typeof value.reason === 'string' ? value.reason : 'unknown',
+      selectionRechecked: typeof value.selectionRechecked === 'boolean' ? value.selectionRechecked : null,
+      poseWasStale: typeof value.poseWasStale === 'boolean' ? value.poseWasStale : null,
+      projectionChanged: typeof value.projectionChanged === 'boolean' ? value.projectionChanged : null,
+      positionDeltaMeters: finiteOrNull(value.positionDeltaMeters),
+      rotationDeltaDeg: finiteOrNull(value.rotationDeltaDeg),
+      tileCount: finiteOrNull(value.tileCount),
+      tileSelectionSaturated: typeof value.tileSelectionSaturated === 'boolean'
+        ? value.tileSelectionSaturated
+        : null,
+    };
+  }
+
+  function sanitizePresentationRendererStats(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      drawCalls: finiteOrNull(value.drawCalls),
+      triangles: finiteOrNull(value.triangles),
+      geometries: finiteOrNull(value.geometries),
+      textures: finiteOrNull(value.textures),
+      programs: finiteOrNull(value.programs),
+    };
+  }
+
+  function sanitizePresentationContext(value) {
+    if (!value || typeof value !== 'object') return null;
+    const terrainByStage = {};
+    if (value.terrainByStage && typeof value.terrainByStage === 'object') {
+      for (const stage in value.terrainByStage) {
+        if (!Object.prototype.hasOwnProperty.call(value.terrainByStage, stage)) continue;
+        const terrain = sanitizePresentationTerrainEpoch(value.terrainByStage[stage]);
+        if (terrain) terrainByStage[String(stage)] = terrain;
+      }
+    }
+    return {
+      frameCount: finiteOrNull(value.frameCount),
+      atMs: finiteOrNull(value.atMs),
+      cameraEpochs: Array.isArray(value.cameraEpochs)
+        ? value.cameraEpochs.slice(-8).map(sanitizePresentationCameraEpoch).filter(Boolean)
+        : [],
+      terrain: sanitizePresentationTerrainEpoch(value.terrain),
+      terrainByStage,
+      terrainSync: sanitizePresentationTerrainSync(value.terrainSync),
+      renderer: sanitizePresentationRendererStats(value.renderer),
+    };
+  }
+
+  function readPresentationContextForShot() {
+    const w = globalWindow;
+    const store = w && w.__presentationEpochContext;
+    if (!store || typeof store.getLatestContext !== 'function') return null;
+    try {
+      return sanitizePresentationContext(store.getLatestContext());
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  function collisionContributorSortY(contributor) {
+    const value = Number(contributor && contributor.maxY || 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function addTopCollisionContributor(out, contributor, limit) {
+    if (!Array.isArray(out) || !contributor) return out;
+    const max = Math.max(1, Number.isFinite(Number(limit)) ? Math.floor(Number(limit)) : 5);
+    const candidateY = collisionContributorSortY(contributor);
+    let insertIndex = out.length;
+    for (let i = 0; i < out.length; i++) {
+      if (candidateY > collisionContributorSortY(out[i])) {
+        insertIndex = i;
+        break;
+      }
+    }
+    if (insertIndex >= max) return out;
+    const cappedLength = Math.min(out.length, max - 1);
+    out.length = Math.min(out.length + 1, max);
+    for (let i = out.length - 1; i > insertIndex; i--) {
+      if (i - 1 < cappedLength) out[i] = out[i - 1];
+    }
+    out[insertIndex] = contributor;
+    return out;
+  }
+
+  function shouldRecordRouteSnapEpoch(opts) {
+    const start = opts && opts.start;
+    const end = opts && opts.end;
+    const status = String((opts && opts.status) || 'unknown');
+    const startDistance = start && Number.isFinite(Number(start.distance)) ? Number(start.distance) : null;
+    const endDistance = end && Number.isFinite(Number(end.distance)) ? Number(end.distance) : null;
+    return !!(
+      (start && start.snapped) ||
+      (end && end.snapped) ||
+      !(start && start.found) ||
+      !(end && end.found) ||
+      status !== 'nav_ok' ||
+      (startDistance !== null && startDistance > 0.01) ||
+      (endDistance !== null && endDistance > 0.01)
+    );
+  }
+
   function createIdleBotIntent() {
     return {
       moveForward: 0,
@@ -635,6 +1050,14 @@
     return intent && intent.aimTarget ? intent.aimTarget : null;
   }
 
+  function classifyDriverViewTarget(intent, overlayPoint, viewTarget) {
+    if (!viewTarget) return null;
+    if (intent && intent.aimTarget === viewTarget) return 'aim_target';
+    if (intent && intent.movementTarget === viewTarget) return 'movement_target';
+    if (overlayPoint && overlayPoint === viewTarget) return 'route_overlay';
+    return 'other';
+  }
+
   function computeWorldMovementIntent(intent, overlayPoint, playerPos) {
     if (!intent || !playerPos) return null;
     const forward = Number(intent.moveForward || 0);
@@ -650,6 +1073,25 @@
       return { x: 0, z: 0, distance: Number.isFinite(len) ? len : 0 };
     }
     return { x: dx / len, z: dz / len, distance: len };
+  }
+
+  function computeViewMovementDivergence(viewTarget, intent, overlayPoint, playerPos) {
+    if (!viewTarget || !intent || !playerPos) return null;
+    const movementTarget = intent.movementTarget || overlayPoint || null;
+    if (!movementTarget) return null;
+    const ax = Number(viewTarget.x || 0) - Number(playerPos.x || 0);
+    const az = Number(viewTarget.z || 0) - Number(playerPos.z || 0);
+    const mx = Number(movementTarget.x || 0) - Number(playerPos.x || 0);
+    const mz = Number(movementTarget.z || 0) - Number(playerPos.z || 0);
+    const aimLen = Math.hypot(ax, az);
+    const moveLen = Math.hypot(mx, mz);
+    if (!Number.isFinite(aimLen) || !Number.isFinite(moveLen) || aimLen < 1e-6 || moveLen < 1e-6) return null;
+    const dot = Math.max(-1, Math.min(1, (ax * mx + az * mz) / (aimLen * moveLen)));
+    return {
+      angleDeg: Math.acos(dot) * 180 / Math.PI,
+      aimDistance: aimLen,
+      movementDistance: moveLen,
+    };
   }
 
   function applyRouteOverlayRecovery(intent, overlayPoint, stuckMs) {
@@ -758,6 +1200,86 @@
     return true;
   }
 
+  function addNearestVisibleCheckCandidate(candidates, candidate, maxCandidates) {
+    if (!Array.isArray(candidates) || !candidate) return;
+    const limit = Math.max(1, Number.isFinite(Number(maxCandidates)) ? Math.floor(Number(maxCandidates)) : 12);
+    let insertAt = candidates.length;
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidate.distSq < candidates[i].distSq) {
+        insertAt = i;
+        break;
+      }
+    }
+    if (insertAt >= limit && candidates.length >= limit) {
+      if (candidates.length > limit) {
+        candidates.length = limit;
+      }
+      return;
+    }
+    const nextLength = Math.min(candidates.length + 1, limit);
+    for (let i = nextLength - 1; i > insertAt; i--) {
+      candidates[i] = candidates[i - 1];
+    }
+    candidates[insertAt] = candidate;
+    candidates.length = nextLength;
+  }
+
+  function selectVisiblePreferredEnemyCandidate(opts) {
+    const combatants = opts && Array.isArray(opts.combatants) ? opts.combatants : [];
+    const playerPos = opts && opts.playerPos;
+    if (!playerPos || combatants.length === 0) return null;
+    const perceptionRange = Math.max(0, Number(opts && opts.perceptionRange || 0));
+    const perceptionSq = perceptionRange > 0 ? perceptionRange * perceptionRange : Number.POSITIVE_INFINITY;
+    const maxFireDistance = Math.max(0, Number(opts && opts.maxFireDistance || 0));
+    const fireSq = maxFireDistance > 0 ? maxFireDistance * maxFireDistance : perceptionSq;
+    const maxVisibleChecks = Number.isFinite(Number(opts && opts.maxVisibleChecks))
+      ? Math.max(1, Math.floor(Number(opts.maxVisibleChecks)))
+      : 12;
+    const isEnemy = opts && typeof opts.isEnemy === 'function' ? opts.isEnemy : () => true;
+    const isBlocked = opts && typeof opts.isBlocked === 'function' ? opts.isBlocked : () => false;
+    const canSeeTarget = opts && typeof opts.canSeeTarget === 'function' ? opts.canSeeTarget : null;
+    let nearest = null;
+    let nearestDistSq = Number.POSITIVE_INFINITY;
+    const visibleCheckCandidates = [];
+
+    for (let i = 0; i < combatants.length; i++) {
+      const c = combatants[i];
+      if (!c || c.id === 'player_proxy') continue;
+      if (!isEnemy(c)) continue;
+      if (c.health <= 0 || c.state === 'dead') continue;
+      if (isBlocked(c)) continue;
+      if (!c.position) continue;
+      const dx = Number(c.position.x) - Number(playerPos.x);
+      const dz = Number(c.position.z) - Number(playerPos.z);
+      const distSq = dx * dx + dz * dz;
+      if (!Number.isFinite(distSq) || distSq > perceptionSq) continue;
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
+        nearest = c;
+      }
+      if (canSeeTarget && distSq <= fireSq) {
+        addNearestVisibleCheckCandidate(visibleCheckCandidates, { combatant: c, distSq }, maxVisibleChecks);
+      }
+    }
+
+    for (let i = 0; i < visibleCheckCandidates.length; i++) {
+      const candidate = visibleCheckCandidates[i];
+      if (canSeeTarget(candidate.combatant.position)) {
+        return {
+          combatant: candidate.combatant,
+          distance: Math.sqrt(candidate.distSq),
+          visible: true,
+        };
+      }
+    }
+
+    return nearest ? {
+      combatant: nearest,
+      distance: Math.sqrt(nearestDistSq),
+      visible: false,
+    } : null;
+  }
+
   function shouldUseTargetForCurrentObjective(opts) {
     const target = opts && opts.target;
     if (!target || !target.position) return false;
@@ -780,7 +1302,8 @@
       ? !!opts.canSeeTarget(target.position)
       : false;
 
-    if (targetDistance <= acquisitionDistance && canSeeTarget) return true;
+    const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
+    if (targetDistance <= interruptDistance && canSeeTarget) return true;
     if (!sameLockedTarget) return false;
     if (botState !== 'ALERT' && botState !== 'ENGAGE' && botState !== 'ADVANCE') return false;
     // Close-pressure fights can momentarily occlude the locked target behind
@@ -801,12 +1324,14 @@
       return false;
     }
 
-    // If the bot is already firing, LOS is established by the state machine.
-    // Route overlay points are still useful around occlusion, but during
-    // visible fire-and-close behavior they can make the driver step around a
-    // local nav corner instead of simply pushing toward the target.
-    if (botState === 'ENGAGE' && intent.firePrimary && opts && opts.currentTarget) {
-      return false;
+    // Keep movement aim-aligned whenever the current target is visible.
+    // ADVANCE still owns routed occlusion recovery; ENGAGE owns short-range
+    // pressure including reload/fire gaps.
+    if (opts && opts.currentTarget) {
+      if (botState === 'ENGAGE') return false;
+      if ((botState === 'ADVANCE' || botState === 'ALERT') && opts.currentTargetVisible === true) {
+        return false;
+      }
     }
 
     return botState === 'ADVANCE' || botState === 'PATROL' || botState === 'ALERT' || botState === 'ENGAGE';
@@ -816,12 +1341,27 @@
     const targetKind = String(opts && opts.targetKind || '');
     if (targetKind !== 'current_target' && targetKind !== 'nearest_opfor') return false;
     const failureReason = String(opts && opts.failureReason || '');
-    if (failureReason !== 'end_snap_failed' && failureReason !== 'start_snap_failed') return false;
+    if (
+      failureReason !== 'end_snap_failed'
+      && failureReason !== 'start_snap_failed'
+      && failureReason !== 'snap_distance_untrusted'
+    ) return false;
     const targetDistance = Number(opts && opts.targetDistance);
     if (!Number.isFinite(targetDistance) || targetDistance <= 0) return false;
     const maxDistance = Number(opts && opts.maxDistance);
     if (!Number.isFinite(maxDistance) || maxDistance <= 0) return false;
     return targetDistance <= maxDistance;
+  }
+
+  function isRouteSnapTrusted(opts) {
+    const limit = Number.isFinite(Number(opts && opts.limit))
+      ? Math.max(0, Number(opts.limit))
+      : NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE;
+    const startDistance = Number(opts && opts.startDistance);
+    const endDistance = Number(opts && opts.endDistance);
+    const startOk = !Number.isFinite(startDistance) || startDistance <= limit;
+    const endOk = !Number.isFinite(endDistance) || endDistance <= limit;
+    return startOk && endOk;
   }
 
   function createDirectCombatFallbackPath(playerPos, target) {
@@ -840,6 +1380,18 @@
         z: Number(target.z || 0),
       },
     ];
+  }
+
+  function shouldIssueFireStart(firingHeld, weaponFiringActive) {
+    if (weaponFiringActive === false) return true;
+    return !firingHeld;
+  }
+
+  function shouldReleaseFireForRetarget(firingHeld, previousTargetId, selectedTargetId) {
+    if (!firingHeld) return false;
+    const previous = previousTargetId === null || previousTargetId === undefined ? null : String(previousTargetId);
+    const selected = selectedTargetId === null || selectedTargetId === undefined ? null : String(selectedTargetId);
+    return previous !== selected;
   }
 
   const OCCLUDED_TARGET_HOLD_DISTANCE = 6;
@@ -946,7 +1498,8 @@
     if (enemy) {
       const dist = botHorizontalDistance(ctx.eyePos, enemy.position);
       const acquisitionDistance = Math.max(0, Number(ctx.config.targetAcquisitionDistance || ctx.config.maxFireDistance || 0));
-      const interruptsObjective = !objective || (dist <= acquisitionDistance && ctx.canSeeTarget(enemy.position));
+      const interruptDistance = Math.max(acquisitionDistance, Number(ctx.config.maxFireDistance || acquisitionDistance));
+      const interruptsObjective = !objective || (dist <= interruptDistance && ctx.canSeeTarget(enemy.position));
       if (interruptsObjective) {
         intent.aimTarget = botAimPoint(enemy);
         return { intent, nextState: 'ALERT', resetTimeInState: true };
@@ -1061,9 +1614,10 @@
     return { intent, nextState: null, resetTimeInState: false };
   }
 
-  function selectLockedTarget(current, fresh, now, staleMs) {
+  function selectLockedTarget(current, fresh, now, staleMs, currentIsLive) {
     const ttlMs = Number.isFinite(Number(staleMs)) ? Number(staleMs) : 4000;
     if (!current) return fresh || null;
+    if (currentIsLive === false) return fresh || null;
     if (fresh && fresh.id === current.id) return fresh;
     if ((Number(now) - Number(current.lastKnownMs || 0)) > ttlMs) return fresh || null;
     return current;
@@ -1173,6 +1727,17 @@
     };
   }
 
+  function resolveDriverDecisionIntervalMs(profile, requestedMs) {
+    const requested = Number(requestedMs);
+    if (Number.isFinite(requested) && requested > 0) {
+      return Math.max(16, Math.floor(requested));
+    }
+    const profiled = Number(profile && profile.decisionIntervalMs);
+    return Number.isFinite(profiled) && profiled > 0
+      ? Math.max(16, Math.floor(profiled))
+      : 250;
+  }
+
   function combatObjectiveMaxDistanceForProfile(profile) {
     if (!profile) return 0;
     const acquisition = Number(profile.targetAcquisitionDistance);
@@ -1238,10 +1803,13 @@
       allowWarpRecovery: options.allowWarpRecovery === true,
       topUpHealth: options.topUpHealth !== false,
       autoRespawn: options.autoRespawn !== false,
+      driverSeed: normalizeDriverSeed(options.driverSeed),
     };
     const profile = profileForMode(opts.mode);
+    const decisionIntervalMs = resolveDriverDecisionIntervalMs(profile, options.movementDecisionIntervalMs);
     const botConfig = botConfigForProfile(profile);
     const enableFrontlineCompression = opts.compressFrontline && supportsFrontlineCompression(opts.mode);
+    const random = createSeededRandom(opts.driverSeed);
 
     const state = {
       heartbeatTimer: null,
@@ -1249,6 +1817,7 @@
       botState: 'PATROL',
       timeInStateMs: 0,
       currentTarget: null,
+      droppedDeadTargetLocks: 0,
       lastTickMs: 0,
       lastDamageMs: 0,
       lastHealth: 100,
@@ -1271,19 +1840,62 @@
       lastPathEndSnapped: null,
       lastPathStartSnapDistance: null,
       lastPathEndSnapDistance: null,
+      maxPathStartSnapDistance: 0,
+      maxPathEndSnapDistance: 0,
+      untrustedPathSnapCount: 0,
+      routeSnapEpochs: [],
       firstObjectiveDistance: null,
       minObjectiveDistance: null,
       playerDistanceMoved: 0,
       lastMovementSamplePos: null,
       movementIntentCalls: 0,
       nonZeroMovementIntentCalls: 0,
+      worldMovementIntentCalls: 0,
+      cameraMovementIntentCalls: 0,
+      nonZeroWorldMovementIntentCalls: 0,
+      nonZeroCameraMovementIntentCalls: 0,
       lastMovementIntent: null,
       lastNonZeroMovementIntent: null,
       // Movement / controller state.
       firingHeld: false,
+      firingRetargets: 0,
+      firingRetargetFireStops: 0,
+      firingRetargetEpochs: [],
       lastYaw: 0,
       lastPitch: 0,
       viewSeeded: false,
+      lastViewStepYawDeg: 0,
+      lastViewStepPitchDeg: 0,
+      lastRequestedViewYawDeltaDeg: 0,
+      lastRequestedViewPitchDeltaDeg: 0,
+      lastRemainingViewYawErrorDeg: 0,
+      lastRemainingViewPitchErrorDeg: 0,
+      lastViewYawClamped: false,
+      lastViewPitchClamped: false,
+      lastViewTargetKind: null,
+      lastViewAnchorResyncChanged: false,
+      lastViewAnchorResyncYawDeg: 0,
+      lastViewAnchorResyncPitchDeg: 0,
+      lastViewUpdateAtMs: 0,
+      lastAimDot: null,
+      lastFireIntent: false,
+      lastAimGatePassed: null,
+      lastAimGateReason: null,
+      lastFireLosGatePassed: null,
+      maxViewYawStepDeg: 0,
+      maxViewPitchStepDeg: 0,
+      maxRequestedViewYawDeltaDeg: 0,
+      maxRequestedViewPitchDeltaDeg: 0,
+      maxRemainingViewYawErrorDeg: 0,
+      maxRemainingViewPitchErrorDeg: 0,
+      viewSlewClampCount: 0,
+      viewAnchorResyncCount: 0,
+      maxViewAnchorResyncYawDeg: 0,
+      maxViewAnchorResyncPitchDeg: 0,
+      largeViewTurnCount: 0,
+      maxAimMovementDivergenceDeg: 0,
+      aimMovementDivergenceSamples: 0,
+      aimMovementDivergenceOver45Count: 0,
       // Path bookkeeping — used when the bot's ADVANCE state wants a planned route.
       waypoints: null,
       waypointIdx: 0,
@@ -1309,7 +1921,18 @@
       shotsFired: 0,
       reloadsIssued: 0,
       losRejectedShots: 0,
+      losUnknownTargetChecks: 0,
+      fireUnknownLosRejectedShots: 0,
       aimDotGateRejectedShots: 0,
+      fireStartRejected: 0,
+      lastTargetLosStatus: null,
+      lastTargetLosReason: null,
+      lastFireLosStatus: null,
+      lastFireLosReason: null,
+      lastCurrentTargetLive: null,
+      lastCurrentTargetHealth: null,
+      lastCurrentTargetState: null,
+      shotEpochs: [],
       stuckTeleportCount: 0,
       stuckWaypointSkips: 0,
       maxStuckMs: 0,
@@ -1349,8 +1972,73 @@
       return globalWindow && globalWindow.__engine && globalWindow.__engine.systemManager;
     }
 
+    function getOptionalSystem(systems, key) {
+      if (!systems || !key) return null;
+      try {
+        const registry = systems.registry;
+        if (registry && typeof registry.get === 'function') {
+          return registry.get(key) || null;
+        }
+      } catch (_err) {
+        // Fall through to the public getter path below.
+      }
+      try {
+        return systems[key] || null;
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function getPlayerController(systems) {
+      return getOptionalSystem(systems, 'playerController');
+    }
+
+    function getFirstPersonWeapon(systems) {
+      return getOptionalSystem(systems, 'firstPersonWeapon');
+    }
+
+    function readPlayerWeaponFiringActive(systems) {
+      const weapon = getFirstPersonWeapon(systems);
+      if (!weapon || typeof weapon.getWeaponInput !== 'function') return null;
+      let input;
+      try {
+        input = weapon.getWeaponInput();
+      } catch (_err) {
+        return null;
+      }
+      if (!input || typeof input.isFiringActive !== 'function') return null;
+      try {
+        return !!input.isFiringActive();
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function getWeaponHarnessSnapshot(systems) {
+      const weapon = getFirstPersonWeapon(systems);
+      if (!weapon) return null;
+      let ammoState = null;
+      let presentation = null;
+      let equippedWeaponType = null;
+      try {
+        if (typeof weapon.getAmmoState === 'function') ammoState = weapon.getAmmoState();
+      } catch (_err) { ammoState = null; }
+      try {
+        if (typeof weapon.getWeaponPresentationState === 'function') presentation = weapon.getWeaponPresentationState();
+      } catch (_err) { presentation = null; }
+      try {
+        if (typeof weapon.getEquippedWeaponType === 'function') equippedWeaponType = weapon.getEquippedWeaponType();
+      } catch (_err) { equippedWeaponType = null; }
+      return {
+        firingActive: readPlayerWeaponFiringActive(systems),
+        equippedWeaponType,
+        ammoState,
+        presentation,
+      };
+    }
+
     function disablePointerLockForHarness(systems) {
-      const pc = systems && systems.playerController;
+      const pc = getPlayerController(systems);
       if (pc && typeof pc.setPointerLockEnabled === 'function') {
         pc.setPointerLockEnabled(false);
       }
@@ -1485,25 +2173,20 @@
       const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
       state.nearestPerceivedEnemyDistance = null;
       if (!Array.isArray(combatants) || combatants.length === 0) return null;
-      const pr = botConfig.perceptionRange;
-      const prSq = pr * pr;
-      let best = null;
-      let bestDistSq = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < combatants.length; i++) {
-        const c = combatants[i];
-        if (!c || c.id === 'player_proxy') continue;
-        if (!isOpforFaction(c.faction)) continue;
-        if (c.health <= 0 || c.state === 'dead') continue;
-        if (isTargetTemporarilyBlocked(c.id, state.blockedTargetUntil, Date.now())) continue;
-        if (!c.position) continue;
-        const dx = Number(c.position.x) - Number(playerPos.x);
-        const dz = Number(c.position.z) - Number(playerPos.z);
-        const distSq = dx * dx + dz * dz;
-        if (distSq > prSq) continue;
-        if (distSq < bestDistSq) { bestDistSq = distSq; best = c; }
-      }
-      if (!best) return null;
-      const distance = Math.sqrt(bestDistSq);
+      const nowMs = Date.now();
+      const selected = selectVisiblePreferredEnemyCandidate({
+        combatants,
+        playerPos,
+        perceptionRange: botConfig.perceptionRange,
+        maxFireDistance: botConfig.maxFireDistance,
+        maxVisibleChecks: 12,
+        isEnemy: (c) => isOpforFaction(c.faction),
+        isBlocked: (c) => isTargetTemporarilyBlocked(c.id, state.blockedTargetUntil, nowMs),
+        canSeeTarget: (pos) => canSeeTarget(systems, playerPos, pos),
+      });
+      if (!selected || !selected.combatant) return null;
+      const best = selected.combatant;
+      const distance = Number(selected.distance);
       state.nearestPerceivedEnemyDistance = Number.isFinite(distance) ? distance : null;
       return {
         id: String(best.id || ''),
@@ -1521,13 +2204,41 @@
       };
     }
 
+    function getCurrentTargetLiveDetails(systems, target) {
+      if (!target || !target.id) {
+        return { live: true, found: false, health: null, state: null };
+      }
+      const cs = systems && systems.combatantSystem;
+      const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
+      if (!Array.isArray(combatants)) {
+        return { live: true, found: false, health: null, state: 'unknown_combatants' };
+      }
+      const targetId = String(target.id);
+      for (let i = 0; i < combatants.length; i++) {
+        const c = combatants[i];
+        if (!c || String(c.id || '') !== targetId) continue;
+        const stateName = String(c.state || '').toLowerCase();
+        const health = Number(c.health ?? 0);
+        return {
+          live: health > 0 && stateName !== 'dead',
+          found: true,
+          health: Number.isFinite(health) ? health : null,
+          state: stateName,
+        };
+      }
+      return { live: false, found: false, health: null, state: 'missing' };
+    }
+
+    function isCurrentTargetLive(systems, target) {
+      return getCurrentTargetLiveDetails(systems, target).live;
+    }
+
     // `canSeeTarget` — consumes `terrainSystem.raycastTerrain` (the same primitive
     // AILineOfSight uses internally), so the bot cannot acquire a target through
     // a hill. Player/combatant positions are already eye-level actor anchors;
     // raycast from player eye to target center mass.
-    function canSeeTarget(systems, playerPos, targetPos) {
+    function queryTargetLineOfSight(systems, playerPos, targetPos) {
       const terrain = systems && systems.terrainSystem;
-      if (!terrain || typeof terrain.raycastTerrain !== 'function') return true;
       const from = {
         x: Number(playerPos.x),
         y: Number(playerPos.y || 0),
@@ -1538,14 +2249,15 @@
         y: Number(targetPos.y || 0) + TARGET_ACTOR_AIM_Y_OFFSET,
         z: Number(targetPos.z),
       };
-      const dx = to.x - from.x;
-      const dy = to.y - from.y;
-      const dz = to.z - from.z;
-      const distance = Math.hypot(dx, dy, dz);
-      if (!Number.isFinite(distance) || distance < 0.001) return true;
-      const dir = { x: dx / distance, y: dy / distance, z: dz / distance };
-      const hit = terrain.raycastTerrain(from, dir, distance);
-      return !(hit && hit.hit && Number.isFinite(hit.distance) && hit.distance < distance - 0.75);
+      return queryTerrainLineOfSight(terrain, from, to, 0.75);
+    }
+
+    function canSeeTarget(systems, playerPos, targetPos) {
+      const result = queryTargetLineOfSight(systems, playerPos, targetPos);
+      state.lastTargetLosStatus = result.status;
+      state.lastTargetLosReason = result.reason;
+      if (result.status === 'unknown') state.losUnknownTargetChecks++;
+      return result.clear;
     }
 
     // `queryPath` — wraps `navmeshSystem.queryPath`. The bot passes plain-object
@@ -1563,6 +2275,8 @@
         state.lastPathFailureReason = 'nav_unavailable';
         return null;
       }
+      let start = null;
+      let end = null;
       try {
         // Snap both endpoints onto the mesh before querying. This is the
         // Round 3 fix: on open_frontier the player regularly stands just
@@ -1572,12 +2286,28 @@
         // stand outside the walkable mesh too. Snap both sides to nearby
         // walkable points so the harness routes toward the combat front instead
         // of failing the whole long-map approach.
-        const start = snapOntoNavmeshDetailed(systems, fromPos, NAVMESH_START_SNAP_RADIUS);
-        const end = snapOntoNavmeshDetailed(systems, toPos, NAVMESH_TARGET_SNAP_RADIUS);
+        start = snapOntoNavmeshDetailed(systems, fromPos, NAVMESH_START_SNAP_RADIUS);
+        end = snapOntoNavmeshDetailed(systems, toPos, NAVMESH_TARGET_SNAP_RADIUS);
         state.lastPathStartSnapped = start.snapped;
         state.lastPathEndSnapped = end.snapped;
         state.lastPathStartSnapDistance = start.distance;
         state.lastPathEndSnapDistance = end.distance;
+        if (Number.isFinite(Number(start.distance))) {
+          state.maxPathStartSnapDistance = Math.max(state.maxPathStartSnapDistance, Number(start.distance));
+        }
+        if (Number.isFinite(Number(end.distance))) {
+          state.maxPathEndSnapDistance = Math.max(state.maxPathEndSnapDistance, Number(end.distance));
+        }
+        if (!isRouteSnapTrusted({
+          startDistance: start.distance,
+          endDistance: end.distance,
+          limit: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE,
+        })) {
+          state.untrustedPathSnapCount++;
+          state.lastPathFailureReason = 'snap_distance_untrusted';
+          recordRouteSnapEpoch(start, end, 'snap_rejected', state.lastPathFailureReason, 0);
+          return null;
+        }
         const path = nav.queryPath(start.point, end.point);
         if (!path || path.length === 0) {
           state.lastPathFailureReason = !start.found
@@ -1585,6 +2315,7 @@
             : !end.found
               ? 'end_snap_failed'
               : 'compute_path_failed';
+          recordRouteSnapEpoch(start, end, 'nav_failed', state.lastPathFailureReason, 0);
           return null;
         }
         const out = [];
@@ -1595,13 +2326,53 @@
         }
         if (out.length === 0) {
           state.lastPathFailureReason = 'empty_path_after_filter';
+          recordRouteSnapEpoch(start, end, 'nav_failed', state.lastPathFailureReason, 0);
           return null;
         }
+        recordRouteSnapEpoch(start, end, 'nav_ok', null, out.length);
         return out;
       } catch (_err) {
         state.lastPathFailureReason = 'query_exception';
+        recordRouteSnapEpoch(start, end, 'query_exception', state.lastPathFailureReason, 0);
         return null;
       }
+    }
+
+    function recordRouteSnapEpoch(start, end, status, reason, pathLength) {
+      const startDistance = start && Number.isFinite(Number(start.distance)) ? Number(start.distance) : null;
+      const endDistance = end && Number.isFinite(Number(end.distance)) ? Number(end.distance) : null;
+      const startSnapped = !!(start && start.snapped);
+      const endSnapped = !!(end && end.snapped);
+      const startFound = !!(start && start.found);
+      const endFound = !!(end && end.found);
+      const meaningful =
+        shouldRecordRouteSnapEpoch({ start: start, end: end, status: status });
+      if (!meaningful) return;
+      appendBoundedEvent(state.routeSnapEpochs, {
+        atMs: Date.now(),
+        botState: state.botState,
+        status: String(status || 'unknown'),
+        reason: reason ? String(reason) : null,
+        pathLength: Number.isFinite(Number(pathLength)) ? Number(pathLength) : 0,
+        pathTargetKind: state.lastPathTargetKind,
+        pathTargetDistance: state.lastPathTargetDistance,
+        pathQueryDistance: state.lastPathQueryDistance,
+        objectiveKind: state.lastObjectiveKind,
+        objectiveDistance: state.lastObjectiveDistance,
+        currentTargetId: state.currentTarget ? String(state.currentTarget.id) : null,
+        currentTargetDistance: state.currentTargetDistance,
+        startFound,
+        endFound,
+        startSnapped,
+        endSnapped,
+        startSnapDistance: startDistance,
+        endSnapDistance: endDistance,
+        trusted: status !== 'snap_rejected',
+        routeProgressAgeMs: state.lastRouteProgressAt > 0 ? Math.max(0, Date.now() - state.lastRouteProgressAt) : null,
+        routeProgressDistance: state.lastRouteProgressDistance,
+        waypointIdx: state.waypointIdx,
+        waypointCount: state.waypoints ? state.waypoints.length : 0,
+      }, ROUTE_SNAP_EPOCH_HISTORY_LIMIT);
     }
 
     function snapOntoNavmeshDetailed(systems, pos, searchRadius) {
@@ -1689,23 +2460,25 @@
     }
 
     function getPlayerPos(systems) {
-      if (!systems || !systems.playerController || !systems.playerController.getPosition) return null;
-      const pos = systems.playerController.getPosition();
+      const pc = getPlayerController(systems);
+      if (!pc || !pc.getPosition) return null;
+      const pos = pc.getPosition();
       if (!pos) return null;
       return { x: Number(pos.x), y: Number(pos.y || 0), z: Number(pos.z) };
     }
 
     function getPlayerVelocity(systems) {
-      if (!systems || !systems.playerController || !systems.playerController.getVelocity) {
+      const pc = getPlayerController(systems);
+      if (!pc || !pc.getVelocity) {
         return { x: 0, y: 0, z: 0 };
       }
-      const v = systems.playerController.getVelocity();
+      const v = pc.getVelocity();
       return { x: Number(v.x || 0), y: Number(v.y || 0), z: Number(v.z || 0) };
     }
 
     function getRuntimeLiveness(systems) {
       const w = globalWindow;
-      const pc = systems && systems.playerController;
+      const pc = getPlayerController(systems);
       const playerPos = getPlayerPos(systems);
       const terrain = systems && systems.terrainSystem;
       let metricsSnapshot = null;
@@ -1814,7 +2587,7 @@
           if (playerPos.x < box.min.x || playerPos.x > box.max.x || playerPos.z < box.min.z || playerPos.z > box.max.z) {
             return;
           }
-          out.push({
+          addTopCollisionContributor(out, {
             id: String(id),
             dynamic: !!entry.dynamic,
             minX: Number(box.min.x),
@@ -1823,13 +2596,12 @@
             maxY: Number(box.max.y),
             minZ: Number(box.min.z),
             maxZ: Number(box.max.z),
-          });
+          }, 5);
         });
       } catch (_err) {
         return out;
       }
-      out.sort((a, b) => Number(b.maxY || 0) - Number(a.maxY || 0));
-      return out.slice(0, 5);
+      return out;
     }
 
     function getPlayerHealth(systems) {
@@ -1845,7 +2617,7 @@
     }
 
     function getMagazine(systems) {
-      const weapon = systems && systems.firstPersonWeapon;
+      const weapon = getFirstPersonWeapon(systems);
       if (!weapon || typeof weapon.getAmmoState !== 'function') {
         return { current: 30, max: 30 };
       }
@@ -1857,8 +2629,9 @@
     }
 
     function getCamera(systems) {
-      return systems && systems.playerController && systems.playerController.getCamera
-        ? systems.playerController.getCamera()
+      const pc = getPlayerController(systems);
+      return pc && pc.getCamera
+        ? pc.getCamera()
         : null;
     }
 
@@ -1890,7 +2663,7 @@
     }
 
     function getCameraAngles(systems) {
-      const pc = systems && systems.playerController;
+      const pc = getPlayerController(systems);
       const cc = pc && pc.cameraController;
       if (cc) {
         return { yaw: Number(cc.yaw || 0), pitch: Number(cc.pitch || 0) };
@@ -1975,7 +2748,7 @@
     }
 
     function releaseAllControls(systems) {
-      const pc = systems && systems.playerController;
+      const pc = getPlayerController(systems);
       if (!pc) return;
       try { pc.applyMovementIntent({ forward: 0, strafe: 0, sprint: false }); } catch { /* ignore */ }
       if (state.firingHeld) {
@@ -2021,10 +2794,10 @@
           const cap = Math.min(group.length, Math.max(0, Math.min(opts.maxCompressedPerFaction, perSideCap)));
           for (let i = 0; i < cap; i++) {
             const c = group[i];
-            const lane = (Math.random() - 0.5) * (side > 0 ? 170 : 130);
+            const lane = (random() - 0.5) * (side > 0 ? 170 : 130);
             const forward = side > 0
-              ? 160 + Math.random() * 130
-              : -(65 + Math.random() * 85);
+              ? 160 + random() * 130
+              : -(65 + random() * 85);
             const nx = playerPos.x + safeDx * forward + latX * lane;
             const nz = playerPos.z + safeDz * forward + latZ * lane;
             if (placeCompressedCombatantForHarness(systems, c, nx, nz)) moved++;
@@ -2053,8 +2826,8 @@
         const cap = Math.min(group.length, Math.max(0, opts.maxCompressedPerFaction));
         for (let i = 0; i < cap; i++) {
           const c = group[i];
-          const lane = (Math.random() - 0.5) * 130;
-          const forward = side * (35 + Math.random() * 25);
+          const lane = (random() - 0.5) * 130;
+          const forward = side * (35 + random() * 25);
           const nx = midX + safeDx * forward + latX * lane;
           const nz = midZ + safeDz * forward + latZ * lane;
           if (placeCompressedCombatantForHarness(systems, c, nx, nz)) moved++;
@@ -2286,7 +3059,7 @@
       }
       deathHandled = false;
 
-      const pc = systems.playerController;
+      const pc = getPlayerController(systems);
       if (pc && typeof pc.isInHelicopter === 'function' && pc.isInHelicopter()) {
         const pos = pc.getPosition ? pc.getPosition() : null;
         if (pos && pos.clone) {
@@ -2341,10 +3114,24 @@
       // wrapper still routes movement toward that stale combatant.
       const freshTarget = findEnemyClosure();
       const objectiveForTargetGate = objectiveClosure();
-      const candidateTarget = updateLockedTarget(state.currentTarget, freshTarget, now);
+      const previousTarget = state.currentTarget;
+      const currentTargetLiveDetails = getCurrentTargetLiveDetails(systems, previousTarget);
+      const currentTargetLive = currentTargetLiveDetails.live;
+      state.lastCurrentTargetLive = currentTargetLive;
+      state.lastCurrentTargetHealth = currentTargetLiveDetails.health;
+      state.lastCurrentTargetState = currentTargetLiveDetails.state;
+      const candidateTarget = updateLockedTarget(previousTarget, freshTarget, now, currentTargetLive);
+      if (previousTarget && currentTargetLive === false) {
+        state.droppedDeadTargetLocks++;
+        if (!candidateTarget || candidateTarget.id !== previousTarget.id) {
+          state.waypoints = null;
+          state.waypointIdx = 0;
+          state.lastWaypointReplanAt = 0;
+        }
+      }
       state.currentTarget = shouldUseTargetForCurrentObjective({
         target: candidateTarget,
-        currentTarget: state.currentTarget,
+        currentTarget: previousTarget,
         objective: objectiveForTargetGate,
         playerPos: playerPos,
         botState: state.botState,
@@ -2355,6 +3142,37 @@
       state.currentTargetDistance = state.currentTarget && state.currentTarget.position
         ? botHorizontalDistance(playerPos, state.currentTarget.position)
         : null;
+      const selectedTargetLiveDetails = getCurrentTargetLiveDetails(systems, state.currentTarget);
+      state.lastCurrentTargetLive = selectedTargetLiveDetails.live;
+      state.lastCurrentTargetHealth = selectedTargetLiveDetails.health;
+      state.lastCurrentTargetState = selectedTargetLiveDetails.state;
+      const previousTargetId = previousTarget && previousTarget.id ? String(previousTarget.id) : null;
+      const selectedTargetId = state.currentTarget && state.currentTarget.id ? String(state.currentTarget.id) : null;
+      const releaseFireForRetarget = shouldReleaseFireForRetarget(
+        state.firingHeld,
+        previousTargetId,
+        selectedTargetId,
+      );
+      if (releaseFireForRetarget) {
+        state.firingRetargets++;
+        if (pc && typeof pc.fireStop === 'function') pc.fireStop();
+        state.firingHeld = false;
+        state.firingRetargetFireStops++;
+        appendBoundedEvent(state.firingRetargetEpochs, {
+          atMs: now,
+          fromTargetId: previousTargetId,
+          toTargetId: selectedTargetId,
+          releasedFire: true,
+          previousTargetLive: currentTargetLive,
+          previousTargetHealth: currentTargetLiveDetails.health,
+          selectedTargetLive: selectedTargetLiveDetails.live,
+          selectedTargetHealth: selectedTargetLiveDetails.health,
+          botState: state.botState,
+          objectiveKind: state.lastObjectiveKind,
+          objectiveDistance: state.lastObjectiveDistance,
+          deadTargetDrops: state.droppedDeadTargetLocks,
+        }, FIRING_RETARGET_EPOCH_HISTORY_LIMIT);
+      }
 
       // Match-end check: TicketSystem owns the lifecycle, not GameModeManager.
       // Latch the first-observed timestamp + outcome so the capture-side reader
@@ -2412,6 +3230,7 @@
         intent: step.intent,
         botState: state.botState,
         currentTarget: state.currentTarget,
+        currentTargetVisible: state.currentTarget ? losClosure(state.currentTarget.position) : false,
       })) {
         const patrolObjective = state.currentTarget ? null : objectiveClosure();
         const anchorKind = state.currentTarget ? 'current_target'
@@ -2479,7 +3298,7 @@
       }
 
       // Apply the intent via the PlayerController surface. Intent → controls.
-      applyIntent(systems, step.intent, angles, overlayPoint, playerPos);
+      applyIntent(systems, step.intent, angles, overlayPoint, playerPos, releaseFireForRetarget);
 
       // Telemetry hooks for capture-side validators.
       if (step.intent.firePrimary) state.shotsFired++;
@@ -2540,12 +3359,12 @@
       }
     }
 
-    function updateLockedTarget(current, fresh, now) {
-      return selectLockedTarget(current, fresh, now, 4000);
+    function updateLockedTarget(current, fresh, now, currentIsLive) {
+      return selectLockedTarget(current, fresh, now, 4000, currentIsLive);
     }
 
-    function applyIntent(systems, intent, currentAngles, overlayPoint, playerPos) {
-      const pc = systems && systems.playerController;
+    function applyIntent(systems, intent, currentAngles, overlayPoint, playerPos, releaseFireForRetarget) {
+      const pc = getPlayerController(systems);
       if (!pc) return;
 
       // Movement intent.
@@ -2555,7 +3374,8 @@
       const wantsMovement = Math.abs(forward) > 0.01 || Math.abs(strafe) > 0.01;
       const worldMovement = computeWorldMovementIntent(intent, overlayPoint, playerPos);
       if (typeof pc.applyMovementIntent === 'function') {
-        if (worldMovement && typeof pc.applyWorldMovementIntent === 'function') {
+        const usesWorldMovement = Boolean(worldMovement && typeof pc.applyWorldMovementIntent === 'function');
+        if (usesWorldMovement) {
           pc.applyWorldMovementIntent({ x: worldMovement.x, z: worldMovement.z, sprint });
         } else {
           pc.applyMovementIntent({ forward, strafe, sprint });
@@ -2565,16 +3385,26 @@
           strafe,
           sprint,
           wantsMovement,
-          movementMode: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? 'world' : 'camera',
-          worldX: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? worldMovement.x : null,
-          worldZ: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? worldMovement.z : null,
-          worldDistance: worldMovement && typeof pc.applyWorldMovementIntent === 'function' ? worldMovement.distance : null,
+          movementMode: usesWorldMovement ? 'world' : 'camera',
+          worldX: usesWorldMovement ? worldMovement.x : null,
+          worldZ: usesWorldMovement ? worldMovement.z : null,
+          worldDistance: usesWorldMovement ? worldMovement.distance : null,
           atMs: Date.now(),
         };
         state.movementIntentCalls++;
+        if (usesWorldMovement) {
+          state.worldMovementIntentCalls++;
+        } else {
+          state.cameraMovementIntentCalls++;
+        }
         state.lastMovementIntent = movementIntent;
         if (wantsMovement) {
           state.nonZeroMovementIntentCalls++;
+          if (usesWorldMovement) {
+            state.nonZeroWorldMovementIntentCalls++;
+          } else {
+            state.nonZeroCameraMovementIntentCalls++;
+          }
           state.lastNonZeroMovementIntent = movementIntent;
         }
       }
@@ -2592,11 +3422,50 @@
         state.lastPitch = currentAngles.pitch;
         state.viewSeeded = true;
       }
+      const viewAnchor = syncViewAnchorToActual(
+        state.lastYaw,
+        state.lastPitch,
+        currentAngles && currentAngles.yaw,
+        currentAngles && currentAngles.pitch,
+      );
+      const viewAnchorYawDeg = Math.abs(viewAnchor.yawDelta) * 180 / Math.PI;
+      const viewAnchorPitchDeg = Math.abs(viewAnchor.pitchDelta) * 180 / Math.PI;
+      state.lastViewAnchorResyncChanged = !!viewAnchor.changed;
+      state.lastViewAnchorResyncYawDeg = Number.isFinite(viewAnchorYawDeg) ? viewAnchorYawDeg : 0;
+      state.lastViewAnchorResyncPitchDeg = Number.isFinite(viewAnchorPitchDeg) ? viewAnchorPitchDeg : 0;
+      if (viewAnchor.changed) {
+        state.viewAnchorResyncCount++;
+        state.maxViewAnchorResyncYawDeg = Math.max(
+          state.maxViewAnchorResyncYawDeg,
+          state.lastViewAnchorResyncYawDeg,
+        );
+        state.maxViewAnchorResyncPitchDeg = Math.max(
+          state.maxViewAnchorResyncPitchDeg,
+          state.lastViewAnchorResyncPitchDeg,
+        );
+      }
+      state.lastYaw = viewAnchor.yaw;
+      state.lastPitch = viewAnchor.pitch;
+      state.lastViewStepYawDeg = 0;
+      state.lastViewStepPitchDeg = 0;
+      state.lastRequestedViewYawDeltaDeg = 0;
+      state.lastRequestedViewPitchDeltaDeg = 0;
+      state.lastRemainingViewYawErrorDeg = 0;
+      state.lastRemainingViewPitchErrorDeg = 0;
+      state.lastViewYawClamped = false;
+      state.lastViewPitchClamped = false;
+      state.lastAimDot = null;
+      state.lastFireIntent = !!intent.firePrimary;
+      state.lastAimGatePassed = null;
+      state.lastAimGateReason = null;
+      state.lastFireLosGatePassed = null;
+      state.lastViewUpdateAtMs = Date.now();
 
       let yawNext = state.lastYaw;
       let pitchNext = state.lastPitch;
       let aimDot = null; // aim-dot against intent.aimTarget, for the fire gate
       const viewTarget = selectDriverViewTarget(intent, overlayPoint, wantsMovement);
+      state.lastViewTargetKind = classifyDriverViewTarget(intent, overlayPoint, viewTarget);
       if (viewTarget && camera) {
         const prevOrder = camera.rotation.order;
         camera.rotation.order = 'YXZ';
@@ -2613,8 +3482,49 @@
         camera.rotation.x = savedX;
         camera.rotation.order = prevOrder;
 
-        yawNext = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
-        pitchNext = clampPitch(state.lastPitch + (clampPitch(targetPitch) - state.lastPitch) * clamp01(intent.aimLerpRate));
+        const desiredYaw = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
+        const desiredPitch = clampPitch(state.lastPitch + (clampPitch(targetPitch) - state.lastPitch) * clamp01(intent.aimLerpRate));
+        const slewedView = applyViewSlewLimit(state.lastYaw, state.lastPitch, desiredYaw, desiredPitch);
+        yawNext = slewedView.yaw;
+        pitchNext = slewedView.pitch;
+        state.lastViewYawClamped = !!slewedView.yawClamped;
+        state.lastViewPitchClamped = !!slewedView.pitchClamped;
+        if (slewedView.yawClamped || slewedView.pitchClamped) {
+          state.viewSlewClampCount++;
+        }
+        const yawStepDeg = Math.abs(signedYawDelta(state.lastYaw, yawNext)) * 180 / Math.PI;
+        const pitchStepDeg = Math.abs(pitchNext - state.lastPitch) * 180 / Math.PI;
+        const requestedYawDeltaDeg = Math.abs(Number(slewedView.yawDelta || 0) * 180 / Math.PI);
+        const requestedPitchDeltaDeg = Math.abs(Number(slewedView.pitchDelta || 0) * 180 / Math.PI);
+        const remainingYawErrorDeg = Math.abs(Number(slewedView.remainingYawDelta || 0) * 180 / Math.PI);
+        const remainingPitchErrorDeg = Math.abs(Number(slewedView.remainingPitchDelta || 0) * 180 / Math.PI);
+        state.lastViewStepYawDeg = Number.isFinite(yawStepDeg) ? yawStepDeg : 0;
+        state.lastViewStepPitchDeg = Number.isFinite(pitchStepDeg) ? pitchStepDeg : 0;
+        state.lastRequestedViewYawDeltaDeg = Number.isFinite(requestedYawDeltaDeg) ? requestedYawDeltaDeg : 0;
+        state.lastRequestedViewPitchDeltaDeg = Number.isFinite(requestedPitchDeltaDeg) ? requestedPitchDeltaDeg : 0;
+        state.lastRemainingViewYawErrorDeg = Number.isFinite(remainingYawErrorDeg) ? remainingYawErrorDeg : 0;
+        state.lastRemainingViewPitchErrorDeg = Number.isFinite(remainingPitchErrorDeg) ? remainingPitchErrorDeg : 0;
+        if (Number.isFinite(yawStepDeg)) {
+          state.maxViewYawStepDeg = Math.max(state.maxViewYawStepDeg, yawStepDeg);
+        }
+        if (Number.isFinite(pitchStepDeg)) {
+          state.maxViewPitchStepDeg = Math.max(state.maxViewPitchStepDeg, pitchStepDeg);
+        }
+        if (Number.isFinite(requestedYawDeltaDeg)) {
+          state.maxRequestedViewYawDeltaDeg = Math.max(state.maxRequestedViewYawDeltaDeg, requestedYawDeltaDeg);
+        }
+        if (Number.isFinite(requestedPitchDeltaDeg)) {
+          state.maxRequestedViewPitchDeltaDeg = Math.max(state.maxRequestedViewPitchDeltaDeg, requestedPitchDeltaDeg);
+        }
+        if (Number.isFinite(remainingYawErrorDeg)) {
+          state.maxRemainingViewYawErrorDeg = Math.max(state.maxRemainingViewYawErrorDeg, remainingYawErrorDeg);
+        }
+        if (Number.isFinite(remainingPitchErrorDeg)) {
+          state.maxRemainingViewPitchErrorDeg = Math.max(state.maxRemainingViewPitchErrorDeg, remainingPitchErrorDeg);
+        }
+        if (Math.max(requestedYawDeltaDeg, requestedPitchDeltaDeg) > 45) {
+          state.largeViewTurnCount++;
+        }
         if (typeof pc.setViewAngles === 'function') {
           pc.setViewAngles(yawNext, pitchNext);
         }
@@ -2632,6 +3542,7 @@
           const tLen = Math.hypot(tx, ty, tz);
           if (tLen > 1e-6) {
             aimDot = (_tmpForward.x * tx + _tmpForward.y * ty + _tmpForward.z * tz) / tLen;
+            state.lastAimDot = Number.isFinite(aimDot) ? aimDot : null;
           }
         }
       }
@@ -2644,13 +3555,19 @@
       // this file; we call that export directly so the gate behavior is
       // one surface, not two.
       if (intent.reload) {
-        if (state.firingHeld) {
+        if (state.firingHeld || readPlayerWeaponFiringActive(systems) === true) {
           if (typeof pc.fireStop === 'function') pc.fireStop();
           state.firingHeld = false;
         }
         if (typeof pc.reloadWeapon === 'function') pc.reloadWeapon();
       } else if (intent.firePrimary) {
         let passesAimGate = true;
+        let fireAimDot = aimDot;
+        let fireAimReason = 'not_checked';
+        let issuedFireStart = false;
+        let weaponFiringActiveBefore = null;
+        let weaponFiringActiveAfter = null;
+        state.lastAimGateReason = fireAimReason;
         if (intent.aimTarget && camera && aimDot !== null && readCameraWorld(camera, _tmpEye, _tmpForward)) {
           // Route through evaluateFireDecision to reuse the export (not dead code).
           const toTarget = {
@@ -2667,21 +3584,104 @@
             closeRange: dist < 10,
           });
           passesAimGate = !!decision.shouldFire;
+          fireAimDot = decision.aimDot;
+          fireAimReason = decision.reason;
+          state.lastAimGatePassed = passesAimGate;
+          state.lastAimGateReason = fireAimReason;
+          state.lastAimDot = Number.isFinite(Number(fireAimDot)) ? Number(fireAimDot) : state.lastAimDot;
           if (!passesAimGate) state.aimDotGateRejectedShots++;
         }
-        if (passesAimGate) {
-          if (!state.firingHeld) {
-            if (typeof pc.fireStart === 'function') pc.fireStart();
-            state.firingHeld = true;
-            state.lastShotAt = Date.now();
+        let passesFireLosGate = true;
+        let fireLosStatus = 'not_checked';
+        let fireLosReason = 'not_checked';
+        if (passesAimGate && intent.aimTarget && camera && readCameraWorld(camera, _tmpEye, _tmpForward)) {
+          const fireLos = queryTerrainLineOfSight(
+            systems && systems.terrainSystem,
+            _tmpEye,
+            intent.aimTarget,
+            0.75,
+          );
+          passesFireLosGate = fireLos.clear;
+          fireLosStatus = fireLos.status;
+          fireLosReason = fireLos.reason;
+          state.lastFireLosGatePassed = passesFireLosGate;
+          state.lastFireLosStatus = fireLosStatus;
+          state.lastFireLosReason = fireLosReason;
+          state.lastFireProbe = {
+            aimDot: Number.isFinite(Number(fireAimDot)) ? Number(fireAimDot) : null,
+            aimReason: fireAimReason,
+            losStatus: fireLosStatus,
+            losReason: fireLosReason,
+          };
+          if (!passesFireLosGate) {
+            state.losRejectedShots++;
+            if (fireLos.status === 'unknown') state.fireUnknownLosRejectedShots++;
           }
-        } else if (state.firingHeld) {
+        }
+        if (passesAimGate && passesFireLosGate && !releaseFireForRetarget) {
+          weaponFiringActiveBefore = readPlayerWeaponFiringActive(systems);
+          if (shouldIssueFireStart(state.firingHeld, weaponFiringActiveBefore)) {
+            if (typeof pc.fireStart === 'function') pc.fireStart();
+            issuedFireStart = true;
+            weaponFiringActiveAfter = readPlayerWeaponFiringActive(systems);
+            if (weaponFiringActiveAfter === false) {
+              state.firingHeld = false;
+              state.fireStartRejected++;
+            } else {
+              state.firingHeld = true;
+              state.lastShotAt = Date.now();
+            }
+          }
+        }
+        appendBoundedEvent(state.shotEpochs, {
+          atMs: Date.now(),
+          botState: state.botState,
+          targetId: state.currentTarget ? String(state.currentTarget.id) : null,
+          targetLive: state.lastCurrentTargetLive,
+          targetHealth: state.lastCurrentTargetHealth,
+          targetState: state.lastCurrentTargetState,
+          targetDistance: state.currentTargetDistance,
+          objectiveKind: state.lastObjectiveKind,
+          objectiveDistance: state.lastObjectiveDistance,
+          aimDot: Number.isFinite(Number(fireAimDot)) ? Number(fireAimDot) : null,
+          aimReason: fireAimReason,
+          aimGatePassed: passesAimGate,
+          losStatus: fireLosStatus,
+          losReason: fireLosReason,
+          losGatePassed: passesFireLosGate,
+          issuedFireStart,
+          releasedFireForRetarget: releaseFireForRetarget,
+          firingHeld: state.firingHeld,
+          weaponFiringActiveBefore,
+          weaponFiringActiveAfter,
+          pathTargetKind: state.lastPathTargetKind,
+          pathQueryStatus: state.lastPathQueryStatus,
+          pathFailureReason: state.lastPathFailureReason,
+          pathStartSnapDistance: state.lastPathStartSnapDistance,
+          pathEndSnapDistance: state.lastPathEndSnapDistance,
+          routeProgressAgeMs: state.lastRouteProgressAt > 0 ? Math.max(0, Date.now() - state.lastRouteProgressAt) : null,
+          deadTargetDrops: state.droppedDeadTargetLocks,
+          presentationContext: readPresentationContextForShot(),
+        }, SHOT_EPOCH_HISTORY_LIMIT);
+        if (!(passesAimGate && passesFireLosGate) && (state.firingHeld || readPlayerWeaponFiringActive(systems) === true)) {
           if (typeof pc.fireStop === 'function') pc.fireStop();
           state.firingHeld = false;
         }
-      } else if (state.firingHeld) {
+      } else if (state.firingHeld || readPlayerWeaponFiringActive(systems) === true) {
         if (typeof pc.fireStop === 'function') pc.fireStop();
         state.firingHeld = false;
+      }
+
+      const aimMovementDivergence = computeViewMovementDivergence(viewTarget, intent, overlayPoint, playerPos);
+      if (aimMovementDivergence) {
+        state.aimMovementDivergenceSamples++;
+        state.maxAimMovementDivergenceDeg = Math.max(
+          state.maxAimMovementDivergenceDeg,
+          Number(aimMovementDivergence.angleDeg || 0),
+        );
+        if (Number(aimMovementDivergence.angleDeg || 0) > 45) {
+          state.aimMovementDivergenceOver45Count++;
+        }
       }
     }
 
@@ -2691,8 +3691,7 @@
     }
 
     function clampPitch(p) {
-      if (!Number.isFinite(p)) return 0;
-      return Math.max(-AIM_PITCH_LIMIT_RAD, Math.min(AIM_PITCH_LIMIT_RAD, p));
+      return clampDriverPitch(p);
     }
 
     function clamp01(x) {
@@ -2743,7 +3742,7 @@
     // ── Public surface ──
 
     function start() {
-      state.heartbeatTimer = setInterval(tick, profile.decisionIntervalMs);
+      state.heartbeatTimer = setInterval(tick, decisionIntervalMs);
       tick();
     }
 
@@ -2757,6 +3756,8 @@
       releaseAllControls(systems);
       return {
         respawnCount: state.respawnCount,
+        driverSeed: opts.driverSeed,
+        movementDecisionIntervalMs: decisionIntervalMs,
         ammoRefillCount: state.ammoRefillCount,
         healthTopUpCount: state.healthTopUpCount,
         frontlineCompressed: state.frontlineCompressed,
@@ -2764,13 +3765,61 @@
         frontlineMoveCount: state.frontlineMoveCount,
         capturedZoneCount: 0,
         movementTransitions: state.transitions,
+        droppedDeadTargetLocks: state.droppedDeadTargetLocks,
+        firingRetargets: state.firingRetargets,
+        firingRetargetFireStops: state.firingRetargetFireStops,
+        firingRetargetEpochs: state.firingRetargetEpochs.slice(),
         losRejectedShots: state.losRejectedShots,
+        losUnknownTargetChecks: state.losUnknownTargetChecks,
+        fireUnknownLosRejectedShots: state.fireUnknownLosRejectedShots,
+        lastTargetLosStatus: state.lastTargetLosStatus,
+        lastTargetLosReason: state.lastTargetLosReason,
+        lastFireLosStatus: state.lastFireLosStatus,
+        lastFireLosReason: state.lastFireLosReason,
+        lastCurrentTargetLive: state.lastCurrentTargetLive,
+        lastCurrentTargetHealth: state.lastCurrentTargetHealth,
+        lastCurrentTargetState: state.lastCurrentTargetState,
+        shotEpochs: state.shotEpochs.slice(),
+        lastFireProbe: state.lastFireProbe,
         aimDotGateRejectedShots: state.aimDotGateRejectedShots,
+        fireStartRejected: state.fireStartRejected,
         stuckTeleportCount: state.stuckTeleportCount,
         stuckWaypointSkips: state.stuckWaypointSkips,
         routeTargetResets: state.routeTargetResets,
         routeNoProgressResets: state.routeNoProgressResets,
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
+        maxViewYawStepDeg: Math.round(state.maxViewYawStepDeg * 10) / 10,
+        maxViewPitchStepDeg: Math.round(state.maxViewPitchStepDeg * 10) / 10,
+        viewSlewClampCount: state.viewSlewClampCount,
+        viewAnchorResyncCount: state.viewAnchorResyncCount,
+        lastViewStepYawDeg: Math.round(state.lastViewStepYawDeg * 10) / 10,
+        lastViewStepPitchDeg: Math.round(state.lastViewStepPitchDeg * 10) / 10,
+        lastRequestedViewYawDeltaDeg: Math.round(state.lastRequestedViewYawDeltaDeg * 10) / 10,
+        lastRequestedViewPitchDeltaDeg: Math.round(state.lastRequestedViewPitchDeltaDeg * 10) / 10,
+        lastRemainingViewYawErrorDeg: Math.round(state.lastRemainingViewYawErrorDeg * 10) / 10,
+        lastRemainingViewPitchErrorDeg: Math.round(state.lastRemainingViewPitchErrorDeg * 10) / 10,
+        lastViewYawClamped: state.lastViewYawClamped,
+        lastViewPitchClamped: state.lastViewPitchClamped,
+        lastViewTargetKind: state.lastViewTargetKind,
+        lastViewAnchorResyncChanged: state.lastViewAnchorResyncChanged,
+        lastViewAnchorResyncYawDeg: Math.round(state.lastViewAnchorResyncYawDeg * 10) / 10,
+        lastViewAnchorResyncPitchDeg: Math.round(state.lastViewAnchorResyncPitchDeg * 10) / 10,
+        lastViewUpdateAtMs: state.lastViewUpdateAtMs,
+        lastAimDot: Number.isFinite(Number(state.lastAimDot)) ? Number(state.lastAimDot) : null,
+        lastFireIntent: state.lastFireIntent,
+        lastAimGatePassed: typeof state.lastAimGatePassed === 'boolean' ? state.lastAimGatePassed : null,
+        lastAimGateReason: state.lastAimGateReason,
+        lastFireLosGatePassed: typeof state.lastFireLosGatePassed === 'boolean' ? state.lastFireLosGatePassed : null,
+        maxRequestedViewYawDeltaDeg: Math.round(state.maxRequestedViewYawDeltaDeg * 10) / 10,
+        maxRequestedViewPitchDeltaDeg: Math.round(state.maxRequestedViewPitchDeltaDeg * 10) / 10,
+        maxRemainingViewYawErrorDeg: Math.round(state.maxRemainingViewYawErrorDeg * 10) / 10,
+        maxRemainingViewPitchErrorDeg: Math.round(state.maxRemainingViewPitchErrorDeg * 10) / 10,
+        maxViewAnchorResyncYawDeg: Math.round(state.maxViewAnchorResyncYawDeg * 10) / 10,
+        maxViewAnchorResyncPitchDeg: Math.round(state.maxViewAnchorResyncPitchDeg * 10) / 10,
+        largeViewTurnCount: state.largeViewTurnCount,
+        maxAimMovementDivergenceDeg: Math.round(state.maxAimMovementDivergenceDeg * 10) / 10,
+        aimMovementDivergenceSamples: state.aimMovementDivergenceSamples,
+        aimMovementDivergenceOver45Count: state.aimMovementDivergenceOver45Count,
         gradientProbeDeflections: 0,
         waypointsFollowedCount: state.waypointsFollowed,
         waypointReplanFailures: state.waypointReplanFailures,
@@ -2819,6 +3868,10 @@
         pathEndSnapped: state.lastPathEndSnapped,
         pathStartSnapDistance: state.lastPathStartSnapDistance,
         pathEndSnapDistance: state.lastPathEndSnapDistance,
+        maxPathStartSnapDistance: state.maxPathStartSnapDistance,
+        maxPathEndSnapDistance: state.maxPathEndSnapDistance,
+        untrustedPathSnapCount: state.untrustedPathSnapCount,
+        routeSnapEpochs: state.routeSnapEpochs.slice(),
         firstObjectiveDistance: state.firstObjectiveDistance,
         minObjectiveDistance: state.minObjectiveDistance,
         objectiveDistanceClosed: Number.isFinite(state.firstObjectiveDistance) && Number.isFinite(state.lastObjectiveDistance)
@@ -2827,9 +3880,14 @@
         playerDistanceMoved: state.playerDistanceMoved,
         movementIntentCalls: state.movementIntentCalls,
         nonZeroMovementIntentCalls: state.nonZeroMovementIntentCalls,
+        worldMovementIntentCalls: state.worldMovementIntentCalls,
+        cameraMovementIntentCalls: state.cameraMovementIntentCalls,
+        nonZeroWorldMovementIntentCalls: state.nonZeroWorldMovementIntentCalls,
+        nonZeroCameraMovementIntentCalls: state.nonZeroCameraMovementIntentCalls,
         lastMovementIntent: state.lastMovementIntent,
         lastNonZeroMovementIntent: state.lastNonZeroMovementIntent,
         runtimeLiveness: runtimeLiveness,
+        weaponHarness: getWeaponHarnessSnapshot(systems),
         perceptionRange: botConfig.perceptionRange,
       };
     }
@@ -2838,6 +3896,8 @@
       const systems = getSystems();
       return {
         mode: opts.mode,
+        driverSeed: opts.driverSeed,
+        movementDecisionIntervalMs: decisionIntervalMs,
         botState: state.botState,
         // Alias `botState` under the legacy `movementState` key so older
         // capture artifacts (and perf-capture readers prior to
@@ -2846,8 +3906,27 @@
         movementState: state.botState,
         timeInStateMs: state.timeInStateMs,
         currentTarget: state.currentTarget ? String(state.currentTarget.id) : null,
+        firingHeld: state.firingHeld,
         shotsFired: state.shotsFired,
         reloadsIssued: state.reloadsIssued,
+        droppedDeadTargetLocks: state.droppedDeadTargetLocks,
+        firingRetargets: state.firingRetargets,
+        firingRetargetFireStops: state.firingRetargetFireStops,
+        firingRetargetEpochs: state.firingRetargetEpochs.slice(),
+        losRejectedShots: state.losRejectedShots,
+        losUnknownTargetChecks: state.losUnknownTargetChecks,
+        fireUnknownLosRejectedShots: state.fireUnknownLosRejectedShots,
+        lastTargetLosStatus: state.lastTargetLosStatus,
+        lastTargetLosReason: state.lastTargetLosReason,
+        lastFireLosStatus: state.lastFireLosStatus,
+        lastFireLosReason: state.lastFireLosReason,
+        lastCurrentTargetLive: state.lastCurrentTargetLive,
+        lastCurrentTargetHealth: state.lastCurrentTargetHealth,
+        lastCurrentTargetState: state.lastCurrentTargetState,
+        shotEpochs: state.shotEpochs.slice(),
+        lastFireProbe: state.lastFireProbe,
+        aimDotGateRejectedShots: state.aimDotGateRejectedShots,
+        fireStartRejected: state.fireStartRejected,
         waypointsFollowedCount: state.waypointsFollowed,
         waypointReplanFailures: state.waypointReplanFailures,
         stuckWaypointSkips: state.stuckWaypointSkips,
@@ -2862,6 +3941,38 @@
         ammoRefillCount: state.ammoRefillCount,
         healthTopUpCount: state.healthTopUpCount,
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
+        maxViewYawStepDeg: Math.round(state.maxViewYawStepDeg * 10) / 10,
+        maxViewPitchStepDeg: Math.round(state.maxViewPitchStepDeg * 10) / 10,
+        viewSlewClampCount: state.viewSlewClampCount,
+        viewAnchorResyncCount: state.viewAnchorResyncCount,
+        lastViewStepYawDeg: Math.round(state.lastViewStepYawDeg * 10) / 10,
+        lastViewStepPitchDeg: Math.round(state.lastViewStepPitchDeg * 10) / 10,
+        lastRequestedViewYawDeltaDeg: Math.round(state.lastRequestedViewYawDeltaDeg * 10) / 10,
+        lastRequestedViewPitchDeltaDeg: Math.round(state.lastRequestedViewPitchDeltaDeg * 10) / 10,
+        lastRemainingViewYawErrorDeg: Math.round(state.lastRemainingViewYawErrorDeg * 10) / 10,
+        lastRemainingViewPitchErrorDeg: Math.round(state.lastRemainingViewPitchErrorDeg * 10) / 10,
+        lastViewYawClamped: state.lastViewYawClamped,
+        lastViewPitchClamped: state.lastViewPitchClamped,
+        lastViewTargetKind: state.lastViewTargetKind,
+        lastViewAnchorResyncChanged: state.lastViewAnchorResyncChanged,
+        lastViewAnchorResyncYawDeg: Math.round(state.lastViewAnchorResyncYawDeg * 10) / 10,
+        lastViewAnchorResyncPitchDeg: Math.round(state.lastViewAnchorResyncPitchDeg * 10) / 10,
+        lastViewUpdateAtMs: state.lastViewUpdateAtMs,
+        lastAimDot: Number.isFinite(Number(state.lastAimDot)) ? Number(state.lastAimDot) : null,
+        lastFireIntent: state.lastFireIntent,
+        lastAimGatePassed: typeof state.lastAimGatePassed === 'boolean' ? state.lastAimGatePassed : null,
+        lastAimGateReason: state.lastAimGateReason,
+        lastFireLosGatePassed: typeof state.lastFireLosGatePassed === 'boolean' ? state.lastFireLosGatePassed : null,
+        maxRequestedViewYawDeltaDeg: Math.round(state.maxRequestedViewYawDeltaDeg * 10) / 10,
+        maxRequestedViewPitchDeltaDeg: Math.round(state.maxRequestedViewPitchDeltaDeg * 10) / 10,
+        maxRemainingViewYawErrorDeg: Math.round(state.maxRemainingViewYawErrorDeg * 10) / 10,
+        maxRemainingViewPitchErrorDeg: Math.round(state.maxRemainingViewPitchErrorDeg * 10) / 10,
+        maxViewAnchorResyncYawDeg: Math.round(state.maxViewAnchorResyncYawDeg * 10) / 10,
+        maxViewAnchorResyncPitchDeg: Math.round(state.maxViewAnchorResyncPitchDeg * 10) / 10,
+        largeViewTurnCount: state.largeViewTurnCount,
+        maxAimMovementDivergenceDeg: Math.round(state.maxAimMovementDivergenceDeg * 10) / 10,
+        aimMovementDivergenceSamples: state.aimMovementDivergenceSamples,
+        aimMovementDivergenceOver45Count: state.aimMovementDivergenceOver45Count,
         stateHistogramMs: Object.assign({}, state.stateHistogram),
         // Combat stats rolled up from PlayerStatsTracker.
         damageDealt: state.damageDealt,
@@ -2891,6 +4002,10 @@
         pathEndSnapped: state.lastPathEndSnapped,
         pathStartSnapDistance: state.lastPathStartSnapDistance,
         pathEndSnapDistance: state.lastPathEndSnapDistance,
+        maxPathStartSnapDistance: state.maxPathStartSnapDistance,
+        maxPathEndSnapDistance: state.maxPathEndSnapDistance,
+        untrustedPathSnapCount: state.untrustedPathSnapCount,
+        routeSnapEpochs: state.routeSnapEpochs.slice(),
         firstObjectiveDistance: state.firstObjectiveDistance,
         minObjectiveDistance: state.minObjectiveDistance,
         objectiveDistanceClosed: Number.isFinite(state.firstObjectiveDistance) && Number.isFinite(state.lastObjectiveDistance)
@@ -2899,9 +4014,14 @@
         playerDistanceMoved: state.playerDistanceMoved,
         movementIntentCalls: state.movementIntentCalls,
         nonZeroMovementIntentCalls: state.nonZeroMovementIntentCalls,
+        worldMovementIntentCalls: state.worldMovementIntentCalls,
+        cameraMovementIntentCalls: state.cameraMovementIntentCalls,
+        nonZeroWorldMovementIntentCalls: state.nonZeroWorldMovementIntentCalls,
+        nonZeroCameraMovementIntentCalls: state.nonZeroCameraMovementIntentCalls,
         lastMovementIntent: state.lastMovementIntent,
         lastNonZeroMovementIntent: state.lastNonZeroMovementIntent,
         runtimeLiveness: getRuntimeLiveness(systems),
+        weaponHarness: getWeaponHarnessSnapshot(systems),
         perceptionRange: botConfig.perceptionRange,
         pathTrustTtlMs: PATH_TRUST_TTL_MS,
         maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
@@ -2920,6 +4040,8 @@
       movementPatternCount: 5, // PATROL/ALERT/ENGAGE/ADVANCE/RESPAWN_WAIT — informative only
       compressFrontline: enableFrontlineCompression,
       mode: opts.mode,
+      driverSeed: opts.driverSeed,
+      movementDecisionIntervalMs: decisionIntervalMs,
       allowWarpRecovery: opts.allowWarpRecovery,
       topUpHealth: opts.topUpHealth,
       autoRespawn: opts.autoRespawn,
@@ -2938,6 +4060,8 @@
           movementPatternCount: driver.movementPatternCount || 0,
           compressFrontline: !!driver.compressFrontline,
           mode: String(driver.mode || ''),
+          driverSeed: driver.driverSeed,
+          movementDecisionIntervalMs: driver.movementDecisionIntervalMs,
           allowWarpRecovery: !!driver.allowWarpRecovery,
           topUpHealth: driver.topUpHealth !== false,
           autoRespawn: driver.autoRespawn !== false,
@@ -2971,7 +4095,19 @@
       shouldFastReplan: shouldFastReplan,
       detectPitTrap: detectPitTrap,
       evaluateFireGate: evaluateFireGate,
+      appendBoundedEvent: appendBoundedEvent,
+      sanitizePresentationContext: sanitizePresentationContext,
+      addTopCollisionContributor: addTopCollisionContributor,
+      shouldRecordRouteSnapEpoch: shouldRecordRouteSnapEpoch,
+      queryTerrainLineOfSight: queryTerrainLineOfSight,
+      hasClearTerrainLineOfSight: hasClearTerrainLineOfSight,
       angularDistance: angularDistance,
+      signedYawDelta: signedYawDelta,
+      clampDriverPitch: clampDriverPitch,
+      applyViewSlewLimit: applyViewSlewLimit,
+      syncViewAnchorToActual: syncViewAnchorToActual,
+      DRIVER_VIEW_MAX_YAW_STEP_RAD: DRIVER_VIEW_MAX_YAW_STEP_RAD,
+      DRIVER_VIEW_MAX_PITCH_STEP_RAD: DRIVER_VIEW_MAX_PITCH_STEP_RAD,
       PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
       TARGET_CHEST_HEIGHT: TARGET_CHEST_HEIGHT,
       TARGET_ACTOR_AIM_Y_OFFSET: TARGET_ACTOR_AIM_Y_OFFSET,
@@ -2984,6 +4120,7 @@
       AIM_PITCH_LIMIT_RAD: AIM_PITCH_LIMIT_RAD,
       NAVMESH_START_SNAP_RADIUS: NAVMESH_START_SNAP_RADIUS,
       NAVMESH_TARGET_SNAP_RADIUS: NAVMESH_TARGET_SNAP_RADIUS,
+      NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE,
       isPathTrusted: isPathTrusted,
       clampAimYByPitch: clampAimYByPitch,
       // Bot primitives.
@@ -2991,6 +4128,10 @@
       createIdleBotIntent: createIdleBotIntent,
       selectDriverViewTarget: selectDriverViewTarget,
       computeWorldMovementIntent: computeWorldMovementIntent,
+      computeAimMovementDivergence: function (intent, overlayPoint, playerPos) {
+        return computeViewMovementDivergence(intent && intent.aimTarget, intent, overlayPoint, playerPos);
+      },
+      computeViewMovementDivergence: computeViewMovementDivergence,
       isRouteOverlayMicroTarget: isRouteOverlayMicroTarget,
       isRoutePathExhausted: isRoutePathExhausted,
       computeRouteContinuationPoint: computeRouteContinuationPoint,
@@ -3002,17 +4143,25 @@
       shouldResetRouteForNoProgress: shouldResetRouteForNoProgress,
       isTargetTemporarilyBlocked: isTargetTemporarilyBlocked,
       markTargetTemporarilyBlocked: markTargetTemporarilyBlocked,
+      addNearestVisibleCheckCandidate: addNearestVisibleCheckCandidate,
+      selectVisiblePreferredEnemyCandidate: selectVisiblePreferredEnemyCandidate,
       shouldUseTargetForCurrentObjective: shouldUseTargetForCurrentObjective,
       shouldUseRouteOverlayForIntent: shouldUseRouteOverlayForIntent,
       shouldUseDirectCombatRouteFallback: shouldUseDirectCombatRouteFallback,
       createDirectCombatFallbackPath: createDirectCombatFallbackPath,
+      isRouteSnapTrusted: isRouteSnapTrusted,
+      shouldIssueFireStart: shouldIssueFireStart,
+      shouldReleaseFireForRetarget: shouldReleaseFireForRetarget,
       engageStrafeIntent: engageStrafeIntent,
       selectLockedTarget: selectLockedTarget,
       profileForMode: profileForMode,
       botConfigForProfile: botConfigForProfile,
+      resolveDriverDecisionIntervalMs: resolveDriverDecisionIntervalMs,
       combatObjectiveMaxDistanceForProfile: combatObjectiveMaxDistanceForProfile,
       supportsFrontlineCompression: supportsFrontlineCompression,
       usesPlayerAnchoredFrontlineCompression: usesPlayerAnchoredFrontlineCompression,
+      normalizeDriverSeed: normalizeDriverSeed,
+      createSeededRandom: createSeededRandom,
       placeCompressedCombatantForHarness: placeCompressedCombatantForHarness,
       // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
       detectMatchEnded: detectMatchEnded,

@@ -123,6 +123,7 @@ export const PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE = String.raw`
     if (modelPath.includes('npcs/pixel-forge')) return 'npc_close_glb';
     if (modelPath.includes('vehicles/aircraft/uh1') || modelPath.includes('vehicles/aircraft/ah1') || modelPath.includes('huey') || modelPath.includes('cobra')) return 'helicopters';
     if (modelPath.includes('vehicles/aircraft')) return 'fixed_wing_aircraft';
+    if (modelPath.includes('vehicles/ground')) return 'ground_vehicles';
     if (modelPath.includes('buildings/') || modelPath.includes('structures/') || modelPath.includes('props/')) return 'world_static_features';
     if (modelPath.includes('weapons/')) return 'weapons';
     if (names.includes('hitboxdebug')) return 'debug_overlays';
@@ -282,6 +283,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     if (modelPath.includes('npcs/pixel-forge')) return 'npc_close_glb';
     if (modelPath.includes('vehicles/aircraft/uh1') || modelPath.includes('vehicles/aircraft/ah1') || modelPath.includes('huey') || modelPath.includes('cobra')) return 'helicopters';
     if (modelPath.includes('vehicles/aircraft')) return 'fixed_wing_aircraft';
+    if (modelPath.includes('vehicles/ground')) return 'ground_vehicles';
     if (modelPath.includes('buildings/') || modelPath.includes('structures/') || modelPath.includes('props/')) return 'world_static_features';
     if (modelPath.includes('weapons/')) return 'weapons';
     if (names.includes('hitboxdebug')) return 'debug_overlays';
@@ -602,10 +604,10 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       const rawFrames = Array.from(state.frames.values())
         .sort((a, b) => a.frameCount - b.frameCount);
       const frames = selectFramesForSummary(rawFrames)
-        .map((frame) => serializeFrame(frame, false))
+        .map((frame) => serializeFrame(frame, true))
         .sort((a, b) => a.frameCount - b.frameCount);
       const totals = Array.from(state.totals.values())
-        .map((bucket) => serializeBucket(bucket, false))
+        .map((bucket) => serializeBucket(bucket, true))
         .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles);
       const result = {
         mode: 'summary',

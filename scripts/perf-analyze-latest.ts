@@ -43,6 +43,15 @@ type RuntimeSample = {
       longAnimationFrameTotalDurationMs?: number;
       longAnimationFrameMaxDurationMs?: number;
       longAnimationFrameBlockingDurationMs?: number;
+      rafCadence?: {
+        intervalCount?: number;
+        overBudget60HzMs?: number;
+        overBudget60HzMsPerSecond?: number;
+        droppedFrameTime60HzMs?: number;
+        droppedFrameTime60HzMsPerSecond?: number;
+        estimatedDropped60HzFrames?: number;
+        estimatedDropped60HzFramesPerSecond?: number;
+      };
       userTimingByName?: Record<string, {
         count?: number;
         totalDurationMs?: number;
@@ -161,6 +170,46 @@ const loafCount = stallSamples.length > 0
 const loafBlockingMs = stallSamples.length > 0
   ? Math.max(...stallSamples.map(s => Number(s.browserStalls?.totals?.longAnimationFrameBlockingDurationMs ?? 0)))
   : 0;
+const latestRafCadence = stallSamples.length > 0
+  ? stallSamples[stallSamples.length - 1].browserStalls?.totals?.rafCadence
+  : undefined;
+const hasRafTimeMetrics = typeof summary?.droppedFrameMetrics?.browserRaf?.overBudget60HzMs === 'number'
+  || typeof summary?.droppedFrameMetrics?.browserRaf?.droppedFrameTime60HzMs === 'number'
+  || typeof latestRafCadence?.overBudget60HzMs === 'number'
+  || typeof latestRafCadence?.droppedFrameTime60HzMs === 'number';
+const rafDropped60HzFrames = Number(
+  summary?.droppedFrameMetrics?.browserRaf?.estimatedDropped60HzFrames
+    ?? latestRafCadence?.estimatedDropped60HzFrames
+    ?? 0
+);
+const rafDropped60HzFramesPerSecond = Number(
+  summary?.droppedFrameMetrics?.browserRaf?.estimatedDropped60HzFramesPerSecond
+    ?? latestRafCadence?.estimatedDropped60HzFramesPerSecond
+    ?? 0
+);
+const rafOverBudget60HzMs = Number(
+  summary?.droppedFrameMetrics?.browserRaf?.overBudget60HzMs
+    ?? latestRafCadence?.overBudget60HzMs
+    ?? 0
+);
+const rafOverBudget60HzMsPerSecond = Number(
+  summary?.droppedFrameMetrics?.browserRaf?.overBudget60HzMsPerSecond
+    ?? latestRafCadence?.overBudget60HzMsPerSecond
+    ?? 0
+);
+const rafDroppedFrameTime60HzMs = Number(
+  summary?.droppedFrameMetrics?.browserRaf?.droppedFrameTime60HzMs
+    ?? latestRafCadence?.droppedFrameTime60HzMs
+    ?? 0
+);
+const rafDroppedFrameTime60HzMsPerSecond = Number(
+  summary?.droppedFrameMetrics?.browserRaf?.droppedFrameTime60HzMsPerSecond
+    ?? latestRafCadence?.droppedFrameTime60HzMsPerSecond
+    ?? 0
+);
+const tailAttributionConclusion = typeof summary?.tailAttribution?.conclusion === 'string'
+  ? String(summary.tailAttribution.conclusion)
+  : null;
 const latestUserTiming = stallSamples.length > 0
   ? (stallSamples[stallSamples.length - 1].browserStalls?.totals?.userTimingByName ?? {})
   : {};
@@ -258,6 +307,17 @@ console.log(`Samples: ${samples.length}`);
 console.log(`Avg frame ms: ${avgFrameMs.toFixed(2)}`);
 console.log(`Max p95 frame ms: ${maxP95.toFixed(2)}`);
 console.log(`Avg over-budget %: ${avgOverBudget.toFixed(2)}`);
+console.log(`rAF dropped 60Hz frames: ${rafDropped60HzFrames.toFixed(0)} (${rafDropped60HzFramesPerSecond.toFixed(2)}/s)`);
+if (hasRafTimeMetrics) {
+  console.log(`rAF over-budget 60Hz time: ${rafOverBudget60HzMs.toFixed(1)}ms (${rafOverBudget60HzMsPerSecond.toFixed(2)}ms/s)`);
+  console.log(`rAF dropped-frame 60Hz time: ${rafDroppedFrameTime60HzMs.toFixed(1)}ms (${rafDroppedFrameTime60HzMsPerSecond.toFixed(2)}ms/s)`);
+} else {
+  console.log('rAF over-budget 60Hz time: unavailable (artifact predates rAF time metrics)');
+  console.log('rAF dropped-frame 60Hz time: unavailable (artifact predates rAF time metrics)');
+}
+if (tailAttributionConclusion) {
+  console.log(`Tail attribution: ${tailAttributionConclusion}`);
+}
 if (heapSamples.length > 0) {
   console.log(`Heap growth (MB): ${heapGrowth.toFixed(2)}`);
   console.log(`Heap peak growth (MB): ${heapPeakGrowth.toFixed(2)}`);

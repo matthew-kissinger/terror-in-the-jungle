@@ -19,6 +19,12 @@ export interface ExplosionEffect {
   fireParticles: THREE.Points;
   debrisParticles: THREE.Points;
   shockwaveRing: THREE.Mesh;
+  smokePositionAttribute: THREE.BufferAttribute;
+  firePositionAttribute: THREE.BufferAttribute;
+  debrisPositionAttribute: THREE.BufferAttribute;
+  smokePositionArray: Float32Array;
+  firePositionArray: Float32Array;
+  debrisPositionArray: Float32Array;
   smokeVelocities: THREE.Vector3[];
   fireVelocities: THREE.Vector3[];
   debrisVelocities: THREE.Vector3[];
@@ -56,7 +62,8 @@ export function createExplosionEffect(
   const smokeCount = 80;
   const smokeGeometry = new THREE.BufferGeometry();
   const smokePositions = new Float32Array(smokeCount * 3);
-  smokeGeometry.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+  const smokePositionAttribute = new THREE.BufferAttribute(smokePositions, 3);
+  smokeGeometry.setAttribute('position', smokePositionAttribute);
 
   const smokeMaterial = new THREE.PointsMaterial({
     color: 0x8b8b80,
@@ -77,7 +84,8 @@ export function createExplosionEffect(
   const fireCount = 60;
   const fireGeometry = new THREE.BufferGeometry();
   const firePositions = new Float32Array(fireCount * 3);
-  fireGeometry.setAttribute('position', new THREE.BufferAttribute(firePositions, 3));
+  const firePositionAttribute = new THREE.BufferAttribute(firePositions, 3);
+  fireGeometry.setAttribute('position', firePositionAttribute);
 
   const fireMaterial = new THREE.PointsMaterial({
     color: 0xff6600,
@@ -98,7 +106,8 @@ export function createExplosionEffect(
   const debrisCount = 50;
   const debrisGeometry = new THREE.BufferGeometry();
   const debrisPositions = new Float32Array(debrisCount * 3);
-  debrisGeometry.setAttribute('position', new THREE.BufferAttribute(debrisPositions, 3));
+  const debrisPositionAttribute = new THREE.BufferAttribute(debrisPositions, 3);
+  debrisGeometry.setAttribute('position', debrisPositionAttribute);
 
   const debrisMaterial = new THREE.PointsMaterial({
     color: 0x4a4032,
@@ -155,6 +164,12 @@ export function createExplosionEffect(
     fireParticles,
     debrisParticles,
     shockwaveRing,
+    smokePositionAttribute,
+    firePositionAttribute,
+    debrisPositionAttribute,
+    smokePositionArray: smokePositions,
+    firePositionArray: firePositions,
+    debrisPositionArray: debrisPositions,
     smokeVelocities,
     fireVelocities,
     debrisVelocities,

@@ -212,6 +212,15 @@ describe('PlayerSuppressionSystem', () => {
       await system.init();
     });
 
+    it('returns before clock reads when suppression is fully idle', () => {
+      const nowSpy = vi.spyOn(Date, 'now');
+
+      system.update(0.016);
+
+      expect(nowSpy).not.toHaveBeenCalled();
+      expect(mockCanvasContext.clearRect).not.toHaveBeenCalled();
+    });
+
     it('should decay near miss count after decay time', () => {
       const bulletPos = new THREE.Vector3(1, 0, 0);
       const playerPos = new THREE.Vector3(0, 0, 0);
@@ -286,19 +295,24 @@ describe('PlayerSuppressionSystem', () => {
       await system.init();
     });
 
-    it('should remove near miss events older than 2 seconds', () => {
+    it('should clear stale directional effects once near miss events expire', () => {
+      vi.useFakeTimers();
       const bulletPos = new THREE.Vector3(1, 0, 0);
       const playerPos = new THREE.Vector3(0, 0, 0);
 
       system.registerNearMiss(bulletPos, playerPos);
+      system.update(0.016);
+      expect(mockCanvasContext.fillRect).toHaveBeenCalled();
+      mockCanvasContext.clearRect.mockClear();
+      mockCanvasContext.createRadialGradient.mockClear();
+      mockCanvasContext.fillRect.mockClear();
 
-      vi.useFakeTimers();
       vi.advanceTimersByTime(2100); // Over 2 seconds
       system.update(0.016);
 
-      // Can't directly inspect recentNearMisses, but we can verify directional effects
-      // are called with filtered events
       expect(mockCanvasContext.clearRect).toHaveBeenCalled();
+      expect(mockCanvasContext.createRadialGradient).not.toHaveBeenCalled();
+      expect(mockCanvasContext.fillRect).not.toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -341,6 +355,64 @@ describe('PlayerSuppressionSystem', () => {
       system.registerNearMiss(bulletPos, playerPos);
 
       expect(system.getNearMissCount()).toBe(0);
+    });
+
+    it('rejects far near misses without Vector3 distance work', () => {
+      const bulletPos = new THREE.Vector3(10, 0, 0);
+      const playerPos = new THREE.Vector3(0, 0, 0);
+      const distanceSpy = vi.spyOn(bulletPos, 'distanceTo').mockImplementation(() => {
+        throw new Error('distanceTo should not run for far near-miss rejection');
+      });
+
+      expect(() => system.registerNearMiss(bulletPos, playerPos)).not.toThrow();
+
+      expect(distanceSpy).not.toHaveBeenCalled();
+      expect(system.getNearMissCount()).toBe(0);
+    });
+
+    it('keeps vertically offset near-miss direction horizontal without changing proximity falloff', () => {
+      const bulletPos = new THREE.Vector3(1, 2, 0);
+      const playerPos = new THREE.Vector3(0, 0, 0);
+
+      system.registerNearMiss(bulletPos, playerPos);
+
+      const internals = system as unknown as {
+        suppressionState: {
+          recentNearMisses: Array<{
+            direction: THREE.Vector3;
+            intensity: number;
+          }>;
+        };
+      };
+      const [event] = internals.suppressionState.recentNearMisses;
+
+      expect(system.getNearMissCount()).toBe(1);
+      expect(event.direction.x).toBeCloseTo(1);
+      expect(event.direction.y).toBe(0);
+      expect(event.direction.z).toBeCloseTo(0);
+      expect(event.intensity).toBeCloseTo(1 - Math.sqrt(5) / 2.5);
+    });
+
+    it('keeps vertical-only near misses directionless without Vector3 normalization work', () => {
+      const bulletPos = new THREE.Vector3(0, 1, 0);
+      const playerPos = new THREE.Vector3(0, 0, 0);
+      const normalizeSpy = vi.spyOn(THREE.Vector3.prototype, 'normalize');
+
+      system.registerNearMiss(bulletPos, playerPos);
+
+      const internals = system as unknown as {
+        suppressionState: {
+          recentNearMisses: Array<{
+            direction: THREE.Vector3;
+          }>;
+        };
+      };
+      const [event] = internals.suppressionState.recentNearMisses;
+
+      expect(normalizeSpy).not.toHaveBeenCalled();
+      expect(system.getNearMissCount()).toBe(1);
+      expect(event.direction.lengthSq()).toBe(0);
+      normalizeSpy.mockRestore();
     });
 
     it('should increase suppression level based on proximity', () => {
@@ -391,6 +463,43 @@ describe('PlayerSuppressionSystem', () => {
 
       // Can't directly inspect array, but getNearMissCount should still accumulate
       expect(system.getNearMissCount()).toBe(10);
+    });
+
+    it('keeps directional near-miss records capped and reusable after overflow', () => {
+      vi.useFakeTimers();
+      const playerPos = new THREE.Vector3(0, 0, 0);
+
+      for (let index = 0; index < 5; index++) {
+        vi.setSystemTime(index * 100);
+        system.registerNearMiss(new THREE.Vector3(1, 0, 0), playerPos);
+      }
+
+      const internals = system as unknown as {
+        suppressionState: {
+          recentNearMisses: Array<{
+            direction: THREE.Vector3;
+            timestamp: number;
+          }>;
+        };
+      };
+      const events = internals.suppressionState.recentNearMisses;
+      const eventRefs = events.slice();
+      const directionRefs = events.map(event => event.direction);
+
+      vi.setSystemTime(500);
+      system.registerNearMiss(new THREE.Vector3(0, 0, 1), playerPos);
+
+      expect(events).toHaveLength(5);
+      for (let index = 0; index < events.length; index++) {
+        expect(events[index]).toBe(eventRefs[index]);
+        expect(events[index].direction).toBe(directionRefs[index]);
+      }
+      expect(events[0].timestamp).toBe(100);
+      expect(events[4].timestamp).toBe(500);
+      expect(events[4].direction.x).toBeCloseTo(0);
+      expect(events[4].direction.z).toBeCloseTo(1);
+
+      vi.useRealTimers();
     });
 
     it('should trigger camera shake with proximity-based intensity', () => {
@@ -690,10 +799,10 @@ describe('PlayerSuppressionSystem', () => {
       await system.init();
     });
 
-    it('should clear canvas each update', () => {
+    it('does not clear an idle canvas when no directional effect is active', () => {
       system.update(0.016);
 
-      expect(mockCanvasContext.clearRect).toHaveBeenCalledWith(0, 0, 1920, 1080);
+      expect(mockCanvasContext.clearRect).not.toHaveBeenCalled();
     });
 
     it('should draw directional effects for recent near misses', () => {
@@ -704,6 +813,19 @@ describe('PlayerSuppressionSystem', () => {
       system.update(0.016);
 
       expect(mockCanvasContext.createRadialGradient).toHaveBeenCalled();
+      expect(mockCanvasContext.fillRect).toHaveBeenCalled();
+    });
+
+    it('reuses the cached directional canvas context during updates', () => {
+      const bulletPos = new THREE.Vector3(1, 0, 0);
+      const playerPos = new THREE.Vector3(0, 0, 0);
+      mockCanvas.getContext.mockClear();
+
+      system.registerNearMiss(bulletPos, playerPos);
+      system.update(0.016);
+      system.update(0.016);
+
+      expect(mockCanvas.getContext).not.toHaveBeenCalled();
       expect(mockCanvasContext.fillRect).toHaveBeenCalled();
     });
 

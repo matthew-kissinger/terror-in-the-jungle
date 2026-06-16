@@ -18,6 +18,7 @@
  */
 
 const ICON_BASE = `${import.meta.env.BASE_URL}assets/ui/icons`;
+const preloadedIconImages = new Map<string, HTMLImageElement>();
 
 // ---- Path resolver ----
 
@@ -91,8 +92,10 @@ export function iconHtml(name: string, opts: IconImgOptions = {}): string {
  */
 export function preloadIcons(names: string[]): void {
   for (const name of names) {
+    if (preloadedIconImages.has(name)) continue;
     const img = new Image();
     img.src = icon(name);
+    preloadedIconImages.set(name, img);
   }
 }
 

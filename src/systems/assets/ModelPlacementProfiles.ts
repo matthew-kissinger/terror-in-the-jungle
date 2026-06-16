@@ -24,6 +24,7 @@ export interface ModelPlacementProfile {
   coverOffset?: number;
   displayScale?: number;
   drawCallOptimization?: ModelDrawCallOptimizationStrategy;
+  detailRenderDistanceM?: number;
 }
 
 const DEFAULT_MODEL_PLACEMENT_PROFILE: ModelPlacementProfile = {
@@ -56,6 +57,30 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+  },
+  [StructureModels.AMMO_CRATE]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    detailRenderDistanceM: 110,
+  },
+  [StructureModels.SUPPLY_CRATE]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    detailRenderDistanceM: 110,
+  },
+  [StructureModels.FUEL_DRUM]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    detailRenderDistanceM: 110,
+  },
+  [StructureModels.PUNJI_TRAP]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    detailRenderDistanceM: 90,
   },
   [StructureModels.FIREBASE_GATE]: {
     groundingMode: 'bounds_center_bottom',
@@ -92,6 +117,7 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    detailRenderDistanceM: 130,
   },
   [BuildingModels.BUNKER_NVA]: {
     groundingMode: 'bounds_center_bottom',
@@ -121,9 +147,9 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
   // displayScale: 0.5 fudge calibrated to the OLD oversized GLBs. The 2026-06
   // repaint catalog ships these props at real meter scale (fuel-drum 0.6x0.92m,
   // supply-crate 0.61x1.01m, ammo-crate 0.9x0.43m, wooden-barrel 0.7x0.9m), so
-  // the fudge double-shrinks them. They now fall through to the default profile
-  // and render at the shared STRUCTURE_SCALE convention like every other
-  // real-scale prop (see WAR_ASSET_REPAINT_AUDIT_2026-06-11.md debt list).
+  // the fudge double-shrinks them. Crates/drums may carry close-detail render
+  // metadata above, but they still keep the shared STRUCTURE_SCALE convention
+  // like every other real-scale prop (see WAR_ASSET_REPAINT_AUDIT_2026-06-11.md).
 };
 
 export function getModelPlacementProfile(modelPath: string): ModelPlacementProfile {

@@ -5,7 +5,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { MathUtils } from '../../utils/Math';
 import { PlayerState } from '../../types';
-import { CameraShakeSystem } from '../effects/CameraShakeSystem';
+import { CameraShakeOffset, CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { PlayerInput } from './PlayerInput';
 import { IHelicopterModel } from '../../types/SystemInterfaces';
 import type { FixedWingModel } from '../vehicle/FixedWingModel';
@@ -81,6 +81,7 @@ export class PlayerCamera {
   private camera: THREE.PerspectiveCamera;
   private playerState: PlayerState;
   private cameraShakeSystem?: CameraShakeSystem;
+  private readonly shakeOffset: CameraShakeOffset = { pitch: 0, yaw: 0 };
   private helicopterModel?: IHelicopterModel;
   private fixedWingModel?: FixedWingModel;
   // Active ground/tank/surface follow-cam provider, set by the vehicle
@@ -315,11 +316,15 @@ export class PlayerCamera {
       input.clearMouseMovement();
     }
 
+    this.applyInfantryCameraPose();
+  }
+
+  private applyInfantryCameraPose(): void {
     // Get shake offset from shake system
     let shakeOffsetPitch = 0;
     let shakeOffsetYaw = 0;
     if (this.cameraShakeSystem) {
-      const shake = this.cameraShakeSystem.getCurrentShakeOffset();
+      const shake = this.cameraShakeSystem.getCurrentShakeOffset(this.shakeOffset);
       shakeOffsetPitch = shake.pitch;
       shakeOffsetYaw = shake.yaw;
     }
@@ -331,6 +336,12 @@ export class PlayerCamera {
 
     // Update camera position
     this.camera.position.copy(this.playerState.position);
+  }
+
+  private canRefreshInfantryPoseImmediately(): boolean {
+    return !this.playerState.isInHelicopter
+      && !this.playerState.isInFixedWing
+      && !this.vehicleFollowCamera;
   }
 
   private updateHelicopterCamera(input: PlayerInput): void {
@@ -623,6 +634,9 @@ export class PlayerCamera {
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void {
     this.pitch = MathUtils.clamp(this.pitch + pitchDeltaRad, -this.maxPitch, this.maxPitch);
     this.yaw += yawDeltaRad;
+    if (this.canRefreshInfantryPoseImmediately()) {
+      this.applyInfantryCameraPose();
+    }
   }
 
   // Reset camera position for respawn

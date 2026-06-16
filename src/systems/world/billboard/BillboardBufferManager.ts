@@ -42,6 +42,12 @@ export class GPUBillboardVegetation {
   private pendingPositionUpdate = false;
   private pendingScaleUpdate = false;
   private pendingRotationUpdate = false;
+  private positionDirtyStart = Number.POSITIVE_INFINITY;
+  private positionDirtyEnd = -1;
+  private scaleDirtyStart = Number.POSITIVE_INFINITY;
+  private scaleDirtyEnd = -1;
+  private rotationDirtyStart = Number.POSITIVE_INFINITY;
+  private rotationDirtyEnd = -1;
 
   constructor(scene: THREE.Scene, config: GPUVegetationConfig) {
     this.scene = scene;
@@ -138,6 +144,9 @@ export class GPUBillboardVegetation {
 
       allocatedIndices.push(index);
       this.liveCount++;
+      this.markPositionDirty(index);
+      this.markScaleDirty(index);
+      this.markRotationDirty(index);
     }
 
     if (allocatedIndices.length > 0) {
@@ -176,6 +185,7 @@ export class GPUBillboardVegetation {
       if (this.liveCount > 0) {
         this.liveCount--;
       }
+      this.markScaleDirty(index);
       removedCount++;
     }
 
@@ -218,11 +228,21 @@ export class GPUBillboardVegetation {
 
   // Reset all instances (for full cleanup)
   reset(): void {
+    const previousHighWaterMark = this.highWaterMark;
     this.highWaterMark = 0;
     this.liveCount = 0;
     this.freeSlots.clear();
     this.geometry.instanceCount = 0;
     this.mesh.visible = false;
+    if (previousHighWaterMark > 0) {
+      this.markPositionRangeDirty(0, previousHighWaterMark - 1);
+      this.markScaleRangeDirty(0, previousHighWaterMark - 1);
+      this.markRotationRangeDirty(0, previousHighWaterMark - 1);
+    } else {
+      this.markPositionRangeDirty(0, this.maxInstances - 1);
+      this.markScaleRangeDirty(0, this.maxInstances - 1);
+      this.markRotationRangeDirty(0, this.maxInstances - 1);
+    }
     this.pendingPositionUpdate = true;
     this.pendingScaleUpdate = true;
     this.pendingRotationUpdate = true;
@@ -238,15 +258,21 @@ export class GPUBillboardVegetation {
   ): void {
     // Apply batched buffer updates
     if (this.pendingPositionUpdate) {
-      this.positionAttribute.needsUpdate = true;
+      this.flushAttributeUpdateRange(this.positionAttribute, this.positionDirtyStart, this.positionDirtyEnd);
+      this.positionDirtyStart = Number.POSITIVE_INFINITY;
+      this.positionDirtyEnd = -1;
       this.pendingPositionUpdate = false;
     }
     if (this.pendingScaleUpdate) {
-      this.scaleAttribute.needsUpdate = true;
+      this.flushAttributeUpdateRange(this.scaleAttribute, this.scaleDirtyStart, this.scaleDirtyEnd);
+      this.scaleDirtyStart = Number.POSITIVE_INFINITY;
+      this.scaleDirtyEnd = -1;
       this.pendingScaleUpdate = false;
     }
     if (this.pendingRotationUpdate) {
-      this.rotationAttribute.needsUpdate = true;
+      this.flushAttributeUpdateRange(this.rotationAttribute, this.rotationDirtyStart, this.rotationDirtyEnd);
+      this.rotationDirtyStart = Number.POSITIVE_INFINITY;
+      this.rotationDirtyEnd = -1;
       this.pendingRotationUpdate = false;
     }
 
@@ -305,6 +331,52 @@ export class GPUBillboardVegetation {
 
   getFreeSlotCount(): number {
     return this.freeSlots.size;
+  }
+
+  private markPositionDirty(index: number): void {
+    this.markPositionRangeDirty(index, index);
+  }
+
+  private markScaleDirty(index: number): void {
+    this.markScaleRangeDirty(index, index);
+  }
+
+  private markRotationDirty(index: number): void {
+    this.markRotationRangeDirty(index, index);
+  }
+
+  private markPositionRangeDirty(start: number, end: number): void {
+    this.positionDirtyStart = Math.min(this.positionDirtyStart, start);
+    this.positionDirtyEnd = Math.max(this.positionDirtyEnd, end);
+  }
+
+  private markScaleRangeDirty(start: number, end: number): void {
+    this.scaleDirtyStart = Math.min(this.scaleDirtyStart, start);
+    this.scaleDirtyEnd = Math.max(this.scaleDirtyEnd, end);
+  }
+
+  private markRotationRangeDirty(start: number, end: number): void {
+    this.rotationDirtyStart = Math.min(this.rotationDirtyStart, start);
+    this.rotationDirtyEnd = Math.max(this.rotationDirtyEnd, end);
+  }
+
+  private flushAttributeUpdateRange(
+    attribute: THREE.InstancedBufferAttribute,
+    dirtyStart: number,
+    dirtyEnd: number,
+  ): void {
+    if (dirtyStart <= dirtyEnd && Number.isFinite(dirtyStart)) {
+      if (typeof attribute.clearUpdateRanges === 'function') {
+        attribute.clearUpdateRanges();
+      }
+      if (typeof attribute.addUpdateRange === 'function') {
+        attribute.addUpdateRange(
+          dirtyStart * attribute.itemSize,
+          (dirtyEnd - dirtyStart + 1) * attribute.itemSize,
+        );
+      }
+    }
+    attribute.needsUpdate = true;
   }
 
   // Dispose resources

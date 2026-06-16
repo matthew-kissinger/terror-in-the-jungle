@@ -40,7 +40,7 @@ import * as Init from './GameEngineInit';
 import * as Input from './GameEngineInput';
 import * as Loop from './GameEngineLoop';
 import { markStartup } from './StartupTelemetry';
-import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
+import { isPerfDiagnosticsEnabled, isPerfHarnessEnabled } from './PerfDiagnostics';
 
 export class GameEngine {
   // Core components (Public for split module access)
@@ -124,7 +124,7 @@ export class GameEngine {
     this.debugHud.setMasterVisible(false);
     // Perf-harness gate (see src/core/PerfDiagnostics.ts and
     // docs/PERFORMANCE.md "Build targets"): DEV or VITE_PERF_HARNESS build.
-    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfHarnessEnabled()) {
       this.runtimeMetrics = new RuntimeMetrics();
     }
 
@@ -246,7 +246,6 @@ export class GameEngine {
         }
         performanceTelemetry.setEnabled(
           this.performanceOverlay.isVisible()
-          || this.sandboxEnabled
           || ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
         );
         break;
@@ -437,16 +436,18 @@ export class GameEngine {
     const mortarCamera = mortarSystem?.getMortarCamera();
     const pp = this.renderer.postProcessing;
     const renderer = this.renderer.renderer;
+    const activeCamera = this.renderer.getActiveCamera();
+    const renderCamera = usingMortarCamera && mortarCamera ? mortarCamera : activeCamera;
+
+    if (typeof this.systemManager.terrainSystem?.syncRenderSelectionForCamera === 'function') {
+      this.systemManager.terrainSystem.syncRenderSelectionForCamera(renderCamera);
+    }
 
     if (pp && !usingMortarCamera) {
       pp.beginFrame();
     }
 
-    if (usingMortarCamera && mortarCamera) {
-      renderer.render(this.renderer.scene, mortarCamera);
-    } else {
-      renderer.render(this.renderer.scene, this.renderer.getActiveCamera());
-    }
+    renderer.render(this.renderer.scene, renderCamera);
 
     if (!usingMortarCamera) {
       this.systemManager.firstPersonWeapon?.renderWeapon(renderer);
@@ -454,7 +455,11 @@ export class GameEngine {
       const currentAutoClear = renderer.autoClear;
       renderer.autoClear = false;
 
-      if (this.systemManager.grenadeSystem && this.systemManager.inventoryManager) {
+      if (
+        this.systemManager.grenadeSystem
+        && this.systemManager.inventoryManager
+        && this.systemManager.grenadeSystem.canRenderOverlay()
+      ) {
         const grenadeScene = this.systemManager.grenadeSystem.getGrenadeOverlayScene();
         const grenadeCamera = this.systemManager.grenadeSystem.getGrenadeOverlayCamera();
         if (grenadeScene && grenadeCamera) {

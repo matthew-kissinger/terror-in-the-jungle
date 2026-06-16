@@ -9,7 +9,29 @@ interface Tracer {
   group: THREE.Group;
   coreLine: THREE.Line;
   glowLine: THREE.Line;
+  positionAttribute: THREE.BufferAttribute;
+  coreMaterial: THREE.LineBasicMaterial;
+  glowMaterial: THREE.LineBasicMaterial;
   aliveUntil: number;
+}
+
+const TRACER_PERF_CATEGORY = 'tracer_fx';
+
+function markAttributeRangeDirty(attribute: THREE.BufferAttribute, start = 0, count = attribute.count * attribute.itemSize): void {
+  if (typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(start, count);
+  }
+  attribute.needsUpdate = true;
+}
+
+function writeTracerPositions(attribute: THREE.BufferAttribute, start: THREE.Vector3, end: THREE.Vector3): void {
+  const array = attribute.array as ArrayLike<number> & { [index: number]: number };
+  array[0] = start.x;
+  array[1] = start.y;
+  array[2] = start.z;
+  array[3] = end.x;
+  array[4] = end.y;
+  array[5] = end.z;
 }
 
 /**
@@ -47,23 +69,38 @@ export class TracerPool extends EffectPool<Tracer> {
   protected createEffect(): Tracer {
     // Create shared geometry per tracer - core and glow lines share it
     const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
+    const positionAttribute = geometry.attributes.position as THREE.BufferAttribute;
 
     const group = new THREE.Group();
+    group.name = 'TracerFx';
+    group.userData.perfCategory = TRACER_PERF_CATEGORY;
 
     // Core tracer line
     const coreMaterial = this.tracerMaterial.clone();
     const coreLine = new THREE.Line(geometry, coreMaterial);
+    coreLine.name = 'TracerCore';
+    coreLine.userData.perfCategory = TRACER_PERF_CATEGORY;
     group.add(coreLine);
 
     // Glow effect line (slightly larger) - shares same geometry as core line
     const glowMat = this.glowMaterial.clone();
     const glowLine = new THREE.Line(geometry, glowMat);
+    glowLine.name = 'TracerGlow';
+    glowLine.userData.perfCategory = TRACER_PERF_CATEGORY;
     glowLine.scale.set(1.1, 1.1, 1.1);
     group.add(glowLine);
 
     group.visible = false;
     group.matrixAutoUpdate = true;
-    return { group, coreLine, glowLine, aliveUntil: 0 };
+    return {
+      group,
+      coreLine,
+      glowLine,
+      positionAttribute,
+      coreMaterial,
+      glowMaterial: glowMat,
+      aliveUntil: 0,
+    };
   }
 
   protected isExpired(tracer: Tracer, now: number): boolean {
@@ -77,8 +114,8 @@ export class TracerPool extends EffectPool<Tracer> {
   protected disposeEffect(tracer: Tracer): void {
     this.scene.remove(tracer.group);
     (tracer.coreLine.geometry as THREE.BufferGeometry).dispose();
-    (tracer.coreLine.material as THREE.Material).dispose();
-    (tracer.glowLine.material as THREE.Material).dispose();
+    tracer.coreMaterial.dispose();
+    tracer.glowMaterial.dispose();
   }
 
   spawn(start: THREE.Vector3, end: THREE.Vector3, lifetimeMs = 150): void {
@@ -89,19 +126,19 @@ export class TracerPool extends EffectPool<Tracer> {
     const tracer = this.acquire();
     if (!tracer) return;
 
-    const positions = (tracer.coreLine.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
-    positions.setXYZ(0, start.x, start.y, start.z);
-    positions.setXYZ(1, end.x, end.y, end.z);
-    positions.needsUpdate = true;
+    writeTracerPositions(tracer.positionAttribute, start, end);
+    markAttributeRangeDirty(tracer.positionAttribute, 0, 6);
 
-    (tracer.coreLine.material as THREE.LineBasicMaterial).opacity = 0.9;
-    (tracer.glowLine.material as THREE.LineBasicMaterial).opacity = 0.5;
+    tracer.coreMaterial.opacity = 0.9;
+    tracer.glowMaterial.opacity = 0.5;
     tracer.group.visible = true;
     tracer.aliveUntil = performance.now() + Math.max(1, lifetimeMs);
     this.pushActive(tracer);
   }
 
   update(): void {
+    if (this.active.length === 0) return;
+
     const now = performance.now();
 
     // Update fade on active tracers before sweeping expired ones
@@ -109,8 +146,8 @@ export class TracerPool extends EffectPool<Tracer> {
       const timeLeft = tracer.aliveUntil - now;
       if (timeLeft > 0 && timeLeft < 50) {
         const opacity = timeLeft / 50;
-        (tracer.coreLine.material as THREE.LineBasicMaterial).opacity = opacity * 0.9;
-        (tracer.glowLine.material as THREE.LineBasicMaterial).opacity = opacity * 0.3;
+        tracer.coreMaterial.opacity = opacity * 0.9;
+        tracer.glowMaterial.opacity = opacity * 0.3;
       }
     }
 

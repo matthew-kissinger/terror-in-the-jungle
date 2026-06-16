@@ -126,10 +126,17 @@ export class ZoneCaptureLogic {
   calculateTicketBleedRate(zones: Map<string, CaptureZone>): { us: number; opfor: number } {
     let usBleed = 0;
     let opforBleed = 0;
+    let usZones = 0;
+    let opforZones = 0;
 
-    const capturedZones = Array.from(zones.values()).filter(z => !z.isHomeBase && z.owner !== null);
-    const usZones = capturedZones.filter(z => z.owner !== null && isBlufor(z.owner)).length;
-    const opforZones = capturedZones.filter(z => z.owner !== null && isOpfor(z.owner)).length;
+    for (const zone of zones.values()) {
+      if (zone.isHomeBase || zone.owner === null) continue;
+      if (isBlufor(zone.owner)) {
+        usZones++;
+      } else if (isOpfor(zone.owner)) {
+        opforZones++;
+      }
+    }
 
     // Majority holder causes ticket bleed for opponent
     if (usZones > opforZones) {

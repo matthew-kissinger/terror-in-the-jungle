@@ -151,19 +151,21 @@ export class GunplayCore {
   }
 
   // Generate multiple pellet rays for shotgun-type weapons
-  computePelletRays(camera: THREE.Camera): THREE.Ray[] {
+  computePelletRays(camera: THREE.Camera, target?: THREE.Ray[]): THREE.Ray[] {
     const pelletCount = this.spec.pelletCount || 1;
     const pelletSpread = this.spec.pelletSpreadDeg || 0;
+    const rays = target ?? [];
+    rays.length = 0;
 
     if (pelletCount === 1 || pelletSpread === 0) {
       const ray = this.ensurePelletRay(0);
       const shotRay = this.computeShotRay(camera, 0);
       ray.origin.copy(shotRay.origin);
       ray.direction.copy(shotRay.direction);
-      return [ray];
+      rays.push(ray);
+      return rays;
     }
 
-    const rays: THREE.Ray[] = [];
     const spreadRad = THREE.MathUtils.degToRad(pelletSpread);
 
     _dir.set(0, 0, 0);

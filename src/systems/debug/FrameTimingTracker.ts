@@ -3,18 +3,19 @@
 
 import { SystemTiming, FrameData } from './PerformanceTypes'
 import { Logger } from '../../utils/Logger'
+import { BoundedRingBuffer } from '../../core/BoundedRingBuffer'
 
 export class FrameTimingTracker {
   private systems: Map<string, SystemTiming> = new Map()
-  private frameHistory: FrameData[] = []
   private readonly FRAME_BUDGET_MS = 16.67 // 60fps target
   private readonly HISTORY_SIZE = 120 // 2 seconds at 60fps
   private readonly EMA_ALPHA = 0.1
+  private readonly frameHistory = new BoundedRingBuffer<FrameData>(this.HISTORY_SIZE)
 
-  private currentFrame: {
-    start: number
-    systems: Record<string, { start: number; duration?: number }>
-  } | null = null
+  private currentFrameStart: number | null = null
+  private readonly currentFrameSystemNames: string[] = []
+  private readonly currentFrameSystemSeen: Set<string> = new Set()
+  private readonly currentFrameSystemDurations: Record<string, number | undefined> = Object.create(null)
 
   // System start times tracked independently of the frame bracket so that
   // buckets opened/closed outside an explicit beginFrame/endFrame pair
@@ -31,10 +32,9 @@ export class FrameTimingTracker {
    * Call at the start of each frame
    */
   beginFrame(): void {
-    this.currentFrame = {
-      start: performance.now(),
-      systems: {}
-    }
+    this.currentFrameStart = performance.now()
+    this.currentFrameSystemNames.length = 0
+    this.currentFrameSystemSeen.clear()
   }
 
   /**
@@ -43,8 +43,12 @@ export class FrameTimingTracker {
   beginSystem(name: string): void {
     const start = performance.now()
     this.pendingSystemStarts.set(name, start)
-    if (this.currentFrame) {
-      this.currentFrame.systems[name] = { start }
+    if (this.currentFrameStart !== null) {
+      if (!this.currentFrameSystemSeen.has(name)) {
+        this.currentFrameSystemSeen.add(name)
+        this.currentFrameSystemNames.push(name)
+      }
+      this.currentFrameSystemDurations[name] = undefined
     }
   }
 
@@ -57,9 +61,8 @@ export class FrameTimingTracker {
     this.pendingSystemStarts.delete(name)
 
     const duration = performance.now() - start
-    if (this.currentFrame) {
-      const sys = this.currentFrame.systems[name]
-      if (sys) sys.duration = duration
+    if (this.currentFrameStart !== null && this.currentFrameSystemSeen.has(name)) {
+      this.currentFrameSystemDurations[name] = duration
     }
     this.updateSystemEMA(name, duration)
   }
@@ -68,29 +71,28 @@ export class FrameTimingTracker {
    * Call at the end of each frame
    */
   endFrame(): void {
-    if (!this.currentFrame) return
+    if (this.currentFrameStart === null) return
 
-    const duration = performance.now() - this.currentFrame.start
+    const duration = performance.now() - this.currentFrameStart
     const overBudget = duration > this.FRAME_BUDGET_MS
 
     // Record frame data
     const frameData: FrameData = {
-      timestamp: this.currentFrame.start,
+      timestamp: this.currentFrameStart,
       duration,
       overBudget,
       systems: {}
     }
 
-    for (const [name, data] of Object.entries(this.currentFrame.systems)) {
-      if (data.duration !== undefined) {
-        frameData.systems[name] = data.duration
+    for (let index = 0; index < this.currentFrameSystemNames.length; index++) {
+      const name = this.currentFrameSystemNames[index]
+      const durationMs = this.currentFrameSystemDurations[name]
+      if (durationMs !== undefined) {
+        frameData.systems[name] = durationMs
       }
     }
 
     this.frameHistory.push(frameData)
-    if (this.frameHistory.length > this.HISTORY_SIZE) {
-      this.frameHistory.shift()
-    }
 
     // Log slow frames (throttled)
     if (duration > this.FRAME_BUDGET_MS * 1.5) {
@@ -106,7 +108,7 @@ export class FrameTimingTracker {
       }
     }
 
-    this.currentFrame = null
+    this.currentFrameStart = null
   }
 
   private updateSystemEMA(name: string, duration: number): void {
@@ -128,12 +130,14 @@ export class FrameTimingTracker {
   }
 
   private getSlowSystemsThisFrame(): string[] {
-    if (!this.currentFrame) return []
+    if (this.currentFrameStart === null) return []
 
     const slow: string[] = []
-    for (const [name, data] of Object.entries(this.currentFrame.systems)) {
-      if (data.duration && data.duration > 2.0) {
-        slow.push(`${name}(${data.duration.toFixed(1)}ms)`)
+    for (let index = 0; index < this.currentFrameSystemNames.length; index++) {
+      const name = this.currentFrameSystemNames[index]
+      const durationMs = this.currentFrameSystemDurations[name]
+      if (durationMs && durationMs > 2.0) {
+        slow.push(`${name}(${durationMs.toFixed(1)}ms)`)
       }
     }
     return slow
@@ -153,18 +157,24 @@ export class FrameTimingTracker {
    * Get average frame time over history
    */
   getAvgFrameTime(): number {
-    if (this.frameHistory.length === 0) return 16.67
-    const sum = this.frameHistory.reduce((acc, f) => acc + f.duration, 0)
-    return sum / this.frameHistory.length
+    let sum = 0
+    const frameCount = this.frameHistory.forEachLatest(frame => {
+      sum += frame.duration
+    })
+    if (frameCount === 0) return 16.67
+    return sum / frameCount
   }
 
   /**
    * Get percentage of frames over budget
    */
   getOverBudgetPercent(): number {
-    if (this.frameHistory.length === 0) return 0
-    const overCount = this.frameHistory.filter(f => f.overBudget).length
-    return (overCount / this.frameHistory.length) * 100
+    let overCount = 0
+    const frameCount = this.frameHistory.forEachLatest(frame => {
+      if (frame.overBudget) overCount++
+    })
+    if (frameCount === 0) return 0
+    return (overCount / frameCount) * 100
   }
 
   /**
@@ -175,12 +185,42 @@ export class FrameTimingTracker {
   }
 
   /**
+   * Get the highest last-frame timings without sorting the whole system map.
+   */
+  getTopSystemBreakdownByLast(limit: number): SystemTiming[] {
+    const max = Math.max(0, Math.floor(limit))
+    if (max === 0) return []
+    const output: SystemTiming[] = []
+    for (const timing of this.systems.values()) {
+      if (!Number.isFinite(timing.lastMs) || timing.lastMs < 0) {
+        continue
+      }
+      let insertAt = 0
+      while (insertAt < output.length && output[insertAt].lastMs >= timing.lastMs) {
+        insertAt++
+      }
+      if (insertAt >= max) {
+        continue
+      }
+      const nextLength = Math.min(output.length + 1, max)
+      for (let index = nextLength - 1; index > insertAt; index--) {
+        output[index] = output[index - 1]
+      }
+      output[insertAt] = timing
+      output.length = nextLength
+    }
+    return output
+  }
+
+  /**
    * Reset frame timing data
    */
   reset(): void {
     this.systems.clear()
-    this.frameHistory = []
+    this.frameHistory.clear()
     this.pendingSystemStarts.clear()
-    this.currentFrame = null
+    this.currentFrameStart = null
+    this.currentFrameSystemNames.length = 0
+    this.currentFrameSystemSeen.clear()
   }
 }

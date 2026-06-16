@@ -15,9 +15,12 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { TerrainSystem } from '../terrain/TerrainSystem';
 import {
+  getCombatFireRaycastBudgetStats,
   resetCombatFireRaycastBudget,
   tryConsumeCombatFireRaycast,
 } from './ai/CombatFireRaycastBudget';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 const mockTracerPool: TracerPool = { spawn: vi.fn() } as any;
 const mockMuzzleFlashSystem: MuzzleFlashSystem = { spawnNPC: vi.fn() } as any;
@@ -151,6 +154,7 @@ describe('CombatantCombat', () => {
     combatantCombat.setTerrainSystem(mockTerrainSystem);
 
     vi.clearAllMocks();
+    resetCombatFireRaycastBudget();
     (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
     (mockTerrainSystem.getEffectiveHeightAt as any).mockReturnValue(-1000);
   });
@@ -185,6 +189,33 @@ describe('CombatantCombat', () => {
       expect(combatant.gunCore.registerShot).not.toHaveBeenCalled();
     });
 
+    it('does not register a shot against a stale dead combatant target', () => {
+      const shooter = createMockCombatant(
+        'shooter-dead-target',
+        Faction.NVA,
+        100,
+        CombatantState.ENGAGING,
+        new THREE.Vector3(0, NPC_Y_OFFSET, 0)
+      );
+      const deadTarget = createMockCombatant(
+        'target-dead',
+        Faction.US,
+        0,
+        CombatantState.DEAD,
+        new THREE.Vector3(40, NPC_Y_OFFSET, 0)
+      );
+      shooter.target = deadTarget;
+      shooter.isFullAuto = true;
+
+      combatantCombat.updateCombat(shooter, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
+
+      expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
+      expect(shooter.target).toBeNull();
+      expect(shooter.isFullAuto).toBe(false);
+      expect(mockMuzzleFlashSystem.spawnNPC).not.toHaveBeenCalled();
+      expect(mockTracerPool.spawn).not.toHaveBeenCalled();
+    });
+
     // fire-gate-ordering: a shot the terrain gate aborts must not consume the
     // fire-rate clock or accumulate bloom. registerShot() is the single mutation
     // that advances both, so an aborted attempt must leave it uncalled and the
@@ -205,6 +236,7 @@ describe('CombatantCombat', () => {
       // Blocked: no fire-rate / bloom mutation, no burst advance.
       expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
       expect(shooter.currentBurst).toBe(0);
+      expect(getCombatFireRaycastBudgetStats().terrainBlockedThisFrame).toBe(1);
 
       // Second attempt: terrain is clear (default mock returns no hit).
       combatantCombat.updateCombat(shooter, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
@@ -227,9 +259,100 @@ describe('CombatantCombat', () => {
 
         expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
         expect(shooter.currentBurst).toBe(0);
+        const fireBudgetStats = getCombatFireRaycastBudgetStats();
+        expect(fireBudgetStats.deniedThisFrame).toBeGreaterThan(0);
+        expect(fireBudgetStats.terrainBlockedThisFrame).toBe(0);
       } finally {
         resetCombatFireRaycastBudget();
       }
+    });
+
+    it('blocks NPC fire when BVH misses but effective terrain height occludes the muzzle line', () => {
+      const shooter = createMockCombatant(
+        'shooter-3',
+        Faction.NVA,
+        100,
+        CombatantState.ENGAGING,
+        new THREE.Vector3(0, NPC_Y_OFFSET, 0)
+      );
+      const target = createMockCombatant(
+        'target-3',
+        Faction.US,
+        100,
+        CombatantState.ENGAGING,
+        new THREE.Vector3(80, NPC_Y_OFFSET, 0)
+      );
+      shooter.target = target;
+      shooter.skillProfile.burstLength = 10;
+
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (
+        x >= 36 && x <= 44 ? NPC_Y_OFFSET + 2.0 : 0
+      ));
+
+      combatantCombat.updateCombat(shooter, 0.016, new THREE.Vector3(0, 0, 0), new Map(), new Map());
+
+      expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
+      expect(shooter.currentBurst).toBe(0);
+      expect(mockMuzzleFlashSystem.spawnNPC).not.toHaveBeenCalled();
+      expect(mockTracerPool.spawn).not.toHaveBeenCalled();
+      expect(getCombatFireRaycastBudgetStats().terrainBlockedThisFrame).toBe(1);
+    });
+
+    it('blocks suppressive fire when the last-known area is terrain-occluded', () => {
+      const shooter = createMockCombatant(
+        'suppressor-1',
+        Faction.NVA,
+        100,
+        CombatantState.SUPPRESSING,
+        new THREE.Vector3(0, NPC_Y_OFFSET, 0)
+      );
+      shooter.lastKnownTargetPos = new THREE.Vector3(80, NPC_Y_OFFSET, 0);
+      shooter.skillProfile.burstLength = 10;
+
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (
+        x >= 36 && x <= 44 ? NPC_Y_OFFSET + 2.0 : 0
+      ));
+
+      combatantCombat.updateCombat(
+        shooter,
+        0.016,
+        new THREE.Vector3(10, NPC_Y_OFFSET, 0),
+        new Map(),
+        new Map()
+      );
+
+      expect(shooter.gunCore.registerShot).not.toHaveBeenCalled();
+      expect(shooter.currentBurst).toBe(0);
+      expect(mockMuzzleFlashSystem.spawnNPC).not.toHaveBeenCalled();
+      expect(mockTracerPool.spawn).not.toHaveBeenCalled();
+      expect(getCombatFireRaycastBudgetStats().terrainBlockedThisFrame).toBe(1);
+    });
+
+    it('keeps suppressive fire active when the last-known area is clear', () => {
+      const shooter = createMockCombatant(
+        'suppressor-2',
+        Faction.NVA,
+        100,
+        CombatantState.SUPPRESSING,
+        new THREE.Vector3(0, NPC_Y_OFFSET, 0)
+      );
+      shooter.lastKnownTargetPos = new THREE.Vector3(80, NPC_Y_OFFSET, 0);
+      shooter.skillProfile.burstLength = 10;
+
+      combatantCombat.updateCombat(
+        shooter,
+        0.016,
+        new THREE.Vector3(10, NPC_Y_OFFSET, 0),
+        new Map(),
+        new Map()
+      );
+
+      expect(shooter.gunCore.registerShot).toHaveBeenCalledTimes(1);
+      expect(shooter.currentBurst).toBe(1);
+      expect(mockMuzzleFlashSystem.spawnNPC).toHaveBeenCalledTimes(1);
+      expect(mockTracerPool.spawn).toHaveBeenCalledTimes(1);
     });
 
     it('tolerates a dead combatant or missing target without throwing', () => {
@@ -282,6 +405,90 @@ describe('CombatantCombat', () => {
       combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
 
       expect(raycast).toHaveBeenCalledWith(ray, Faction.US, allCombatants, { positionMode: 'visual' });
+    });
+
+    it('does not emit player-shot telemetry spans when telemetry is disabled', () => {
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const allCombatants = new Map<string, Combatant>();
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue(null);
+      const isEnabledSpy = vi.spyOn(performanceTelemetry, 'isEnabled').mockReturnValue(false);
+      const beginSystemSpy = vi.spyOn(performanceTelemetry, 'beginSystem').mockImplementation(() => undefined);
+      const endSystemSpy = vi.spyOn(performanceTelemetry, 'endSystem').mockImplementation(() => undefined);
+
+      try {
+        combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
+
+        expect(isEnabledSpy).toHaveBeenCalledTimes(1);
+        expect(beginSystemSpy).not.toHaveBeenCalled();
+        expect(endSystemSpy).not.toHaveBeenCalled();
+      } finally {
+        isEnabledSpy.mockRestore();
+        beginSystemSpy.mockRestore();
+        endSystemSpy.mockRestore();
+      }
+    });
+
+    it('emits fixed player-shot telemetry spans when telemetry is enabled', () => {
+      const target = createMockCombatant('target-telemetry', Faction.NVA, 100);
+      const allCombatants = new Map<string, Combatant>([['target-telemetry', target]]);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 1.2, 0), new THREE.Vector3(1, 0, 0));
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(20, 1.2, 0),
+        distance: 20,
+        headshot: false,
+      });
+      const isEnabledSpy = vi.spyOn(performanceTelemetry, 'isEnabled').mockReturnValue(true);
+      const beginSystemSpy = vi.spyOn(performanceTelemetry, 'beginSystem').mockImplementation(() => undefined);
+      const endSystemSpy = vi.spyOn(performanceTelemetry, 'endSystem').mockImplementation(() => undefined);
+
+      try {
+        combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
+
+        const expectedPhases = [
+          'Combat.PlayerShot.HitDetection',
+          'Combat.PlayerShot.TerrainRaycast',
+          'Combat.PlayerShot.HeightProfile',
+          'Combat.PlayerShot.Damage',
+        ];
+        expect(beginSystemSpy.mock.calls.map(([name]) => name)).toEqual(expectedPhases);
+        expect(endSystemSpy.mock.calls.map(([name]) => name)).toEqual(expectedPhases);
+      } finally {
+        isEnabledSpy.mockRestore();
+        beginSystemSpy.mockRestore();
+        endSystemSpy.mockRestore();
+      }
+    });
+
+    it('emits fixed preview-shot telemetry spans when telemetry is enabled', () => {
+      const target = createMockCombatant('target-preview-telemetry', Faction.NVA, 100);
+      const allCombatants = new Map<string, Combatant>([['target-preview-telemetry', target]]);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 1.2, 0), new THREE.Vector3(1, 0, 0));
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(20, 1.2, 0),
+        distance: 20,
+        headshot: false,
+      });
+      const isEnabledSpy = vi.spyOn(performanceTelemetry, 'isEnabled').mockReturnValue(true);
+      const beginSystemSpy = vi.spyOn(performanceTelemetry, 'beginSystem').mockImplementation(() => undefined);
+      const endSystemSpy = vi.spyOn(performanceTelemetry, 'endSystem').mockImplementation(() => undefined);
+
+      try {
+        combatantCombat.previewPlayerShot(ray, allCombatants);
+
+        const expectedPhases = [
+          'Combat.PlayerShot.PreviewHitDetection',
+          'Combat.PlayerShot.PreviewTerrainRaycast',
+          'Combat.PlayerShot.PreviewHeightProfile',
+        ];
+        expect(beginSystemSpy.mock.calls.map(([name]) => name)).toEqual(expectedPhases);
+        expect(endSystemSpy.mock.calls.map(([name]) => name)).toEqual(expectedPhases);
+      } finally {
+        isEnabledSpy.mockRestore();
+        beginSystemSpy.mockRestore();
+        endSystemSpy.mockRestore();
+      }
     });
 
     it('adds a kill to the HUD when the shot is lethal', () => {

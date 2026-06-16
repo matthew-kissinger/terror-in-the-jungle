@@ -122,6 +122,30 @@ describe('AICoverSystem', () => {
       expect(cover).toBeNull();
     });
 
+    it('keeps the search-radius boundary inclusive without exact distance checks', () => {
+      const combatant = createMockCombatant('test-1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const threatPos = new THREE.Vector3(30, 0, 0);
+      const allCombatants = new Map<string, Combatant>();
+      const exactDistanceSpy = vi.spyOn(combatant.position, 'distanceTo');
+
+      coverSystem['coverCache'].set('0_0', {
+        spots: [{
+          position: new THREE.Vector3(10, 0, 0),
+          score: 0,
+          coverType: 'terrain',
+          height: 2,
+          lastEvaluatedTime: Date.now(),
+        }],
+        lastUpdated: Date.now(),
+      });
+
+      const cover = coverSystem.findBestCover(combatant, threatPos, allCombatants, 10);
+
+      expect(cover).not.toBeNull();
+      expect(cover!.position.x).toBe(10);
+      expect(exactDistanceSpy).not.toHaveBeenCalled();
+    });
+
     it('should skip cover occupied by another combatant', () => {
       const combatant = createMockCombatant('test-1', Faction.US, new THREE.Vector3(0, 0, 0));
       const occupant = createMockCombatant(
@@ -350,6 +374,22 @@ describe('AICoverSystem', () => {
       expect(result.shouldReposition).toBe(true);
     });
 
+    it('compares current-cover distances without exact distance checks', () => {
+      const combatant = createMockCombatant('test-1', Faction.US, new THREE.Vector3(0, 0, 0));
+      combatant.inCover = true;
+      combatant.coverPosition = new THREE.Vector3(10, 0, 0);
+      const threatPos = new THREE.Vector3(12, 0, 0);
+      const coverDistanceSpy = vi.spyOn(combatant.coverPosition, 'distanceTo');
+      const combatantDistanceSpy = vi.spyOn(combatant.position, 'distanceTo');
+
+      const result = coverSystem.evaluateCurrentCover(combatant, threatPos);
+
+      expect(result.effective).toBe(false);
+      expect(result.shouldReposition).toBe(true);
+      expect(coverDistanceSpy).not.toHaveBeenCalled();
+      expect(combatantDistanceSpy).not.toHaveBeenCalled();
+    });
+
     it('should return effective when cover is good', () => {
       const combatant = createMockCombatant('test-1', Faction.US, new THREE.Vector3(5, 0, 0));
       combatant.inCover = true;
@@ -414,6 +454,16 @@ describe('AICoverSystem', () => {
       // 40m is in preferred range (15-60m), so distanceScore=1.0
       // heightAdvantage=0 (same height), so (0 + 1.0) / 2 = 0.5
       expect(quality).toBe(0.5);
+    });
+
+    it('keeps strict medium-range boundaries for cover quality', () => {
+      mockHeightQueryCache.getHeightAt = vi.fn(() => 0);
+
+      const threatPos = new THREE.Vector3(0, 0, 0);
+
+      expect(coverSystem.getCoverQuality(new THREE.Vector3(15, 0, 0), threatPos)).toBe(0.25);
+      expect(coverSystem.getCoverQuality(new THREE.Vector3(16, 0, 0), threatPos)).toBe(0.5);
+      expect(coverSystem.getCoverQuality(new THREE.Vector3(60, 0, 0), threatPos)).toBe(0.25);
     });
   });
 
@@ -749,6 +799,27 @@ describe('AICoverSystem', () => {
       const candidates = coverSystem.collectCoverCandidates(origin, threat, 5);
 
       expect(candidates.length).toBe(0);
+    });
+
+    it('keeps candidate radius boundaries inclusive without exact distance checks', () => {
+      coverSystem['coverCache'].set('0_0', {
+        spots: [{
+          position: new THREE.Vector3(10, 0, 0),
+          score: 0,
+          coverType: 'terrain',
+          height: 2,
+          lastEvaluatedTime: Date.now(),
+        }],
+        lastUpdated: Date.now(),
+      });
+      const origin = new THREE.Vector3(0, 0, 0);
+      const threat = new THREE.Vector3(30, 0, 0);
+      const exactDistanceSpy = vi.spyOn(origin, 'distanceTo');
+
+      const candidates = coverSystem.collectCoverCandidates(origin, threat, 10);
+
+      expect(candidates.some(c => c.position.x === 10)).toBe(true);
+      expect(exactDistanceSpy).not.toHaveBeenCalled();
     });
 
     it('hands back cloned positions the caller can retain safely', () => {

@@ -251,6 +251,24 @@ describe('MortarSystem', () => {
       expect(mockChunkManager.getEffectiveHeightAt).toHaveBeenCalled();
     });
 
+    it('should reuse trajectory preview geometry while aiming', async () => {
+      mortarSystem.deployMortar(new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
+      await flushPromises();
+      mortarSystem.startAiming();
+
+      const visuals = (mortarSystem as any).visuals;
+      const trajectoryLine = visuals.trajectoryLine as THREE.Line;
+      const geometry = trajectoryLine.geometry;
+
+      mortarSystem.update(0.1);
+      mortarSystem.update(0.1);
+
+      expect(trajectoryLine.geometry).toBe(geometry);
+      expect(geometry.drawRange.count).toBeGreaterThan(0);
+      expect(geometry.getAttribute('position').count).toBeGreaterThanOrEqual(geometry.drawRange.count);
+      expect(geometry.getAttribute('lineDistance').count).toBeGreaterThanOrEqual(geometry.drawRange.count);
+    });
+
     it('should detonate after fuse time', async () => {
       mortarSystem.deployMortar(new THREE.Vector3(), new THREE.Vector3(0, 0, 1));
       await flushPromises();

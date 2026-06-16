@@ -10,8 +10,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
+  DRIVER_VIEW_MAX_YAW_STEP_RAD,
+  DRIVER_VIEW_MAX_PITCH_STEP_RAD,
   PlayerBotController,
   PlayerBotControllerTarget,
+  applyViewSlewLimit,
   lerpAngle,
 } from './PlayerBotController';
 import { createIdlePlayerBotIntent } from './types';
@@ -58,6 +61,18 @@ function makeTarget(opts: { withCamera?: boolean } = {}): RecordingTarget {
   };
   if (includeCamera) t.getCamera = () => camera;
   return t;
+}
+
+function applyUntilFired(
+  controller: PlayerBotController,
+  intent: ReturnType<typeof createIdlePlayerBotIntent>,
+  maxTicks = 24,
+): ReturnType<PlayerBotController['apply']> {
+  let result = controller.apply(intent);
+  for (let i = 1; i < maxTicks && !result.fired; i++) {
+    result = controller.apply(intent);
+  }
+  return result;
 }
 
 describe('PlayerBotController — movement translation', () => {
@@ -122,7 +137,7 @@ describe('PlayerBotController — yaw convention (REGRESSION 1)', () => {
     const intent = createIdlePlayerBotIntent();
     intent.aimTarget = { x: dx, y: 0, z: dz };
     intent.aimLerpRate = 1;
-    controller.apply(intent);
+    for (let i = 0; i < 24; i++) controller.apply(intent);
     return target.camera.getWorldDirection(new THREE.Vector3());
   }
 
@@ -179,14 +194,14 @@ describe('PlayerBotController — aim-dot gate (REGRESSION 2)', () => {
     expect(result.aimDot).toBeLessThan(0.8);
   });
 
-  it('allows fire when camera is pointing at the aim target (snap)', () => {
+  it('allows fire once capped slew reaches the aim target', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const intent = createIdlePlayerBotIntent();
     intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.firePrimary = true;
     intent.aimLerpRate = 1;
-    const result = controller.apply(intent);
+    const result = applyUntilFired(controller, intent);
     expect(result.fired).toBe(true);
     expect(target.fireCalls).toContain('start');
   });
@@ -237,9 +252,10 @@ describe('PlayerBotController — aim translation', () => {
     intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.movementTarget = { x: 0, y: 0, z: -10 };
     intent.aimLerpRate = 1;
-    const result = controller.apply(intent);
+    const result = applyUntilFired(controller, intent);
     const fwd = target.camera.getWorldDirection(new THREE.Vector3());
-    expect(fwd.x).toBeGreaterThan(0.9);
+    expect(fwd.x).toBeGreaterThan(0.8);
+    expect(Math.abs(fwd.x)).toBeGreaterThan(Math.abs(fwd.z));
     expect(result.fired).toBe(true);
   });
 
@@ -250,22 +266,21 @@ describe('PlayerBotController — aim translation', () => {
     // Target directly above eye — lookAt pitch would be ~+90°, we clamp to 80°.
     intent.aimTarget = { x: 0, y: 100, z: 0.001 };
     intent.aimLerpRate = 1;
-    controller.apply(intent);
+    for (let i = 0; i < 32; i++) controller.apply(intent);
     const maxPitch = (80 * Math.PI) / 180;
-    expect(Math.abs(target.viewCalls[0].pitch)).toBeLessThanOrEqual(maxPitch + 1e-6);
+    expect(Math.abs(target.viewCalls[target.viewCalls.length - 1].pitch)).toBeLessThanOrEqual(maxPitch + 1e-6);
   });
 
-  it('slews partway toward target yaw at lower lerp rates', () => {
+  it('caps a single-tick view slew even when aimLerpRate requests a snap', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     controller.seedViewAngles(0, 0);
     const intent = createIdlePlayerBotIntent();
     intent.aimTarget = { x: 10, y: 0, z: 0 };
-    intent.aimLerpRate = 0.5;
+    intent.aimLerpRate = 1;
     controller.apply(intent);
-    // First tick: halfway between 0 and target yaw. Target yaw for +X is finite
-    // and non-zero; we just assert movement toward the target (behavior, not value).
-    expect(target.viewCalls[0].yaw).not.toBe(0);
+    expect(Math.abs(target.viewCalls[0].yaw)).toBeLessThanOrEqual(DRIVER_VIEW_MAX_YAW_STEP_RAD + 1e-6);
+    expect(Math.abs(target.viewCalls[0].pitch)).toBeLessThanOrEqual(DRIVER_VIEW_MAX_PITCH_STEP_RAD + 1e-6);
   });
 });
 
@@ -277,9 +292,7 @@ describe('PlayerBotController — fire and reload', () => {
     intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.aimLerpRate = 1;
     intent.firePrimary = true;
-    controller.apply(intent);
-    controller.apply(intent);
-    controller.apply(intent);
+    for (let i = 0; i < 24; i++) controller.apply(intent);
     const starts = target.fireCalls.filter(c => c === 'start').length;
     expect(starts).toBe(1);
   });
@@ -291,7 +304,7 @@ describe('PlayerBotController — fire and reload', () => {
     intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.aimLerpRate = 1;
     intent.firePrimary = true;
-    controller.apply(intent);
+    applyUntilFired(controller, intent);
     intent.firePrimary = false;
     controller.apply(intent);
     expect(target.fireCalls).toContain('stop');
@@ -304,7 +317,7 @@ describe('PlayerBotController — fire and reload', () => {
     fire.aimTarget = { x: 10, y: 0, z: 0 };
     fire.aimLerpRate = 1;
     fire.firePrimary = true;
-    controller.apply(fire);
+    applyUntilFired(controller, fire);
     const reload = createIdlePlayerBotIntent();
     reload.reload = true;
     controller.apply(reload);
@@ -319,7 +332,7 @@ describe('PlayerBotController — fire and reload', () => {
     intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.aimLerpRate = 1;
     intent.firePrimary = true;
-    controller.apply(intent);
+    applyUntilFired(controller, intent);
     expect(controller.isFiringHeld()).toBe(true);
     controller.reset();
     expect(controller.isFiringHeld()).toBe(false);
@@ -349,6 +362,24 @@ describe('lerpAngle', () => {
   });
 });
 
+describe('applyViewSlewLimit', () => {
+  it('limits yaw and pitch changes to the driver caps', () => {
+    const next = applyViewSlewLimit(0, 0, Math.PI / 2, Math.PI / 4);
+    expect(next.yaw).toBeCloseTo(DRIVER_VIEW_MAX_YAW_STEP_RAD, 6);
+    expect(next.pitch).toBeCloseTo(DRIVER_VIEW_MAX_PITCH_STEP_RAD, 6);
+    expect(next.yawClamped).toBe(true);
+    expect(next.pitchClamped).toBe(true);
+  });
+
+  it('does not clamp small view changes', () => {
+    const next = applyViewSlewLimit(0, 0, 0.01, -0.01);
+    expect(next.yaw).toBeCloseTo(0.01, 6);
+    expect(next.pitch).toBeCloseTo(-0.01, 6);
+    expect(next.yawClamped).toBe(false);
+    expect(next.pitchClamped).toBe(false);
+  });
+});
+
 describe('PlayerBotController — integration-lite', () => {
   it('returns an apply-result that reflects committed values', () => {
     const target = makeTarget();
@@ -358,7 +389,7 @@ describe('PlayerBotController — integration-lite', () => {
     intent.firePrimary = true;
     intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.aimLerpRate = 1;
-    const result = controller.apply(intent);
+    const result = applyUntilFired(controller, intent);
     expect(result.fired).toBe(true);
     expect(result.forward).toBe(1);
     expect(Number.isFinite(result.yaw)).toBe(true);

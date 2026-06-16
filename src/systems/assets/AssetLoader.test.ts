@@ -53,6 +53,105 @@ describe('AssetLoader GPU texture warmup', () => {
     expect(texture.version).toBeGreaterThan(versionBefore);
   });
 
+  it('defers Pixel Forge foliage atlas decode out of boot-critical texture init', async () => {
+    const loader = new AssetLoader();
+    const loadTexture = vi
+      .spyOn(loader as unknown as { loadTexture(path: string): Promise<THREE.Texture> }, 'loadTexture')
+      .mockImplementation(async () => makeTexture(1, 1));
+
+    await loader.init();
+
+    const loadedPaths = loadTexture.mock.calls.map(([path]) => path);
+    expect(loadedPaths.some(path => path.includes('jungle-floor.webp'))).toBe(true);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/npcs/usArmy/idle/animated-albedo-packed.png'))).toBe(true);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/npcs/usArmy/advance_fire/animated-albedo-packed.png'))).toBe(false);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/vegetation/'))).toBe(false);
+    expect(loader.getTexture('PixelForge.Vegetation.fanPalm.color')).toBeUndefined();
+    expect(loader.getTexture('PixelForge.NPC.US.idle.color')).toBeInstanceOf(THREE.Texture);
+    expect(loader.getTexture('PixelForge.NPC.US.advance_fire.color')).toBeUndefined();
+  });
+
+  it('loads deferred texture names on demand once assets are registered', async () => {
+    const loader = new AssetLoader();
+    const loadTexture = vi
+      .spyOn(loader as unknown as { loadTexture(path: string): Promise<THREE.Texture> }, 'loadTexture')
+      .mockImplementation(async () => makeTexture(1, 1));
+
+    await loader.init();
+    loadTexture.mockClear();
+
+    const progress: Array<[number, number]> = [];
+    await loader.ensureTexturesLoaded(
+      [
+        'PixelForge.Vegetation.fanPalm.color',
+        'PixelForge.Vegetation.fanPalm.color',
+      ],
+      (loaded, total) => progress.push([loaded, total]),
+    );
+
+    expect(loadTexture).toHaveBeenCalledTimes(1);
+    expect(loadTexture.mock.calls[0]?.[0]).toContain('pixel-forge/vegetation/fanPalm/');
+    expect(loader.getTexture('PixelForge.Vegetation.fanPalm.color')).toBeInstanceOf(THREE.Texture);
+    expect(progress).toEqual([[1, 1]]);
+  });
+
+  it('can batch deferred texture loads and yield between batches', async () => {
+    const loader = new AssetLoader();
+    const loadOrder: string[] = [];
+    vi.spyOn(loader as unknown as { loadTexture(path: string): Promise<THREE.Texture> }, 'loadTexture')
+      .mockImplementation(async (path: string) => {
+        loadOrder.push(path);
+        return makeTexture(1, 1);
+      });
+
+    await loader.init();
+    loadOrder.length = 0;
+    const yields: number[] = [];
+    const progress: Array<[number, number]> = [];
+
+    await loader.ensureTexturesLoaded(
+      [
+        'PixelForge.Vegetation.fanPalm.color',
+        'PixelForge.Vegetation.fanPalm.normal',
+        'PixelForge.Vegetation.bananaPlant.color',
+      ],
+      (loaded, total) => progress.push([loaded, total]),
+      {
+        batchSize: 2,
+        afterBatch: async () => {
+          yields.push(loadOrder.length);
+        },
+      },
+    );
+
+    expect(loadOrder).toHaveLength(3);
+    expect(yields).toEqual([2]);
+    expect(progress.at(-1)).toEqual([3, 3]);
+  });
+
+  it('loads non-startup NPC impostor atlases during mode startup preparation', async () => {
+    const loader = new AssetLoader();
+    const loadTexture = vi
+      .spyOn(loader as unknown as { loadTexture(path: string): Promise<THREE.Texture> }, 'loadTexture')
+      .mockImplementation(async () => makeTexture(1, 1));
+
+    await loader.init();
+    loadTexture.mockClear();
+
+    const progress: Array<[number, number]> = [];
+    await loader.ensurePixelForgeNpcImpostorTexturesLoaded((loaded, total) => {
+      progress.push([loaded, total]);
+    });
+
+    const loadedPaths = loadTexture.mock.calls.map(([path]) => path);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/npcs/usArmy/idle/'))).toBe(false);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/npcs/usArmy/advance_fire/'))).toBe(true);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/npcs/vc/death_fall_back/'))).toBe(true);
+    expect(loadedPaths.some(path => path.includes('pixel-forge/vegetation/'))).toBe(false);
+    expect(loader.getTexture('PixelForge.NPC.US.advance_fire.color')).toBeInstanceOf(THREE.Texture);
+    expect(progress.at(-1)).toEqual([28, 28]);
+  });
+
   it('uploads requested loaded textures and records texture residency metadata', () => {
     const loader = new AssetLoader();
     const texture = makeTexture(4096, 2048);

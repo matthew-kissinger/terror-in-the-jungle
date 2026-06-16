@@ -116,6 +116,25 @@ describe('VehicleManager', () => {
     expect(medium).toHaveLength(2);
   });
 
+  it('iterates vehicles in radius without materializing the getVehiclesInRadius array', () => {
+    const v1 = createMockVehicle('heli_1', { position: new THREE.Vector3(10, 0, 10) });
+    const v2 = createMockVehicle('heli_2', { position: new THREE.Vector3(100, 0, 100) });
+    const v3 = createMockVehicle('heli_3', { position: new THREE.Vector3(500, 0, 500) });
+
+    manager.register(v1);
+    manager.register(v2);
+    manager.register(v3);
+
+    const center = new THREE.Vector3(0, 0, 0);
+    const visited: string[] = [];
+    manager.forEachVehicleInRadius(center, 200, vehicle => {
+      visited.push(vehicle.vehicleId);
+    });
+
+    expect(visited).toEqual(['heli_1', 'heli_2']);
+    expect(manager.getVehiclesInRadius(center, 200).map(vehicle => vehicle.vehicleId)).toEqual(visited);
+  });
+
   it('queries vehicles by category', () => {
     const heli = createMockVehicle('heli_1', { category: 'helicopter' });
     const ground = createMockVehicle('jeep_1', { category: 'ground' });
@@ -133,6 +152,39 @@ describe('VehicleManager', () => {
 
     const boats = manager.getVehiclesByCategory('watercraft');
     expect(boats).toHaveLength(0);
+  });
+
+  it('iterates vehicles by category without materializing the getVehiclesByCategory array', () => {
+    const heli = createMockVehicle('heli_1', { category: 'helicopter' });
+    const groundA = createMockVehicle('jeep_1', { category: 'ground' });
+    const groundB = createMockVehicle('tank_1', { category: 'ground' });
+
+    manager.register(heli);
+    manager.register(groundA);
+    manager.register(groundB);
+
+    const visited: string[] = [];
+    manager.forEachVehicleByCategory('ground', vehicle => {
+      visited.push(vehicle.vehicleId);
+    });
+
+    expect(visited).toEqual(['jeep_1', 'tank_1']);
+    expect(manager.getVehiclesByCategory('ground').map(vehicle => vehicle.vehicleId)).toEqual(visited);
+  });
+
+  it('iterates vehicles without materializing the getAllVehicles array', () => {
+    const heli = createMockVehicle('heli_1', { category: 'helicopter' });
+    const ground = createMockVehicle('jeep_1', { category: 'ground' });
+    manager.register(heli);
+    manager.register(ground);
+
+    const visited: string[] = [];
+    manager.forEachVehicle(vehicle => {
+      visited.push(vehicle.vehicleId);
+    });
+
+    expect(visited).toEqual(['heli_1', 'jeep_1']);
+    expect(manager.getVehicleCount()).toBe(2);
   });
 
   it('finds vehicle by occupant', () => {

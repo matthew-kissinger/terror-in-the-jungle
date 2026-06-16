@@ -14,11 +14,26 @@ interface ScorePopup {
   stackIndex: number; // For vertical stacking
 }
 
+const SCORE_POPUP_ANIMATION_DURATION_MS = 2000;
+const SCORE_POPUP_KEYFRAMES: Keyframe[] = [
+  { opacity: 0, transform: 'translate(-50%, -50%) scale(0.5)' },
+  { opacity: 1, transform: 'translate(-50%, -50%) scale(1.3)', offset: 0.15 },
+  { opacity: 1, transform: 'translate(-50%, -50%) scale(1)', offset: 0.2 },
+  { opacity: 0, transform: 'translate(-50%, calc(-50% - 150px)) scale(0.9)' }
+];
+const SCORE_POPUP_ANIMATION_OPTIONS: KeyframeAnimationOptions = {
+  duration: SCORE_POPUP_ANIMATION_DURATION_MS,
+  easing: 'ease-out',
+  fill: 'forwards'
+};
+
 export class ScorePopupSystem {
-  private pool: ScorePopup[] = [];
+  private availablePopups: Array<ScorePopup | undefined> = [];
+  private availableHeadIndex = 0;
+  private availableCount = 0;
   private container: HTMLDivElement;
   private readonly POOL_SIZE = 20; // Increased for more simultaneous popups
-  private readonly ANIMATION_DURATION = 2000; // Increased to 2 seconds
+  private readonly ANIMATION_DURATION = SCORE_POPUP_ANIMATION_DURATION_MS; // Increased to 2 seconds
   private activePopups: ScorePopup[] = []; // Track active popups for stacking
 
   constructor() {
@@ -38,14 +53,15 @@ export class ScorePopupSystem {
     // Initialize pool
     for (let i = 0; i < this.POOL_SIZE; i++) {
       const element = this.createPopupElement();
-      this.pool.push({
+      const popup: ScorePopup = {
         element,
         active: false,
         startTime: 0,
         points: 0,
         type: 'capture',
         stackIndex: 0
-      });
+      };
+      this.releasePopup(popup);
       this.container.appendChild(element);
     }
 
@@ -153,8 +169,7 @@ export class ScorePopupSystem {
   }
 
   spawn(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void {
-    // Find inactive popup from pool
-    let popup = this.pool.find(p => !p.active);
+    const popup = this.acquirePopup();
 
     if (!popup) {
       Logger.warn('ui', ' Score popup pool exhausted');
@@ -215,38 +230,66 @@ export class ScorePopupSystem {
     element.style.display = 'block';
     playElementAnimation(
       element,
-      [
-        { opacity: 0, transform: 'translate(-50%, -50%) scale(0.5)' },
-        { opacity: 1, transform: 'translate(-50%, -50%) scale(1.3)', offset: 0.15 },
-        { opacity: 1, transform: 'translate(-50%, -50%) scale(1)', offset: 0.2 },
-        { opacity: 0, transform: 'translate(-50%, calc(-50% - 150px)) scale(0.9)' }
-      ],
-      {
-        duration: this.ANIMATION_DURATION,
-        easing: 'ease-out',
-        fill: 'forwards'
-      }
+      SCORE_POPUP_KEYFRAMES,
+      SCORE_POPUP_ANIMATION_OPTIONS
     );
   }
 
   update(): void {
-    const now = performance.now();
+    if (this.activePopups.length === 0) return;
 
-    // Update all active popups
-    for (const popup of this.pool) {
+    const now = performance.now();
+    let needsCompaction = false;
+
+    for (let i = 0; i < this.activePopups.length; i++) {
+      const popup = this.activePopups[i];
       if (!popup.active) continue;
 
       const elapsed = now - popup.startTime;
 
-      // Deactivate after animation completes
       if (elapsed >= this.ANIMATION_DURATION) {
         popup.active = false;
         popup.element.style.display = 'none';
+        this.releasePopup(popup);
+        needsCompaction = true;
       }
     }
 
-    // Clean up activePopups array (remove deactivated popups)
-    this.activePopups = this.activePopups.filter(p => p.active);
+    if (needsCompaction) {
+      this.compactActivePopups();
+    }
+  }
+
+  private compactActivePopups(): void {
+    let writeIndex = 0;
+
+    for (let readIndex = 0; readIndex < this.activePopups.length; readIndex++) {
+      const popup = this.activePopups[readIndex];
+      if (!popup.active) continue;
+
+      if (writeIndex !== readIndex) {
+        this.activePopups[writeIndex] = popup;
+      }
+      writeIndex++;
+    }
+
+    this.activePopups.length = writeIndex;
+  }
+
+  private acquirePopup(): ScorePopup | undefined {
+    if (this.availableCount === 0) return undefined;
+
+    const popup = this.availablePopups[this.availableHeadIndex];
+    this.availablePopups[this.availableHeadIndex] = undefined;
+    this.availableHeadIndex = (this.availableHeadIndex + 1) % this.POOL_SIZE;
+    this.availableCount--;
+    return popup;
+  }
+
+  private releasePopup(popup: ScorePopup): void {
+    const writeIndex = (this.availableHeadIndex + this.availableCount) % this.POOL_SIZE;
+    this.availablePopups[writeIndex] = popup;
+    this.availableCount++;
   }
 
   attachToDOM(parent?: HTMLElement): void {

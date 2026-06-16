@@ -127,6 +127,14 @@ export class PlayerStatsTracker {
     return { ...this.stats };
   }
 
+  getKills(): number {
+    return this.stats.kills;
+  }
+
+  getDeaths(): number {
+    return this.stats.deaths;
+  }
+
   getMatchDuration(): number {
     if (this.stats.matchStartTime === 0) return 0;
     return (Date.now() - this.stats.matchStartTime) / 1000;

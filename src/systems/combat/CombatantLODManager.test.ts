@@ -12,6 +12,7 @@ import type { CombatantRenderer } from './CombatantRenderer';
 import type { SquadManager } from './SquadManager';
 import type { GameModeManager } from '../world/GameModeManager';
 import type { ZoneManager } from '../world/ZoneManager';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import { spatialGridManager } from './SpatialGridManager';
 import type { SpatialGridManager } from './SpatialGridManager';
 
@@ -334,6 +335,41 @@ describe('CombatantLODManager', () => {
       expect(manager.lodCulledCount).toBe(0);
     });
 
+    it('emits diagnostics buckets for the LOD scheduler phases', () => {
+      const isEnabledSpy = vi.spyOn(performanceTelemetry, 'isEnabled').mockReturnValue(true);
+      const beginSystemSpy = vi.spyOn(performanceTelemetry, 'beginSystem');
+      const endSystemSpy = vi.spyOn(performanceTelemetry, 'endSystem');
+
+      try {
+        combatants.set('close', createMockCombatant('close', new THREE.Vector3(50, 0, 0)));
+        combatants.set('medium', createMockCombatant('medium', new THREE.Vector3(200, 0, 0)));
+        combatants.set('low', createMockCombatant('low', new THREE.Vector3(400, 0, 0)));
+        combatants.set('culled', createMockCombatant('culled', new THREE.Vector3(600, 0, 0)));
+
+        manager.updateCombatants(0.016);
+
+        const expectedBuckets = [
+          'Combat.AI.Death',
+          'Combat.AI.FrameSetup',
+          'Combat.AI.Classify',
+          'Combat.AI.High',
+          'Combat.AI.Medium',
+          'Combat.AI.Low',
+          'Combat.AI.Culled',
+          'Combat.AI.RenderInterpolation',
+        ];
+
+        for (const bucket of expectedBuckets) {
+          expect(beginSystemSpy).toHaveBeenCalledWith(bucket);
+          expect(endSystemSpy).toHaveBeenCalledWith(bucket);
+        }
+      } finally {
+        isEnabledSpy.mockRestore();
+        beginSystemSpy.mockRestore();
+        endSystemSpy.mockRestore();
+      }
+    });
+
     it('should cull combatants outside world bounds', () => {
       const outsideCombatant = createMockCombatant('outside', new THREE.Vector3(500, 0, 0));
       combatants.set('outside', outsideCombatant);
@@ -390,6 +426,19 @@ describe('CombatantLODManager', () => {
       expect(combatant.lastUpdateTime).toBeGreaterThan(0);
     });
 
+    it('leaves impostor texture bucket selection to the render pass during LOD scheduling', () => {
+      const combatant = createMockCombatant('high', new THREE.Vector3(10, 0, 0));
+      combatants.set('high', combatant);
+
+      manager.updateCombatants(0.016);
+      manager.updateCombatants(0.016);
+      manager.updateCombatants(0.016);
+
+      expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
+      expect(combatantMovement.updateMovement).toHaveBeenCalledTimes(3);
+      expect(combatantRenderer.updateCombatantTexture).not.toHaveBeenCalled();
+    });
+
     it('does not report off-stagger high LOD visual updates as AI budget starvation', () => {
       let perfNow = 0;
       const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => perfNow);
@@ -406,6 +455,67 @@ describe('CombatantLODManager', () => {
 
         expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
         expect(manager.getFrameSchedulingStats().aiBudgetExceededEvents).toBe(2);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
+    it('defers projected high LOD full updates before a costly candidate overruns the frame budget', () => {
+      let perfNow = 0;
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => perfNow);
+      vi.mocked(combatantAI.updateAI).mockImplementation(() => {
+        perfNow += 3.5;
+      });
+
+      try {
+        for (let i = 0; i < 6; i++) {
+          combatants.set(`high-${i}`, createMockCombatant(`high-${i}`, new THREE.Vector3(10 + i, 0, 0)));
+        }
+
+        (manager as unknown as { highFullUpdateCostEmaMs: number }).highFullUpdateCostEmaMs = 2.0;
+        manager.updateCombatants(0.016);
+
+        const stats = manager.getFrameSchedulingStats();
+        expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
+        expect(stats.highFullUpdates).toBe(1);
+        expect(stats.projectedHighFullUpdateDeferrals).toBe(1);
+        expect(stats.aiBudgetExceededEvents).toBe(0);
+      } finally {
+        nowSpy.mockRestore();
+      }
+    });
+
+    it('learns repeat-expensive high LOD actors and defers them when they would overrun the frame', () => {
+      let perfNow = 0;
+      const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => perfNow);
+      vi.mocked(combatantAI.updateAI).mockImplementation((combatant: Combatant) => {
+        perfNow += combatant.id === 'high-4' ? 5.0 : 0.2;
+      });
+
+      try {
+        for (let i = 0; i < 5; i++) {
+          combatants.set(`high-${i}`, createMockCombatant(`high-${i}`, new THREE.Vector3(10 + i, 0, 0)));
+        }
+
+        manager.updateCombatants(0.016);
+        expect(combatantAI.updateAI).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'high-4' }),
+          expect.any(Number),
+          playerPosition,
+          combatants,
+          expect.anything(),
+          'high'
+        );
+
+        vi.mocked(combatantAI.updateAI).mockClear();
+        manager.updateCombatants(0.016);
+        manager.updateCombatants(0.016);
+        manager.updateCombatants(0.016);
+
+        const calledIds = vi.mocked(combatantAI.updateAI).mock.calls.map(call => call[0].id);
+        expect(calledIds).toContain('high-1');
+        expect(calledIds).not.toContain('high-4');
+        expect(manager.getFrameSchedulingStats().projectedHighFullUpdateDeferrals).toBe(1);
       } finally {
         nowSpy.mockRestore();
       }
@@ -629,6 +739,84 @@ describe('CombatantLODManager', () => {
 
       // Should not throw even with only home base zones
       expect(() => manager.updateCombatants(30)).not.toThrow();
+    });
+
+    it('selects the nearest eligible distant objective without allocating a filtered zone list', () => {
+      manager.setGameModeManager(createMockGameModeManager(2000));
+      const zoneManager = createMockZoneManager();
+      const homeBase = {
+        id: 'home',
+        name: 'Home Base',
+        position: new THREE.Vector3(900, 0, 820),
+        radius: 20,
+        height: 2,
+        owner: Faction.US,
+        state: 'blufor_controlled',
+        captureProgress: 0,
+        captureSpeed: 0,
+        isHomeBase: true,
+      };
+      const secureOwnedZone = {
+        id: 'secure',
+        name: 'Secure',
+        position: new THREE.Vector3(900, 0, 780),
+        radius: 20,
+        height: 2,
+        owner: Faction.US,
+        state: 'blufor_controlled',
+        captureProgress: 0,
+        captureSpeed: 0,
+        isHomeBase: false,
+      };
+      const enemyZone = {
+        id: 'enemy',
+        name: 'Enemy',
+        position: new THREE.Vector3(0, 0, 900),
+        radius: 20,
+        height: 2,
+        owner: Faction.NVA,
+        state: 'opfor_controlled',
+        captureProgress: 0,
+        captureSpeed: 0,
+        isHomeBase: false,
+      };
+      const contestedOwnedZone = {
+        id: 'contested',
+        name: 'Contested',
+        position: new THREE.Vector3(900, 0, 500),
+        radius: 20,
+        height: 2,
+        owner: Faction.US,
+        state: 'contested',
+        captureProgress: 0,
+        captureSpeed: 0,
+        isHomeBase: false,
+      };
+      vi.mocked(zoneManager.getAllZones).mockReturnValue([
+        homeBase as any,
+        secureOwnedZone as any,
+        enemyZone as any,
+        contestedOwnedZone as any,
+      ]);
+      manager.setZoneManager(zoneManager);
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const farCombatant = createMockCombatant('far', new THREE.Vector3(900, 0, 900));
+        farCombatant.lastUpdateTime = 1;
+        combatants.set('far', farCombatant);
+
+        manager.updateCombatants(0.016);
+
+        expect(farCombatant.position.x).toBeCloseTo(900);
+        expect(farCombatant.position.z).toBeLessThan(900);
+        expect(farCombatant.position.distanceTo(contestedOwnedZone.position)).toBeLessThan(
+          new THREE.Vector3(900, 0, 900).distanceTo(contestedOwnedZone.position)
+        );
+        expect(combatantMovement.syncTerrainHeight).toHaveBeenCalledWith(farCombatant);
+      } finally {
+        randomSpy.mockRestore();
+      }
     });
 
     it('should add randomness to movement to prevent clustering', () => {

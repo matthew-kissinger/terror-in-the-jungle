@@ -30,7 +30,7 @@ import {
   LoadoutWeapon,
 } from '../../ui/loadout/LoadoutTypes';
 import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
-import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import { InputContextManager } from '../input/InputContextManager';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 import { SpawnPointSelector } from './SpawnPointSelector';
@@ -747,7 +747,7 @@ export class PlayerRespawnManager implements GameSystem {
   private shouldAutoConfirmInitialDeploy(): boolean {
     const deployState = this.deployFlow.getState();
     return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
-      && isPerfDiagnosticsEnabled()
+      && isPerfHarnessEnabled()
       && deployState.hasPendingInitialDeploy
       && !!this.selectedSpawnPoint;
   }

@@ -52,6 +52,101 @@ const EMPTY_UPDATE_DEBUG: VegetationScattererUpdateDebugInfo = {
   lastGeneratedCell: null,
 };
 
+interface ParsedCellKey {
+  x: number;
+  z: number;
+}
+
+interface CachedTerrainExclusionZone extends TerrainExclusionZone {
+  radiusSq: number;
+}
+
+function parseIntegerToken(value: string, start: number, end: number): number {
+  if (start >= end) return Number.NaN;
+
+  let index = start;
+  let sign = 1;
+  const first = value.charCodeAt(index);
+  if (first === 45) {
+    sign = -1;
+    index += 1;
+  } else if (first === 43) {
+    index += 1;
+  }
+
+  if (index >= end) return Number.NaN;
+
+  let result = 0;
+  let readDigit = false;
+  for (; index < end; index += 1) {
+    const digit = value.charCodeAt(index) - 48;
+    if (digit < 0 || digit > 9) break;
+    result = result * 10 + digit;
+    readDigit = true;
+  }
+
+  return readDigit ? result * sign : Number.NaN;
+}
+
+function readCellKey(cellKey: string, target: ParsedCellKey): ParsedCellKey {
+  const commaIndex = cellKey.indexOf(',');
+  if (commaIndex < 0) {
+    target.x = parseIntegerToken(cellKey, 0, cellKey.length);
+    target.z = Number.NaN;
+    return target;
+  }
+
+  target.x = parseIntegerToken(cellKey, 0, commaIndex);
+  target.z = parseIntegerToken(cellKey, commaIndex + 1, cellKey.length);
+  return target;
+}
+
+function dropQueuePrefix<T>(queue: T[], count: number): void {
+  if (count <= 0) {
+    return;
+  }
+  if (count >= queue.length) {
+    queue.length = 0;
+    return;
+  }
+
+  let writeIndex = 0;
+  for (let readIndex = count; readIndex < queue.length; readIndex++) {
+    queue[writeIndex++] = queue[readIndex];
+  }
+  queue.length = writeIndex;
+}
+
+function removeQueueItemAt<T>(queue: T[], index: number): T | undefined {
+  if (index < 0 || index >= queue.length) {
+    return undefined;
+  }
+
+  const item = queue[index];
+  for (let readIndex = index + 1; readIndex < queue.length; readIndex++) {
+    queue[readIndex - 1] = queue[readIndex];
+  }
+  queue.length -= 1;
+  return item;
+}
+
+function insertCellByDistance(keys: string[], distances: number[], key: string, distance: number): void {
+  let insertAt = 0;
+  while (insertAt < distances.length && distances[insertAt] <= distance) {
+    insertAt++;
+  }
+
+  const nextLength = keys.length + 1;
+  keys.length = nextLength;
+  distances.length = nextLength;
+  for (let index = nextLength - 1; index > insertAt; index--) {
+    keys[index] = keys[index - 1];
+    distances[index] = distances[index - 1];
+  }
+  keys[insertAt] = key;
+  distances[insertAt] = distance;
+}
+
 /**
  * Cell-based vegetation scatterer. Replaces per-chunk vegetation generation.
  *
@@ -64,23 +159,29 @@ export class VegetationScatterer {
   private static readonly CRITICAL_RESIDENCY_RADIUS_CELLS = 1;
   private billboardSystem: GlobalBillboardSystem;
   private cellSize: number;
+  private fallbackMaxCellDistance: number;
   private activeCells: Set<string> = new Set();
   private targetCells: Set<string> = new Set();
   private pendingAdditions: string[] = [];
   private pendingRemovals: string[] = [];
+  private readonly queuedRemovalCells: Set<string> = new Set();
+  private readonly queuedAdditionCells: Set<string> = new Set();
+  private readonly sortedResidencyAdditions: string[] = [];
+  private readonly sortedResidencyAdditionDistances: number[] = [];
   private maxCellDistance: number; // In cells
   private lastPlayerCellX = NaN;
   private lastPlayerCellZ = NaN;
   private worldHalfExtent = Infinity; // Half the world size; cells outside are skipped
   private visualMargin = VegetationScatterer.DEFAULT_VISUAL_MARGIN;
   private lastUpdateDebug: VegetationScattererUpdateDebugInfo = { ...EMPTY_UPDATE_DEBUG };
+  private readonly parsedCellKey: ParsedCellKey = { x: 0, z: 0 };
 
   // Vegetation config
   private vegetationTypes: VegetationTypeConfig[] = [];
   private biomePalettes: Map<string, BiomeVegetationEntry[]> = new Map();
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
-  private exclusionZones: TerrainExclusionZone[] = [];
+  private exclusionZones: CachedTerrainExclusionZone[] = [];
 
   constructor(
     billboardSystem: GlobalBillboardSystem,
@@ -89,6 +190,7 @@ export class VegetationScatterer {
   ) {
     this.billboardSystem = billboardSystem;
     this.cellSize = cellSize;
+    this.fallbackMaxCellDistance = maxCellDistance;
     this.maxCellDistance = maxCellDistance;
   }
 
@@ -114,10 +216,20 @@ export class VegetationScatterer {
     this.defaultBiomeId = defaultBiomeId;
     this.biomePalettes = new Map(biomePalettes);
     this.biomeRules = biomeRules.slice();
+    const nextMaxCellDistance = this.resolveMaxCellDistance(types);
+    if (nextMaxCellDistance !== this.maxCellDistance) {
+      this.maxCellDistance = nextMaxCellDistance;
+      if (Number.isFinite(this.lastPlayerCellX) && Number.isFinite(this.lastPlayerCellZ)) {
+        this.rebuildResidencyTargets(this.lastPlayerCellX, this.lastPlayerCellZ);
+      }
+    }
   }
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
-    this.exclusionZones = zones.slice();
+    this.exclusionZones = zones.map((zone) => ({
+      ...zone,
+      radiusSq: zone.radius * zone.radius,
+    }));
   }
 
   /**
@@ -194,9 +306,9 @@ export class VegetationScatterer {
       return this.createCellGenerationDebugInfo(cellKey, null, new Map(), 'unconfigured');
     }
 
-    const [cxStr, czStr] = cellKey.split(',');
-    const cellX = parseInt(cxStr, 10);
-    const cellZ = parseInt(czStr, 10);
+    const parsedCell = readCellKey(cellKey, this.parsedCellKey);
+    const cellX = parsedCell.x;
+    const cellZ = parsedCell.z;
 
     const cache = getHeightQueryCache();
     const baseX = cellX * this.cellSize;
@@ -313,7 +425,8 @@ export class VegetationScatterer {
   }
 
   private rebuildResidencyTargets(cellX: number, cellZ: number): void {
-    const neededCells = new Set<string>();
+    const neededCells = this.targetCells;
+    neededCells.clear();
 
     for (let dx = -this.maxCellDistance; dx <= this.maxCellDistance; dx++) {
       for (let dz = -this.maxCellDistance; dz <= this.maxCellDistance; dz++) {
@@ -321,21 +434,50 @@ export class VegetationScatterer {
       }
     }
 
-    this.targetCells = neededCells;
-    this.pendingRemovals = this.pendingRemovals.filter(key => neededCells.has(key));
-    this.pendingAdditions = this.pendingAdditions.filter(key => neededCells.has(key));
+    this.retainPendingCells(this.pendingRemovals, neededCells);
+    this.retainPendingCells(this.pendingAdditions, neededCells);
+    const queuedRemovals = this.queuedRemovalCells;
+    const queuedAdditions = this.queuedAdditionCells;
+    queuedRemovals.clear();
+    queuedAdditions.clear();
+    for (const key of this.pendingRemovals) queuedRemovals.add(key);
+    for (const key of this.pendingAdditions) queuedAdditions.add(key);
 
     for (const key of this.activeCells) {
-      if (!neededCells.has(key) && !this.pendingRemovals.includes(key)) {
+      if (!neededCells.has(key) && !queuedRemovals.has(key)) {
         this.pendingRemovals.push(key);
+        queuedRemovals.add(key);
       }
     }
 
-    const additions = Array.from(neededCells)
-      .filter(key => !this.activeCells.has(key) && !this.pendingAdditions.includes(key))
-      .sort((a, b) => this.getCellDistanceToCenter(a, cellX, cellZ) - this.getCellDistanceToCenter(b, cellX, cellZ));
+    const additions = this.sortedResidencyAdditions;
+    const additionDistances = this.sortedResidencyAdditionDistances;
+    additions.length = 0;
+    additionDistances.length = 0;
+    for (const key of neededCells) {
+      if (!this.activeCells.has(key) && !queuedAdditions.has(key)) {
+        const distance = this.getCellDistanceToCenter(key, cellX, cellZ);
+        insertCellByDistance(additions, additionDistances, key, distance);
+        queuedAdditions.add(key);
+      }
+    }
 
     this.pendingAdditions.push(...additions);
+    additions.length = 0;
+    additionDistances.length = 0;
+    queuedRemovals.clear();
+    queuedAdditions.clear();
+  }
+
+  private retainPendingCells(pendingCells: string[], neededCells: ReadonlySet<string>): void {
+    let writeIndex = 0;
+    for (let readIndex = 0; readIndex < pendingCells.length; readIndex++) {
+      const key = pendingCells[readIndex];
+      if (neededCells.has(key)) {
+        pendingCells[writeIndex++] = key;
+      }
+    }
+    pendingCells.length = writeIndex;
   }
 
   private processPendingWork(maxAddsPerFrame: number, maxRemovalsPerFrame: number): boolean {
@@ -351,37 +493,54 @@ export class VegetationScatterer {
       lastGeneratedCell: null,
     };
 
-    for (let i = 0; i < Math.max(0, maxRemovalsPerFrame) && this.pendingRemovals.length > 0; i++) {
-      const key = this.pendingRemovals.shift()!;
+    let processedRemovals = 0;
+    const removalBudget = Math.max(0, maxRemovalsPerFrame);
+    for (; processedRemovals < removalBudget && processedRemovals < this.pendingRemovals.length; processedRemovals++) {
+      const key = this.pendingRemovals[processedRemovals];
       this.billboardSystem.removeChunkInstances(key);
       this.activeCells.delete(key);
       didWork = true;
       debug.removedCells++;
     }
+    dropQueuePrefix(this.pendingRemovals, processedRemovals);
 
-    const addBudget = this.resolveAddBudget(maxAddsPerFrame);
-    debug.resolvedAddBudget = addBudget;
-    for (let i = 0; i < addBudget && this.pendingAdditions.length > 0; i++) {
-      const key = this.pendingAdditions.shift()!;
-      const generated = this.generateCell(key);
-      this.activeCells.add(key);
-      didWork = true;
-      debug.addedCells++;
-      debug.generatedInstances += generated.instanceCount;
-      debug.lastGeneratedCell = generated;
-      if (generated.instanceCount === 0) {
-        debug.emptyCells++;
+    const addWork = this.resolveAddWork(maxAddsPerFrame);
+    debug.resolvedAddBudget = addWork.budget;
+    if (addWork.criticalIndex >= 0) {
+      const key = removeQueueItemAt(this.pendingAdditions, addWork.criticalIndex);
+      if (key !== undefined) {
+        this.processGeneratedCell(key, debug);
+        didWork = true;
       }
+    } else {
+      let processedAdditions = 0;
+      for (; processedAdditions < addWork.budget && processedAdditions < this.pendingAdditions.length; processedAdditions++) {
+        const key = this.pendingAdditions[processedAdditions];
+        this.processGeneratedCell(key, debug);
+        didWork = true;
+      }
+      dropQueuePrefix(this.pendingAdditions, processedAdditions);
     }
 
     this.lastUpdateDebug = debug;
     return didWork;
   }
 
-  private resolveAddBudget(maxAddsPerFrame: number): number {
+  private processGeneratedCell(cellKey: string, debug: VegetationScattererUpdateDebugInfo): void {
+    const generated = this.generateCell(cellKey);
+    this.activeCells.add(cellKey);
+    debug.addedCells++;
+    debug.generatedInstances += generated.instanceCount;
+    debug.lastGeneratedCell = generated;
+    if (generated.instanceCount === 0) {
+      debug.emptyCells++;
+    }
+  }
+
+  private resolveAddWork(maxAddsPerFrame: number): { budget: number; criticalIndex: number } {
     const requestedBudget = Math.max(0, maxAddsPerFrame);
     if (requestedBudget > 0 || this.pendingAdditions.length === 0) {
-      return requestedBudget;
+      return { budget: requestedBudget, criticalIndex: -1 };
     }
 
     const criticalIndex = this.pendingAdditions.findIndex((key) =>
@@ -392,19 +551,28 @@ export class VegetationScatterer {
       ) <= VegetationScatterer.CRITICAL_RESIDENCY_RADIUS_CELLS
     );
     if (criticalIndex < 0) {
-      return 0;
+      return { budget: 0, criticalIndex: -1 };
     }
-    if (criticalIndex > 0) {
-      const [criticalCell] = this.pendingAdditions.splice(criticalIndex, 1);
-      this.pendingAdditions.unshift(criticalCell);
+    return { budget: 1, criticalIndex };
+  }
+
+  private resolveMaxCellDistance(types: VegetationTypeConfig[]): number {
+    const maxVisualDistance = types.reduce((maxDistance, type) => (
+      Number.isFinite(type.maxDistance) ? Math.max(maxDistance, type.maxDistance) : maxDistance
+    ), 0);
+    if (maxVisualDistance <= 0) {
+      return this.fallbackMaxCellDistance;
     }
-    return 1;
+    return Math.max(
+      VegetationScatterer.CRITICAL_RESIDENCY_RADIUS_CELLS,
+      Math.ceil(maxVisualDistance / this.cellSize),
+    );
   }
 
   private getCellDistanceToCenter(cellKey: string, centerCellX: number, centerCellZ: number): number {
-    const [cxStr, czStr] = cellKey.split(',');
-    const cellX = parseInt(cxStr, 10);
-    const cellZ = parseInt(czStr, 10);
+    const parsedCell = readCellKey(cellKey, this.parsedCellKey);
+    const cellX = parsedCell.x;
+    const cellZ = parsedCell.z;
     return Math.abs(cellX - centerCellX) + Math.abs(cellZ - centerCellZ);
   }
 
@@ -425,7 +593,21 @@ export class VegetationScatterer {
 
     const filtered = new Map<string, BillboardInstance[]>();
     for (const [typeId, instances] of instancesByType) {
-      const nextInstances = instances.filter(instance => !this.isExcluded(instance.position.x, instance.position.z));
+      let nextInstances: BillboardInstance[] | null = null;
+      for (let i = 0; i < instances.length; i++) {
+        const instance = instances[i];
+        if (this.isExcluded(instance.position.x, instance.position.z)) {
+          if (nextInstances === null) {
+            nextInstances = instances.slice(0, i);
+          }
+          continue;
+        }
+        nextInstances?.push(instance);
+      }
+      if (nextInstances === null) {
+        filtered.set(typeId, instances);
+        continue;
+      }
       if (nextInstances.length > 0) {
         filtered.set(typeId, nextInstances);
       }
@@ -437,7 +619,7 @@ export class VegetationScatterer {
     for (const zone of this.exclusionZones) {
       const dx = worldX - zone.x;
       const dz = worldZ - zone.z;
-      if (dx * dx + dz * dz <= zone.radius * zone.radius) {
+      if (dx * dx + dz * dz <= zone.radiusSq) {
         return true;
       }
     }

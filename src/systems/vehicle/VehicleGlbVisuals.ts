@@ -3,7 +3,9 @@
 
 import * as THREE from 'three';
 import { modelLoader } from '../assets/ModelLoader';
+import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { GroundVehicleModels } from '../assets/modelPaths';
+import { Logger } from '../../utils/Logger';
 
 /**
  * Async GLB visual upgrade for the drivable ground vehicles.
@@ -55,6 +57,11 @@ export interface TurretRigSource {
 const PROCEDURAL_TURRET_MESHES = ['m48_turret', 'm48_turret_ring', 'm48_cupola'] as const;
 const PROCEDURAL_GUN_MESHES = ['m48_mantlet', 'm48_barrel', 'm48_muzzle_brake'] as const;
 const M151_RUNTIME_VISUAL_SCALE = 1.15;
+const GROUND_VEHICLE_PERF_CATEGORY = 'ground_vehicles';
+const M151_BODY_OPTIMIZED_RESOURCE_KEY = 'm151BodyOptimizedGeneratedResource';
+const M48_HULL_OPTIMIZED_RESOURCE_KEY = 'm48HullOptimizedGeneratedResource';
+const M48_TURRET_OPTIMIZED_RESOURCE_KEY = 'm48TurretOptimizedGeneratedResource';
+const M48_GUN_OPTIMIZED_RESOURCE_KEY = 'm48GunOptimizedGeneratedResource';
 
 function enableShadows(root: THREE.Object3D): void {
   root.traverse((obj) => {
@@ -63,6 +70,109 @@ function enableShadows(root: THREE.Object3D): void {
       obj.receiveShadow = true;
     }
   });
+}
+
+function markGroundVehiclePerfCategory(root: THREE.Object3D): void {
+  root.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
+  root.traverse((obj) => {
+    if ((obj as THREE.Mesh).isMesh) {
+      obj.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
+    }
+  });
+}
+
+function optimizeM48StaticHullDrawCalls(glb: THREE.Group): void {
+  try {
+    const result = optimizeStaticModelDrawCalls(glb, {
+      batchNamePrefix: 'm48_hull',
+      strategy: 'merge',
+      minBucketSize: 2,
+    });
+    glb.userData.m48HullDrawCallOptimization = result;
+    glb.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
+        child.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
+        child.userData[M48_HULL_OPTIMIZED_RESOURCE_KEY] = true;
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  } catch (error) {
+    Logger.warn('vehicle', 'Failed to optimize M48 static hull draw calls', error);
+  }
+}
+
+function optimizeM48ArticulatedJointDrawCalls(
+  root: THREE.Object3D,
+  options: {
+    resultKey: string;
+    resourceKey: string;
+    batchNamePrefix: string;
+    warning: string;
+    excludeMesh?: (mesh: THREE.Mesh) => boolean;
+  },
+): void {
+  try {
+    const result = optimizeStaticModelDrawCalls(root, {
+      batchNamePrefix: options.batchNamePrefix,
+      strategy: 'merge',
+      minBucketSize: 2,
+      excludeMesh: options.excludeMesh,
+    });
+    root.userData[options.resultKey] = result;
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
+        child.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
+        child.userData[options.resourceKey] = true;
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  } catch (error) {
+    Logger.warn('vehicle', options.warning, error);
+  }
+}
+
+function optimizeM48TurretDrawCalls(turretJoint: THREE.Object3D): void {
+  optimizeM48ArticulatedJointDrawCalls(turretJoint, {
+    resultKey: 'm48TurretDrawCallOptimization',
+    resourceKey: M48_TURRET_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 'm48_turret',
+    warning: 'Failed to optimize M48 turret draw calls',
+  });
+}
+
+function optimizeM48GunDrawCalls(gunJoint: THREE.Object3D): void {
+  optimizeM48ArticulatedJointDrawCalls(gunJoint, {
+    resultKey: 'm48GunDrawCallOptimization',
+    resourceKey: M48_GUN_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 'm48_gun',
+    warning: 'Failed to optimize M48 gun draw calls',
+    // Keep named muzzle meshes addressable for barrel/muzzle proof and future
+    // weapon-effect anchors; merge the rest of the rigid pitch subtree.
+    excludeMesh: (mesh) => mesh.name.toLowerCase().includes('muzzle'),
+  });
+}
+
+function optimizeM151StaticBodyDrawCalls(glb: THREE.Group): void {
+  try {
+    const result = optimizeStaticModelDrawCalls(glb, {
+      batchNamePrefix: 'm151_body',
+      strategy: 'merge',
+      minBucketSize: 2,
+    });
+    glb.userData.m151BodyDrawCallOptimization = result;
+    glb.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
+        child.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
+        child.userData[M151_BODY_OPTIMIZED_RESOURCE_KEY] = true;
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+  } catch (error) {
+    Logger.warn('vehicle', 'Failed to optimize M151 static body draw calls', error);
+  }
 }
 
 /** Remove the procedural placeholder meshes (direct Mesh children) from a chassis root. */
@@ -90,6 +200,8 @@ export async function applyM151JeepGlbVisual(
   glb.name = 'm151_glb_visual';
   glb.scale.setScalar(M151_RUNTIME_VISUAL_SCALE);
   enableShadows(glb);
+  markGroundVehiclePerfCategory(glb);
+  optimizeM151StaticBodyDrawCalls(glb);
   removeProceduralMeshes(chassisRoot);
   chassisRoot.add(glb);
   return true;
@@ -132,6 +244,8 @@ export async function applyM48TankGlbVisual(
   if (!turretJoint || !gunJoint) return false; // unexpected asset shape
 
   enableShadows(glb);
+  markGroundVehiclePerfCategory(chassisRoot);
+  markGroundVehiclePerfCategory(glb);
   const rig = tank.getTurret();
   const yawNode = rig.getYawNode();
   const pitchNode = rig.getPitchNode();
@@ -154,5 +268,10 @@ export async function applyM48TankGlbVisual(
   // and runtime yaw/pitch compose on top of it.
   yawNode.attach(turretJoint);
   pitchNode.attach(gunJoint);
+  markGroundVehiclePerfCategory(turretJoint);
+  markGroundVehiclePerfCategory(gunJoint);
+  optimizeM48StaticHullDrawCalls(glb);
+  optimizeM48TurretDrawCalls(turretJoint);
+  optimizeM48GunDrawCalls(gunJoint);
   return true;
 }

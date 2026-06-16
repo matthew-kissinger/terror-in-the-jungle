@@ -6,7 +6,9 @@ import type { GameSystem } from '../../types';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { GameMode, GameModeConfig, ZoneConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
+import { freezeTransform } from '../../utils/SceneUtils';
 import { modelLoader } from '../assets/ModelLoader';
+import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import {
   WILDLIFE_CONFIG,
   WILDLIFE_ROSTER,
@@ -38,7 +40,9 @@ interface WildlifeAgent {
   readonly id: string;
   readonly species: WildlifeSpecies;
   readonly object: THREE.Object3D;
+  readonly shadowMeshes: THREE.Mesh[];
   heading: number;
+  castingShadow: boolean;
   /**
    * Whether the animal is committed to a flee escape. Latched true the moment
    * the player enters the trigger radius and held until the animal clears the
@@ -50,6 +54,32 @@ interface WildlifeAgent {
 
 const _playerPos = new THREE.Vector3();
 const _agentToPlayer = new THREE.Vector3();
+const WILDLIFE_OPTIMIZED_RESOURCE_KEY = 'wildlifeOptimizedGeneratedResource';
+const WILDLIFE_OPTIMIZED_TEMPLATE_KEY = 'wildlifeOptimizedTemplate';
+const WILDLIFE_OPTIMIZED_TEMPLATE_INSTANCE_KEY = 'wildlifeOptimizedTemplateInstance';
+const WILDLIFE_SHARED_TEMPLATE_RESOURCE_KEY = 'wildlifeSharedOptimizedTemplateResource';
+const WILDLIFE_DESPAWN_DISTANCE_SQ = WILDLIFE_CONFIG.despawnDistanceM * WILDLIFE_CONFIG.despawnDistanceM;
+const WILDLIFE_FLEE_TRIGGER_DISTANCE_SQ =
+  WILDLIFE_CONFIG.fleeTriggerDistanceM * WILDLIFE_CONFIG.fleeTriggerDistanceM;
+const WILDLIFE_FLEE_DESPAWN_DISTANCE_SQ =
+  WILDLIFE_CONFIG.fleeDespawnDistanceM * WILDLIFE_CONFIG.fleeDespawnDistanceM;
+const WILDLIFE_MIN_PLAYER_SPAWN_DISTANCE_SQ =
+  WILDLIFE_CONFIG.minPlayerSpawnDistanceM * WILDLIFE_CONFIG.minPlayerSpawnDistanceM;
+const WILDLIFE_SHADOW_CAST_DISTANCE_SQ =
+  WILDLIFE_CONFIG.shadowCastDistanceM * WILDLIFE_CONFIG.shadowCastDistanceM;
+
+function isPerfWildlifeDisabled(): boolean {
+  if (!(import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')) return false;
+  if (typeof window === 'undefined') return false;
+  try {
+    const value = new URLSearchParams(window.location.search).get('perfDisableWildlife');
+    if (value === null) return false;
+    const normalized = value.toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Ambient ground-wildlife spawner (ambient-wildlife-mvp). Spawns up to a small
@@ -72,6 +102,10 @@ export class WildlifeSystem implements GameSystem {
   private cadenceAccumulator = 0;
   private nextAgentId = 0;
   private active = false;
+  private preloadPromise?: Promise<number>;
+  private templateCacheEpoch = 0;
+  private readonly optimizedTemplateCache = new Map<string, THREE.Object3D>();
+  private readonly pendingOptimizedTemplates = new Map<string, Promise<THREE.Object3D>>();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -101,6 +135,13 @@ export class WildlifeSystem implements GameSystem {
     return this.agents.length;
   }
 
+  async preloadCurrentModeAssets(): Promise<number> {
+    if (!this.modeProvider || !this.isModeAllowed(this.modeProvider.getCurrentConfig().id)) {
+      return 0;
+    }
+    return this.preloadAllowedModeAssets();
+  }
+
   update(deltaTime: number): void {
     this.cadenceAccumulator += deltaTime;
     if (this.cadenceAccumulator < WILDLIFE_CONFIG.updateIntervalSeconds) {
@@ -112,12 +153,15 @@ export class WildlifeSystem implements GameSystem {
   }
 
   dispose(): void {
+    this.templateCacheEpoch++;
     for (const agent of this.agents) {
       this.releaseAgent(agent);
     }
     this.agents.length = 0;
     this.active = false;
     this.cadenceAccumulator = 0;
+    this.pendingOptimizedTemplates.clear();
+    this.disposeOptimizedTemplateCache();
   }
 
   private tick(step: number): void {
@@ -135,6 +179,7 @@ export class WildlifeSystem implements GameSystem {
       return;
     }
     this.active = true;
+    void this.preloadAllowedModeAssets();
 
     if (!this.terrain.isTerrainReady()) {
       return;
@@ -153,7 +198,16 @@ export class WildlifeSystem implements GameSystem {
   }
 
   private isModeAllowed(mode: GameMode): boolean {
+    if (isPerfWildlifeDisabled()) return false;
     return WILDLIFE_ALLOWED_MODES.includes(mode);
+  }
+
+  private preloadAllowedModeAssets(): Promise<number> {
+    if (!this.preloadPromise) {
+      const paths = [...new Set(WILDLIFE_ROSTER.map((species) => species.modelPath))];
+      this.preloadPromise = modelLoader.preload(paths).then(() => paths.length);
+    }
+    return this.preloadPromise;
   }
 
   /**
@@ -167,20 +221,21 @@ export class WildlifeSystem implements GameSystem {
       const agent = this.agents[i];
       _agentToPlayer.copy(agent.object.position).sub(playerPos);
       _agentToPlayer.y = 0;
-      const playerDistance = _agentToPlayer.length();
+      const playerDistanceSq = _agentToPlayer.lengthSq();
 
-      if (playerDistance > WILDLIFE_CONFIG.despawnDistanceM) {
+      if (playerDistanceSq > WILDLIFE_DESPAWN_DISTANCE_SQ) {
         this.removeAgentAt(i);
         continue;
       }
+      this.setAgentShadowCasting(agent, playerDistanceSq <= WILDLIFE_SHADOW_CAST_DISTANCE_SQ);
 
       // Latch the flee escape the moment the player breaches the trigger
       // radius. A committed animal then bursts away every tick until it clears
       // the cull range, where it fades out — it never relapses mid-escape.
-      if (playerDistance < WILDLIFE_CONFIG.fleeTriggerDistanceM) {
+      if (playerDistanceSq < WILDLIFE_FLEE_TRIGGER_DISTANCE_SQ) {
         agent.fleeing = true;
       }
-      if (agent.fleeing && playerDistance > WILDLIFE_CONFIG.fleeDespawnDistanceM) {
+      if (agent.fleeing && playerDistanceSq > WILDLIFE_FLEE_DESPAWN_DISTANCE_SQ) {
         this.removeAgentAt(i);
         continue;
       }
@@ -218,6 +273,7 @@ export class WildlifeSystem implements GameSystem {
 
     agent.object.position.y = this.terrain.getHeightAt(agent.object.position.x, agent.object.position.z);
     agent.object.rotation.y = agent.heading;
+    this.syncAnimalTransform(agent.object);
   }
 
   private isWalkable(x: number, z: number): boolean {
@@ -261,7 +317,8 @@ export class WildlifeSystem implements GameSystem {
     for (const zone of zones) {
       const dx = x - zone.position.x;
       const dz = z - zone.position.z;
-      if (Math.hypot(dx, dz) < WILDLIFE_CONFIG.objectiveExclusionM + zone.radius) {
+      const threshold = WILDLIFE_CONFIG.objectiveExclusionM + zone.radius;
+      if (dx * dx + dz * dz < threshold * threshold) {
         return true;
       }
     }
@@ -276,7 +333,7 @@ export class WildlifeSystem implements GameSystem {
     }
     let object: THREE.Object3D;
     try {
-      object = await modelLoader.loadModel(species.modelPath);
+      object = await this.createAnimalInstance(species);
     } catch (error) {
       Logger.warn('world', `Failed to load wildlife model ${species.modelPath}`, error);
       return;
@@ -293,7 +350,7 @@ export class WildlifeSystem implements GameSystem {
     // animal in too close.
     this.player.getPosition(_playerPos);
     _agentToPlayer.set(x - _playerPos.x, 0, z - _playerPos.z);
-    if (_agentToPlayer.length() < WILDLIFE_CONFIG.minPlayerSpawnDistanceM) {
+    if (_agentToPlayer.lengthSq() < WILDLIFE_MIN_PLAYER_SPAWN_DISTANCE_SQ) {
       modelLoader.disposeInstance(object);
       return;
     }
@@ -302,20 +359,20 @@ export class WildlifeSystem implements GameSystem {
     object.position.set(x, this.terrain.getHeightAt(x, z), z);
     const heading = Math.random() * Math.PI * 2;
     object.rotation.y = heading;
-    object.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
+    const shadowMeshes = this.prepareAnimalShadowMeshes(object);
+    const castingShadow = _agentToPlayer.lengthSq() <= WILDLIFE_SHADOW_CAST_DISTANCE_SQ;
+    this.setShadowCasting(shadowMeshes, castingShadow);
     object.userData.perfCategory = 'wildlife';
     this.scene.add(object);
+    freezeTransform(object);
 
     this.agents.push({
       id: `wildlife_${species.id}_${this.nextAgentId++}`,
       species,
       object,
+      shadowMeshes,
       heading,
+      castingShadow,
       fleeing: false,
     });
   }
@@ -323,14 +380,183 @@ export class WildlifeSystem implements GameSystem {
   private removeAgentAt(index: number): void {
     const agent = this.agents[index];
     this.releaseAgent(agent);
-    this.agents.splice(index, 1);
+    for (let i = index + 1; i < this.agents.length; i++) {
+      this.agents[i - 1] = this.agents[i];
+    }
+    this.agents.length -= 1;
   }
 
   private releaseAgent(agent: WildlifeAgent): void {
+    this.disposeOptimizedAnimalResources(agent.object);
     if (typeof modelLoader.disposeInstance === 'function') {
       modelLoader.disposeInstance(agent.object);
     } else {
       agent.object.removeFromParent();
+    }
+  }
+
+  private async createAnimalInstance(species: WildlifeSpecies): Promise<THREE.Object3D> {
+    const template = await this.getOptimizedAnimalTemplate(species);
+    const object = template.clone(true);
+    object.userData[WILDLIFE_OPTIMIZED_TEMPLATE_INSTANCE_KEY] = true;
+    object.userData.perfCategory = 'wildlife';
+    this.markTemplateCloneResourceOwnership(template, object);
+    return object;
+  }
+
+  private getOptimizedAnimalTemplate(species: WildlifeSpecies): Promise<THREE.Object3D> {
+    const cacheKey = species.modelPath;
+    const cached = this.optimizedTemplateCache.get(cacheKey);
+    if (cached) {
+      return Promise.resolve(cached);
+    }
+
+    const pending = this.pendingOptimizedTemplates.get(cacheKey);
+    if (pending) {
+      return pending;
+    }
+
+    const epoch = this.templateCacheEpoch;
+    const loadPromise = modelLoader.loadModel(species.modelPath)
+      .then((object) => {
+        this.pendingOptimizedTemplates.delete(cacheKey);
+        if (epoch !== this.templateCacheEpoch) {
+          this.disposeOptimizedTemplateObject(object);
+          throw new Error(`Wildlife optimized template load superseded for ${species.modelPath}`);
+        }
+        this.optimizeAnimalDrawCalls(object, species);
+        object.userData[WILDLIFE_OPTIMIZED_TEMPLATE_KEY] = true;
+        object.userData.perfCategory = 'wildlife';
+        this.optimizedTemplateCache.set(cacheKey, object);
+        return object;
+      })
+      .catch((error) => {
+        this.pendingOptimizedTemplates.delete(cacheKey);
+        throw error;
+      });
+
+    this.pendingOptimizedTemplates.set(cacheKey, loadPromise);
+    return loadPromise;
+  }
+
+  private disposeOptimizedTemplateCache(): void {
+    for (const template of this.optimizedTemplateCache.values()) {
+      this.disposeOptimizedTemplateObject(template);
+    }
+    this.optimizedTemplateCache.clear();
+  }
+
+  private disposeOptimizedTemplateObject(template: THREE.Object3D): void {
+    this.disposeOptimizedAnimalResources(template);
+    if (typeof modelLoader.disposeInstance === 'function') {
+      modelLoader.disposeInstance(template);
+    } else {
+      template.removeFromParent();
+    }
+  }
+
+  private markTemplateCloneResourceOwnership(template: THREE.Object3D, object: THREE.Object3D): void {
+    const templateMeshes = this.collectOptimizedMeshes(template);
+    const clonedMeshes = this.collectOptimizedMeshes(object);
+    const count = Math.min(templateMeshes.length, clonedMeshes.length);
+
+    for (let i = 0; i < count; i++) {
+      const templateMesh = templateMeshes[i];
+      const clonedMesh = clonedMeshes[i];
+      if (templateMesh.geometry !== clonedMesh.geometry || templateMesh.material !== clonedMesh.material) {
+        continue;
+      }
+      clonedMesh.userData[WILDLIFE_SHARED_TEMPLATE_RESOURCE_KEY] = true;
+      delete clonedMesh.userData[WILDLIFE_OPTIMIZED_RESOURCE_KEY];
+    }
+  }
+
+  private collectOptimizedMeshes(root: THREE.Object3D): THREE.Mesh[] {
+    const meshes: THREE.Mesh[] = [];
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.userData[WILDLIFE_OPTIMIZED_RESOURCE_KEY] === true) {
+        meshes.push(child);
+      }
+    });
+    return meshes;
+  }
+
+  private optimizeAnimalDrawCalls(object: THREE.Object3D, species: WildlifeSpecies): void {
+    try {
+      const result = optimizeStaticModelDrawCalls(object, {
+        batchNamePrefix: `wildlife_${species.id}`,
+        minBucketSize: 1,
+      });
+      object.userData.wildlifeDrawCallOptimization = result;
+      object.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
+          child.userData.perfCategory = 'wildlife';
+          child.userData[WILDLIFE_OPTIMIZED_RESOURCE_KEY] = true;
+        }
+      });
+    } catch (error) {
+      Logger.warn('world', `Failed to optimize wildlife model ${species.modelPath}`, error);
+    }
+  }
+
+  private disposeOptimizedAnimalResources(object: THREE.Object3D): void {
+    object.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || child.userData[WILDLIFE_OPTIMIZED_RESOURCE_KEY] !== true) {
+        return;
+      }
+      if (child.userData[WILDLIFE_SHARED_TEMPLATE_RESOURCE_KEY] === true) {
+        return;
+      }
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => material.dispose());
+      } else {
+        child.material.dispose();
+      }
+    });
+  }
+
+  private prepareAnimalShadowMeshes(object: THREE.Object3D): THREE.Mesh[] {
+    const meshes: THREE.Mesh[] = [];
+    object.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.receiveShadow = true;
+        meshes.push(child);
+      }
+    });
+    return meshes;
+  }
+
+  private setAgentShadowCasting(agent: WildlifeAgent, castingShadow: boolean): void {
+    if (agent.castingShadow === castingShadow) {
+      return;
+    }
+    agent.castingShadow = castingShadow;
+    this.setShadowCasting(agent.shadowMeshes, castingShadow);
+  }
+
+  private setShadowCasting(meshes: readonly THREE.Mesh[], castingShadow: boolean): void {
+    for (const mesh of meshes) {
+      mesh.castShadow = castingShadow;
+    }
+  }
+
+  private syncAnimalTransform(object: THREE.Object3D): void {
+    object.updateMatrix();
+    if (object.parent) {
+      object.parent.updateWorldMatrix(true, false);
+      object.matrixWorld.multiplyMatrices(object.parent.matrixWorld, object.matrix);
+    } else {
+      object.matrixWorld.copy(object.matrix);
+    }
+    object.matrixWorldNeedsUpdate = false;
+    this.syncFrozenDescendantWorldTransforms(object);
+  }
+
+  private syncFrozenDescendantWorldTransforms(parent: THREE.Object3D): void {
+    for (const child of parent.children) {
+      child.matrixWorld.multiplyMatrices(parent.matrixWorld, child.matrix);
+      this.syncFrozenDescendantWorldTransforms(child);
     }
   }
 }

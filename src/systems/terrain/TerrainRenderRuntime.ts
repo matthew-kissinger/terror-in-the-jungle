@@ -2,8 +2,17 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { CDLODQuadtree, type FrustumPlane } from './CDLODQuadtree';
+import { CDLODQuadtree, type CDLODTile, type FrustumPlane } from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
+
+export interface TerrainDebugTile {
+  x: number;
+  z: number;
+  size: number;
+  lodLevel: number;
+  morphFactor: number;
+  edgeMorphMask?: number;
+}
 
 interface TerrainRenderRuntimeConfig {
   worldSize: number;
@@ -13,30 +22,95 @@ interface TerrainRenderRuntimeConfig {
   tileResolution: number;
 }
 
+export interface TerrainRenderSelectionSyncResult {
+  didSync: boolean;
+  reason: 'current' | 'stale' | 'uninitialized';
+  selectionRechecked: boolean;
+  poseWasStale: boolean;
+  projectionChanged: boolean;
+  positionDeltaMeters: number;
+  rotationDeltaDeg: number;
+  tileCount: number;
+  tileSelectionSaturated?: boolean;
+}
+
+export interface TerrainRenderSubmissionStats {
+  instanceSubmissions: number;
+  unchangedSubmissionSkips: number;
+  lastSubmissionSkipped: boolean;
+  forceInstanceUploadEnabled: boolean;
+  forcedInstanceSubmissions: number;
+}
+
+const CAMERA_RENDER_SYNC_POSITION_EPSILON_METERS = 0;
+const CAMERA_RENDER_SYNC_ROTATION_EPSILON_RAD = THREE.MathUtils.degToRad(0.01);
+const CAMERA_SELECTION_MORPH_EPSILON = 1e-5;
+const CAMERA_SELECTION_PROJECTION_EPSILON = 1e-7;
+
+function readBooleanQueryFlag(name: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const value = new URLSearchParams(window.location.search).get(name);
+    if (value === null) return false;
+    const normalized = value.toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  } catch {
+    return false;
+  }
+}
+
+export function isTerrainForceInstanceUploadEnabled(): boolean {
+  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
+    && readBooleanQueryFlag('terrainForceInstanceUpload');
+}
+
 /**
  * Owns camera frustum extraction, quadtree tile selection, and instanced terrain draw submission.
  */
 export class TerrainRenderRuntime {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
-  private readonly frustumPlanes: FrustumPlane[] = [];
+  private readonly frustumPlanes: FrustumPlane[] = [
+    { nx: 0, ny: 0, nz: 0, d: 0 },
+    { nx: 0, ny: 0, nz: 0, d: 0 },
+    { nx: 0, ny: 0, nz: 0, d: 0 },
+    { nx: 0, ny: 0, nz: 0, d: 0 },
+    { nx: 0, ny: 0, nz: 0, d: 0 },
+    { nx: 0, ny: 0, nz: 0, d: 0 },
+  ];
   private readonly frustum = new THREE.Frustum();
   private readonly projScreenMatrix = new THREE.Matrix4();
 
   private config: TerrainRenderRuntimeConfig;
   private quadtree: CDLODQuadtree;
   private renderer: CDLODRenderer;
+  private readonly terrainHeightAt?: (x: number, z: number) => number;
   private cameraOverride: THREE.PerspectiveCamera | null = null;
+  private readonly lastSelectedTiles: TerrainDebugTile[] = [];
+  private readonly debugTilePool: TerrainDebugTile[] = [];
+  private readonly lastSelectionPosition = new THREE.Vector3();
+  private readonly lastSelectionQuaternion = new THREE.Quaternion();
+  private readonly lastSelectionProjectionMatrix = new THREE.Matrix4();
+  private readonly lastSelectedTileEdgeMorphMasks: number[] = [];
+  private lastSelectionCamera: THREE.Camera | null = null;
+  private hasSelectionPose = false;
+  private instanceSubmissions = 0;
+  private unchangedSubmissionSkips = 0;
+  private lastSubmissionSkipped = false;
+  private forcedInstanceSubmissions = 0;
+  private lastTileSelectionSaturated = false;
 
   constructor(
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     material: THREE.Material,
     config: TerrainRenderRuntimeConfig,
+    terrainHeightAt?: (x: number, z: number) => number,
   ) {
     this.scene = scene;
     this.camera = camera;
     this.config = { ...config, lodRanges: [...config.lodRanges] };
+    this.terrainHeightAt = terrainHeightAt;
     this.quadtree = this.buildQuadtree();
     this.renderer = new CDLODRenderer(material, this.config.tileResolution);
   }
@@ -47,14 +121,97 @@ export class TerrainRenderRuntime {
 
   update(): void {
     const camera = this.getSelectionCamera();
+    const tiles = this.selectTiles(camera);
+    const forceInstanceUpload = isTerrainForceInstanceUploadEnabled();
+    if (
+      !forceInstanceUpload
+      &&
+      this.hasSelectionPose
+      && this.matchesLastSubmittedTileSet(tiles)
+      && this.matchesLastSubmittedTileDynamics(tiles)
+    ) {
+      this.rememberSelectionPose(camera);
+      this.unchangedSubmissionSkips += 1;
+      this.lastSubmissionSkipped = true;
+      return;
+    }
+    this.submitTiles(camera, tiles, forceInstanceUpload && this.hasSelectionPose);
+  }
+
+  syncSelectionForCamera(camera: THREE.Camera | null | undefined): TerrainRenderSelectionSyncResult {
+    if (!camera) {
+      return this.buildSyncResult(false, 'uninitialized', 0, 0);
+    }
+
+    const positionDelta = this.hasSelectionPose
+      ? camera.position.distanceTo(this.lastSelectionPosition)
+      : Number.POSITIVE_INFINITY;
+    const rotationDelta = this.hasSelectionPose
+      ? camera.quaternion.angleTo(this.lastSelectionQuaternion)
+      : Number.POSITIVE_INFINITY;
+    const cameraChanged = camera !== this.lastSelectionCamera;
+    const projectionChanged = this.hasSelectionPose
+      ? !this.matchesLastSelectionProjection(camera)
+      : false;
+    const poseWasStale = !this.hasSelectionPose
+      || cameraChanged
+      || positionDelta > CAMERA_RENDER_SYNC_POSITION_EPSILON_METERS
+      || rotationDelta > CAMERA_RENDER_SYNC_ROTATION_EPSILON_RAD;
+    const selectionStale = poseWasStale || projectionChanged;
+
+    if (!selectionStale) {
+      return this.buildSyncResult(false, 'current', positionDelta, rotationDelta);
+    }
+
+    const tiles = this.selectTiles(camera);
+    const recheckContext = {
+      selectionRechecked: true,
+      poseWasStale,
+      projectionChanged,
+    };
+    if (this.matchesLastSubmittedTileSet(tiles)) {
+      if (!this.matchesLastSubmittedTileDynamics(tiles)) {
+        this.submitTiles(camera, tiles);
+        return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, recheckContext);
+      }
+      this.submitTiles(camera, tiles);
+      return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, recheckContext);
+    }
+
+    this.submitTiles(camera, tiles);
+    return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, recheckContext);
+  }
+
+  private selectTiles(camera: THREE.Camera): readonly CDLODTile[] {
     this.updateFrustumPlanes(camera);
+    const lodCameraY = this.getTerrainRelativeCameraY(camera);
     const tiles = this.quadtree.selectTiles(
       camera.position.x,
-      camera.position.y,
+      lodCameraY,
       camera.position.z,
       this.frustumPlanes,
     );
+    this.lastTileSelectionSaturated = this.quadtree.wasLastSelectionSaturated();
+    return tiles;
+  }
+
+  private submitTiles(camera: THREE.Camera, tiles: readonly CDLODTile[], forced = false): void {
+    this.copySelectedTilesForDebug(tiles);
     this.renderer.updateInstances(tiles);
+    this.instanceSubmissions += 1;
+    if (forced) {
+      this.forcedInstanceSubmissions += 1;
+    }
+    this.lastSubmissionSkipped = false;
+    this.rememberSelectionPose(camera);
+  }
+
+  private rememberSelectionPose(camera: THREE.Camera): void {
+    this.lastSelectionCamera = camera;
+    this.lastSelectionPosition.copy(camera.position);
+    this.lastSelectionQuaternion.copy(camera.quaternion);
+    this.lastSelectionProjectionMatrix.copy(camera.projectionMatrix);
+    this.hasSelectionPose = true;
   }
 
   setCameraOverride(camera: THREE.PerspectiveCamera | null): void {
@@ -64,6 +221,10 @@ export class TerrainRenderRuntime {
   reconfigure(config: TerrainRenderRuntimeConfig): void {
     this.config = { ...config, lodRanges: [...config.lodRanges] };
     this.quadtree = this.buildQuadtree();
+    this.lastSelectedTiles.length = 0;
+    this.hasSelectionPose = false;
+    this.lastSelectionCamera = null;
+    this.lastSubmissionSkipped = false;
   }
 
   private buildQuadtree(): CDLODQuadtree {
@@ -80,23 +241,50 @@ export class TerrainRenderRuntime {
     return this.quadtree.getSelectedTileCount();
   }
 
+  wasLastTileSelectionSaturated(): boolean {
+    return this.lastTileSelectionSaturated;
+  }
+
   /**
-   * Re-runs tile selection against the current camera and returns a snapshot
-   * of the CDLOD tiles the terrain renderer would draw this frame. Additive
-   * accessor added for `world-overlay-debugger`; O(tiles) + frustum update.
-   * `morphFactor` is included so the `terrain-seam` overlay can highlight
-   * adjacent tiles with mismatched morph blends; older callers consuming
-   * the narrower {x,z,size,lodLevel} shape are unaffected (TS structural
-   * subtyping keeps them happy).
+   * Returns the last CDLOD tile set selected by update(). This intentionally
+   * does not re-run selection, so perf artifacts and overlays can inspect the
+   * terrain state that was actually submitted to the renderer for the latest
+   * terrain update.
    */
-  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number; morphFactor: number }> {
+  getActiveTilesForDebug(): ReadonlyArray<TerrainDebugTile> {
+    return this.lastSelectedTiles;
+  }
+
+  /**
+   * Explicit fresh overlay probe. Use this only for interactive debug tooling
+   * that wants to ask "what would select now?" instead of artifact truth.
+   */
+  selectTilesForDebugOverlay(): ReadonlyArray<TerrainDebugTile> {
     const camera = this.getSelectionCamera();
     this.updateFrustumPlanes(camera);
+    const lodCameraY = this.getTerrainRelativeCameraY(camera);
     const tiles = this.quadtree.selectTiles(
-      camera.position.x, camera.position.y, camera.position.z,
+      camera.position.x, lodCameraY, camera.position.z,
       this.frustumPlanes,
     );
-    return tiles.map((t) => ({ x: t.x, z: t.z, size: t.size, lodLevel: t.lodLevel, morphFactor: t.morphFactor }));
+    return tiles.map((t) => ({
+      x: t.x,
+      z: t.z,
+      size: t.size,
+      lodLevel: t.lodLevel,
+      morphFactor: t.morphFactor,
+      edgeMorphMask: t.edgeMorphMask,
+    }));
+  }
+
+  getSubmissionStatsForDebug(): TerrainRenderSubmissionStats {
+    return {
+      instanceSubmissions: this.instanceSubmissions,
+      unchangedSubmissionSkips: this.unchangedSubmissionSkips,
+      lastSubmissionSkipped: this.lastSubmissionSkipped,
+      forceInstanceUploadEnabled: isTerrainForceInstanceUploadEnabled(),
+      forcedInstanceSubmissions: this.forcedInstanceSubmissions,
+    };
   }
 
   dispose(): void {
@@ -108,22 +296,120 @@ export class TerrainRenderRuntime {
     return this.cameraOverride ?? this.camera;
   }
 
-  private updateFrustumPlanes(camera: THREE.PerspectiveCamera): void {
+  private getTerrainRelativeCameraY(camera: THREE.Camera): number {
+    if (!this.terrainHeightAt) return camera.position.y;
+    const terrainY = this.terrainHeightAt(camera.position.x, camera.position.z);
+    const relativeY = camera.position.y - terrainY;
+    return Number.isFinite(relativeY) ? relativeY : camera.position.y;
+  }
+
+  private updateFrustumPlanes(camera: THREE.Camera): void {
+    camera.updateMatrixWorld(true);
     this.projScreenMatrix.multiplyMatrices(
       camera.projectionMatrix,
       camera.matrixWorldInverse,
     );
     this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
 
-    this.frustumPlanes.length = 0;
     for (let i = 0; i < 6; i++) {
       const p = this.frustum.planes[i];
-      this.frustumPlanes.push({
-        nx: p.normal.x,
-        ny: p.normal.y,
-        nz: p.normal.z,
-        d: p.constant,
-      });
+      const target = this.frustumPlanes[i];
+      target.nx = p.normal.x;
+      target.ny = p.normal.y;
+      target.nz = p.normal.z;
+      target.d = p.constant;
     }
+  }
+
+  private copySelectedTilesForDebug(tiles: readonly TerrainDebugTile[]): void {
+    this.lastSelectedTiles.length = tiles.length;
+    this.lastSelectedTileEdgeMorphMasks.length = tiles.length;
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      const target = this.debugTilePool[i] ?? {
+        x: 0,
+        z: 0,
+        size: 0,
+        lodLevel: 0,
+        morphFactor: 0,
+      };
+      this.debugTilePool[i] = target;
+      target.x = tile.x;
+      target.z = tile.z;
+      target.size = tile.size;
+      target.lodLevel = tile.lodLevel;
+      target.morphFactor = tile.morphFactor;
+      target.edgeMorphMask = Number(tile.edgeMorphMask ?? 0);
+      this.lastSelectedTiles[i] = target;
+      this.lastSelectedTileEdgeMorphMasks[i] = Number(tile.edgeMorphMask ?? 0);
+    }
+  }
+
+  private matchesLastSubmittedTileSet(tiles: readonly CDLODTile[]): boolean {
+    if (tiles.length !== this.lastSelectedTiles.length) return false;
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      const previous = this.lastSelectedTiles[i];
+      if (
+        tile.x !== previous.x
+        || tile.z !== previous.z
+        || tile.size !== previous.size
+        || tile.lodLevel !== previous.lodLevel
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private matchesLastSubmittedTileDynamics(tiles: readonly CDLODTile[]): boolean {
+    if (tiles.length !== this.lastSelectedTiles.length) return false;
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      const previous = this.lastSelectedTiles[i];
+      if (Math.abs(tile.morphFactor - previous.morphFactor) > CAMERA_SELECTION_MORPH_EPSILON) {
+        return false;
+      }
+      if (Number(tile.edgeMorphMask ?? 0) !== Number(this.lastSelectedTileEdgeMorphMasks[i] ?? 0)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private matchesLastSelectionProjection(camera: THREE.Camera): boolean {
+    const previous = this.lastSelectionProjectionMatrix.elements;
+    const current = camera.projectionMatrix.elements;
+    for (let i = 0; i < 16; i++) {
+      if (Math.abs(previous[i] - current[i]) > CAMERA_SELECTION_PROJECTION_EPSILON) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private buildSyncResult(
+    didSync: boolean,
+    reason: TerrainRenderSelectionSyncResult['reason'],
+    positionDeltaMeters: number,
+    rotationDeltaRad: number,
+    diagnostics: Partial<Pick<
+      TerrainRenderSelectionSyncResult,
+      'selectionRechecked' | 'poseWasStale' | 'projectionChanged'
+    >> = {},
+  ): TerrainRenderSelectionSyncResult {
+    return {
+      didSync,
+      reason,
+      selectionRechecked: Boolean(diagnostics.selectionRechecked),
+      poseWasStale: Boolean(diagnostics.poseWasStale),
+      projectionChanged: Boolean(diagnostics.projectionChanged),
+      positionDeltaMeters: Number.isFinite(positionDeltaMeters) ? positionDeltaMeters : 0,
+      rotationDeltaDeg: Number.isFinite(rotationDeltaRad)
+        ? THREE.MathUtils.radToDeg(rotationDeltaRad)
+        : 0,
+      tileCount: this.lastSelectedTiles.length,
+      tileSelectionSaturated: this.lastTileSelectionSaturated,
+    };
   }
 }

@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FrameTimingTracker } from './FrameTimingTracker'
+import { BoundedRingBuffer } from '../../core/BoundedRingBuffer'
 
 function runBracketedFrame(tracker: FrameTimingTracker, work?: () => void): void {
   tracker.beginFrame()
   if (work) work()
   tracker.endFrame()
 }
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('FrameTimingTracker.getSystemBreakdown', () => {
   it('includes buckets that begin and end inside a frame bracket', () => {
@@ -22,6 +27,23 @@ describe('FrameTimingTracker.getSystemBreakdown', () => {
     const breakdown = tracker.getSystemBreakdown()
     const names = breakdown.map(entry => entry.name)
     expect(names).toContain('Combat')
+  })
+
+  it('finalizes frame system timings without allocating Object.entries()', () => {
+    const tracker = new FrameTimingTracker()
+    const entriesSpy = vi.spyOn(Object, 'entries')
+
+    try {
+      runBracketedFrame(tracker, () => {
+        tracker.beginSystem('Combat')
+        tracker.endSystem('Combat')
+      })
+
+      expect(entriesSpy).not.toHaveBeenCalled()
+      expect(tracker.getSystemBreakdown().map(entry => entry.name)).toContain('Combat')
+    } finally {
+      entriesSpy.mockRestore()
+    }
   })
 
   it('surfaces RenderMain and RenderOverlay when they bracket outside an active frame', () => {
@@ -75,5 +97,97 @@ describe('FrameTimingTracker.getSystemBreakdown', () => {
     tracker.reset()
 
     expect(tracker.getSystemBreakdown()).toEqual([])
+  })
+
+  it('returns top last-frame timings without sorting the full breakdown', () => {
+    const tracker = new FrameTimingTracker()
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const sortSpy = vi.spyOn(Array.prototype, 'sort')
+
+    const recordSystem = (name: string, durationMs: number): void => {
+      tracker.beginSystem(name)
+      now += durationMs
+      tracker.endSystem(name)
+      now += 1
+    }
+
+    try {
+      recordSystem('AI', 4)
+      recordSystem('Render', 7)
+      recordSystem('Audio', 2)
+      recordSystem('Terrain', 5)
+
+      const top = tracker.getTopSystemBreakdownByLast(2)
+
+      expect(sortSpy).not.toHaveBeenCalled()
+      expect(top.map(entry => entry.name)).toEqual(['Render', 'Terrain'])
+    } finally {
+      sortSpy.mockRestore()
+    }
+  })
+})
+
+describe('FrameTimingTracker frame history', () => {
+  it('bases aggregate frame metrics on the latest 120 frames', () => {
+    const tracker = new FrameTimingTracker()
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const filterSpy = vi.spyOn(Array.prototype, 'filter')
+    const reduceSpy = vi.spyOn(Array.prototype, 'reduce')
+    const snapshotSpy = vi.spyOn(BoundedRingBuffer.prototype, 'snapshotLatest')
+
+    const recordFrame = (durationMs: number): void => {
+      tracker.beginFrame()
+      now += durationMs
+      tracker.endFrame()
+      now += 1
+    }
+
+    recordFrame(24)
+    for (let index = 0; index < 120; index++) {
+      recordFrame(1)
+    }
+
+    try {
+      expect(tracker.getAvgFrameTime()).toBeCloseTo(1, 5)
+      expect(tracker.getOverBudgetPercent()).toBe(0)
+      expect(reduceSpy).not.toHaveBeenCalled()
+      expect(filterSpy).not.toHaveBeenCalled()
+      expect(snapshotSpy).not.toHaveBeenCalled()
+    } finally {
+      snapshotSpy.mockRestore()
+      reduceSpy.mockRestore()
+      filterSpy.mockRestore()
+    }
+  })
+
+  it('counts over-budget frames without allocating a filtered frame array', () => {
+    const tracker = new FrameTimingTracker()
+    let now = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => now)
+    const filterSpy = vi.spyOn(Array.prototype, 'filter')
+    const snapshotSpy = vi.spyOn(BoundedRingBuffer.prototype, 'snapshotLatest')
+
+    const recordFrame = (durationMs: number): void => {
+      tracker.beginFrame()
+      now += durationMs
+      tracker.endFrame()
+      now += 1
+    }
+
+    recordFrame(10)
+    recordFrame(20)
+    recordFrame(40)
+    recordFrame(12)
+
+    try {
+      expect(tracker.getOverBudgetPercent()).toBe(50)
+      expect(filterSpy).not.toHaveBeenCalled()
+      expect(snapshotSpy).not.toHaveBeenCalled()
+    } finally {
+      snapshotSpy.mockRestore()
+      filterSpy.mockRestore()
+    }
   })
 })

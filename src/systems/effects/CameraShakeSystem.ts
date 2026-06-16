@@ -11,6 +11,12 @@ interface ShakeState {
   duration: number;
   elapsed: number;
   frequency: number; // Shake frequency in Hz
+  maxAngleRad: number;
+}
+
+export interface CameraShakeOffset {
+  pitch: number;
+  yaw: number;
 }
 
 // ── Shake parameters ──
@@ -46,9 +52,12 @@ const RECOIL_FREQUENCY = 25;
 // Envelope
 const SHAKE_FADE_FRACTION = 0.3;
 const SHAKE_MAX_ANGLE_PER_UNIT = 0.6; // degrees
+const SHAKE_MAX_ANGLE_PER_UNIT_RAD = SHAKE_MAX_ANGLE_PER_UNIT * Math.PI / 180;
+const SHAKE_STATE_POOL_LIMIT = 64;
 
 export class CameraShakeSystem implements GameSystem {
   private activeShakes: ShakeState[] = [];
+  private readonly recycledShakes: ShakeState[] = [];
   private noiseOffset: number = 0;
   private readonly MAX_INTENSITY = MAX_INTENSITY;
   private readonly DEFAULT_FREQUENCY = DEFAULT_FREQUENCY;
@@ -71,6 +80,10 @@ export class CameraShakeSystem implements GameSystem {
   }
 
   update(deltaTime: number): void {
+    if (this.activeShakes.length === 0) {
+      return;
+    }
+
     this.noiseOffset += deltaTime * NOISE_TIME_SCALE;
 
     // Update and remove expired shakes
@@ -79,11 +92,7 @@ export class CameraShakeSystem implements GameSystem {
       shake.elapsed += deltaTime;
 
       if (shake.elapsed >= shake.duration) {
-        const last = this.activeShakes.length - 1;
-        if (i !== last) {
-          this.activeShakes[i] = this.activeShakes[last];
-        }
-        this.activeShakes.pop();
+        this.releaseShakeAt(i);
       }
     }
   }
@@ -95,7 +104,9 @@ export class CameraShakeSystem implements GameSystem {
   dispose(): void {
     for (const unsub of this.eventUnsubscribes) unsub();
     this.eventUnsubscribes.length = 0;
-    this.activeShakes = [];
+    while (this.activeShakes.length > 0) {
+      this.releaseShakeAt(this.activeShakes.length - 1);
+    }
   }
 
   /**
@@ -105,12 +116,35 @@ export class CameraShakeSystem implements GameSystem {
    * @param frequency Shake frequency in Hz (optional, default 20Hz)
    */
   shake(intensity: number, duration: number, frequency?: number): void {
-    this.activeShakes.push({
-      intensity: Math.min(intensity, this.MAX_INTENSITY),
-      duration,
+    this.activeShakes.push(this.checkoutShake(intensity, duration, frequency));
+  }
+
+  private checkoutShake(intensity: number, duration: number, frequency?: number): ShakeState {
+    const shake = this.recycledShakes.pop() ?? {
+      intensity: 0,
+      duration: 0,
       elapsed: 0,
-      frequency: frequency || this.DEFAULT_FREQUENCY
-    });
+      frequency: this.DEFAULT_FREQUENCY,
+      maxAngleRad: 0,
+    };
+    shake.intensity = Math.min(intensity, this.MAX_INTENSITY);
+    shake.duration = duration;
+    shake.elapsed = 0;
+    shake.frequency = frequency || this.DEFAULT_FREQUENCY;
+    shake.maxAngleRad = shake.intensity * SHAKE_MAX_ANGLE_PER_UNIT_RAD;
+    return shake;
+  }
+
+  private releaseShakeAt(index: number): void {
+    const shake = this.activeShakes[index];
+    const last = this.activeShakes.length - 1;
+    if (index !== last) {
+      this.activeShakes[index] = this.activeShakes[last];
+    }
+    this.activeShakes.pop();
+    if (this.recycledShakes.length < SHAKE_STATE_POOL_LIMIT) {
+      this.recycledShakes.push(shake);
+    }
   }
 
   /**
@@ -120,9 +154,12 @@ export class CameraShakeSystem implements GameSystem {
    * @param maxRadius Maximum damage radius
    */
   shakeFromExplosion(explosionPos: THREE.Vector3, playerPos: THREE.Vector3, maxRadius: number): void {
-    const distance = explosionPos.distanceTo(playerPos);
-
     const effectiveRadius = maxRadius * EXPLOSION_SHAKE_RADIUS_MULT;
+    const effectiveRadiusSq = effectiveRadius * effectiveRadius;
+    const distanceSq = explosionPos.distanceToSquared(playerPos);
+    if (distanceSq > effectiveRadiusSq) return;
+
+    const distance = Math.sqrt(distanceSq);
     if (distance > effectiveRadius) return;
 
     const falloff = Math.max(0, 1 - (distance / effectiveRadius));
@@ -149,7 +186,10 @@ export class CameraShakeSystem implements GameSystem {
    * @param playerPos Player camera position
    */
   shakeFromNearbyDeath(deathPos: THREE.Vector3, playerPos: THREE.Vector3): void {
-    const distance = deathPos.distanceTo(playerPos);
+    const distanceSq = deathPos.distanceToSquared(playerPos);
+    if (distanceSq > DEATH_SHAKE_MAX_DISTANCE * DEATH_SHAKE_MAX_DISTANCE) return;
+
+    const distance = Math.sqrt(distanceSq);
     if (distance > DEATH_SHAKE_MAX_DISTANCE) return;
 
     const falloff = Math.max(0, 1 - (distance / DEATH_SHAKE_MAX_DISTANCE));
@@ -169,9 +209,11 @@ export class CameraShakeSystem implements GameSystem {
    * Get current camera shake offset to apply to camera rotation
    * Returns offset in radians for pitch and yaw
    */
-  getCurrentShakeOffset(): { pitch: number; yaw: number } {
+  getCurrentShakeOffset(target: CameraShakeOffset = { pitch: 0, yaw: 0 }): CameraShakeOffset {
     if (this.activeShakes.length === 0) {
-      return { pitch: 0, yaw: 0 };
+      target.pitch = 0;
+      target.yaw = 0;
+      return target;
     }
 
     let totalPitch = 0;
@@ -197,12 +239,13 @@ export class CameraShakeSystem implements GameSystem {
       const noiseY = (Math.sin(timePhase * 1.3 + 50) + Math.sin(timePhase * 2.1 + 150) * 0.5) / 1.5;
 
       // Apply intensity and envelope
-      const maxAngleRad = THREE.MathUtils.degToRad(shake.intensity * SHAKE_MAX_ANGLE_PER_UNIT);
-      totalYaw += noiseX * maxAngleRad * envelope;
-      totalPitch += noiseY * maxAngleRad * envelope;
+      totalYaw += noiseX * shake.maxAngleRad * envelope;
+      totalPitch += noiseY * shake.maxAngleRad * envelope;
     }
 
-    return { pitch: totalPitch, yaw: totalYaw };
+    target.pitch = totalPitch;
+    target.yaw = totalYaw;
+    return target;
   }
 
   /**

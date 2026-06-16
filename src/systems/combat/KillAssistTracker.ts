@@ -7,18 +7,12 @@ import { Logger } from '../../utils/Logger';
 const ASSIST_WINDOW_MS = 10000;
 const MAX_ENTRIES = 10;
 
+type DamageHistory = NonNullable<Combatant['damageHistory']>;
+
 export class KillAssistTracker {
   static trackDamage(target: Combatant, attackerId: string, damage: number): void {
     if (!target.damageHistory) target.damageHistory = [];
-    target.damageHistory.push({
-      attackerId,
-      damage,
-      timestamp: performance.now()
-    });
-
-    if (target.damageHistory.length > MAX_ENTRIES) {
-      target.damageHistory.shift();
-    }
+    this.appendDamageHistory(target.damageHistory, attackerId, damage, performance.now());
   }
 
   static processKillAssists(victim: Combatant, killerId?: string): Set<string> {
@@ -35,5 +29,34 @@ export class KillAssistTracker {
 
     victim.damageHistory = [];
     return uniqueAssisters;
+  }
+
+  private static appendDamageHistory(
+    history: DamageHistory,
+    attackerId: string,
+    damage: number,
+    timestamp: number,
+  ): void {
+    if (history.length < MAX_ENTRIES) {
+      history.push({
+        attackerId,
+        damage,
+        timestamp,
+      });
+      return;
+    }
+
+    for (let index = 1; index < history.length; index++) {
+      const source = history[index];
+      const target = history[index - 1];
+      target.attackerId = source.attackerId;
+      target.damage = source.damage;
+      target.timestamp = source.timestamp;
+    }
+
+    const target = history[history.length - 1];
+    target.attackerId = attackerId;
+    target.damage = damage;
+    target.timestamp = timestamp;
   }
 }

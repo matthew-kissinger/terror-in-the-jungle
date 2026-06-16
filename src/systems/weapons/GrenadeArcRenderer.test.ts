@@ -454,15 +454,15 @@ describe('GrenadeArcRenderer', () => {
     expect(distance).toBeCloseTo(0);
   });
 
-  it('releases object pool vectors after arc update', () => {
+  it('updates the arc without borrowing object pool vectors', () => {
     const renderer = new GrenadeArcRenderer(scene, 10, 5);
     const getSpy = vi.spyOn(objectPool, 'getVector3');
     const releaseSpy = vi.spyOn(objectPool, 'releaseVector3');
 
     renderer.updateArc(camera, 1, -10, 10, 10, () => 0);
 
-    expect(getSpy).toHaveBeenCalledTimes(9);
-    expect(releaseSpy).toHaveBeenCalledTimes(9);
+    expect(getSpy).not.toHaveBeenCalled();
+    expect(releaseSpy).not.toHaveBeenCalled();
   });
 
   it('disposes geometries, materials, and removes meshes from scene', () => {

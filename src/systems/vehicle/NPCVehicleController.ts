@@ -14,6 +14,13 @@ const DISMOUNT_DELAY = 0.5; // seconds of dismount animation
 // Scratch vector
 const _diff = new THREE.Vector3();
 
+function removeOrderAt<T>(orders: T[], index: number): void {
+  for (let i = index + 1; i < orders.length; i++) {
+    orders[i - 1] = orders[i];
+  }
+  orders.length -= 1;
+}
+
 interface BoardingOrder {
   combatantId: string;
   vehicleId: string;
@@ -165,7 +172,7 @@ export class NPCVehicleController {
 
       const combatant = this.getCombatant(order.combatantId);
       if (!combatant || combatant.state === CombatantState.DEAD) {
-        this.boardingOrders.splice(i, 1);
+        removeOrderAt(this.boardingOrders, i);
         continue;
       }
 
@@ -174,7 +181,7 @@ export class NPCVehicleController {
         // Vehicle gone or the requested seat-role was claimed by another
         // unit while this NPC was en route - cancel boarding.
         combatant.state = CombatantState.PATROLLING;
-        this.boardingOrders.splice(i, 1);
+        removeOrderAt(this.boardingOrders, i);
         continue;
       }
 
@@ -195,11 +202,11 @@ export class NPCVehicleController {
         } else {
           combatant.state = CombatantState.PATROLLING;
         }
-        this.boardingOrders.splice(i, 1);
+        removeOrderAt(this.boardingOrders, i);
       } else if (order.elapsed > 30) {
         // Timeout - cancel
         combatant.state = CombatantState.PATROLLING;
-        this.boardingOrders.splice(i, 1);
+        removeOrderAt(this.boardingOrders, i);
       }
       // Otherwise NPC keeps moving toward vehicle via normal movement system
     }
@@ -219,7 +226,7 @@ export class NPCVehicleController {
           combatant.vehicleSeatIndex = undefined;
           Logger.debug('vehicle', `NPC ${order.combatantId} dismounted at (${order.exitPosition.x.toFixed(0)}, ${order.exitPosition.z.toFixed(0)})`);
         }
-        this.dismountOrders.splice(i, 1);
+        removeOrderAt(this.dismountOrders, i);
       }
     }
   }

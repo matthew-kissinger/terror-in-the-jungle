@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { createRequire } from 'node:module';
 import {
   engageStrafeIntent,
   horizontalDistance,
@@ -17,8 +18,10 @@ import {
   BotTarget,
   BotVec3,
   DEFAULT_PLAYER_BOT_CONFIG,
+  PlayerBotConfig,
   PlayerBotState,
   PlayerBotStateContext,
+  PlayerBotStateStep,
 } from './types';
 import { NPC_PIXEL_FORGE_VISUAL_HEIGHT, NPC_Y_OFFSET } from '../../../config/CombatantConfig';
 import {
@@ -32,6 +35,15 @@ const TARGET_VISUAL_CHEST_Y_OFFSET =
   * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
   * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
   - NPC_Y_OFFSET;
+
+type CjsPerfDriverMirror = {
+  profileForMode: (mode: string) => unknown;
+  botConfigForProfile: (profile: unknown) => PlayerBotConfig;
+  stepBotState: (state: PlayerBotState, ctx: PlayerBotStateContext) => PlayerBotStateStep;
+};
+
+const require = createRequire(import.meta.url);
+const cjsPerfDriver = require('../../../../scripts/perf-active-driver.cjs') as CjsPerfDriverMirror;
 
 function makeCtx(overrides: Partial<PlayerBotStateContext> = {}): PlayerBotStateContext {
   const defaults: PlayerBotStateContext = {
@@ -68,6 +80,97 @@ function makeTarget(overrides: Partial<BotTarget> = {}): BotTarget {
   };
 }
 
+describe('states — CJS perf-driver mirror parity', () => {
+  it('keeps shared PlayerBot state outputs aligned with the injected perf driver', () => {
+    const config = cjsPerfDriver.botConfigForProfile(cjsPerfDriver.profileForMode('a_shau_valley'));
+    const visibleTarget = makeTarget({
+      id: 'visible',
+      position: { x: 12, y: 1.5, z: -52 },
+      aimPosition: { x: 12.25, y: 1.6, z: -52.5 },
+      lastKnownMs: 950,
+    });
+    const occludedTarget = makeTarget({
+      id: 'occluded',
+      position: { x: -18, y: 0.5, z: -92 },
+      lastKnownMs: 900,
+    });
+    const objective = { position: { x: 140, y: 0, z: -30 }, priority: 1 };
+
+    const cases: Array<{
+      label: string;
+      state: PlayerBotState;
+      ctx: Partial<PlayerBotStateContext>;
+    }> = [
+      {
+        label: 'PATROL interrupts objective travel for a visible combat target',
+        state: 'PATROL',
+        ctx: {
+          config,
+          findNearestEnemy: () => visibleTarget,
+          getObjective: () => objective,
+          canSeeTarget: () => true,
+        },
+      },
+      {
+        label: 'ALERT advances toward an occluded target',
+        state: 'ALERT',
+        ctx: {
+          config,
+          currentTarget: occludedTarget,
+          canSeeTarget: () => false,
+        },
+      },
+      {
+        label: 'ENGAGE fires while visible and in range',
+        state: 'ENGAGE',
+        ctx: {
+          config,
+          currentTarget: visibleTarget,
+          magazine: { current: 14, max: 30 },
+          timeInStateMs: 900,
+          canSeeTarget: () => true,
+        },
+      },
+      {
+        label: 'ENGAGE holds through brief LOS flicker',
+        state: 'ENGAGE',
+        ctx: {
+          config,
+          currentTarget: visibleTarget,
+          timeInStateMs: 250,
+          canSeeTarget: () => false,
+        },
+      },
+      {
+        label: 'ADVANCE reacquires ENGAGE after the dwell expires',
+        state: 'ADVANCE',
+        ctx: {
+          config,
+          currentTarget: visibleTarget,
+          timeInStateMs: 900,
+          canSeeTarget: () => true,
+        },
+      },
+      {
+        label: 'RESPAWN_WAIT returns to patrol after respawn',
+        state: 'RESPAWN_WAIT',
+        ctx: {
+          config,
+          health: 100,
+        },
+      },
+    ];
+
+    for (const testCase of cases) {
+      const ctx = makeCtx(testCase.ctx);
+      const tsStep = stepState(testCase.state, ctx);
+      const cjsStep = cjsPerfDriver.stepBotState(testCase.state, ctx);
+
+      expect(cjsStep, testCase.label).toEqual(tsStep);
+    }
+  });
+});
+
 describe('states — PATROL', () => {
   it('stays in PATROL when there are no enemies', () => {
     const step = stepState('PATROL', makeCtx());
@@ -96,6 +199,20 @@ describe('states — PATROL', () => {
     const step = stepState('PATROL', makeCtx({
       findNearestEnemy: () => makeTarget({ position: { x: 0, y: 0, z: -30 } }),
       getObjective: () => ({ position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+    }));
+
+    expect(step.nextState).toBe('ALERT');
+  });
+
+  it('breaks off objective travel for a visible target inside weapon range', () => {
+    const step = stepState('PATROL', makeCtx({
+      findNearestEnemy: () => makeTarget({ position: { x: 0, y: 0, z: -220 } }),
+      getObjective: () => ({ position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+      config: {
+        ...DEFAULT_PLAYER_BOT_CONFIG,
+        targetAcquisitionDistance: 185,
+        maxFireDistance: 245,
+      },
     }));
 
     expect(step.nextState).toBe('ALERT');

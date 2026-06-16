@@ -191,6 +191,46 @@ describe('GrenadeSystem', () => {
       expect((grenadeSystem as any).grenades.length).toBe(1);
     });
 
+    it('throws from the camera-forward offset without cloning the camera position', () => {
+      camera.position.set(2, 10, -3);
+      camera.lookAt(2, 9, -2);
+      camera.updateMatrixWorld(true);
+      const positionCloneSpy = vi.spyOn(camera.position, 'clone');
+      const expectedDirection = new THREE.Vector3();
+      camera.getWorldDirection(expectedDirection);
+      const expectedStart = new THREE.Vector3().copy(camera.position).addScaledVector(expectedDirection, 0.5);
+      expectedStart.y -= 0.3;
+      const throwPower = 0.3;
+      const baseThrowAngle = 0.25 + (0.15 * throwPower);
+      const throwForce = 18 + (70 - 18) * throwPower;
+      const expectedForward = new THREE.Vector3().copy(expectedDirection);
+      expectedForward.y = 0;
+      expectedForward.normalize();
+      const expectedVelocity = new THREE.Vector3(
+        expectedForward.x * Math.cos(baseThrowAngle),
+        Math.sin(baseThrowAngle),
+        expectedForward.z * Math.cos(baseThrowAngle)
+      ).multiplyScalar(throwForce);
+      expectedVelocity.y += Math.max(0, expectedDirection.y * 3) * throwPower;
+
+      try {
+        grenadeSystem.startAiming();
+        const success = grenadeSystem.throwGrenade();
+
+        expect(success).toBe(true);
+        expect(positionCloneSpy).not.toHaveBeenCalled();
+        const grenade = (grenadeSystem as any).grenades[0];
+        expect(grenade.position.x).toBeCloseTo(expectedStart.x);
+        expect(grenade.position.y).toBeCloseTo(expectedStart.y);
+        expect(grenade.position.z).toBeCloseTo(expectedStart.z);
+        expect(grenade.velocity.x).toBeCloseTo(expectedVelocity.x);
+        expect(grenade.velocity.y).toBeCloseTo(expectedVelocity.y);
+        expect(grenade.velocity.z).toBeCloseTo(expectedVelocity.z);
+      } finally {
+        positionCloneSpy.mockRestore();
+      }
+    });
+
     it('should not throw if not aiming', () => {
       const success = grenadeSystem.throwGrenade();
       expect(success).toBe(false);
@@ -306,8 +346,11 @@ describe('GrenadeSystem', () => {
   describe('Utility methods', () => {
     it('should show/hide grenade in hand', () => {
       // This mainly tests that it doesn't crash as it calls sub-component
+      expect(grenadeSystem.canRenderOverlay()).toBe(false);
       grenadeSystem.showGrenadeInHand(true);
+      expect(grenadeSystem.canRenderOverlay()).toBe(true);
       grenadeSystem.showGrenadeInHand(false);
+      expect(grenadeSystem.canRenderOverlay()).toBe(false);
     });
 
     it('should return overlay scene and camera', () => {

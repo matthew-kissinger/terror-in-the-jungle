@@ -41,6 +41,7 @@ export class CombatantSpawnManager {
   private readonly MAX_ENQUEUED_SPAWNS = 24;
   private progressiveSpawnTimer = 0;
   private progressiveSpawnQueue: Array<{faction: Faction, position: THREE.Vector3, size: number}> = [];
+  private progressiveSpawnQueueHead = 0;
   private reinforcementWaveTimer = 0;
   private reinforcementWaveIntervalSeconds = 15;
   private lastSpawnCheck = 0;
@@ -238,12 +239,12 @@ export class CombatantSpawnManager {
     // Seed progressive queue. Open Frontier gets an explicit pressure corridor so
     // first contact happens earlier in large maps instead of both sides idling at HQ.
     if (this.combatants.size < this.MAX_COMBATANTS) {
-      this.progressiveSpawnQueue = this.buildInitialProgressiveQueue(
+      this.resetProgressiveSpawnQueue(this.buildInitialProgressiveQueue(
         config,
         usBasePos,
         opforBasePos,
         avgSquadSize
-      );
+      ));
     }
 
     Logger.info('Combat', `Initial forces deployed: ${this.combatants.size} combatants`);
@@ -264,7 +265,7 @@ export class CombatantSpawnManager {
     Logger.info('Combat', 'Reseed forces for new game mode configuration...');
     this.combatants.clear();
     spatialGridManager.clear();
-    this.progressiveSpawnQueue = [];
+    this.resetProgressiveSpawnQueue();
     this.progressiveSpawnTimer = 0;
     this.reinforcementWaveTimer = 0;
     return this.spawnInitialForces(shouldCreatePlayerSquad, playerSquadId);
@@ -283,13 +284,14 @@ export class CombatantSpawnManager {
     }
 
     // Progressive spawning (short early trickle)
-    if (this.progressiveSpawnQueue.length > 0) {
+    if (this.getQueuedSpawnCount() > 0) {
       this.progressiveSpawnTimer += deltaTime * 1000;
       if (this.progressiveSpawnTimer >= this.PROGRESSIVE_SPAWN_DELAY) {
         this.progressiveSpawnTimer = 0;
-        const spawn = this.progressiveSpawnQueue.shift()!;
+        const spawn = this.progressiveSpawnQueue[this.progressiveSpawnQueueHead++];
+        this.compactProgressiveSpawnQueueIfNeeded();
         this.spawnSquad(spawn.faction, spawn.position, spawn.size);
-        Logger.debug('combat', `Reinforcements deployed: ${spawn.faction} squad size ${spawn.size} (queued=${this.progressiveSpawnQueue.length})`);
+        Logger.debug('combat', `Reinforcements deployed: ${spawn.faction} squad size ${spawn.size} (queued=${this.getQueuedSpawnCount()})`);
       }
     }
 
@@ -512,7 +514,7 @@ export class CombatantSpawnManager {
   }
 
   private enqueueSpawn(faction: Faction, position: THREE.Vector3, size: number): void {
-    if (this.progressiveSpawnQueue.length >= this.MAX_ENQUEUED_SPAWNS) {
+    if (this.getQueuedSpawnCount() >= this.MAX_ENQUEUED_SPAWNS) {
       return;
     }
     this.progressiveSpawnQueue.push({
@@ -569,10 +571,41 @@ export class CombatantSpawnManager {
   }
 
   resetRuntimeStateForExternalPopulation(): void {
-    this.progressiveSpawnQueue = [];
+    this.resetProgressiveSpawnQueue();
     this.progressiveSpawnTimer = 0;
     this.reinforcementWaveTimer = 0;
     this.lastSpawnCheck = 0;
     this.respawnManager.clearPendingRespawns();
+  }
+
+  private getQueuedSpawnCount(): number {
+    return this.progressiveSpawnQueue.length - this.progressiveSpawnQueueHead;
+  }
+
+  private resetProgressiveSpawnQueue(
+    entries: Array<{faction: Faction, position: THREE.Vector3, size: number}> = []
+  ): void {
+    this.progressiveSpawnQueue = entries;
+    this.progressiveSpawnQueueHead = 0;
+  }
+
+  private compactProgressiveSpawnQueueIfNeeded(): void {
+    if (this.progressiveSpawnQueueHead === 0) {
+      return;
+    }
+    if (this.progressiveSpawnQueueHead >= this.progressiveSpawnQueue.length) {
+      this.resetProgressiveSpawnQueue();
+      return;
+    }
+    if (this.progressiveSpawnQueueHead < 8) {
+      return;
+    }
+    const consumed = this.progressiveSpawnQueueHead;
+    const remaining = this.progressiveSpawnQueue.length - consumed;
+    for (let i = 0; i < remaining; i++) {
+      this.progressiveSpawnQueue[i] = this.progressiveSpawnQueue[i + consumed];
+    }
+    this.progressiveSpawnQueue.length = remaining;
+    this.progressiveSpawnQueueHead = 0;
   }
 }

@@ -220,6 +220,38 @@ describe('AIFlankingSystem', () => {
       expect(result).toBe(false)
     })
 
+    it('should keep the exact 20m flanking boundary eligible', () => {
+      const squad = createMockSquad('squad-1', Faction.US, ['c1', 'c2', 'c3'], 'c1')
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0), CombatantState.ENGAGING, 'squad-1', 'leader')
+      const member1 = createMockCombatant('c2', Faction.US, new THREE.Vector3(2, 0, 0), CombatantState.ENGAGING, 'squad-1', 'follower')
+      const member2 = createMockCombatant('c3', Faction.US, new THREE.Vector3(-2, 0, 0), CombatantState.ENGAGING, 'squad-1', 'follower')
+
+      member1.lastHitTime = Date.now() - 2000
+      allCombatants.set('c1', leader)
+      allCombatants.set('c2', member1)
+      allCombatants.set('c3', member2)
+
+      const result = flankingSystem.shouldInitiateFlank(squad, allCombatants, new THREE.Vector3(20, 0, 0))
+
+      expect(result).toBe(true)
+    })
+
+    it('should keep the exact 80m flanking boundary eligible', () => {
+      const squad = createMockSquad('squad-1', Faction.US, ['c1', 'c2', 'c3'], 'c1')
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0), CombatantState.ENGAGING, 'squad-1', 'leader')
+      const member1 = createMockCombatant('c2', Faction.US, new THREE.Vector3(2, 0, 0), CombatantState.ENGAGING, 'squad-1', 'follower')
+      const member2 = createMockCombatant('c3', Faction.US, new THREE.Vector3(-2, 0, 0), CombatantState.ENGAGING, 'squad-1', 'follower')
+
+      member1.lastHitTime = Date.now() - 2000
+      allCombatants.set('c1', leader)
+      allCombatants.set('c2', member1)
+      allCombatants.set('c3', member2)
+
+      const result = flankingSystem.shouldInitiateFlank(squad, allCombatants, new THREE.Vector3(80, 0, 0))
+
+      expect(result).toBe(true)
+    })
+
     it('should return true when squad has recent damage', () => {
       const squad = createMockSquad('squad-1', Faction.US, ['c1', 'c2', 'c3'], 'c1')
       const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0), CombatantState.ENGAGING, 'squad-1', 'leader')

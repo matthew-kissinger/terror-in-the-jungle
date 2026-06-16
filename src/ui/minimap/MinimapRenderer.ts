@@ -5,15 +5,17 @@ import * as THREE from 'three';
 import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction, isBlufor } from '../../systems/combat/types';
+import { isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
-import { worldToPlayerCenteredMap, factionMarkerFill } from '../map/MapProjection';
+import { worldToPlayerCenteredMapInto, factionMarkerFill } from '../map/MapProjection';
+import type { VehicleMarker } from '../map/VehicleMarkers';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
 const _flowPoint = new THREE.Vector3();
+const _minimapPoint: MinimapPosition = { x: 0, y: 0 };
 
 import { icon as iconUrl } from '../icons/IconRegistry';
 
@@ -36,17 +38,12 @@ export type HelipadMarker = {
 /**
  * Minimap marker for a drivable / boardable vehicle or stationary
  * emplacement. Sibling of `HelipadMarker`. Populated per-frame by
- * `MinimapSystem` from `VehicleManager.getVehiclesByCategory(...)` so
- * positions follow moving vehicles. Shared with `FullMapSystem` (which
- * imports this type from `MinimapRenderer`) so the minimap and full map
- * agree on category + faction coding.
+ * `MinimapSystem` from the vehicle-marker source so positions follow moving
+ * vehicles. Shared with `FullMapSystem` (which imports this type from
+ * `MinimapRenderer`) so the minimap and full map agree on category + faction
+ * coding.
  */
-export type VehicleMarker = {
-  worldPos: THREE.Vector3;
-  category: 'ground' | 'watercraft' | 'emplacement';
-  faction: Faction;
-  vehicleType: string;
-};
+export type { VehicleMarker } from '../map/VehicleMarkers';
 
 type MinimapRenderState = {
   ctx: CanvasRenderingContext2D;
@@ -136,7 +133,9 @@ function drawTerrainFlowPaths(
 
     for (const point of path.points) {
       _flowPoint.set(point.x, 0, point.z);
-      const { x, y } = worldToMinimap(_flowPoint, state, scale);
+      const pointOnMap = worldToMinimap(_flowPoint, state, scale);
+      const x = pointOnMap.x;
+      const y = pointOnMap.y;
       if (!started) {
         ctx.beginPath();
         ctx.moveTo(x, y);
@@ -156,7 +155,9 @@ function drawTerrainFlowPaths(
 
 function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: MinimapRenderState, renderScale: number): void {
   const scale = state.size / state.worldSize;
-  const { x, y } = worldToMinimap(zone.position, state, scale);
+  const pointOnMap = worldToMinimap(zone.position, state, scale);
+  const x = pointOnMap.x;
+  const y = pointOnMap.y;
 
   if (x < -20 * renderScale || x > state.size + 20 * renderScale || y < -20 * renderScale || y > state.size + 20 * renderScale) return;
 
@@ -241,7 +242,9 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
       if ((dx * dx + dz * dz) > tacticalRangeSq) return;
     }
 
-    const { x, y } = worldToMinimap(combatant.position, state, scale);
+    const pointOnMap = worldToMinimap(combatant.position, state, scale);
+    const x = pointOnMap.x;
+    const y = pointOnMap.y;
 
     if (x < 0 || x > state.size || y < 0 || y > state.size) return;
 
@@ -295,7 +298,8 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
     if (tier === 0) continue;
 
     // World to minimap (player-centered + rotated, same as worldToMinimap)
-    const { x: mx, y: my } = worldToPlayerCenteredMap(
+    const pointOnMap = worldToPlayerCenteredMapInto(
+      _minimapPoint,
       ax,
       az,
       state.playerPosition.x,
@@ -304,6 +308,8 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
       state.size,
       scale,
     );
+    const mx = pointOnMap.x;
+    const my = pointOnMap.y;
 
     if (mx < 0 || mx > state.size || my < 0 || my > state.size) continue;
 
@@ -385,7 +391,9 @@ function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderSt
   if (!state.commandPosition) return;
 
   const scale = state.size / state.worldSize;
-  const { x, y } = worldToMinimap(state.commandPosition, state, scale);
+  const pointOnMap = worldToMinimap(state.commandPosition, state, scale);
+  const x = pointOnMap.x;
+  const y = pointOnMap.y;
 
   if (x < 0 || x > state.size || y < 0 || y > state.size) return;
 
@@ -423,7 +431,9 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
   const iconSize = 8 * renderScale;
 
   for (const marker of state.helipadMarkers) {
-    const { x, y } = worldToMinimap(marker.position, state, scale);
+    const pointOnMap = worldToMinimap(marker.position, state, scale);
+    const x = pointOnMap.x;
+    const y = pointOnMap.y;
     if (x < -iconSize || x > state.size + iconSize || y < -iconSize || y > state.size + iconSize) continue;
 
     // Circle background
@@ -529,7 +539,9 @@ function drawVehicleMarkers(
   ctx.lineWidth = 1.25 * renderScale;
 
   for (const marker of state.vehicleMarkers) {
-    const { x, y } = worldToMinimap(marker.worldPos, state, scale);
+    const pointOnMap = worldToMinimap(marker.worldPos, state, scale);
+    const x = pointOnMap.x;
+    const y = pointOnMap.y;
     if (x < -baseRadius || x > state.size + baseRadius || y < -baseRadius || y > state.size + baseRadius) continue;
 
     // Faction palette: matches the combatant-dot palette so player can
@@ -548,7 +560,8 @@ function worldToMinimap(
   state: MinimapRenderState,
   scale: number
 ): MinimapPosition {
-  return worldToPlayerCenteredMap(
+  return worldToPlayerCenteredMapInto(
+    _minimapPoint,
     worldPosition.x,
     worldPosition.z,
     state.playerPosition.x,

@@ -60,8 +60,14 @@ export interface ShotResult {
  * Factory for creating shot commands
  */
 export class ShotCommandFactory {
+  private static readonly placeholderRay = new THREE.Ray()
+  private static readonly placeholderDamage = () => 0
   private static rayPool: THREE.Ray[] = []
   private static rayPoolIndex = 0
+  private static pelletRayArrayPool: THREE.Ray[][] = []
+  private static pelletRayArrayPoolIndex = 0
+  private static commandPool: ShotCommand[] = []
+  private static commandPoolIndex = 0
 
   /**
    * Get a ray from the pool (reused to avoid allocations)
@@ -78,6 +84,40 @@ export class ShotCommandFactory {
    */
   static resetPool(): void {
     this.rayPoolIndex = 0
+    this.pelletRayArrayPoolIndex = 0
+    this.commandPoolIndex = 0
+  }
+
+  /**
+   * Get a pellet-ray array from the frame pool. Commands in the same frame get
+   * distinct arrays; later frames reuse the containers just like Ray objects.
+   */
+  private static getPelletRayArray(): THREE.Ray[] {
+    if (this.pelletRayArrayPoolIndex >= this.pelletRayArrayPool.length) {
+      this.pelletRayArrayPool.push([])
+    }
+    const pelletRays = this.pelletRayArrayPool[this.pelletRayArrayPoolIndex++]
+    pelletRays.length = 0
+    return pelletRays
+  }
+
+  /**
+   * Get a command container from the frame pool. Commands already carry pooled
+   * Ray instances, so the whole command has the same frame-scoped lifetime.
+   */
+  private static getCommand(): ShotCommand {
+    if (this.commandPoolIndex >= this.commandPool.length) {
+      this.commandPool.push({
+        ray: this.placeholderRay,
+        weaponType: 'rifle',
+        damage: this.placeholderDamage,
+        timestamp: 0,
+        isADS: false,
+      })
+    }
+    const command = this.commandPool[this.commandPoolIndex++]
+    command.pelletRays = undefined
+    return command
   }
 
   /**
@@ -94,13 +134,13 @@ export class ShotCommandFactory {
     ray.origin.copy(origin)
     ray.direction.copy(direction).normalize()
 
-    return {
-      ray,
-      weaponType,
-      damage,
-      timestamp: performance.now(),
-      isADS
-    }
+    const command = this.getCommand()
+    command.ray = ray
+    command.weaponType = weaponType
+    command.damage = damage
+    command.timestamp = performance.now()
+    command.isADS = isADS
+    return command
   }
 
   /**
@@ -117,20 +157,22 @@ export class ShotCommandFactory {
     ray.origin.copy(origin)
     ray.direction.copy(baseDirection).normalize()
 
-    const pelletRays: THREE.Ray[] = pelletDirections.map(dir => {
+    const pelletRays = this.getPelletRayArray()
+    for (let i = 0; i < pelletDirections.length; i++) {
+      const dir = pelletDirections[i]
       const pelletRay = this.getRay()
       pelletRay.origin.copy(origin)
       pelletRay.direction.copy(dir).normalize()
-      return pelletRay
-    })
-
-    return {
-      ray,
-      weaponType: 'shotgun',
-      damage,
-      pelletRays,
-      timestamp: performance.now(),
-      isADS
+      pelletRays.push(pelletRay)
     }
+
+    const command = this.getCommand()
+    command.ray = ray
+    command.weaponType = 'shotgun'
+    command.damage = damage
+    command.pelletRays = pelletRays
+    command.timestamp = performance.now()
+    command.isADS = isADS
+    return command
   }
 }

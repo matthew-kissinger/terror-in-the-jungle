@@ -79,6 +79,7 @@ export class ClusterManager {
     const force = outputVector || this.scratchVec1
     force.set(0, 0, 0)
     let nearbyCount = 0
+    const minSpacingSq = this.MIN_FRIENDLY_SPACING * this.MIN_FRIENDLY_SPACING
 
     // Use spatial grid to find only nearby combatants within spacing radius
     const nearbyIds = spatialGrid.queryRadius(combatant.position, this.MIN_FRIENDLY_SPACING)
@@ -93,15 +94,15 @@ export class ClusterManager {
 
       // Use distanceToSquared for comparison (faster than distanceTo)
       const distanceSq = combatant.position.distanceToSquared(other.position)
-      const minSpacingSq = this.MIN_FRIENDLY_SPACING * this.MIN_FRIENDLY_SPACING
 
       if (distanceSq < minSpacingSq && distanceSq > 0.01) {
         const distance = Math.sqrt(distanceSq)
+        const invDistance = 1 / distance
 
         // Calculate repulsion direction (away from other)
         this.scratchVec2
           .subVectors(combatant.position, other.position)
-          .normalize()
+          .multiplyScalar(invDistance)
 
         // Stronger force when closer
         const strength = (1 - distance / this.MIN_FRIENDLY_SPACING) * this.SPACING_FORCE_STRENGTH

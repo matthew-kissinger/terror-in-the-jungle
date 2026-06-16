@@ -10,6 +10,10 @@ const _toDestination = new THREE.Vector3()
 const _toTarget = new THREE.Vector3()
 const _toCover = new THREE.Vector3()
 const SEEKING_COVER_VISIBILITY_RECHECK_MS = 250
+const ADVANCE_DESTINATION_RADIUS_SQ = 3.0 * 3.0
+const ADVANCING_REACT_DISTANCE_SQ = 30 * 30
+const ADVANCING_VERY_CLOSE_RANGE_SQ = 15 * 15
+const SEEKING_COVER_ARRIVAL_RADIUS_SQ = 1.5 * 1.5
 
 interface SeekingCoverVisibilitySample {
   targetId: string
@@ -51,8 +55,8 @@ export class AIStateMovement {
       return;
     }
 
-    const distanceToDestination = combatant.position.distanceTo(combatant.destinationPoint);
-    if (distanceToDestination < 3.0) {
+    const distanceToDestinationSq = combatant.position.distanceToSquared(combatant.destinationPoint);
+    if (distanceToDestinationSq < ADVANCE_DESTINATION_RADIUS_SQ) {
       combatant.state = CombatantState.ENGAGING;
       combatant.destinationPoint = undefined;
       return;
@@ -64,12 +68,12 @@ export class AIStateMovement {
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy && this.isEnemyWithinCommandLeash(combatant, isPlayerTarget(enemy) ? playerPosition : enemy.position)) {
       const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
-      const distance = combatant.position.distanceTo(targetPos);
+      const distanceSq = combatant.position.distanceToSquared(targetPos);
 
       // At very close range, ALWAYS react - can't ignore enemy right next to you
-      const veryCloseRange = distance < 15;
+      const veryCloseRange = distanceSq < ADVANCING_VERY_CLOSE_RANGE_SQ;
 
-      if (distance < 30) {
+      if (distanceSq < ADVANCING_REACT_DISTANCE_SQ) {
         // Turn toward enemy before LOS check
         const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize();
         const savedRotation = combatant.rotation;
@@ -105,8 +109,8 @@ export class AIStateMovement {
       return;
     }
 
-    const distanceToCover = combatant.position.distanceTo(combatant.coverPosition);
-    if (distanceToCover < 1.5) {
+    const distanceToCoverSq = combatant.position.distanceToSquared(combatant.coverPosition);
+    if (distanceToCoverSq < SEEKING_COVER_ARRIVAL_RADIUS_SQ) {
       combatant.inCover = true;
       combatant.state = CombatantState.ENGAGING;
       Logger.info('combat-ai', ` ${combatant.faction} unit reached cover, switching to peek-and-fire`);

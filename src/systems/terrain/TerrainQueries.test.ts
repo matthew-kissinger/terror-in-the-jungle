@@ -138,7 +138,7 @@ describe('TerrainQueries', () => {
     expect(queries.getEffectiveHeightAt(0, 0)).toBe(10.75);
   });
 
-  it('recomputes dynamic collision bounds without treating them as effective ground', () => {
+  it('skips dynamic collision bounds for effective height but recomputes them for collision checks', () => {
     const obj = new THREE.Mesh(
       new THREE.BoxGeometry(4, 4, 4),
       new THREE.MeshBasicMaterial(),
@@ -147,13 +147,19 @@ describe('TerrainQueries', () => {
     obj.updateMatrixWorld(true);
 
     queries.registerCollisionObject('dynamic_box', obj, { dynamic: true });
+    const updateMatrixWorld = vi.spyOn(obj, 'updateMatrixWorld');
+
     expect(queries.getEffectiveHeightAt(0, 0)).toBe(10);
+    expect(updateMatrixWorld).not.toHaveBeenCalled();
 
     obj.position.set(0, 20, 0);
     obj.updateMatrixWorld(true);
+    updateMatrixWorld.mockClear();
 
     expect(queries.getEffectiveHeightAt(0, 0)).toBe(10);
+    expect(updateMatrixWorld).not.toHaveBeenCalled();
     expect(queries.checkObjectCollision(new THREE.Vector3(0, 20, 0), 0)).toBe(true);
+    expect(updateMatrixWorld).toHaveBeenCalled();
   });
 
   it('getLOSAccelerator returns the injected accelerator', () => {

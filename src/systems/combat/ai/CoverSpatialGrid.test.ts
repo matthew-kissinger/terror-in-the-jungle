@@ -231,6 +231,79 @@ describe('CoverSpatialGrid', () => {
     });
   });
 
+  describe('queryNearestWithLOS', () => {
+    it('returns null when terrainRuntime, grid, or inputs are degenerate', () => {
+      const terrain = mockTerrainRuntime();
+      grid.insert('a', new THREE.Vector3(5, 0, 0));
+
+      expect(grid.queryNearestWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(20, 0, 0), null)).toBeNull();
+      expect(grid.queryNearestWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(20, 0, 0), undefined)).toBeNull();
+      expect(grid.queryNearestWithLOS(new THREE.Vector3(Number.NaN, 0, 0), new THREE.Vector3(20, 0, 0), terrain)).toBeNull();
+      expect(grid.queryNearestWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(Number.POSITIVE_INFINITY, 0, 0), terrain)).toBeNull();
+      expect(grid.queryNearestWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(20, 0, 0), terrain, 0)).toBeNull();
+
+      const emptyGrid = new CoverSpatialGrid();
+      expect(emptyGrid.queryNearestWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(20, 0, 0), terrain)).toBeNull();
+    });
+
+    it('returns the nearest visible candidate when closer candidates are occluded', () => {
+      grid.insert('blocked-near', new THREE.Vector3(3, 0, 0));
+      grid.insert('visible-mid', new THREE.Vector3(10, 0, 0));
+      grid.insert('visible-far', new THREE.Vector3(25, 0, 0));
+      const terrain = mockTerrainRuntime({
+        raycastTerrain: (origin: THREE.Vector3) => {
+          if (Math.abs(origin.x - 3) < 0.001) return { hit: true, distance: 1 };
+          return { hit: false, distance: undefined };
+        },
+      });
+
+      const hit = grid.queryNearestWithLOS(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(100, 0, 0),
+        terrain,
+        50,
+      );
+
+      expect(hit?.coverId).toBe('visible-mid');
+      expect(hit?.distance).toBeCloseTo(10, 5);
+    });
+
+    it('uses lexicographic coverId as the equal-distance tiebreaker', () => {
+      grid.insert('zeta', new THREE.Vector3(3, 0, 4));
+      grid.insert('alpha', new THREE.Vector3(4, 0, 3));
+
+      const hit = grid.queryNearestWithLOS(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(20, 0, 0),
+        mockTerrainRuntime(),
+        10,
+      );
+
+      expect(hit?.coverId).toBe('alpha');
+    });
+
+    it('clones the winning cover position so callers cannot mutate the grid', () => {
+      grid.insert('cover-a', new THREE.Vector3(3, 0, 0));
+
+      const hit = grid.queryNearestWithLOS(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(20, 0, 0),
+        mockTerrainRuntime(),
+        10,
+      );
+      hit?.position.set(999, 999, 999);
+
+      const recheck = grid.queryNearestWithLOS(
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(20, 0, 0),
+        mockTerrainRuntime(),
+        10,
+      );
+      expect(recheck?.position.x).toBeCloseTo(3, 5);
+      expect(recheck?.position.z).toBeCloseTo(0, 5);
+    });
+  });
+
   describe('large-grid behavior', () => {
     it('keeps queries scoped to the cells overlapping the radius', () => {
       // 100 entries scattered across a 500x500 area. Verify the range

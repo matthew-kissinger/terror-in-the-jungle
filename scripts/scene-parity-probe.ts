@@ -50,6 +50,7 @@ interface MaterialProbe {
 
 interface TerrainLodSummary {
   tileCount: number;
+  tileSelectionSaturated: boolean | null;
   countsByLod: Record<string, number>;
   areaByLod: Record<string, number>;
   morphByLod: Record<string, { min: number; max: number; avg: number; count: number }>;
@@ -498,6 +499,9 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
         ? terrain.getActiveTilesForDebug()
         : null;
       if (!Array.isArray(tilesRaw)) return null;
+      const tileSelectionSaturated = typeof terrain?.wasLastTileSelectionSaturated === 'function'
+        ? Boolean(terrain.wasLastTileSelectionSaturated())
+        : null;
       const tiles = tilesRaw
         .map((tile: any) => {
           const x = Number(tile.x);
@@ -583,6 +587,7 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
       );
       return {
         tileCount: tiles.length,
+        tileSelectionSaturated,
         countsByLod,
         areaByLod,
         morphByLod,
@@ -722,6 +727,7 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
     return {
       pose: kind,
       tileCount: terrainLod?.tileCount ?? 0,
+      tileSelectionSaturated: terrainLod?.tileSelectionSaturated ?? null,
       countsByLod: terrainLod?.countsByLod ?? {},
       rings: terrainLod?.rings ?? [],
       triangleEstimate: terrainLod?.triangleEstimate ?? 0,
@@ -729,6 +735,7 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
   });
   const hasCdlodNodeRingEvidence = cdlodPoseEvidence.every(entry =>
     entry.tileCount > 0
+    && entry.tileSelectionSaturated !== null
     && entry.rings.some(ring => ring.tileCount > 0)
     && Object.keys(entry.countsByLod).length > 0
   );
@@ -759,8 +766,8 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
       id: 'cdlod-node-ring-evidence',
       status: hasCdlodNodeRingEvidence ? 'pass' : 'warn',
       message: hasCdlodNodeRingEvidence
-        ? 'Captured active CDLOD node counts, LOD distribution, and distance-ring summaries for ground, elevated, and skyward cameras.'
-        : 'Missing CDLOD node/ring evidence for one or more required terrain camera poses.',
+        ? 'Captured active CDLOD node counts, saturation flag, LOD distribution, and distance-ring summaries for ground, elevated, and skyward cameras.'
+        : 'Missing CDLOD node/ring/saturation evidence for one or more required terrain camera poses.',
       value: cdlodPoseEvidence,
     },
     {
@@ -843,7 +850,7 @@ function terrainLodLine(pose: PoseProbe | undefined): string {
   const rings = terrainLod.rings
     .map(ring => `${ring.id}:${ring.tileCount}`)
     .join('/');
-  return `tiles=${terrainLod.tileCount} singleSubmitTri=${terrainLod.triangleEstimate} lods=${lods || 'none'} rings=${rings || 'none'}`;
+  return `tiles=${terrainLod.tileCount} saturated=${String(terrainLod.tileSelectionSaturated)} singleSubmitTri=${terrainLod.triangleEstimate} lods=${lods || 'none'} rings=${rings || 'none'}`;
 }
 
 function renderMarkdown(report: ProbeReport): string {

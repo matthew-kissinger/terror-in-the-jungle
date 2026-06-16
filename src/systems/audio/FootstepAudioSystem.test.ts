@@ -305,10 +305,31 @@ describe('FootstepAudioSystem', () => {
       expect(FootstepSynthesis.createGrassFootstep).not.toHaveBeenCalled();
     });
 
+    it('should include the exact AI footstep range boundary without using distanceTo', () => {
+      const boundaryPos = new THREE.Vector3(30, 0, 0);
+      const distanceTo = vi.spyOn(boundaryPos, 'distanceTo');
+
+      const result = system.playAIFootstep(boundaryPos, playerPos);
+
+      expect(result).toBe(true);
+      expect(distanceTo).not.toHaveBeenCalled();
+    });
+
     it('should play AI footstep within range', () => {
       const nearPos = new THREE.Vector3(10, 0, 0);
       const result = system.playAIFootstep(nearPos, playerPos);
       expect(result).toBe(true);
+    });
+
+    it('should preserve the concurrent AI footstep limit', () => {
+      const aiPool = (system as any).aiFootstepPool as Array<{ isPlaying: boolean }>;
+      for (let index = 0; index < 5; index++) {
+        aiPool[index].isPlaying = true;
+      }
+
+      const result = system.playAIFootstep(new THREE.Vector3(10, 0, 0), playerPos);
+
+      expect(result).toBe(false);
     });
 
     it('should populate AI pool on construction', () => {

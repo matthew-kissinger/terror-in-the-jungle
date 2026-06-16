@@ -1,16 +1,38 @@
 <!-- Proposed next cycle. Source audit: TIJ current docs + examples/fable5-world-demo, 2026-06-13. -->
 # cycle-2026-06-13-fable5-webgpu-world-systems
 
-Status: active; owner alignment complete. R1 WebGPU feature-profile slice is
-implemented in `src/core/RendererFeatureProfile.ts`; broader visual/world
-systems remain gated by the plan below.
+Status: shipped predecessor; this is no longer the active broad cycle. The R1
+WebGPU feature-profile slice is implemented in
+`src/core/RendererFeatureProfile.ts`. Broader visual/world systems are split
+into `docs/tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md` and
+`docs/tasks/cycle-2026-06-13-world-systems-release-decision-run.md`.
 
-Goal statement: Analyze TIJ and Fable5 end to end, choose the WebGPU-primary
-architecture posture, adapt the useful Fable terrain, erosion, hydrology,
-cloud/post, generated-species, forest LOD, and Nanite-style ideas into
-TIJ-owned scoped systems with explicit controlled burns, prove the approved
-subset locally and visually, then finish by committing, pushing, merging to
-`master`, deploying production, and passing `npm run check:live-release`.
+Historical broad goal statement, superseded by split follow-ups: Analyze TIJ
+and Fable5 end to end, choose the WebGPU-primary architecture posture, adapt
+the useful Fable terrain, erosion, hydrology, cloud/post, generated-species,
+forest LOD, and Nanite-style ideas into TIJ-owned scoped systems with explicit
+controlled burns, prove the approved subset locally and visually, then finish
+by committing, pushing, merging to `master`, deploying production, and passing
+`npm run check:live-release`.
+
+## Completed Result
+
+- `src/core/RendererFeatureProfile.ts` defines the WebGPU-primary feature
+  policy surface and classifies future renderer/world-system work as strict
+  WebGPU, degraded fallback, shared-node-safe, diagnostic-only, or disabled.
+- The codebase remains a single project: WebGPU is the primary development
+  path, and WebGL2 remains a compatibility/degraded fallback rather than a
+  mandatory mirror for every future WebGPU feature.
+- The remaining broad-world-system topics were not released from this
+  predecessor and are no longer tracked here as unfinished release gates.
+
+## Follow-Up Split
+
+| Topic | Follow-up surface |
+|---|---|
+| Terrain, erosion, hydrology, debug-only water proof, sky/cloud/post, generated-species, forest LOD, and Nanite-lite adaptation | `docs/tasks/cycle-2026-06-13-fable5-world-systems-debug-proofs.md` |
+| Ship/default-off/defer/no-go decisions for owner-selected releasable code | `docs/tasks/cycle-2026-06-13-world-systems-release-decision-run.md` |
+| Owner-facing summary of the split | `docs/tasks/cycle-2026-06-13-world-systems-goal-statements.md` |
 
 ## Alignment Decisions
 
@@ -154,23 +176,9 @@ The cycle can proceed with a red p99 only if all are true:
 If any touched system appears in the tail attribution or worsens the capture,
 cut scope and fix that regression before merge.
 
-## Acceptance
+## Acceptance Disposition
 
-- [x] Owner approves or edits this cycle before implementation starts.
-- [ ] `master` is the only release-target name used in this cycle.
-- [x] WebGPU-primary policy is authored or implemented without splitting the
-      project.
-- [ ] WebGL2 fallback is preserved as compatibility/degraded mode, not as a
-      full mirror requirement for every new WebGPU feature.
-- [ ] Fable heightfield/erosion/hydrology/water analysis is captured, with no
-      runtime water implementation.
-- [ ] Fable sky/cloud/post analysis is captured; any prototype is gated and
-      not default-on without proof.
-- [ ] Generated species / forest LOD / Nanite-lite plan is captured without
-      copying Fable assets or species.
-- [ ] R0 and final p99 attribution are recorded.
-- [ ] `npm run validate:fast` passes before merge.
-- [ ] Relevant visual/perf gates pass or have explicit owner-approved
-      non-regression notes.
-- [ ] Work is committed, pushed, merged to `master`, deployed, and verified
-      with `npm run check:live-release`.
+This predecessor is accepted only for the R1 WebGPU feature-profile result.
+The broad checklist that originally lived here is superseded by the split
+follow-up docs above and must not be used as an active release gate for this
+shipped predecessor.

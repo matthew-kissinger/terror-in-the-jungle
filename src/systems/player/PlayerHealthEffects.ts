@@ -16,7 +16,10 @@ export class PlayerHealthEffects {
   private damageOverlay: HTMLCanvasElement;
   private damageContext: CanvasRenderingContext2D;
   private cameraDirection: THREE.Vector3 = new THREE.Vector3(0, 0, -1);
+  private readonly scratchToSource = new THREE.Vector3();
+  private readonly scratchCameraForward = new THREE.Vector3();
   private boundOnResize: (() => void) | null = null;
+  private damageOverlayDirty = false;
 
   // Audio for heartbeat effect
   private audioContext?: AudioContext;
@@ -85,13 +88,12 @@ export class PlayerHealthEffects {
       this.cameraDirection.copy(cameraDirection);
 
       // Calculate direction from player to damage source
-      const toSource = new THREE.Vector3()
-        .subVectors(sourcePosition, playerPosition);
+      const toSource = this.scratchToSource.subVectors(sourcePosition, playerPosition);
       toSource.y = 0; // Ignore vertical component
       toSource.normalize();
 
       // Get camera forward direction (ignore vertical)
-      const cameraForward = cameraDirection.clone();
+      const cameraForward = this.scratchCameraForward.copy(cameraDirection);
       cameraForward.y = 0;
       cameraForward.normalize();
 
@@ -126,19 +128,45 @@ export class PlayerHealthEffects {
   }
 
   updateDamageIndicators(_deltaTime: number): void {
-    // Remove expired indicators
-    this.damageIndicators = this.damageIndicators.filter(indicator => {
-      const age = (Date.now() - indicator.timestamp) / 1000;
-      return age < indicator.fadeTime;
-    });
+    if (this.damageIndicators.length === 0) {
+      return;
+    }
+
+    const now = Date.now();
+    let writeIndex = 0;
+    for (let readIndex = 0; readIndex < this.damageIndicators.length; readIndex++) {
+      const indicator = this.damageIndicators[readIndex];
+      const age = (now - indicator.timestamp) / 1000;
+      if (age < indicator.fadeTime) {
+        this.damageIndicators[writeIndex++] = indicator;
+      }
+    }
+    this.damageIndicators.length = writeIndex;
   }
 
   renderDamageOverlay(health: number, _maxHealth: number): void {
+    const hasDamageOverlay = this.damageIndicators.length > 0 || health < 30;
+    if (!hasDamageOverlay && !this.damageOverlayDirty) {
+      return;
+    }
+
     this.damageContext.clearRect(0, 0, this.damageOverlay.width, this.damageOverlay.height);
+    if (!hasDamageOverlay) {
+      this.damageOverlayDirty = false;
+      return;
+    }
+    this.damageOverlayDirty = true;
 
     // Render damage indicators as partial circle arcs
-    this.damageIndicators.forEach(indicator => {
-      const age = (Date.now() - indicator.timestamp) / 1000;
+    const now = Date.now();
+    const centerX = this.damageOverlay.width / 2;
+    const centerY = this.damageOverlay.height / 2;
+    const radius = Math.min(centerX, centerY) * 0.4; // Distance from center
+    const arcWidth = 30; // Width of the arc indicator
+    const arcSpread = Math.PI / 6; // 30 degrees spread (1/6 of a circle)
+
+    for (const indicator of this.damageIndicators) {
+      const age = (now - indicator.timestamp) / 1000;
       const alpha = Math.max(0, (indicator.fadeTime - age) / indicator.fadeTime);
 
       this.damageContext.save();
@@ -148,12 +176,6 @@ export class PlayerHealthEffects {
       this.damageContext.globalAlpha = opacity;
 
       // Setup indicator position and size
-      const centerX = this.damageOverlay.width / 2;
-      const centerY = this.damageOverlay.height / 2;
-      const radius = Math.min(centerX, centerY) * 0.4; // Distance from center
-      const arcWidth = 30; // Width of the arc indicator
-      const arcSpread = Math.PI / 6; // 30 degrees spread (1/6 of a circle)
-
       // Calculate the angle for the indicator
       // Rotate by -90 degrees (PI/2) so 0 is up
       const angle = indicator.direction - Math.PI / 2;
@@ -198,7 +220,7 @@ export class PlayerHealthEffects {
       this.damageContext.stroke();
 
       this.damageContext.restore();
-    });
+    }
 
     // Red screen edge effect when low health
     if (health < 30) {
@@ -260,7 +282,7 @@ export class PlayerHealthEffects {
   }
 
   clearDamageIndicators(): void {
-    this.damageIndicators = [];
+    this.damageIndicators.length = 0;
   }
 
   dispose(): void {

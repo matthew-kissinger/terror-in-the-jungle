@@ -12,6 +12,38 @@ function shouldDisableVegetationNormalMapsForProof(): boolean {
   return globalScope.__KB_LOAD_DISABLE_VEGETATION_NORMALS__ === true;
 }
 
+function distanceSqFromBoundsToPoint(bounds: THREE.Box2, x: number, z: number): number {
+  let dx = 0;
+  if (x < bounds.min.x) {
+    dx = bounds.min.x - x;
+  } else if (x > bounds.max.x) {
+    dx = x - bounds.max.x;
+  }
+
+  let dz = 0;
+  if (z < bounds.min.y) {
+    dz = bounds.min.y - z;
+  } else if (z > bounds.max.y) {
+    dz = z - bounds.max.y;
+  }
+
+  return dx * dx + dz * dz;
+}
+
+function boundsIntersectsZone(
+  bounds: THREE.Box2,
+  zone: { x: number; z: number; radius: number; radiusSq?: number },
+): boolean {
+  const radiusSq = zone.radiusSq ?? zone.radius * zone.radius;
+  return distanceSqFromBoundsToPoint(bounds, zone.x, zone.z) <= radiusSq;
+}
+
+function pointInsideZone(x: number, z: number, zone: { x: number; z: number; radius: number; radiusSq?: number }): boolean {
+  const dx = x - zone.x;
+  const dz = z - zone.z;
+  return dx * dx + dz * dz <= (zone.radiusSq ?? zone.radius * zone.radius);
+}
+
 export class GPUBillboardSystem {
   private vegetationTypes: Map<string, GPUBillboardVegetation> = new Map();
   private chunkInstances: Map<string, Map<string, number[]>> = new Map();
@@ -34,6 +66,15 @@ export class GPUBillboardSystem {
     if (disableNormalMaps) {
       Logger.info('vegetation', 'KB-LOAD proof mode: vegetation normal maps disabled for this run');
     }
+
+    const textureNames = new Set<string>();
+    for (const vegType of types) {
+      textureNames.add(vegType.textureName);
+      if (!disableNormalMaps && vegType.shaderProfile === 'normal-lit' && vegType.normalTextureName) {
+        textureNames.add(vegType.normalTextureName);
+      }
+    }
+    await this.assetLoader.ensureTexturesLoaded([...textureNames]);
 
     for (const vegType of types) {
       const texture = this.assetLoader.getTexture(vegType.textureName);
@@ -148,10 +189,9 @@ export class GPUBillboardSystem {
 
     let totalCleared = 0;
     const radiusSq = radius * radius;
-    const center = new THREE.Vector2(centerX, centerZ);
 
     this.chunkBounds.forEach((bounds, chunkKey) => {
-      const distSq = bounds.distanceToPoint(center) ** 2;
+      const distSq = distanceSqFromBoundsToPoint(bounds, centerX, centerZ);
       if (distSq > radiusSq) return;
 
       const chunkData = this.chunkInstances.get(chunkKey);
@@ -162,29 +202,35 @@ export class GPUBillboardSystem {
         if (!vegetation) return;
 
         const positions = vegetation.getInstancePositions();
-        const indicesToRemove: number[] = [];
-        const remainingIndices: number[] = [];
+        let indicesToRemove: number[] | null = null;
+        let writeIndex = 0;
 
-        for (const index of indices) {
+        for (let i = 0; i < indices.length; i++) {
+          const index = indices[i];
           const i3 = index * 3;
           const x = positions[i3];
           const z = positions[i3 + 2];
           const dx = x - centerX;
           const dz = z - centerZ;
           if (dx * dx + dz * dz <= radiusSq) {
+            if (indicesToRemove === null) {
+              indicesToRemove = [];
+            }
             indicesToRemove.push(index);
           } else {
-            remainingIndices.push(index);
+            if (indicesToRemove !== null) {
+              indices[writeIndex] = index;
+            }
+            writeIndex++;
           }
         }
 
-        if (indicesToRemove.length > 0) {
+        if (indicesToRemove !== null) {
           vegetation.removeInstances(indicesToRemove);
           totalCleared += indicesToRemove.length;
-          if (remainingIndices.length === 0) {
+          indices.length = writeIndex;
+          if (indices.length === 0) {
             chunkData.delete(type);
-          } else {
-            chunkData.set(type, remainingIndices);
           }
         }
       });
@@ -198,23 +244,20 @@ export class GPUBillboardSystem {
     Logger.info('vegetation', `Cleared ${totalCleared} vegetation instances`);
   }
 
-  clearInstancesInZones(zones: ReadonlyArray<{ x: number; z: number; radius: number }>): void {
+  clearInstancesInZones(zones: ReadonlyArray<{ x: number; z: number; radius: number; radiusSq?: number }>): void {
     if (zones.length === 0) return;
 
     let totalCleared = 0;
-    const zoneCenters = zones.map(zone => ({
-      x: zone.x,
-      z: zone.z,
-      radius: zone.radius,
-      radiusSq: zone.radius * zone.radius,
-      center: new THREE.Vector2(zone.x, zone.z),
-    }));
 
     this.chunkBounds.forEach((bounds, chunkKey) => {
-      const candidateZones = zoneCenters.filter(zone =>
-        bounds.distanceToPoint(zone.center) ** 2 <= zone.radiusSq
-      );
-      if (candidateZones.length === 0) return;
+      let intersectsAnyZone = false;
+      for (const zone of zones) {
+        if (boundsIntersectsZone(bounds, zone)) {
+          intersectsAnyZone = true;
+          break;
+        }
+      }
+      if (!intersectsAnyZone) return;
 
       const chunkData = this.chunkInstances.get(chunkKey);
       if (!chunkData) return;
@@ -224,36 +267,40 @@ export class GPUBillboardSystem {
         if (!vegetation) return;
 
         const positions = vegetation.getInstancePositions();
-        const indicesToRemove: number[] = [];
-        const remainingIndices: number[] = [];
+        let indicesToRemove: number[] | null = null;
+        let writeIndex = 0;
 
-        for (const index of indices) {
+        for (let i = 0; i < indices.length; i++) {
+          const index = indices[i];
           const i3 = index * 3;
           const x = positions[i3];
           const z = positions[i3 + 2];
           let inZone = false;
-          for (const zone of candidateZones) {
-            const dx = x - zone.x;
-            const dz = z - zone.z;
-            if (dx * dx + dz * dz <= zone.radiusSq) {
+          for (const zone of zones) {
+            if (pointInsideZone(x, z, zone)) {
               inZone = true;
               break;
             }
           }
           if (inZone) {
+            if (indicesToRemove === null) {
+              indicesToRemove = [];
+            }
             indicesToRemove.push(index);
           } else {
-            remainingIndices.push(index);
+            if (indicesToRemove !== null) {
+              indices[writeIndex] = index;
+            }
+            writeIndex++;
           }
         }
 
-        if (indicesToRemove.length > 0) {
+        if (indicesToRemove !== null) {
           vegetation.removeInstances(indicesToRemove);
           totalCleared += indicesToRemove.length;
-          if (remainingIndices.length === 0) {
+          indices.length = writeIndex;
+          if (indices.length === 0) {
             chunkData.delete(type);
-          } else {
-            chunkData.set(type, remainingIndices);
           }
         }
       });

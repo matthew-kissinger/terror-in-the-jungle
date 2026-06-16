@@ -40,6 +40,7 @@ const MAX_HEIGHTMAP_GRID_SIZE = 1024;
  */
 const GAMEPLAY_QUERY_TARGET_METERS_PER_SAMPLE = 20;
 const MAX_GAMEPLAY_QUERY_GRID_SIZE = 1024;
+const ATMOSPHERE_LIGHTING_EPSILON = 1e-5;
 
 function roundUpToPowerOfTwo(value: number): number {
   let result = 1;
@@ -90,6 +91,21 @@ export function computeGameplayQueryGridSize(playableWorldSize: number): number 
   );
 }
 
+function terrainAtmosphereLightingEquals(
+  current: TerrainAtmosphereLightingMaterialConfig,
+  next: TerrainAtmosphereLightingMaterialConfig,
+): boolean {
+  return Math.abs(current.nightFillColor.r - next.nightFillColor.r) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.nightFillColor.g - next.nightFillColor.g) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.nightFillColor.b - next.nightFillColor.b) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.nightFillStrength - next.nightFillStrength) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.directLightDirection.x - next.directLightDirection.x) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.directLightDirection.y - next.directLightDirection.y) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.directLightDirection.z - next.directLightDirection.z) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.daylightFactor - next.daylightFactor) <= ATMOSPHERE_LIGHTING_EPSILON
+    && Math.abs(current.lowSunOcclusionStrength - next.lowSunOcclusionStrength) <= ATMOSPHERE_LIGHTING_EPSILON;
+}
+
 /**
  * Bake a CPU gameplay-query height grid from a source provider, sampled over
  * `worldSize` centred on the origin. Mirrors {@link HeightmapGPU.bakeFromProvider}
@@ -126,6 +142,13 @@ export class TerrainSurfaceRuntime {
   private surfaceWetness = 0;
   private farCanopyTint: TerrainFarCanopyTintConfig = { enabled: false };
   private atmosphereLighting: TerrainAtmosphereLightingMaterialConfig = {
+    nightFillColor: new THREE.Color(0, 0, 0),
+    nightFillStrength: 0,
+    directLightDirection: new THREE.Vector3(0, 1, 0),
+    daylightFactor: 1,
+    lowSunOcclusionStrength: 0,
+  };
+  private readonly nextAtmosphereLighting: TerrainAtmosphereLightingMaterialConfig = {
     nightFillColor: new THREE.Color(0, 0, 0),
     nightFillStrength: 0,
     directLightDirection: new THREE.Vector3(0, 1, 0),
@@ -293,19 +316,28 @@ export class TerrainSurfaceRuntime {
   }
 
   setAtmosphereLighting(lighting: TerrainAtmosphereLightingMaterialConfig): void {
-    const directLightDirection = lighting.directLightDirection.clone();
+    const nextLighting = this.nextAtmosphereLighting;
+    const directLightDirection = nextLighting.directLightDirection;
+    nextLighting.nightFillColor.copy(lighting.nightFillColor);
+    nextLighting.nightFillStrength = THREE.MathUtils.clamp(lighting.nightFillStrength, 0, 0.5);
+    nextLighting.daylightFactor = THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1);
+    nextLighting.lowSunOcclusionStrength = THREE.MathUtils.clamp(lighting.lowSunOcclusionStrength, 0, 1);
+    directLightDirection.copy(lighting.directLightDirection);
     if (directLightDirection.lengthSq() < 1e-8) {
       directLightDirection.set(0, 1, 0);
     } else {
       directLightDirection.normalize();
     }
-    this.atmosphereLighting = {
-      nightFillColor: lighting.nightFillColor.clone(),
-      nightFillStrength: THREE.MathUtils.clamp(lighting.nightFillStrength, 0, 0.5),
-      directLightDirection,
-      daylightFactor: THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1),
-      lowSunOcclusionStrength: THREE.MathUtils.clamp(lighting.lowSunOcclusionStrength, 0, 1),
-    };
+
+    if (terrainAtmosphereLightingEquals(this.atmosphereLighting, nextLighting)) {
+      return;
+    }
+
+    this.atmosphereLighting.nightFillColor.copy(nextLighting.nightFillColor);
+    this.atmosphereLighting.directLightDirection.copy(nextLighting.directLightDirection);
+    this.atmosphereLighting.nightFillStrength = nextLighting.nightFillStrength;
+    this.atmosphereLighting.daylightFactor = nextLighting.daylightFactor;
+    this.atmosphereLighting.lowSunOcclusionStrength = nextLighting.lowSunOcclusionStrength;
     if (this.terrainMaterial) {
       updateTerrainMaterialAtmosphereLighting(this.terrainMaterial, this.atmosphereLighting);
     }

@@ -149,6 +149,31 @@ describe('NPCVehicleController', () => {
     expect(npc.state).toBe(CombatantState.BOARDING);
   });
 
+  it('compacts completed boarding orders without splicing the queue', () => {
+    const vehicle = createTestVehicle('heli_1', new THREE.Vector3(10, 0, 10));
+    vehicleManager.register(vehicle);
+
+    const closeNpc = createTestCombatant('npc_close', new THREE.Vector3(10, 0, 10));
+    const farNpc = createTestCombatant('npc_far', new THREE.Vector3(100, 0, 100));
+    combatants.set(closeNpc.id, closeNpc);
+    combatants.set(farNpc.id, farNpc);
+
+    controller.orderBoard(closeNpc.id, 'heli_1');
+    controller.orderBoard(farNpc.id, 'heli_1');
+    const controllerAny = controller as any;
+    const boardingOrders = controllerAny.boardingOrders as Array<{ combatantId: string }>;
+    const spliceSpy = vi.spyOn(boardingOrders, 'splice');
+
+    controller.update(0.1);
+
+    expect(spliceSpy).not.toHaveBeenCalled();
+    spliceSpy.mockRestore();
+    expect(closeNpc.state).toBe(CombatantState.IN_VEHICLE);
+    expect(farNpc.state).toBe(CombatantState.BOARDING);
+    expect(boardingOrders).toHaveLength(1);
+    expect(boardingOrders[0].combatantId).toBe(farNpc.id);
+  });
+
   it('rejects boarding dead NPC', () => {
     const vehicle = createTestVehicle('heli_1', new THREE.Vector3(10, 0, 10));
     vehicleManager.register(vehicle);
@@ -180,6 +205,36 @@ describe('NPCVehicleController', () => {
     controller.update(1.0);
     expect(npc.state).toBe(CombatantState.PATROLLING);
     expect(npc.vehicleId).toBeUndefined();
+  });
+
+  it('compacts completed dismount orders without splicing the queue', () => {
+    const vehicle = createTestVehicle('heli_1', new THREE.Vector3(10, 0, 10));
+    vehicleManager.register(vehicle);
+
+    const first = createTestCombatant('npc_1', new THREE.Vector3(10, 0, 10));
+    const second = createTestCombatant('npc_2', new THREE.Vector3(10, 0, 10));
+    combatants.set(first.id, first);
+    combatants.set(second.id, second);
+    controller.orderBoard(first.id, 'heli_1');
+    controller.orderBoard(second.id, 'heli_1');
+    controller.update(0.1);
+
+    controller.orderDismount(first.id);
+    controller.orderDismount(second.id);
+    const controllerAny = controller as any;
+    const dismountOrders = controllerAny.dismountOrders as Array<{ combatantId: string; elapsed: number }>;
+    dismountOrders[0].elapsed = 0.5;
+    dismountOrders[1].elapsed = 0;
+    const spliceSpy = vi.spyOn(dismountOrders, 'splice');
+
+    controller.update(0);
+
+    expect(spliceSpy).not.toHaveBeenCalled();
+    spliceSpy.mockRestore();
+    expect(first.state).toBe(CombatantState.PATROLLING);
+    expect(second.state).toBe(CombatantState.DISMOUNTING);
+    expect(dismountOrders).toHaveLength(1);
+    expect(dismountOrders[0].combatantId).toBe(second.id);
   });
 
   it('dismounts all passengers', () => {

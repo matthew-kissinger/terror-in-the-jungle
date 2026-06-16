@@ -44,6 +44,8 @@ export class TerrainQueries {
     for (const [, entry] of this.collisionObjects) {
       const obj = entry.object;
       if (!obj.visible) continue;
+      if (entry.dynamic) continue;
+
       const box = this.getCollisionBounds(entry);
 
       if (
@@ -161,10 +163,6 @@ export class TerrainQueries {
     box: THREE.Box3,
     terrainHeight: number,
   ): boolean {
-    if (entry.dynamic) {
-      return false;
-    }
-
     if (entry.object.userData.type === 'helipad') {
       return true;
     }

@@ -33,21 +33,40 @@ function fakeM48Glb(): { glb: THREE.Group; turret: THREE.Object3D; gun: THREE.Ob
   axis.quaternion.copy(AXIS_NORMALIZE_QUAT);
   const body = new THREE.Object3D();
   body.name = 'M48Patton';
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+  const hullMaterial = new THREE.MeshStandardMaterial();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), hullMaterial);
   hull.name = 'Mesh_Hull';
-  body.add(hull);
+  const hullSide = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), hullMaterial);
+  hullSide.name = 'Mesh_HullSide';
+  hullSide.position.set(0, 0, 1.2);
+  body.add(hull, hullSide);
 
   const turret = new THREE.Group();
   turret.name = 'Joint_Turret';
   turret.position.set(1.04, 2.22, -0.11); // source +X-forward authored offset
+  const turretMaterial = new THREE.MeshStandardMaterial({ color: 0x44512f });
+  const turretCheek = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.5), turretMaterial);
+  turretCheek.name = 'Mesh_TurretCheek';
+  turretCheek.position.set(0, 0.1, 0.2);
+  const turretCupola = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), turretMaterial);
+  turretCupola.name = 'Mesh_TurretCupola';
+  turretCupola.position.set(0, 0.35, 0.3);
+  turret.add(turretCheek, turretCupola);
   const gun = new THREE.Group();
   gun.name = 'Joint_MainGun';
   gun.position.set(3.92, 2.05, 0); // source +X-forward authored offset
+  const gunMaterial = new THREE.MeshStandardMaterial({ color: 0x22231e });
+  const barrelSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 1), gunMaterial);
+  barrelSleeve.name = 'Mesh_BarrelSleeve';
+  barrelSleeve.position.set(0.4, 0, 0);
+  const mantlet = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.35), gunMaterial);
+  mantlet.name = 'Mesh_Mantlet';
+  mantlet.position.set(-0.2, 0, 0);
   // Muzzle tip authored along the source +X axis (forward in source frame).
   const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 4), new THREE.MeshStandardMaterial());
   muzzle.name = 'Mesh_MuzzleBrakeCap';
   muzzle.position.set(1.58, 0, 0);
-  gun.add(muzzle);
+  gun.add(barrelSleeve, mantlet, muzzle);
 
   body.add(turret, gun);
   axis.add(body);
@@ -85,6 +104,16 @@ function barrelForward(chassisRoot: THREE.Object3D, gun: THREE.Object3D, muzzle:
   return tip.sub(pivot).normalize();
 }
 
+function collectMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      meshes.push(child);
+    }
+  });
+  return meshes;
+}
+
 describe('applyM151JeepGlbVisual', () => {
   it('replaces the procedural meshes with the GLB and enables shadows', async () => {
     const root = buildM151JeepMesh();
@@ -101,6 +130,33 @@ describe('applyM151JeepGlbVisual', () => {
     expect(root.children.filter((c) => (c as THREE.Mesh).isMesh)).toHaveLength(0);
     expect(body.castShadow).toBe(true);
     expect(body.receiveShadow).toBe(true);
+    expect(body.userData.perfCategory).toBe('ground_vehicles');
+  });
+
+  it('merges compatible static M151 body meshes without removing vehicle identity', async () => {
+    const root = buildM151JeepMesh();
+    const glb = new THREE.Group();
+    const sharedMaterial = new THREE.MeshStandardMaterial();
+    glb.add(
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), sharedMaterial),
+      new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), sharedMaterial),
+    );
+
+    const ok = await applyM151JeepGlbVisual(root, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    expect(root.children).toContain(glb);
+    expect(glb.userData.perfCategory).toBe('ground_vehicles');
+    expect(glb.userData.m151BodyDrawCallOptimization).toMatchObject({
+      sourceMeshCount: 2,
+      mergedMeshCount: 1,
+    });
+    const meshes = collectMeshes(glb);
+    expect(meshes).toHaveLength(1);
+    expect(meshes[0].userData.generatedOptimizedMesh).toBe(true);
+    expect(meshes[0].userData.perfCategory).toBe('ground_vehicles');
+    expect(meshes[0].castShadow).toBe(true);
+    expect(meshes[0].receiveShadow).toBe(true);
   });
 
   it('keeps the procedural mesh when the load fails', async () => {
@@ -133,6 +189,57 @@ describe('applyM48TankGlbVisual', () => {
     // Procedural turret + gun parts removed from the rig.
     expect(yawNode.getObjectByName('m48_turret')).toBeUndefined();
     expect(pitchNode.getObjectByName('m48_barrel')).toBeUndefined();
+    expect(root.userData.perfCategory).toBe('ground_vehicles');
+    expect(turret.userData.perfCategory).toBe('ground_vehicles');
+    expect(gun.userData.perfCategory).toBe('ground_vehicles');
+  });
+
+  it('merges only the static M48 hull meshes after articulated joints are re-seated', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeTurretRig();
+    const { glb, turret, gun } = fakeM48Glb();
+
+    const ok = await applyM48TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    expect(turret.parent).toBe(yawNode);
+    expect(gun.parent).toBe(pitchNode);
+    expect(glb.userData.m48HullDrawCallOptimization).toMatchObject({
+      sourceMeshCount: 2,
+      mergedMeshCount: 1,
+    });
+    const hullMeshes = collectMeshes(glb);
+    expect(hullMeshes).toHaveLength(1);
+    expect(hullMeshes[0].userData.generatedOptimizedMesh).toBe(true);
+    expect(hullMeshes[0].userData.perfCategory).toBe('ground_vehicles');
+    expect(hullMeshes[0].castShadow).toBe(true);
+    expect(hullMeshes[0].receiveShadow).toBe(true);
+  });
+
+  it('merges rigid M48 turret and gun subtrees without crossing articulation joints', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeTurretRig();
+    const { glb, turret, gun, muzzle } = fakeM48Glb();
+
+    const ok = await applyM48TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    expect(turret.parent).toBe(yawNode);
+    expect(gun.parent).toBe(pitchNode);
+    expect(turret.userData.m48TurretDrawCallOptimization).toMatchObject({
+      sourceMeshCount: 2,
+      mergedMeshCount: 1,
+    });
+    expect(gun.userData.m48GunDrawCallOptimization).toMatchObject({
+      sourceMeshCount: 2,
+      mergedMeshCount: 1,
+    });
+    expect(collectMeshes(turret)).toHaveLength(1);
+    const gunMeshes = collectMeshes(gun);
+    expect(gunMeshes).toHaveLength(2);
+    expect(gunMeshes).toContain(muzzle);
+    expect(gunMeshes.some((mesh) => mesh.userData.m48GunOptimizedGeneratedResource === true)).toBe(true);
+    expect(gun.getObjectByName('Mesh_MuzzleBrakeCap')).toBe(muzzle);
   });
 
   it('keeps the barrel pointing down-bore after re-seating past the axis wrapper', async () => {

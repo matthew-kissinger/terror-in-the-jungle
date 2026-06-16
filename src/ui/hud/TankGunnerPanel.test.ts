@@ -88,4 +88,50 @@ describe('TankGunnerPanel', () => {
     panel.setMagnification(2.8);
     expect(zoom.textContent).toBe('2.8x');
   });
+
+  it('does not rewrite zoom text while the visible magnification is unchanged', () => {
+    panel.setMagnification(2.81);
+    const zoom = panel.element.querySelector('[data-ref="zoom"]') as HTMLElement;
+    expect(zoom.textContent).toBe('2.8x');
+    const textWrites = trackTextWrites(zoom);
+
+    panel.setMagnification(2.84);
+
+    expect(textWrites).toEqual([]);
+
+    panel.setMagnification(2.86);
+
+    expect(textWrites).toEqual(['2.9x']);
+  });
+
+  it('does not rewrite azimuth text while the rounded bearing is unchanged', () => {
+    panel.setTurretAzimuth(0.01);
+    const needle = panel.element.querySelector('[data-ref="needle"]') as HTMLElement;
+    const az = panel.element.querySelector('[data-ref="azDeg"]') as HTMLElement;
+    const needleBefore = needle.style.transform;
+    const textWrites = trackTextWrites(az);
+
+    panel.setTurretAzimuth(0.011);
+
+    expect(needle.style.transform).not.toBe(needleBefore);
+    expect(textWrites).toEqual([]);
+
+    panel.setTurretAzimuth(0.03);
+
+    expect(textWrites).toEqual(['2°']);
+  });
 });
+
+function trackTextWrites(element: HTMLElement): string[] {
+  let current = element.textContent ?? '';
+  const writes: string[] = [];
+  Object.defineProperty(element, 'textContent', {
+    configurable: true,
+    get: () => current,
+    set: (value: string | null) => {
+      current = value ?? '';
+      writes.push(current);
+    },
+  });
+  return writes;
+}

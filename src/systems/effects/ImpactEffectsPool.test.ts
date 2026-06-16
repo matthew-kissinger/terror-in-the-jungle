@@ -86,6 +86,7 @@ vi.mock('three', () => {
     itemSize: number;
     count: number;
     needsUpdate = false;
+    updateRanges: Array<{ start: number; count: number }> = [];
 
     constructor(array: Float32Array, itemSize: number) {
       this.array = array;
@@ -98,6 +99,10 @@ vi.mock('three', () => {
       this.array[i] = x;
       this.array[i + 1] = y;
       this.array[i + 2] = z;
+    }
+
+    addUpdateRange(start: number, count: number) {
+      this.updateRanges.push({ start, count });
     }
 
     getX(index: number) {
@@ -334,12 +339,14 @@ describe('ImpactEffectsPool', () => {
     expect(particlePositions.getY(0)).toBeCloseTo(20);
     expect(particlePositions.getZ(0)).toBeCloseTo(30);
     expect(particlePositions.needsUpdate).toBe(true);
+    expect(particlePositions.updateRanges.at(-1)).toEqual({ start: 0, count: particlePositions.count * 3 });
 
     const sparkPositions = effect.sparks.geometry.attributes.position;
     expect(sparkPositions.getX(0)).toBeCloseTo(10);
     expect(sparkPositions.getY(0)).toBeCloseTo(20);
     expect(sparkPositions.getZ(0)).toBeCloseTo(30);
     expect(sparkPositions.needsUpdate).toBe(true);
+    expect(sparkPositions.updateRanges.at(-1)).toEqual({ start: 0, count: sparkPositions.count * 3 });
 
     const velocity0 = effect.velocity[0];
     expect(velocity0.x).toBeCloseTo(-3.5355339, 5);
@@ -352,6 +359,14 @@ describe('ImpactEffectsPool', () => {
     expect(sparkVelocity0.z).toBeCloseTo(0, 5);
   });
 
+  it('does not read the clock on idle update when no impact effects are active', () => {
+    performanceSpy?.mockClear();
+
+    pool.update(0.016);
+
+    expect(performanceSpy).not.toHaveBeenCalled();
+  });
+
   it('updates physics, damping, and fades at the correct times', () => {
     const THREE = require('three');
     pool.spawn(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0));
@@ -362,6 +377,8 @@ describe('ImpactEffectsPool', () => {
 
     const initialParticleVelocity = effect.velocity[0].clone();
     const initialSparkVelocity = effect.velocity[particlePositions.count].clone();
+    const particleRangeCount = particlePositions.updateRanges.length;
+    const sparkRangeCount = sparkPositions.updateRanges.length;
 
     mockNow += 150; // 150ms elapsed
     pool.update(0.15);
@@ -374,6 +391,10 @@ describe('ImpactEffectsPool', () => {
 
     expect(particlePositions.getY(0)).not.toBeCloseTo(0);
     expect(sparkPositions.getY(0)).not.toBeCloseTo(0);
+    expect(particlePositions.updateRanges).toHaveLength(particleRangeCount + 1);
+    expect(sparkPositions.updateRanges).toHaveLength(sparkRangeCount + 1);
+    expect(particlePositions.updateRanges.at(-1)).toEqual({ start: 0, count: particlePositions.count * 3 });
+    expect(sparkPositions.updateRanges.at(-1)).toEqual({ start: 0, count: sparkPositions.count * 3 });
 
     // Decal uses shared material - stays visible until 400ms cutoff
     expect(effect.decal.visible).toBe(true);

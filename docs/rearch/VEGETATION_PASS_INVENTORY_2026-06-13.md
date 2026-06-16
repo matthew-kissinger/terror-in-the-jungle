@@ -71,14 +71,15 @@ validation unrelated to the vegetation inventory decision.
 
 ## First Runtime Target
 
-1. Added `JungleGroundRing` for dense near-field fern/elephant-ear ground
-   coverage with route/base/vehicle exclusion. It uses the existing
-   `GlobalBillboardSystem`, not a new renderer path. Its near-field cell size
-   is `32m`; the older persistent scatterer keeps its `128m` mid/far cell
-   granularity.
-2. Changed `TerrainSystem` ownership so `JungleGroundRing` receives all active
-   ground-cover types and `VegetationScatterer` receives only non-ground-cover
-   mid/canopy vegetation types.
+1. Added `JungleGroundRing` as a dense near-field fern/elephant-ear ground
+   coverage experiment with route/base/vehicle exclusion. It uses the existing
+   `GlobalBillboardSystem`, not a new renderer path. Owner follow-up rejected
+   the resulting dense camera-following vegetation circle, so normal runtime
+   no longer schedules the ring.
+2. Reverted normal runtime ownership so `VegetationScatterer` receives accepted
+   ground-cover, mid-level, and canopy vegetation types. `JungleGroundRing`
+   remains dormant experiment/reference code, not current player-facing
+   vegetation ownership.
 3. Add `jungle-tree-tier-mvp` with 2-3 tree families only after source
    licensing, Pixel Forge/source-bake approval, and GLB/LOD evidence pass. R1
    starts with the two already accepted tall palm families, `fanPalm` and
@@ -94,7 +95,7 @@ validation unrelated to the vegetation inventory decision.
 
 | Evidence | Result | Notes |
 |---|---|---|
-| `npx vitest run src/systems/terrain/JungleGroundRing.test.ts src/systems/terrain/TerrainSystem.test.ts` | PASS | 23 tests; ring prefixing, throttled critical cells, exclusions, removals, ownership split |
+| `npm run test:run -- src/systems/terrain/TerrainVegetationRuntime.test.ts src/systems/terrain/TerrainSystem.test.ts src/systems/terrain/VegetationScatterer.test.ts src/systems/terrain/JungleGroundRing.test.ts` | PASS | 47 tests; scatterer owns normal runtime vegetation, dormant ring is not scheduled, stale ring-ownership tests burned |
 | `npm run typecheck` | PASS | Source TypeScript check |
 | `npm run lint` | PASS | ESLint on `src/` |
 | `npm run test:quick` | PASS | 397 files, 5926 tests |
@@ -103,7 +104,7 @@ validation unrelated to the vegetation inventory decision.
 | `npm run check:vegetation-horizon` | GAP | `artifacts/perf/2026-06-13T13-09-34-437Z/vegetation-horizon-audit/horizon-audit.json`; max vegetation range still `520m`, so the far canopy tier is still required |
 | `npm run perf:capture:openfrontier:short` | FAIL existing p99 gate | `artifacts/perf/2026-06-13T13-09-44-876Z/summary.json`; avg `20.70ms`, p99 `100ms`, zero console errors, vegetation `12,951` visible instances / `25,902` triangles |
 | `npm run perf:capture:ashau:short` | FAIL existing p99 gate | `artifacts/perf/2026-06-13T13-13-49-438Z/summary.json`; avg `25.10ms`, p99 `100ms`, zero console errors, vegetation `20,388` visible instances / `40,776` triangles |
-| `npx vitest run src/config/vegetationTypes.test.ts src/systems/terrain/ChunkVegetationGenerator.test.ts src/systems/terrain/TerrainMaterial.test.ts src/systems/terrain/JungleGroundRing.test.ts src/systems/terrain/TerrainSystem.test.ts` | PASS | 51 tests; canopy tier policy, generator placement, material coverage uniforms, ground ring, TerrainSystem ownership |
+| `npx vitest run src/config/vegetationTypes.test.ts src/systems/terrain/ChunkVegetationGenerator.test.ts src/systems/terrain/TerrainMaterial.test.ts src/systems/terrain/JungleGroundRing.test.ts src/systems/terrain/TerrainSystem.test.ts` | PASS | Historical pre-rollback evidence; superseded for ground-cover ownership by the 2026-06-15 focused terrain vegetation suite above |
 | `npm run check:tod-coherence` | PASS | `artifacts/lighting-rig/tod-sweep/gate/verdict.json`; hard lighting checks pass, with non-hard GLB range-ratio advisory still present |
 | `npm run check:vegetation-horizon` | PASS | `artifacts/perf/2026-06-13T13-47-19-388Z/vegetation-horizon-audit/horizon-audit.json`; all five audited modes report `maxBareBand=0m` and `flags=none` |
 | `npm run check:vegetation-grounding` | PASS | `artifacts/perf/2026-06-13T13-47-19-535Z/vegetation-grounding-audit/summary.json` |
@@ -116,21 +117,25 @@ R1 perf attribution: the ground-ring split, accepted-palm canopy tier, and
 terrain-material coverage mask reduced visible persistent vegetation-imposter
 residency in both measured modes, but they do not clear the existing frame-tail
 gates. The final Open Frontier rerun fails only `peak_p99_frame_ms`; tail
-attribution is render/Other `77.3ms (77%)` plus Combat `22.7ms (23%)`, with
-cover search at `0ms` and vegetation not identified as the driver. A Shau final
-tail attribution is `render/Other 97.9%` with Combat `2%`. Vegetation stream
-samples remain small and are not the tail driver in either after-capture.
-Startup threshold stays `3s` in both modes. Open Frontier still cannot be
-called a clean perf pass, but the final capture is a vegetation-cycle
-non-regression decision rather than a new vegetation blocker.
+attribution used the older residual wording: non-combat residual was labeled
+render/Other `77.3ms (77%)` plus Combat `22.7ms (23%)`, with cover search at
+`0ms` and vegetation not identified as the driver. A Shau final tail attribution
+similarly labeled the residual `render/Other 97.9%` with Combat `2%`. As of
+2026-06-14, the tail reporter distinguishes named non-combat sampled systems
+from unassigned residual, so do not read those historical labels as a proven
+renderer-only finding. Vegetation stream samples remain small and are not the
+tail driver in either after-capture. Startup threshold stays `3s` in both modes.
+Open Frontier still cannot be called a clean perf pass, but the final capture is
+a vegetation-cycle non-regression decision rather than a new vegetation blocker.
 
-Visual review note: final perf screenshots show denser near jungle and palm
-canopy coverage, especially in A Shau, but the scene still needs owner visual
-approval. That walk is tracked in `docs/PLAYTEST_PENDING.md`. The Open
-Frontier dawn/night sample also exposes the separate lighting problem:
-vegetation and terrain can read too red/black even while the TOD coherence hard
-gate passes. Treat that as lighting-pass input, not as vegetation placement
-evidence.
+Visual review note: `JungleGroundRing` should not be treated as current runtime
+ownership. Owner feedback on 2026-06-15 was that the dense vegetation circle is
+unnecessary and should feel like the previous vegetation setup. Normal runtime
+therefore routes accepted ground-cover plants through `VegetationScatterer`
+again and keeps `JungleGroundRing` dormant. The Open Frontier dawn/night sample
+also exposes the separate lighting problem: vegetation and terrain can read too
+red/black even while the TOD coherence hard gate passes. Treat that as
+lighting-pass input, not as vegetation placement evidence.
 
 Tree asset status: no new tree assets imported. The first runtime tree tier
 uses existing accepted Pixel Forge `fanPalm` and `coconut` vegetation assets as

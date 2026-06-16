@@ -75,7 +75,8 @@ function shouldInterruptObjectiveForTarget(
   if (!objective) return true;
   const dist = horizontalDistance(ctx.eyePos, target.position);
   const acquisitionDistance = Math.max(0, ctx.config.targetAcquisitionDistance);
-  return dist <= acquisitionDistance && ctx.canSeeTarget(target.position);
+  const interruptDistance = Math.max(acquisitionDistance, ctx.config.maxFireDistance);
+  return dist <= interruptDistance && ctx.canSeeTarget(target.position);
 }
 
 function resolveUngatedCombatTarget(ctx: PlayerBotStateContext): BotTarget | null {
@@ -189,7 +190,8 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
     return { intent, nextState: 'ADVANCE', resetTimeInState: true };
   }
 
-  // Fire intent — aim snap + weapon trigger. Reload when magazine empty.
+  // Fire intent — aim at target through the controller's view slew + weapon trigger.
+  // Reload when magazine empty.
   if (ctx.magazine.current <= 0) {
     intent.reload = true;
   } else {

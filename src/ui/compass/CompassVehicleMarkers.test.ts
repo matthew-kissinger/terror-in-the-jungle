@@ -264,4 +264,136 @@ describe('updateVehicleMarkers', () => {
     expect(state.markers.get('ground')?.textContent).toContain('42m');
     expect(state.markers.get('watercraft')?.textContent).toContain('1.5km');
   });
+
+  it('does not rewrite stable marker class or position styles', () => {
+    const camera = makeCamera(new THREE.Vector3(0, 0, 0));
+    const query = makeQuery([
+      makeEntry('m151_front', 'ground', Faction.US, [0, 0, 30])
+    ]);
+
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+
+    const marker = state.markers.get('ground')!;
+    let className = marker.className;
+    let display = marker.style.display;
+    let left = marker.style.left;
+    let classWrites = 0;
+    let displayWrites = 0;
+    let leftWrites = 0;
+
+    Object.defineProperty(marker, 'className', {
+      configurable: true,
+      get: () => className,
+      set: (value: string) => {
+        classWrites++;
+        className = value;
+      },
+    });
+    Object.defineProperty(marker.style, 'display', {
+      configurable: true,
+      get: () => display,
+      set: (value: string) => {
+        displayWrites++;
+        display = value;
+      },
+    });
+    Object.defineProperty(marker.style, 'left', {
+      configurable: true,
+      get: () => left,
+      set: (value: string) => {
+        leftWrites++;
+        left = value;
+      },
+    });
+
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+
+    expect(classWrites).toBe(0);
+    expect(displayWrites).toBe(0);
+    expect(leftWrites).toBe(0);
+    expect(className).toContain('friendly');
+    expect(display).toBe('flex');
+    expect(left).toBe('100px');
+  });
+
+  it('reuses nearest-category scratch maps across marker refreshes', () => {
+    const camera = makeCamera(new THREE.Vector3(0, 0, 0));
+    const query = makeQuery([
+      makeEntry('m151_front', 'ground', Faction.US, [0, 0, 30])
+    ]);
+    const nearestEntries = state.nearestEntries;
+    const bestDistSq = state.bestDistSq;
+
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+
+    expect(state.nearestEntries).toBe(nearestEntries);
+    expect(state.bestDistSq).toBe(bestDistSq);
+    expect(state.nearestEntries.get('ground')?.vehicleId).toBe('m151_front');
+  });
+
+  it('reuses marker label nodes when only distance changes', () => {
+    const camera = makeCamera(new THREE.Vector3(0, 0, 0));
+    const entry = makeEntry('m151_front', 'ground', Faction.US, [0, 0, 30]);
+    const query = makeQuery([entry]);
+
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+
+    const marker = state.markers.get('ground')!;
+    const firstTextNode = marker.firstChild;
+    const firstDistanceNode = marker.querySelector('.compass-marker-distance');
+    expect(firstTextNode?.nodeValue).toBe('G');
+    expect(firstDistanceNode?.textContent).toBe('30m');
+
+    entry.position.set(0, 0, 45);
+    updateVehicleMarkers({
+      camera,
+      vehicleQuery: query,
+      markersContainer: container,
+      playerHeadingDegrees: 0,
+      state
+    });
+
+    expect(marker.firstChild).toBe(firstTextNode);
+    expect(marker.querySelector('.compass-marker-distance')).toBe(firstDistanceNode);
+    expect(firstTextNode?.nodeValue).toBe('G');
+    expect(firstDistanceNode?.textContent).toBe('45m');
+  });
 });

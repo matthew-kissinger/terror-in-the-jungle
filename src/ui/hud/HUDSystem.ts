@@ -72,6 +72,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private readonly TIMER_INTERVAL = 1.0;      // 1Hz - timer only needs second ticks
   private readonly TICKET_INTERVAL = 0.1;     // 10Hz - ticket counts should feel responsive
   private readonly OBJECTIVE_INTERVAL = 0.5;  // 2Hz - zone/objective display
+  private lastAmmoMagazine?: number;
+  private lastAmmoReserve?: number;
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -475,9 +477,20 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   updateAmmoDisplay(magazine: number, reserve: number): void {
+    if (this.lastAmmoMagazine === magazine && this.lastAmmoReserve === reserve) {
+      return;
+    }
+
     this.elements.updateAmmoDisplay(magazine, reserve);
     // Also update the mobile WeaponPill ammo display
     this.elements.weaponPill.setAmmo(magazine, reserve);
+    this.publishAmmoState(magazine, reserve);
+  }
+
+  private publishAmmoState(magazine: number, reserve: number): void {
+    this.lastAmmoMagazine = magazine;
+    this.lastAmmoReserve = reserve;
+
     // Broadcast ammo update via DOM event for TouchActionButtons weapon cycler.
     // Also persist on data attributes so late-mounting components can read initial values.
     document.documentElement.dataset.ammoMag = String(magazine);
@@ -683,9 +696,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     // is suppressed during weapon switch, so the cycler never gets initial values)
     const parts = ammo.split('/').map(s => parseInt(s.trim(), 10));
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      document.documentElement.dataset.ammoMag = String(parts[0]);
-      document.documentElement.dataset.ammoRes = String(parts[1]);
-      document.dispatchEvent(new CustomEvent('hud:ammo', { detail: { magazine: parts[0], reserve: parts[1] } }));
+      if (this.lastAmmoMagazine !== parts[0] || this.lastAmmoReserve !== parts[1]) {
+        this.publishAmmoState(parts[0], parts[1]);
+      }
     }
   }
 

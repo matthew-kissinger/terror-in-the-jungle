@@ -3,7 +3,6 @@
 
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { AudioManager } from '../audio/AudioManager';
@@ -19,6 +18,15 @@ export class GrenadeArcRenderer {
   private arcPositions: Float32Array;
   private arcVisualization?: THREE.Line;
   private landingIndicator?: THREE.Mesh;
+  private readonly startPos = new THREE.Vector3();
+  private readonly direction = new THREE.Vector3();
+  private readonly forwardDir = new THREE.Vector3();
+  private readonly finalDirection = new THREE.Vector3();
+  private readonly throwVelocity = new THREE.Vector3();
+  private readonly pos = new THREE.Vector3();
+  private readonly vel = new THREE.Vector3();
+  private readonly landingPos = new THREE.Vector3();
+  private readonly velDelta = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, maxArcPoints: number, damageRadius: number) {
     this.scene = scene;
@@ -43,8 +51,8 @@ export class GrenadeArcRenderer {
   ): number {
     if (!this.arcVisualization) return 0;
 
-    const startPos = objectPool.getVector3().copy(camera.position);
-    const direction = objectPool.getVector3();
+    const startPos = this.startPos.copy(camera.position);
+    const direction = this.direction;
     camera.getWorldDirection(direction);
 
     // Variable throw force based on power buildup
@@ -55,17 +63,17 @@ export class GrenadeArcRenderer {
     const baseThrowAngle = 0.25 + (0.15 * throwPower); // 0.25 to 0.4 radians (14 to 23 degrees)
 
     // Maintain more forward momentum regardless of vertical look angle
-    const forwardDir = objectPool.getVector3().copy(direction);
+    const forwardDir = this.forwardDir.copy(direction);
     forwardDir.y = 0; // Remove vertical component
     forwardDir.normalize();
 
     // Combine forward direction with upward angle
-    const finalDirection = objectPool.getVector3();
+    const finalDirection = this.finalDirection;
     finalDirection.x = forwardDir.x * Math.cos(baseThrowAngle);
     finalDirection.z = forwardDir.z * Math.cos(baseThrowAngle);
     finalDirection.y = Math.sin(baseThrowAngle);
 
-    const throwVelocity = objectPool.getVector3().copy(finalDirection).multiplyScalar(throwForce);
+    const throwVelocity = this.throwVelocity.copy(finalDirection).multiplyScalar(throwForce);
 
     // Add moderate upward boost based on look angle (but not too much)
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
@@ -79,10 +87,10 @@ export class GrenadeArcRenderer {
     const dragPerStep = Math.pow(airResistance, timeStep * 60);
     const grenadeRadius = 0.3; // Match physics ground offset
 
-    const pos = objectPool.getVector3().copy(startPos);
-    const vel = objectPool.getVector3().copy(throwVelocity);
-    const landingPos = objectPool.getVector3().copy(pos);
-    const velDelta = objectPool.getVector3();
+    const pos = this.pos.copy(startPos);
+    const vel = this.vel.copy(throwVelocity);
+    const landingPos = this.landingPos.copy(pos);
+    const velDelta = this.velDelta;
 
     let pointCount = 0;
     let bounceCount = 0;
@@ -151,17 +159,6 @@ export class GrenadeArcRenderer {
 
     // Calculate distance from start to landing position
     const distance = startPos.distanceTo(landingPos);
-
-    // Release all borrowed vectors
-    objectPool.releaseVector3(startPos);
-    objectPool.releaseVector3(direction);
-    objectPool.releaseVector3(forwardDir);
-    objectPool.releaseVector3(finalDirection);
-    objectPool.releaseVector3(throwVelocity);
-    objectPool.releaseVector3(pos);
-    objectPool.releaseVector3(vel);
-    objectPool.releaseVector3(landingPos);
-    objectPool.releaseVector3(velDelta);
 
     return distance;
   }
@@ -270,6 +267,10 @@ export class GrenadeHandView {
     if (this.grenadeInHand) {
       this.grenadeInHand.visible = show;
     }
+  }
+
+  hasVisibleContent(): boolean {
+    return this.grenadeInHand?.visible === true;
   }
 
   updateHandAnimation(isAiming: boolean, throwPower: number, idleTime: number): void {

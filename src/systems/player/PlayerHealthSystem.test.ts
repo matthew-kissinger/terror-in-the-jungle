@@ -172,6 +172,16 @@ describe('PlayerHealthSystem', () => {
   });
 
   describe('Health Regeneration', () => {
+    it('does not read the clock for regeneration while already at full health', () => {
+      vi.clearAllMocks();
+      const nowSpy = vi.spyOn(Date, 'now');
+
+      system.update(0.016);
+
+      expect(nowSpy).not.toHaveBeenCalled();
+      expect(system.getHealth()).toBe(150);
+    });
+
     it('should regenerate health after delay', () => {
       system.takeDamage(50); // Health = 100
       expect(system.getHealth()).toBe(100);
@@ -197,6 +207,18 @@ describe('PlayerHealthSystem', () => {
 
       system.update(1.0); // Should add 20, but cap at 150
       expect(system.getHealth()).toBe(150);
+    });
+
+    it('only updates low-health visual effects when the low-health state changes', () => {
+      system.takeDamage(130); // Health drops to 20
+      vi.clearAllMocks();
+
+      system.update(0.1);
+      system.update(0.1);
+
+      expect(mockUI.setLowHealthEffect).toHaveBeenCalledTimes(1);
+      expect(mockUI.setLowHealthEffect).toHaveBeenCalledWith(true);
+      expect(mockEffects.startHeartbeat).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -59,18 +59,19 @@ export function handleRejoiningMovement(
 }
 
 function getSquadCentroid(squad: Squad, combatants: Map<string, Combatant>): THREE.Vector3 | undefined {
-  const squadMembers = squad.members
-    .map(id => combatants.get(id))
-    .filter(c => c && !c.isRejoiningSquad);
+  let centroid: THREE.Vector3 | undefined;
+  let validMemberCount = 0;
 
-  if (squadMembers.length === 0) return undefined;
+  for (const id of squad.members) {
+    const member = combatants.get(id);
+    if (!member || member.isRejoiningSquad) continue;
+    centroid ??= objectPool.getVector3();
+    centroid.add(member.position);
+    validMemberCount++;
+  }
 
-  const centroid = objectPool.getVector3();
-  squadMembers.forEach(member => {
-    if (member) centroid.add(member.position);
-  });
-  centroid.divideScalar(squadMembers.length);
-
+  if (!centroid || validMemberCount === 0) return undefined;
+  centroid.divideScalar(validMemberCount);
   return centroid;
 }
 

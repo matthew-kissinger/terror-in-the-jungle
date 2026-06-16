@@ -24,6 +24,7 @@ function createRefs() {
     secondaryWeapon: 'm1911',
     equipment: 'frag_grenade',
   };
+  const statsTracker = {};
 
   const refs = {
     audioManager: {},
@@ -56,6 +57,7 @@ function createRefs() {
       setInventoryManager: vi.fn(),
       setPlayerController: vi.fn(),
       setPlayerFaction: vi.fn(),
+      setStatsTracker: vi.fn(),
       setTicketSystem: vi.fn(),
       setZoneManager: vi.fn(),
     },
@@ -72,6 +74,7 @@ function createRefs() {
     helicopterModel: {},
     helipadSystem: {},
     hudSystem: {
+      getStatsTracker: vi.fn(() => statsTracker),
       getLayout: vi.fn(() => layout),
       setAudioManager: vi.fn(),
       setCombatantSystem: vi.fn(),
@@ -173,6 +176,7 @@ function createRefs() {
   return {
     refs,
     layout,
+    statsTracker,
     getSpectatorProvider: () => spectatorProvider,
     setContext: (next: { alliance: Alliance; faction: Faction }) => {
       currentContext = next;
@@ -183,7 +187,7 @@ function createRefs() {
 
 describe('StartupPlayerRuntimeComposer', () => {
   it('wires startup/player/deploy dependencies and applies the active loadout', () => {
-    const { refs, layout, currentLoadout } = createRefs();
+    const { refs, layout, currentLoadout, statsTracker } = createRefs();
     const camera = new THREE.PerspectiveCamera();
     const renderer = { renderer: {} } as any;
 
@@ -199,6 +203,7 @@ describe('StartupPlayerRuntimeComposer', () => {
     expect(refs.playerHealthSystem.setRespawnManager).toHaveBeenCalledWith(refs.playerRespawnManager);
     expect(refs.hudSystem.setGrenadeSystem).toHaveBeenCalledWith(refs.grenadeSystem);
     expect(refs.hudSystem.setMortarSystem).toHaveBeenCalledWith(refs.mortarSystem);
+    expect(refs.firstPersonWeapon.setStatsTracker).toHaveBeenCalledWith(statsTracker);
     expect(refs.playerRespawnManager.setLoadoutService).toHaveBeenCalledWith(refs.loadoutService);
     expect(refs.playerRespawnManager.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.inventoryManager.setLoadout).toHaveBeenCalledWith(currentLoadout);
@@ -245,6 +250,80 @@ describe('StartupPlayerRuntimeComposer', () => {
     // Aircraft + destroyed entries are dropped; only the live ground vehicle survives.
     expect(markers.map(m => m.vehicleId)).toEqual(['m151_a']);
     expect(markers[0].category).toBe('ground');
+  });
+
+  it('reuses compass vehicle marker records across refreshes and prunes stale vehicles', () => {
+    const { refs } = createRefs();
+    const drivableJeep = {
+      vehicleId: 'm151_a',
+      category: 'ground',
+      faction: Faction.US,
+      position: new THREE.Vector3(10, 0, 20),
+      destroyed: false,
+      getPosition() {
+        return this.position;
+      },
+      isDestroyed() {
+        return this.destroyed;
+      },
+    };
+    refs.vehicleManager.getAllVehicles = vi.fn(() => [drivableJeep]);
+
+    wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), {
+      camera: new THREE.PerspectiveCamera(),
+    });
+
+    const query = refs.compassSystem.setVehicleQuery.mock.calls[0][0] as {
+      getVehicleMarkers: () => Array<{ vehicleId: string; position: THREE.Vector3 }>;
+    };
+    const firstMarkers = query.getVehicleMarkers();
+    const firstEntry = firstMarkers[0];
+
+    drivableJeep.position = new THREE.Vector3(12, 0, 25);
+    const secondMarkers = query.getVehicleMarkers();
+
+    expect(secondMarkers).toBe(firstMarkers);
+    expect(secondMarkers[0]).toBe(firstEntry);
+    expect(secondMarkers[0].position).toBe(drivableJeep.position);
+
+    drivableJeep.destroyed = true;
+    expect(query.getVehicleMarkers()).toHaveLength(0);
+
+    drivableJeep.destroyed = false;
+    const thirdMarkers = query.getVehicleMarkers();
+    expect(thirdMarkers).toBe(firstMarkers);
+    expect(thirdMarkers[0]).not.toBe(firstEntry);
+    expect(thirdMarkers[0].vehicleId).toBe('m151_a');
+  });
+
+  it('uses the allocation-free compass vehicle iterator when the manager exposes one', () => {
+    const { refs } = createRefs();
+    const drivableJeep = {
+      vehicleId: 'm151_a',
+      category: 'ground',
+      faction: Faction.US,
+      getPosition: () => new THREE.Vector3(10, 0, 20),
+      isDestroyed: () => false,
+    };
+    refs.vehicleManager.getAllVehicles = vi.fn(() => {
+      throw new Error('getAllVehicles should not be used when forEachVehicle is available');
+    });
+    refs.vehicleManager.forEachVehicle = vi.fn((visitor: (vehicle: typeof drivableJeep) => void) => {
+      visitor(drivableJeep);
+    });
+
+    wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), {
+      camera: new THREE.PerspectiveCamera(),
+    });
+
+    const query = refs.compassSystem.setVehicleQuery.mock.calls[0][0] as {
+      getVehicleMarkers: () => Array<{ vehicleId: string; category: string }>;
+    };
+    expect(query.getVehicleMarkers()).toEqual([
+      expect.objectContaining({ vehicleId: 'm151_a', category: 'ground' }),
+    ]);
+    expect(refs.vehicleManager.forEachVehicle).toHaveBeenCalledTimes(1);
+    expect(refs.vehicleManager.getAllVehicles).not.toHaveBeenCalled();
   });
 
   it('wires the boarding-factory back into the player controller when the seam exists (VEKHIKL-UX-2)', () => {

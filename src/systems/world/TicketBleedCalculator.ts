@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { ZoneState } from './ZoneManager';
+import { type CaptureZone, ZoneState } from './ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 
 export interface TicketBleedRate {
@@ -12,6 +12,20 @@ export interface TicketBleedRate {
 
 export class TicketBleedCalculator {
   private readonly baseBleedRate = 1.0; // tickets per second when losing all zones
+  private countedTotalZones = 0;
+  private countedUsControlled = 0;
+  private countedOpforControlled = 0;
+  private readonly countZoneControl = (zone: CaptureZone): void => {
+    this.countedTotalZones++;
+    switch (zone.state) {
+      case ZoneState.BLUFOR_CONTROLLED:
+        this.countedUsControlled++;
+        break;
+      case ZoneState.OPFOR_CONTROLLED:
+        this.countedOpforControlled++;
+        break;
+    }
+  };
 
   /**
    * Get base bleed rate (for testing/debugging)
@@ -28,28 +42,26 @@ export class TicketBleedCalculator {
       return { usTickets: 0, opforTickets: 0, bleedPerSecond: 0 };
     }
 
-    const capturableZones = zoneQuery.getCapturableZones();
+    this.resetZoneControlCounts();
+    const iterableZoneQuery = zoneQuery as IZoneQuery & {
+      forEachCapturableZone?: (callback: (zone: CaptureZone) => void) => void;
+    };
+    if (iterableZoneQuery.forEachCapturableZone) {
+      iterableZoneQuery.forEachCapturableZone(this.countZoneControl);
+    } else {
+      const capturableZones = zoneQuery.getCapturableZones();
+      for (const zone of capturableZones) {
+        this.countZoneControl(zone);
+      }
+    }
 
-    if (capturableZones.length === 0) {
+    const totalZones = this.countedTotalZones;
+    if (totalZones === 0) {
       return { usTickets: 0, opforTickets: 0, bleedPerSecond: 0 };
     }
 
-    let usControlled = 0;
-    let opforControlled = 0;
-
-    // Count zone control
-    capturableZones.forEach(zone => {
-      switch (zone.state) {
-        case ZoneState.BLUFOR_CONTROLLED:
-          usControlled++;
-          break;
-        case ZoneState.OPFOR_CONTROLLED:
-          opforControlled++;
-          break;
-      }
-    });
-
-    const totalZones = capturableZones.length;
+    const usControlled = this.countedUsControlled;
+    const opforControlled = this.countedOpforControlled;
     const usControlRatio = usControlled / totalZones;
     const opforControlRatio = opforControlled / totalZones;
 
@@ -85,6 +97,12 @@ export class TicketBleedCalculator {
       opforTickets: opforBleed,
       bleedPerSecond: Math.max(usBleed, opforBleed)
     };
+  }
+
+  private resetZoneControlCounts(): void {
+    this.countedTotalZones = 0;
+    this.countedUsControlled = 0;
+    this.countedOpforControlled = 0;
   }
 
   /**

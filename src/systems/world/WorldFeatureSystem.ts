@@ -8,12 +8,13 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
 import { freezeTransform } from '../../utils/SceneUtils';
 import { modelLoader } from '../assets/ModelLoader';
-import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
+import { getModelPlacementProfile, type ModelDrawCallOptimizationStrategy } from '../assets/ModelPlacementProfiles';
 import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { AIRFIELD_TEMPLATES, getAirfieldTemplateCompatibilityIssues } from './AirfieldTemplates';
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
+import { disposeGeneratedGroundVehicleResources, prepareDynamicGroundVehicleForRendering, updateDynamicGroundVehicleVisibility } from './GroundVehicleRenderOptimization';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import { createGroundVehicleForModelPath, groundVehicleIdForPlacement, isGroundVehicleModelPath } from '../vehicle/GroundVehicle';
@@ -28,9 +29,11 @@ const _placementBounds = new THREE.Box3();
 const _placementSize = new THREE.Vector3();
 const _placementNormal = new THREE.Vector3();
 const _featureSectorBounds = new THREE.Box3();
+const _featureContentBounds = new THREE.Box3();
 const _featureFrustum = new THREE.Frustum();
 const _featureViewProjection = new THREE.Matrix4();
 const _featureCameraInverse = new THREE.Matrix4();
+const _detailWorldPosition = new THREE.Vector3();
 
 /**
  * Global scale multiplier for placed structures.
@@ -59,6 +62,37 @@ const WORLD_FEATURE_BATCH_SECTOR_SIZE_M = 700;
 const WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M = 180;
 const WORLD_FEATURE_SECTOR_MIN_Y = -120;
 const WORLD_FEATURE_SECTOR_MAX_Y = 420;
+const WORLD_FEATURE_DETAIL_RENDER_HYSTERESIS_M = 20;
+const WORLD_FEATURE_DETAIL_CULL_KEY = 'worldFeatureDetailCull';
+const WORLD_FEATURE_DETAIL_OPTIMIZED_RESOURCE_KEY = 'worldFeatureDetailOptimizedResource';
+const WORLD_FEATURE_STATIC_VISIBILITY_MOVE_THRESHOLD_M = 1.5;
+const WORLD_FEATURE_STATIC_VISIBILITY_ROTATION_THRESHOLD_DEG = 0.5;
+const WORLD_FEATURE_STATIC_VISIBILITY_FORCE_INTERVAL_FRAMES = 6;
+const WORLD_FEATURE_STATIC_VISIBILITY_ROTATION_DOT =
+  Math.cos(THREE.MathUtils.degToRad(WORLD_FEATURE_STATIC_VISIBILITY_ROTATION_THRESHOLD_DEG));
+const WORLD_FEATURE_PROJECTION_EPSILON = 1e-6;
+const WORLD_FEATURE_PLACEMENT_SAMPLE_OFFSETS = [
+  [0, 0],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [0.7, 0.7],
+  [-0.7, 0.7],
+  [0.7, -0.7],
+  [-0.7, -0.7],
+] as const;
+
+function matrixApproximatelyEquals(a: THREE.Matrix4, b: THREE.Matrix4, epsilon: number): boolean {
+  const left = a.elements;
+  const right = b.elements;
+  for (let i = 0; i < 16; i++) {
+    if (Math.abs(left[i] - right[i]) > epsilon) {
+      return false;
+    }
+  }
+  return true;
+}
 
 interface TerrainPlacementCandidate {
   x: number;
@@ -86,6 +120,14 @@ interface WorldFeatureRenderSector {
   maxZ: number;
 }
 
+interface WorldFeatureDetailCullObject {
+  object: THREE.Object3D;
+  worldX: number;
+  worldZ: number;
+  renderDistanceM: number;
+  visibilityInitialized: boolean;
+}
+
 interface WorldFeatureSystemDependencies {
   terrainManager: ITerrainRuntime;
   gameModeManager: GameModeManager;
@@ -103,9 +145,16 @@ export class WorldFeatureSystem implements GameSystem {
   private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
   private featureGroups: WorldFeatureRenderSector[] = [];
+  private detailCullObjects: WorldFeatureDetailCullObject[] = [];
   private staticFeatureRoot: THREE.Group | null = null;
   private buildInFlight = false;
   private builtModeId: string | null = null;
+  private readonly lastStaticVisibilityCameraPosition = new THREE.Vector3();
+  private readonly lastStaticVisibilityCameraQuaternion = new THREE.Quaternion();
+  private readonly lastStaticVisibilityProjectionMatrix = new THREE.Matrix4();
+  private staticVisibilityPoseInitialized = false;
+  private staticVisibilityFramesSinceRefresh = 0;
+  private dynamicGroundVehicleCount = 0;
 
   constructor(scene: THREE.Scene, camera?: THREE.Camera) {
     this.scene = scene;
@@ -201,6 +250,7 @@ export class WorldFeatureSystem implements GameSystem {
       }
       for (const sector of this.featureGroups) {
         this.optimizeStaticFeatureGroup(sector.group);
+        this.updateFeatureSectorBoundsFromContent(sector);
       }
       this.updateFeatureVisibility();
       this.builtModeId = modeId;
@@ -336,12 +386,37 @@ export class WorldFeatureSystem implements GameSystem {
       });
       const objectId = `${feature.id}_${placement.id ?? i}`;
       const isDynamicGroundVehicle = isGroundVehicleModelPath(placement.modelPath) && Boolean(this.vehicleManager);
-      // Runtime ground-vehicle prefabs must move outside frozen static scenery
-      // and stale collision/LOS bounds.
+      const detailRenderDistanceM = Number(profile.detailRenderDistanceM ?? 0);
+      const hasDetailCull = !isDynamicGroundVehicle &&
+        Number.isFinite(detailRenderDistanceM) &&
+        detailRenderDistanceM > 0;
+      if (hasDetailCull) {
+        object.userData[WORLD_FEATURE_DETAIL_CULL_KEY] = true;
+        object.userData.worldFeatureDetailRenderDistanceM = detailRenderDistanceM;
+      }
       if (isDynamicGroundVehicle) {
+        prepareDynamicGroundVehicleForRendering(object, placement.modelPath);
         this.scene.add(object);
       } else {
-        parent.add(object);
+        if (hasDetailCull) {
+          this.optimizeDetailObjectDrawCalls(
+            object,
+            placement.modelPath,
+            profile.drawCallOptimization ?? 'merge',
+          );
+          parent.add(object);
+          object.updateMatrixWorld(true);
+          object.getWorldPosition(_detailWorldPosition);
+          this.detailCullObjects.push({
+            object,
+            worldX: _detailWorldPosition.x,
+            worldZ: _detailWorldPosition.z,
+            renderDistanceM: detailRenderDistanceM,
+            visibilityInitialized: false,
+          });
+        } else {
+          parent.add(object);
+        }
         freezeTransform(object);
       }
       const collisionRegistered = !isDynamicGroundVehicle &&
@@ -353,6 +428,9 @@ export class WorldFeatureSystem implements GameSystem {
 
       const losObstacleIds = isDynamicGroundVehicle ? [] : this.registerPlacementWithLOS(objectId, object);
       const vehicleId = this.registerGroundVehiclePlacement(objectId, placement, object);
+      if (vehicleId) {
+        this.dynamicGroundVehicleCount++;
+      }
 
       this.spawnedObjects.push({
         id: objectId,
@@ -373,7 +451,9 @@ export class WorldFeatureSystem implements GameSystem {
       batchNamePrefix: 'world_static_features',
       strategy: 'batch',
       minBucketSize: 2,
-      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true || this.isGroundVehicleMesh(mesh),
+      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true ||
+        this.isGroundVehicleMesh(mesh) ||
+        this.isDetailCullMesh(mesh),
     });
 
     if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
@@ -384,13 +464,40 @@ export class WorldFeatureSystem implements GameSystem {
     }
   }
 
-  private updateFeatureVisibility(): void {
-    if (!this.camera || this.featureGroups.length === 0) {
+  private updateFeatureSectorBoundsFromContent(sector: WorldFeatureRenderSector): void {
+    if (sector.group.children.length === 0) {
       return;
     }
 
+    sector.group.updateMatrixWorld(true);
+    _featureContentBounds.setFromObject(sector.group);
+    if (
+      !Number.isFinite(_featureContentBounds.min.x)
+      || !Number.isFinite(_featureContentBounds.max.x)
+      || !Number.isFinite(_featureContentBounds.min.z)
+      || !Number.isFinite(_featureContentBounds.max.z)
+    ) {
+      return;
+    }
+
+    sector.minX = _featureContentBounds.min.x;
+    sector.maxX = _featureContentBounds.max.x;
+    sector.minZ = _featureContentBounds.min.z;
+    sector.maxZ = _featureContentBounds.max.z;
+  }
+
+  private updateFeatureVisibility(): void {
+    if (!this.camera) return;
+
     const cameraX = this.camera.position.x;
     const cameraZ = this.camera.position.z;
+    if (this.dynamicGroundVehicleCount > 0) {
+      updateDynamicGroundVehicleVisibility(this.spawnedObjects, this.camera, { renderDistanceM: WORLD_FEATURE_RENDER_DISTANCE_M, hysteresisM: WORLD_FEATURE_RENDER_HYSTERESIS_M, alwaysVisibleM: WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M });
+    }
+    if (!this.shouldRefreshStaticFeatureVisibility()) {
+      return;
+    }
+
     const showDistanceSq = WORLD_FEATURE_RENDER_DISTANCE_M * WORLD_FEATURE_RENDER_DISTANCE_M;
     const hideDistance = WORLD_FEATURE_RENDER_DISTANCE_M + WORLD_FEATURE_RENDER_HYSTERESIS_M;
     const hideDistanceSq = hideDistance * hideDistance;
@@ -413,6 +520,62 @@ export class WorldFeatureSystem implements GameSystem {
       }
       entry.visible = shouldBeVisible;
       entry.group.visible = shouldBeVisible;
+    }
+    this.updateDetailObjectVisibility(cameraX, cameraZ);
+  }
+
+  private shouldRefreshStaticFeatureVisibility(): boolean {
+    const camera = this.camera;
+    if (!camera) return false;
+
+    this.staticVisibilityFramesSinceRefresh++;
+    if (!this.staticVisibilityPoseInitialized) {
+      this.storeStaticVisibilityCameraPose(camera);
+      return true;
+    }
+
+    const moveThresholdSq =
+      WORLD_FEATURE_STATIC_VISIBILITY_MOVE_THRESHOLD_M * WORLD_FEATURE_STATIC_VISIBILITY_MOVE_THRESHOLD_M;
+    const movedEnough = this.lastStaticVisibilityCameraPosition.distanceToSquared(camera.position) >= moveThresholdSq;
+    const rotatedEnough = Math.abs(this.lastStaticVisibilityCameraQuaternion.dot(camera.quaternion)) <=
+      WORLD_FEATURE_STATIC_VISIBILITY_ROTATION_DOT;
+    const projectionChanged = !matrixApproximatelyEquals(
+      this.lastStaticVisibilityProjectionMatrix,
+      camera.projectionMatrix,
+      WORLD_FEATURE_PROJECTION_EPSILON,
+    );
+    const forceRefresh = this.staticVisibilityFramesSinceRefresh >= WORLD_FEATURE_STATIC_VISIBILITY_FORCE_INTERVAL_FRAMES;
+
+    if (!movedEnough && !rotatedEnough && !projectionChanged && !forceRefresh) {
+      return false;
+    }
+
+    this.storeStaticVisibilityCameraPose(camera);
+    return true;
+  }
+
+  private storeStaticVisibilityCameraPose(camera: THREE.Camera): void {
+    this.lastStaticVisibilityCameraPosition.copy(camera.position);
+    this.lastStaticVisibilityCameraQuaternion.copy(camera.quaternion);
+    this.lastStaticVisibilityProjectionMatrix.copy(camera.projectionMatrix);
+    this.staticVisibilityPoseInitialized = true;
+    this.staticVisibilityFramesSinceRefresh = 0;
+  }
+
+  private updateDetailObjectVisibility(cameraX: number, cameraZ: number): void {
+    for (const entry of this.detailCullObjects) {
+      const dx = entry.worldX - cameraX;
+      const dz = entry.worldZ - cameraZ;
+      const distanceSq = dx * dx + dz * dz;
+      const currentlyVisible = entry.visibilityInitialized ? entry.object.visible : false;
+      const limit = currentlyVisible
+        ? entry.renderDistanceM + WORLD_FEATURE_DETAIL_RENDER_HYSTERESIS_M
+        : entry.renderDistanceM;
+      const shouldBeVisible = distanceSq <= limit * limit;
+      if (entry.object.visible !== shouldBeVisible) {
+        entry.object.visible = shouldBeVisible;
+      }
+      entry.visibilityInitialized = true;
     }
   }
 
@@ -519,6 +682,40 @@ export class WorldFeatureSystem implements GameSystem {
     return false;
   }
 
+  private isDetailCullMesh(mesh: THREE.Mesh): boolean {
+    let current: THREE.Object3D | null = mesh;
+    while (current) {
+      if (current.userData[WORLD_FEATURE_DETAIL_CULL_KEY] === true) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  private optimizeDetailObjectDrawCalls(
+    object: THREE.Object3D,
+    modelPath: string,
+    strategy: ModelDrawCallOptimizationStrategy,
+  ): void {
+    try {
+      const result = optimizeStaticModelDrawCalls(object, {
+        batchNamePrefix: 'world_static_feature_detail',
+        strategy,
+        minBucketSize: 1,
+      });
+      object.userData.worldFeatureDetailDrawCallOptimization = result;
+      object.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
+          child.userData.perfCategory = 'world_static_features';
+          child.userData[WORLD_FEATURE_DETAIL_OPTIMIZED_RESOURCE_KEY] = true;
+        }
+      });
+    } catch (error) {
+      Logger.warn('world', `Failed to optimize detail world feature model ${modelPath}`, error);
+    }
+  }
+
   private resolvePlacements(feature: MapFeatureDefinition): StaticModelPlacementConfig[] {
     const prefab = getWorldFeaturePrefab(feature);
     const prefabPlacements = prefab?.placements ?? [];
@@ -564,6 +761,8 @@ export class WorldFeatureSystem implements GameSystem {
         this.vehicleManager.unregister(entry.vehicleId);
       }
       if (typeof (modelLoader as any).disposeInstance === 'function') {
+        this.disposeGeneratedDetailResources(entry.object);
+        disposeGeneratedGroundVehicleResources(entry.object);
         modelLoader.disposeInstance(entry.object);
       } else {
         this.scene.remove(entry.object);
@@ -589,8 +788,26 @@ export class WorldFeatureSystem implements GameSystem {
     }
     this.spawnedObjects = [];
     this.featureGroups = [];
+    this.detailCullObjects = [];
+    this.dynamicGroundVehicleCount = 0;
+    this.staticVisibilityPoseInitialized = false;
+    this.staticVisibilityFramesSinceRefresh = 0;
     this.clearStaticFeatureRoot();
     this.builtModeId = null;
+  }
+
+  private disposeGeneratedDetailResources(object: THREE.Object3D): void {
+    object.traverse((child) => {
+      if (!(child instanceof THREE.Mesh) || child.userData[WORLD_FEATURE_DETAIL_OPTIMIZED_RESOURCE_KEY] !== true) {
+        return;
+      }
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach((material) => material.dispose());
+      } else {
+        child.material.dispose();
+      }
+    });
   }
 
   private clearStaticFeatureRoot(): void {
@@ -743,8 +960,8 @@ export class WorldFeatureSystem implements GameSystem {
     );
 
     let best = baseCandidate;
-    const ringRadii = [searchRadius * 0.5, searchRadius];
-    for (const radius of ringRadii) {
+    for (let ringIndex = 0; ringIndex < 2; ringIndex++) {
+      const radius = ringIndex === 0 ? searchRadius * 0.5 : searchRadius;
       for (let sampleIndex = 0; sampleIndex < WORLD_FEATURE_SAMPLE_DIRECTIONS; sampleIndex++) {
         const angle = (sampleIndex / WORLD_FEATURE_SAMPLE_DIRECTIONS) * Math.PI * 2;
         const candidate = this.scoreTerrainPlacementCandidate(
@@ -790,25 +1007,13 @@ export class WorldFeatureSystem implements GameSystem {
       1.1,
       WORLD_FEATURE_MAX_PLACEMENT_SAMPLE_RADIUS,
     );
-    const samples = [
-      [0, 0],
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-      [0.7, 0.7],
-      [-0.7, 0.7],
-      [0.7, -0.7],
-      [-0.7, -0.7],
-    ] as const;
-
     let minHeight = Number.POSITIVE_INFINITY;
     let maxHeight = Number.NEGATIVE_INFINITY;
     let sumHeight = 0;
     let centerHeight = 0;
 
-    for (let i = 0; i < samples.length; i++) {
-      const [offsetX, offsetZ] = samples[i];
+    for (let i = 0; i < WORLD_FEATURE_PLACEMENT_SAMPLE_OFFSETS.length; i++) {
+      const [offsetX, offsetZ] = WORLD_FEATURE_PLACEMENT_SAMPLE_OFFSETS[i];
       const sampleX = x + offsetX * sampleRadius;
       const sampleZ = z + offsetZ * sampleRadius;
       if (!this.terrainManager.hasTerrainAt(sampleX, sampleZ)) {
@@ -824,7 +1029,7 @@ export class WorldFeatureSystem implements GameSystem {
       sumHeight += height;
     }
 
-    const meanHeight = sumHeight / samples.length;
+    const meanHeight = sumHeight / WORLD_FEATURE_PLACEMENT_SAMPLE_OFFSETS.length;
     const heightSpan = maxHeight - minHeight;
     const normalY = typeof (this.terrainManager as any).getNormalAt === 'function'
       ? Number(this.terrainManager.getNormalAt(x, z, _placementNormal).y)

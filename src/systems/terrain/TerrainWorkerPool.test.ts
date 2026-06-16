@@ -148,4 +148,31 @@ describe('TerrainWorkerPool lifecycle safety', () => {
     worker0.emitMessage(makeResultMessage(worker0.posted[worker0.posted.length - 1].data.requestId));
     await c;
   });
+
+  it('rejects still-queued work on dispose after earlier queued work has dispatched', async () => {
+    pool.dispose();
+    pool = new TestableWorkerPool(1);
+
+    const first = pool.bakeHeightmap(2, 64);
+    const second = pool.bakeHeightmap(2, 64);
+    const third = pool.bakeHeightmap(2, 64);
+    const worker = pool.fakeWorkers[0];
+
+    expect(worker.posted).toHaveLength(1);
+    expect(pool.getStats().queueLength).toBe(3);
+
+    worker.emitMessage(makeResultMessage(worker.posted[0].data.requestId));
+    await first;
+
+    expect(worker.posted).toHaveLength(2);
+    expect(pool.getStats().queueLength).toBe(2);
+
+    const secondRejection = expect(second).rejects.toThrow(/disposed/i);
+    const thirdRejection = expect(third).rejects.toThrow(/disposed/i);
+    pool.dispose();
+
+    await secondRejection;
+    await thirdRejection;
+    expect(pool.getStats().queueLength).toBe(0);
+  });
 });

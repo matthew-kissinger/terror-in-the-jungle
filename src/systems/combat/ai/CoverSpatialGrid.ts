@@ -176,6 +176,55 @@ export class CoverSpatialGrid {
   }
 
   /**
+   * Return the nearest LOS-valid cover entry without materializing and sorting
+   * the full candidate set. This is the production hot path for callers that
+   * only need one cover position; `queryWithLOS()` remains the sorted-list API.
+   */
+  queryNearestWithLOS(
+    origin: THREE.Vector3,
+    target: THREE.Vector3,
+    terrainRuntime: ITerrainRuntime | null | undefined,
+    radius: number = 30,
+  ): CoverGridQueryResult | null {
+    if (!terrainRuntime) return null;
+    if (!isFiniteVec3(origin) || !isFiniteVec3(target)) return null;
+    if (!(radius > 0) || !Number.isFinite(radius)) return null;
+    if (this.entries.size === 0) return null;
+
+    const radiusSq = radius * radius;
+    const best: { entry: CoverEntry | null; distanceSq: number } = {
+      entry: null,
+      distanceSq: Number.POSITIVE_INFINITY,
+    };
+
+    this.forEachCandidateInRadius(origin, radius, (entry) => {
+      _toCover.subVectors(entry.position, origin);
+      const distSq = _toCover.lengthSq();
+      if (distSq > radiusSq) return;
+      if (
+        best.entry
+        && (
+          distSq > best.distanceSq
+          || (distSq === best.distanceSq && entry.coverId >= best.entry.coverId)
+        )
+      ) {
+        return;
+      }
+      if (!this.hasLineOfSight(entry.position, target, terrainRuntime)) return;
+      best.entry = entry;
+      best.distanceSq = distSq;
+    });
+
+    const bestEntry = best.entry;
+    if (!bestEntry) return null;
+    return {
+      coverId: bestEntry.coverId,
+      position: bestEntry.position.clone(),
+      distance: Math.sqrt(best.distanceSq),
+    };
+  }
+
+  /**
    * Range query with line-of-sight gating against the target. A candidate
    * is included only when the terrain raycast from the candidate's eye
    * height toward the target reports no hit short of the target — i.e.

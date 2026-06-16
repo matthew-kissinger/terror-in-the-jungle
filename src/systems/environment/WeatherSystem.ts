@@ -15,6 +15,16 @@ import {
 } from './WeatherAtmosphere';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
+const MAX_RAIN_OPACITY = 0.6;
+const MIN_ACTIVE_RAIN_FRACTION = 0.5;
+
+function markActiveRainMatricesDirty(attribute: THREE.InstancedBufferAttribute, activeCount: number): void {
+  if (typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(0, activeCount * attribute.itemSize);
+  }
+  attribute.needsUpdate = true;
+}
+
 export class WeatherSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -37,9 +47,11 @@ export class WeatherSystem implements GameSystem {
   // Rain Rendering
   private rainMesh?: THREE.InstancedMesh;
   private rainCount: number;
-  private rainDummy: THREE.Object3D = new THREE.Object3D();
+  private activeRainCount: number = 0;
   private rainVelocities: Float32Array;
   private rainPositions: Float32Array;
+  private lastSurfaceWetness = Number.NaN;
+  private rainInactive = true;
 
   // Lightning
   private lightningState: LightningState = {
@@ -145,16 +157,19 @@ export class WeatherSystem implements GameSystem {
     const material = new THREE.MeshBasicMaterial({
       color: 0xaaaaaa,
       transparent: true,
-      opacity: 0.6,
+      opacity: MAX_RAIN_OPACITY,
       side: THREE.DoubleSide,
       forceSinglePass: true,
       depthWrite: false
     });
 
     this.rainMesh = new THREE.InstancedMesh(geometry, material, this.rainCount);
+    this.rainMesh.name = 'WeatherRain';
+    this.rainMesh.userData.perfCategory = 'weather_rain';
     this.rainMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.rainMesh.frustumCulled = false; // Rain follows camera, bounding sphere won't be accurate
     this.rainMesh.visible = false;
+    this.rainMesh.count = 0;
     this.rainMesh.matrixAutoUpdate = false;
     this.rainMesh.matrixWorldAutoUpdate = false;
     this.scene.add(this.rainMesh);
@@ -165,23 +180,24 @@ export class WeatherSystem implements GameSystem {
     }
   }
 
-  private resetRainDrop(index: number, randomY: boolean = false): void {
+  private resetRainDrop(index: number, randomY: boolean = false, center?: THREE.Vector3): void {
     if (!this.rainMesh) return;
 
     const range = 40; // Rain radius around camera
-    const x = (Math.random() - 0.5) * range * 2;
-    const z = (Math.random() - 0.5) * range * 2;
+    const originX = center?.x ?? 0;
+    const originY = center?.y ?? 0;
+    const originZ = center?.z ?? 0;
+    const x = originX + (Math.random() - 0.5) * range * 2;
+    const z = originZ + (Math.random() - 0.5) * range * 2;
     // Keep Y relative to camera later
-    const y = randomY ? (Math.random() * 30) : 30;
+    const y = originY + (randomY ? (Math.random() * 30) : 30);
 
     const idx = index * 3;
     this.rainPositions[idx] = x;
     this.rainPositions[idx + 1] = y;
     this.rainPositions[idx + 2] = z;
 
-    this.rainDummy.position.set(x, y, z);
-    this.rainDummy.updateMatrix();
-    this.rainMesh.setMatrixAt(index, this.rainDummy.matrix);
+    this.writeRainMatrix(index, x, y, z);
     
     // Random fall speed
     this.rainVelocities[index] = 15 + Math.random() * 10;
@@ -189,7 +205,7 @@ export class WeatherSystem implements GameSystem {
 
   update(deltaTime: number): void {
     if (!this.config?.enabled) {
-      this.terrainRuntime.setSurfaceWetness(0);
+      this.setSurfaceWetness(0);
       return;
     }
 
@@ -246,7 +262,7 @@ export class WeatherSystem implements GameSystem {
     if (instant) {
       this.currentState = state;
       this.transitionProgress = 1.0;
-      this.terrainRuntime.setSurfaceWetness(getBlendedRainIntensity(state, state, 1.0));
+      this.setSurfaceWetness(getBlendedRainIntensity(state, state, 1.0));
       this.updateAtmosphere();
     } else {
       this.transitionProgress = 0.0;
@@ -268,21 +284,42 @@ export class WeatherSystem implements GameSystem {
 
     // Determine rain intensity based on blended state
     const intensity = getBlendedRainIntensity(this.currentState, this.targetState, this.transitionProgress);
-    this.terrainRuntime.setSurfaceWetness(intensity);
-    
+    this.setSurfaceWetness(intensity);
+
     if (intensity <= 0.01) {
+      if (this.rainInactive) {
+        return;
+      }
       this.rainMesh.visible = false;
+      this.rainMesh.count = 0;
+      this.activeRainCount = 0;
+      this.rainInactive = true;
       return;
     }
 
     this.rainMesh.visible = true;
-    (this.rainMesh.material as THREE.MeshBasicMaterial).opacity = 0.6 * intensity;
+    this.rainInactive = false;
 
     const cameraPos = this.camera.position;
+    const nextActiveRainCount = this.resolveActiveRainCount(intensity);
+    if (nextActiveRainCount > this.activeRainCount) {
+      for (let i = this.activeRainCount; i < nextActiveRainCount; i++) {
+        this.resetRainDrop(i, true, cameraPos);
+      }
+    }
+    this.activeRainCount = nextActiveRainCount;
+    this.rainMesh.count = nextActiveRainCount;
+
+    const activeFraction = nextActiveRainCount / this.rainCount;
+    (this.rainMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(
+      MAX_RAIN_OPACITY,
+      MAX_RAIN_OPACITY * intensity / activeFraction,
+    );
+
     const windX = (this.currentState === WeatherState.STORM ? 5 : 2) * deltaTime;
-    
+
     // Optimization: Use direct position tracking to avoid expensive matrix decomposition
-    for (let i = 0; i < this.rainCount; i++) {
+    for (let i = 0; i < nextActiveRainCount; i++) {
       const idx = i * 3;
       let x = this.rainPositions[idx];
       let y = this.rainPositions[idx + 1];
@@ -314,11 +351,53 @@ export class WeatherSystem implements GameSystem {
       this.rainPositions[idx + 1] = y;
       this.rainPositions[idx + 2] = z;
 
-      this.rainDummy.position.set(x, y, z);
-      this.rainDummy.updateMatrix();
-      this.rainMesh.setMatrixAt(i, this.rainDummy.matrix);
+      this.writeRainTranslation(i, x, y, z);
     }
-    this.rainMesh.instanceMatrix.needsUpdate = true;
+    markActiveRainMatricesDirty(this.rainMesh.instanceMatrix, nextActiveRainCount);
+  }
+
+  private resolveActiveRainCount(intensity: number): number {
+    if (this.rainCount <= 0 || intensity <= 0.01) return 0;
+    const activeFraction = Math.min(1, Math.max(MIN_ACTIVE_RAIN_FRACTION, intensity));
+    return Math.max(1, Math.min(this.rainCount, Math.ceil(this.rainCount * activeFraction)));
+  }
+
+  private writeRainMatrix(index: number, x: number, y: number, z: number): void {
+    if (!this.rainMesh) return;
+    const matrixArray = this.rainMesh.instanceMatrix.array;
+    const offset = index * 16;
+
+    matrixArray[offset] = 1;
+    matrixArray[offset + 1] = 0;
+    matrixArray[offset + 2] = 0;
+    matrixArray[offset + 3] = 0;
+    matrixArray[offset + 4] = 0;
+    matrixArray[offset + 5] = 1;
+    matrixArray[offset + 6] = 0;
+    matrixArray[offset + 7] = 0;
+    matrixArray[offset + 8] = 0;
+    matrixArray[offset + 9] = 0;
+    matrixArray[offset + 10] = 1;
+    matrixArray[offset + 11] = 0;
+    matrixArray[offset + 12] = x;
+    matrixArray[offset + 13] = y;
+    matrixArray[offset + 14] = z;
+    matrixArray[offset + 15] = 1;
+  }
+
+  private writeRainTranslation(index: number, x: number, y: number, z: number): void {
+    if (!this.rainMesh) return;
+    const matrixArray = this.rainMesh.instanceMatrix.array;
+    const offset = index * 16;
+    matrixArray[offset + 12] = x;
+    matrixArray[offset + 13] = y;
+    matrixArray[offset + 14] = z;
+  }
+
+  private setSurfaceWetness(value: number): void {
+    if (this.lastSurfaceWetness === value) return;
+    this.terrainRuntime.setSurfaceWetness(value);
+    this.lastSurfaceWetness = value;
   }
 
   private updateLightning(deltaTime: number): void {
@@ -364,7 +443,7 @@ export class WeatherSystem implements GameSystem {
     this.transitionProgress = 1.0;
     this.transitionTimer = 0;
     this.cycleTimer = this.getRandomCycleDuration();
-    this.terrainRuntime.setSurfaceWetness(0);
+    this.setSurfaceWetness(0);
     Logger.info('weather', 'Weather system reset to clear state');
   }
 

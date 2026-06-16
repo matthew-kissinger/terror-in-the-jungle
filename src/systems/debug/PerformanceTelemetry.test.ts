@@ -122,7 +122,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('exposes perf API on window when diagnostics are enabled', async () => {
-    const { windowRef } = await loadTelemetry(true, { search: '?sandbox=true' })
+    const { windowRef } = await loadTelemetry(true, { search: '?telemetry=1' })
     expect(windowRef).toBeDefined()
     expect(windowRef.perf).toBeDefined()
     expect(typeof windowRef.perf.report).toBe('function')
@@ -157,7 +157,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('tracks frames and resets per-frame spatial grid counters', async () => {
-    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+    const { instance } = await loadTelemetry(true, { search: '?telemetry=1' })
 
     instance.updateSpatialGridTelemetry({ queriesThisFrame: 9 })
     instance.beginFrame()
@@ -210,7 +210,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('tracks movement telemetry and exposes averaged summaries', async () => {
-    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+    const { instance } = await loadTelemetry(true, { search: '?telemetry=1' })
 
     instance.recordPlayerMovementSample(true, 0.9, 0.1, 5, 4.5, 0.08, false, false, true, 0.7, 0.2, 0.1)
     instance.recordPlayerMovementSample(true, 0.8, 0.2, 5, 4.0, -0.05, true, true, false, 0.7, 0.3, 0.15)
@@ -269,6 +269,99 @@ describe('PerformanceTelemetry', () => {
     )
   })
 
+  it('summarizes active NPC pinned trackers without materializing tracker arrays', async () => {
+    const { instance } = await loadTelemetry(true, { telemetryEnabled: true })
+
+    instance.recordNPCMovementSample('npc-pinned', 'high', 'route_follow', 0.05, true, false, false, false, 0.7, 10, 10, true)
+    instance.recordNPCMovementSample('npc-pinned', 'high', 'route_follow', 0.05, true, false, false, false, 0.7, 10.1, 10.1, true)
+
+    const arrayFromSpy = vi.spyOn(Array, 'from')
+    try {
+      const movement = instance.getMovementTelemetry()
+
+      expect(arrayFromSpy).not.toHaveBeenCalled()
+      expect(movement.npc.pinnedAreaEvents).toBe(1)
+      expect(movement.npc.pinnedSamples).toBe(1)
+      expect(movement.npc.maxPinnedSeconds).toBeCloseTo(1.4)
+    } finally {
+      arrayFromSpy.mockRestore()
+    }
+  })
+
+  it('builds movement artifacts without materializing intermediate arrays', async () => {
+    const { instance } = await loadTelemetry(true, { telemetryEnabled: true })
+
+    instance.recordPlayerMovementSample(true, 1, 0, 3, 3, 0, false, false, true, 1, 1, 1)
+    instance.recordPlayerMovementSample(true, 1, 0, 3, 3, 0, true, false, false, 1, 1.2, 1.1)
+    instance.recordPlayerMovementSample(true, 1, 0, 3, 3, 0, false, false, false, 1, 49, 1)
+    instance.recordNPCMovementSample('npc-a', 'high', 'route_follow', 1, false, false, false, false, 1, 1, 1, true)
+    instance.recordNPCMovementSample('npc-a', 'high', 'route_follow', 1, true, false, true, false, 1, 1.1, 1.1, true)
+    instance.recordNPCMovementSample('npc-b', 'low', 'backtrack', 0.1, true, false, true, false, 1, 73, 1, true)
+
+    const arrayFromSpy = vi.spyOn(Array, 'from')
+    try {
+      const artifacts = instance.getMovementArtifacts()
+
+      expect(arrayFromSpy).not.toHaveBeenCalled()
+      expect(artifacts.playerOccupancy.map((cell) => cell.count)).toEqual([2, 1])
+      expect(artifacts.npcOccupancy.map((cell) => cell.count)).toEqual([2, 1])
+      expect(artifacts.hotspots.map((hotspot) => hotspot.count))
+        .toEqual([...artifacts.hotspots.map((hotspot) => hotspot.count)].sort((a, b) => b - a))
+      expect(artifacts.tracks.map((track) => track.id)).toEqual(['player', 'npc-a', 'npc-b'])
+    } finally {
+      arrayFromSpy.mockRestore()
+    }
+  })
+
+  it('keeps movement artifact tracks bounded and chronological after wrapping', async () => {
+    const { instance } = await loadTelemetry(true, { telemetryEnabled: true })
+
+    for (let index = 0; index < 1030; index++) {
+      instance.recordPlayerMovementSample(
+        true,
+        1,
+        0,
+        2,
+        2,
+        0,
+        false,
+        false,
+        false,
+        1,
+        index * 2,
+        0,
+      )
+    }
+
+    for (let index = 0; index < 100; index++) {
+      instance.recordNPCMovementSample(
+        'npc-track',
+        'high',
+        'route_follow',
+        2,
+        false,
+        false,
+        false,
+        false,
+        1,
+        index * 2,
+        10,
+        true,
+      )
+    }
+
+    const artifacts = instance.getMovementArtifacts()
+    const playerTrack = artifacts.tracks.find((track) => track.id === 'player')
+    const npcTrack = artifacts.tracks.find((track) => track.id === 'npc-track')
+
+    expect(playerTrack?.points).toHaveLength(1024)
+    expect(playerTrack?.points[0]?.x).toBe(12)
+    expect(playerTrack?.points.at(-1)?.x).toBe(2058)
+    expect(npcTrack?.points).toHaveLength(96)
+    expect(npcTrack?.points[0]?.x).toBe(8)
+    expect(npcTrack?.points.at(-1)?.x).toBe(198)
+  })
+
   it('handles zero shots without divide-by-zero in hit rate', async () => {
     const { instance } = await loadTelemetry()
 
@@ -296,7 +389,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('generates a complete telemetry report with computed fps', async () => {
-    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+    const { instance } = await loadTelemetry(true, { search: '?telemetry=1' })
 
     frameTimingSpies.getAvgFrameTime.mockReturnValue(20)
     frameTimingSpies.getOverBudgetPercent.mockReturnValue(12.5)
@@ -318,7 +411,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('uses zero fps when average frame time is zero', async () => {
-    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+    const { instance } = await loadTelemetry(true, { search: '?telemetry=1' })
 
     frameTimingSpies.getAvgFrameTime.mockReturnValue(0)
     const report = instance.getReport()
@@ -327,7 +420,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('returns structured validation data', async () => {
-    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+    const { instance } = await loadTelemetry(true, { search: '?telemetry=1' })
 
     instance.updateSpatialGridTelemetry({ initialized: true, entityCount: 3, fallbackCount: 1 })
     instance.recordShot(true)
@@ -361,8 +454,8 @@ describe('PerformanceTelemetry', () => {
     expect(windowRef.perf).toBeUndefined()
   })
 
-  it('enables telemetry automatically in sandbox query mode', async () => {
+  it('keeps sandbox-only harness mode free of diagnostics telemetry', async () => {
     const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
-    expect(instance.isEnabled()).toBe(true)
+    expect(instance.isEnabled()).toBe(false)
   })
 })

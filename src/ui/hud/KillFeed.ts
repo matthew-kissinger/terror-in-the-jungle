@@ -33,6 +33,7 @@ export class KillFeed {
   private container: HTMLDivElement;
   private entries: KillEntry[] = [];
   private entryElements: Map<string, HTMLElement> = new Map();
+  private readonly renderCurrentIds = new Set<string>();
   private pendingTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
   private entryIdCounter: number = 0;
   private readonly MAX_ENTRIES = 6;
@@ -59,8 +60,9 @@ export class KillFeed {
     weaponType: WeaponType = 'unknown',
     isStreak: boolean = false
   ): void {
+    const timestamp = Date.now();
     const entry: KillEntry = {
-      id: `kill-${Date.now()}-${++this.entryIdCounter}`,
+      id: `kill-${timestamp}-${++this.entryIdCounter}`,
       killerName,
       killerFaction,
       victimName,
@@ -68,31 +70,28 @@ export class KillFeed {
       isHeadshot,
       weaponType,
       isStreak,
-      timestamp: Date.now(),
+      timestamp,
       opacity: 1.0,
     };
 
-    this.entries.push(entry);
-
-    if (this.entries.length > this.MAX_ENTRIES) {
-      const removed = this.entries.shift();
-      if (removed) {
-        const element = this.entryElements.get(removed.id);
-        if (element && element.parentNode) {
-          element.parentNode.removeChild(element);
-        }
-        this.entryElements.delete(removed.id);
-      }
+    if (this.entries.length >= this.MAX_ENTRIES) {
+      this.removeEntryElement(this.entries[0].id);
+      this.entries.copyWithin(0, 1);
+      this.entries[this.entries.length - 1] = entry;
+    } else {
+      this.entries.push(entry);
     }
 
     this.render();
   }
 
   update(_deltaTime: number): void {
+    if (this.entries.length === 0) return;
+
     const now = Date.now();
     let needsRender = false;
 
-    this.entries.forEach(entry => {
+    for (const entry of this.entries) {
       const age = now - entry.timestamp;
 
       if (age > this.FADE_START) {
@@ -100,18 +99,23 @@ export class KillFeed {
         entry.opacity = Math.max(0, 1.0 - fadeProgress);
         needsRender = true;
       }
-    });
+    }
 
     const originalLength = this.entries.length;
     const expiredIds: string[] = [];
-    this.entries = this.entries.filter(entry => {
+    let retainedCount = 0;
+    for (let index = 0; index < this.entries.length; index++) {
+      const entry = this.entries[index];
       const age = now - entry.timestamp;
       if (age >= this.ENTRY_LIFETIME) {
         expiredIds.push(entry.id);
-        return false;
+      } else {
+        this.entries[retainedCount++] = entry;
       }
-      return true;
-    });
+    }
+    if (retainedCount !== this.entries.length) {
+      this.entries.length = retainedCount;
+    }
 
     expiredIds.forEach(id => {
       const element = this.entryElements.get(id);
@@ -139,18 +143,23 @@ export class KillFeed {
   }
 
   private render(): void {
-    const currentIds = new Set(this.entries.map(entry => entry.id));
+    const currentIds = this.renderCurrentIds;
+    currentIds.clear();
+    for (const entry of this.entries) {
+      currentIds.add(entry.id);
+    }
 
-    const idsToRemove: string[] = [];
     this.entryElements.forEach((element, id) => {
       if (!currentIds.has(id)) {
+        if (element.classList.contains(styles.entrySlideOut)) {
+          return;
+        }
         if (element.parentNode) {
           element.parentNode.removeChild(element);
         }
-        idsToRemove.push(id);
+        this.entryElements.delete(id);
       }
     });
-    idsToRemove.forEach(id => this.entryElements.delete(id));
 
     this.entries.forEach((entry, index) => {
       const existingElement = this.entryElements.get(entry.id);
@@ -158,15 +167,12 @@ export class KillFeed {
       if (existingElement) {
         this.updateEntryElement(existingElement, entry);
 
-        const currentIndex = Array.from(this.container.children).indexOf(existingElement);
-        if (currentIndex !== index) {
-          if (index === this.container.children.length) {
-            this.container.appendChild(existingElement);
+        const referenceNode = this.container.children[index];
+        if (referenceNode !== existingElement) {
+          if (referenceNode) {
+            this.container.insertBefore(existingElement, referenceNode);
           } else {
-            const referenceNode = this.container.children[index];
-            if (referenceNode !== existingElement) {
-              this.container.insertBefore(existingElement, referenceNode);
-            }
+            this.container.appendChild(existingElement);
           }
         }
       } else {
@@ -182,6 +188,7 @@ export class KillFeed {
         this.entryElements.set(entry.id, entryElement);
       }
     });
+    currentIds.clear();
   }
 
   private createEntryElement(entry: KillEntry): HTMLDivElement {
@@ -246,6 +253,14 @@ export class KillFeed {
 
   private updateEntryElement(element: HTMLElement, entry: KillEntry): void {
     element.style.opacity = `${entry.opacity}`;
+  }
+
+  private removeEntryElement(id: string): void {
+    const element = this.entryElements.get(id);
+    if (element && element.parentNode) {
+      element.parentNode.removeChild(element);
+    }
+    this.entryElements.delete(id);
   }
 
   private getFactionColor(faction: Faction): string {

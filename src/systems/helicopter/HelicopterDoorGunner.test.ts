@@ -43,12 +43,20 @@ const PILOT_GUN: AircraftWeaponMount = {
 };
 
 function makeCombatantSystem() {
-  return {
+  const system = {
     querySpatialRadius: vi.fn().mockReturnValue([]),
     getAllCombatants: vi.fn().mockReturnValue([]),
     handlePlayerShot: vi.fn().mockReturnValue({ hit: false, point: new THREE.Vector3() }),
     impactEffectsPool: { spawn: vi.fn() },
-  } as unknown as CombatantSystem;
+  };
+  const lookupSystem = system as typeof system & {
+    getCombatantById: ReturnType<typeof vi.fn>;
+  };
+  lookupSystem.getCombatantById = vi.fn((id: string) => {
+    const combatants = system.getAllCombatants() as Array<{ id: string }>;
+    return combatants.find(c => c.id === id);
+  });
+  return system as unknown as CombatantSystem;
 }
 
 function makeAudioManager() {
@@ -146,9 +154,26 @@ describe('HelicopterDoorGunner', () => {
 
     // Should fire at the closer target
     expect(cs.handlePlayerShot).toHaveBeenCalledTimes(1);
-    // Verify the target is 'close' by checking getAllCombatants was used to find it
+    // Verify an enemy target was selected and fired upon.
     const shotCall = (cs.handlePlayerShot as any).mock.calls[0];
     expect(shotCall).toBeDefined();
+  });
+
+  it('acquires and fires through direct combatant lookup without materializing all combatants', () => {
+    gunner.initGunners(HELI_ID, [CREW_GUN], Faction.US);
+
+    const target = makeTarget('e1', new THREE.Vector3(0, 50, 80));
+    (cs.querySpatialRadius as any).mockReturnValue(['e1']);
+    (cs.getCombatantById as any).mockImplementation((id: string) => (id === 'e1' ? target : undefined));
+    (cs.getAllCombatants as any).mockImplementation(() => {
+      throw new Error('door gunner should not materialize the full combatant list');
+    });
+
+    expect(() => gunner.update(0.6, HELI_ID, heliPos, heliQuat, false)).not.toThrow();
+
+    expect(cs.handlePlayerShot).toHaveBeenCalledTimes(1);
+    expect(cs.getCombatantById).toHaveBeenCalledWith('e1');
+    expect(cs.getAllCombatants).not.toHaveBeenCalled();
   });
 
   it('ignores dead combatants during target acquisition', () => {
@@ -225,6 +250,57 @@ describe('HelicopterDoorGunner', () => {
 
     gunner.update(0.6, HELI_ID, heliPos, heliQuat, false);
     expect(cs.handlePlayerShot).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes fire through a normalized shot ray without mutating helicopter pose inputs', () => {
+    const directGun = { ...CREW_GUN, spreadDeg: 0 };
+    gunner.initGunners(HELI_ID, [directGun], Faction.US);
+
+    const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
+    (cs.querySpatialRadius as any).mockReturnValue(['e1']);
+    (cs.getAllCombatants as any).mockReturnValue([target]);
+
+    const positionBefore = heliPos.clone();
+    const quaternionBefore = heliQuat.clone();
+    gunner.update(0.6, HELI_ID, heliPos, heliQuat, false);
+
+    expect(cs.handlePlayerShot).toHaveBeenCalledTimes(1);
+    const [ray, damage, weaponType, shooterFaction] = (cs.handlePlayerShot as any).mock.calls[0] as [
+      THREE.Ray,
+      (distance: number, isHeadshot: boolean) => number,
+      string,
+      Faction,
+    ];
+    const expectedOrigin = new THREE.Vector3(...directGun.localPosition)
+      .applyQuaternion(heliQuat)
+      .add(heliPos);
+    const expectedDirection = target.position.clone().sub(expectedOrigin).normalize();
+    expect(ray.origin.distanceTo(expectedOrigin)).toBeLessThan(0.000001);
+    expect(ray.direction.length()).toBeCloseTo(1, 6);
+    expect(ray.direction.angleTo(expectedDirection)).toBeLessThan(0.000001);
+    expect(damage(50, false)).toBe(directGun.damage);
+    expect(weaponType).toBe('rifle');
+    expect(shooterFaction).toBe(Faction.US);
+    expect(heliPos.distanceTo(positionBefore)).toBe(0);
+    expect(heliQuat.dot(quaternionBefore)).toBeCloseTo(1, 6);
+  });
+
+  it('reuses one damage resolver across consecutive door-gunner shots', () => {
+    const directGun = { ...CREW_GUN, damage: 33, spreadDeg: 0 };
+    gunner.initGunners(HELI_ID, [directGun], Faction.US);
+
+    const target = makeTarget('e1', new THREE.Vector3(0, 50, 100));
+    (cs.querySpatialRadius as any).mockReturnValue(['e1']);
+    (cs.getAllCombatants as any).mockReturnValue([target]);
+
+    gunner.update(0.6, HELI_ID, heliPos, heliQuat, false);
+    gunner.update((1 / directGun.fireRate) + 0.01, HELI_ID, heliPos, heliQuat, false);
+
+    expect(cs.handlePlayerShot).toHaveBeenCalledTimes(2);
+    const firstDamageResolver = (cs.handlePlayerShot as any).mock.calls[0][1];
+    const secondDamageResolver = (cs.handlePlayerShot as any).mock.calls[1][1];
+    expect(firstDamageResolver).toBe(secondDamageResolver);
+    expect(firstDamageResolver(50, false)).toBe(33);
   });
 
   it('consumes ammo on fire', () => {

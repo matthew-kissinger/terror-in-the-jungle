@@ -5,6 +5,7 @@ import { GameSystem } from '../../types';
 import { Faction, Alliance, isBlufor, isOpfor } from '../combat/types';
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import {
   AgentTier,
   StrategicAgent,
@@ -28,6 +29,14 @@ const MIN_STRATEGIC_SPAWN_SPREAD_M = 18;
 const HOME_BASE_SPAWN_RADIUS_SCALE = 0.75;
 const OBJECTIVE_SPAWN_RADIUS_SCALE = 0.55;
 const OBJECTIVE_FORMATION_RADIUS_SCALE = 0.72;
+const MOVEMENT_BUDGET_MS = 0.5;
+const MOVEMENT_BUDGET_GRACE_MS = 0.75;
+const ROUTE_PLAN_REFRESH_LIMIT = 1;
+const ROUTE_PLAN_SCAN_LIMIT = 48;
+const AGENT_MOVEMENT_MAX_PER_TICK = 512;
+const MIN_AGENT_MOVEMENT_UPDATES_PER_TICK = 64;
+const CENTROID_BUDGET_MS = 0.35;
+const MIN_CENTROID_SQUADS_PER_TICK = 16;
 
 type StrategicZoneInput = {
   id: string;
@@ -56,6 +65,11 @@ export class WarSimulator implements GameSystem {
   private currentGameMode = 'zone_control';
   private agents: Map<string, StrategicAgent> = new Map();
   private squads: Map<string, StrategicSquad> = new Map();
+  private readonly agentList: StrategicAgent[] = [];
+  private readonly squadList: StrategicSquad[] = [];
+  private agentMovementCursor = 0;
+  private routePlanSquadCursor = 0;
+  private centroidSquadCursor = 0;
   private elapsedTime = 0;
   private factionStats = {
     [Alliance.BLUFOR]: { tickets: 0, kills: 0, deaths: 0 },
@@ -110,35 +124,47 @@ export class WarSimulator implements GameSystem {
     this.elapsedTime += deltaTime;
 
     // 1. Update materialization pipeline (always - handles despawn on game end too)
-    if (this.pipeline) {
-      this.pipeline.update(
-        this.playerX, this.playerY, this.playerZ,
-        this.playerVelX, this.playerVelZ
-      );
-    }
+    this.trackWarSimPhase('WarSim.Pipeline', () => {
+      if (this.pipeline) {
+        this.pipeline.update(
+          this.playerX, this.playerY, this.playerZ,
+          this.playerVelX, this.playerVelZ
+        );
+      }
+    });
 
     // 2. Update simulated agent movement (position lerp toward destination)
     if (gameActive) {
-      this.updateSimulatedMovement(deltaTime, budgetStart);
+      this.trackWarSimPhase('WarSim.Movement', () => {
+        this.updateSimulatedMovement(deltaTime, budgetStart);
+      });
     }
 
     // 3. Run abstract combat resolver on schedule (only during active combat)
     if (this.resolver && gameActive) {
-      this.resolver.update(this.elapsedTime);
+      this.trackWarSimPhase('WarSim.Resolver', () => {
+        this.resolver!.update(this.elapsedTime);
+      });
     }
 
     // 4. Run strategic director on schedule (only during active combat)
     if (this.director && gameActive) {
-      this.director.update(this.elapsedTime);
+      this.trackWarSimPhase('WarSim.Director', () => {
+        this.director!.update(this.elapsedTime);
+      });
     }
 
     // 5. Auto-save
-    if (this.persistence) {
-      this.persistence.checkAutoSave(this.elapsedTime, () => this.getWarState());
-    }
+    this.trackWarSimPhase('WarSim.Persistence', () => {
+      if (this.persistence) {
+        this.persistence.checkAutoSave(this.elapsedTime, () => this.getWarState());
+      }
+    });
 
     // 6. Flush events to listeners
-    this.events.flush();
+    this.trackWarSimPhase('WarSim.Events', () => {
+      this.events.flush();
+    });
   }
 
   dispose(): void {
@@ -204,6 +230,11 @@ export class WarSimulator implements GameSystem {
     this.enabled = false;
     this.agents.clear();
     this.squads.clear();
+    this.agentList.length = 0;
+    this.squadList.length = 0;
+    this.agentMovementCursor = 0;
+    this.routePlanSquadCursor = 0;
+    this.centroidSquadCursor = 0;
     this.pipeline = null;
     this.resolver = null;
     this.director = null;
@@ -309,6 +340,11 @@ export class WarSimulator implements GameSystem {
   private resetStrategicForces(): void {
     this.agents.clear();
     this.squads.clear();
+    this.agentList.length = 0;
+    this.squadList.length = 0;
+    this.agentMovementCursor = 0;
+    this.routePlanSquadCursor = 0;
+    this.centroidSquadCursor = 0;
     this.nextAgentId = 0;
     this.nextSquadId = 0;
   }
@@ -357,6 +393,7 @@ export class WarSimulator implements GameSystem {
         };
 
         this.agents.set(agentId, agent);
+        this.agentList.push(agent);
         members.push(agentId);
       }
 
@@ -377,76 +414,204 @@ export class WarSimulator implements GameSystem {
       };
 
       this.squads.set(squadId, squad);
+      this.squadList.push(squad);
     }
   }
 
   // -- Simulated movement --
 
   private updateSimulatedMovement(deltaTime: number, budgetStart: number): void {
-    const MOVEMENT_BUDGET_MS = 0.5;
+    this.trackWarSimPhase('WarSim.Movement.RoutePlans', () => {
+      this.refreshBudgetedSquadRoutePlans(
+        budgetStart,
+        MOVEMENT_BUDGET_MS + MOVEMENT_BUDGET_GRACE_MS,
+      );
+    });
 
-    for (const squad of this.squads.values()) {
-      if (squad.strength <= 0) continue;
-      this.ensureSquadRoutePlan(squad);
-    }
-
-    for (const agent of this.agents.values()) {
-      if (performance.now() - budgetStart > MOVEMENT_BUDGET_MS + 1.5) break;
-
-      if (!agent.alive || agent.tier === AgentTier.MATERIALIZED) continue;
-      if (agent.combatState === 'dead' || agent.combatState === 'fighting') continue;
-
-      const squad = this.squads.get(agent.squadId);
-      if (squad) {
-        const destination = this.getAgentTravelDestination(agent, squad);
-        agent.destX = destination.x;
-        agent.destZ = destination.z;
-      }
-
-      // Move toward destination
-      const dx = agent.destX - agent.x;
-      const dz = agent.destZ - agent.z;
-      const distSq = dx * dx + dz * dz;
-
-      if (distSq < 4) { // within 2m of destination
-        agent.combatState = 'idle';
-        continue;
-      }
-
-      agent.combatState = 'moving';
-      const dist = Math.sqrt(distSq);
-      const step = agent.speed * deltaTime;
-      const ratio = Math.min(step / dist, 1);
-
-      agent.x += dx * ratio;
-      agent.z += dz * ratio;
-
-      // Keep non-materialized agents terrain-aligned so later materialization
-      // never inherits stale altitude from long-range strategic movement.
-      if (this.getTerrainHeight) {
-        agent.y = this.getTerrainHeight(agent.x, agent.z);
-      }
-    }
+    this.trackWarSimPhase('WarSim.Movement.Agents', () => {
+      this.updateBudgetedAgentMovement(
+        deltaTime,
+        budgetStart,
+        MOVEMENT_BUDGET_MS + MOVEMENT_BUDGET_GRACE_MS,
+      );
+    });
 
     // Update squad centroids
-    for (const squad of this.squads.values()) {
-      let sx = 0, sz = 0, alive = 0;
-      for (const memberId of squad.members) {
-        const a = this.agents.get(memberId);
-        if (a && a.alive) {
-          sx += a.x;
-          sz += a.z;
-          alive++;
-        }
+    this.trackWarSimPhase('WarSim.Movement.Centroids', () => {
+      this.updateBudgetedSquadCentroids(
+        budgetStart,
+        MOVEMENT_BUDGET_MS + MOVEMENT_BUDGET_GRACE_MS + CENTROID_BUDGET_MS,
+      );
+    });
+  }
+
+  private refreshBudgetedSquadRoutePlans(budgetStart: number, budgetLimitMs: number): void {
+    const squads = this.getSquadIterationList();
+    if (squads.length === 0) return;
+
+    const processAll = !Number.isFinite(budgetStart) || !Number.isFinite(budgetLimitMs);
+    const scanLimit = processAll ? squads.length : Math.min(ROUTE_PLAN_SCAN_LIMIT, squads.length);
+    let scanned = 0;
+    let refreshed = 0;
+
+    while (scanned < squads.length && scanned < scanLimit) {
+      const index = this.routePlanSquadCursor % squads.length;
+      this.routePlanSquadCursor = (index + 1) % squads.length;
+      scanned++;
+
+      const squad = squads[index];
+      if (squad.strength <= 0 || !this.squadNeedsRoutePlan(squad)) continue;
+
+      this.ensureSquadRoutePlan(squad);
+      refreshed++;
+
+      if (refreshed >= ROUTE_PLAN_REFRESH_LIMIT) break;
+      if (!processAll && performance.now() - budgetStart > budgetLimitMs) break;
+    }
+  }
+
+  private updateBudgetedAgentMovement(deltaTime: number, budgetStart: number, budgetLimitMs: number): void {
+    const agents = this.getAgentIterationList();
+    if (agents.length === 0) return;
+
+    const processAll = !Number.isFinite(budgetStart) || !Number.isFinite(budgetLimitMs);
+    const minUpdates = Math.min(MIN_AGENT_MOVEMENT_UPDATES_PER_TICK, agents.length);
+    const maxUpdates = processAll ? agents.length : Math.min(AGENT_MOVEMENT_MAX_PER_TICK, agents.length);
+    let inspected = 0;
+    let updated = 0;
+
+    while (inspected < agents.length && updated < maxUpdates) {
+      const index = this.agentMovementCursor % agents.length;
+      this.agentMovementCursor = (index + 1) % agents.length;
+      inspected++;
+
+      if (!this.updateStrategicAgentMovement(agents[index], deltaTime)) continue;
+      updated++;
+
+      if (
+        !processAll
+        && updated >= minUpdates
+        && performance.now() - budgetStart > budgetLimitMs
+      ) {
+        break;
       }
-      if (alive > 0) {
-        squad.x = sx / alive;
-        squad.z = sz / alive;
-        squad.strength = alive / squad.members.length;
-        this.advanceSquadRoute(squad);
-      } else {
-        squad.strength = 0;
+    }
+  }
+
+  private updateStrategicAgentMovement(agent: StrategicAgent, deltaTime: number): boolean {
+    if (!agent.alive || agent.tier === AgentTier.MATERIALIZED) return false;
+    if (agent.combatState === 'dead' || agent.combatState === 'fighting') return false;
+
+    const squad = this.squads.get(agent.squadId);
+    if (squad) {
+      this.updateAgentTravelDestination(agent, squad);
+    }
+
+    const dx = agent.destX - agent.x;
+    const dz = agent.destZ - agent.z;
+    const distSq = dx * dx + dz * dz;
+
+    if (distSq < 4) {
+      agent.combatState = 'idle';
+      return true;
+    }
+
+    agent.combatState = 'moving';
+    const dist = Math.sqrt(distSq);
+    const step = agent.speed * deltaTime;
+    const ratio = Math.min(step / dist, 1);
+
+    agent.x += dx * ratio;
+    agent.z += dz * ratio;
+
+    // Keep non-materialized agents terrain-aligned so later materialization
+    // never inherits stale altitude from long-range strategic movement.
+    if (this.getTerrainHeight) {
+      agent.y = this.getTerrainHeight(agent.x, agent.z);
+    }
+
+    return true;
+  }
+
+  private updateBudgetedSquadCentroids(budgetStart: number, budgetLimitMs: number): void {
+    const squads = this.getSquadIterationList();
+    if (squads.length === 0) return;
+
+    const processAll = !Number.isFinite(budgetStart) || !Number.isFinite(budgetLimitMs);
+    const minSquadsThisTick = Math.min(MIN_CENTROID_SQUADS_PER_TICK, squads.length);
+    let processed = 0;
+
+    while (processed < squads.length) {
+      const index = this.centroidSquadCursor % squads.length;
+      this.updateSquadCentroid(squads[index]);
+      this.centroidSquadCursor = (index + 1) % squads.length;
+      processed++;
+
+      if (
+        !processAll
+        && processed >= minSquadsThisTick
+        && performance.now() - budgetStart > budgetLimitMs
+      ) {
+        break;
       }
+    }
+  }
+
+  private getSquadIterationList(): StrategicSquad[] {
+    if (this.squadList.length !== this.squads.size) {
+      this.squadList.length = 0;
+      for (const squad of this.squads.values()) {
+        this.squadList.push(squad);
+      }
+      if (this.centroidSquadCursor >= this.squadList.length) {
+        this.centroidSquadCursor = 0;
+      }
+      if (this.routePlanSquadCursor >= this.squadList.length) {
+        this.routePlanSquadCursor = 0;
+      }
+    }
+    return this.squadList;
+  }
+
+  private getAgentIterationList(): StrategicAgent[] {
+    if (this.agentList.length !== this.agents.size) {
+      this.agentList.length = 0;
+      for (const agent of this.agents.values()) {
+        this.agentList.push(agent);
+      }
+      if (this.agentMovementCursor >= this.agentList.length) {
+        this.agentMovementCursor = 0;
+      }
+    }
+    return this.agentList;
+  }
+
+  private updateSquadCentroid(squad: StrategicSquad): void {
+    let sx = 0, sz = 0, alive = 0;
+    for (const memberId of squad.members) {
+      const a = this.agents.get(memberId);
+      if (a && a.alive) {
+        sx += a.x;
+        sz += a.z;
+        alive++;
+      }
+    }
+    if (alive > 0) {
+      squad.x = sx / alive;
+      squad.z = sz / alive;
+      squad.strength = alive / squad.members.length;
+      this.advanceSquadRoute(squad);
+    } else {
+      squad.strength = 0;
+    }
+  }
+
+  private trackWarSimPhase<T>(name: string, fn: () => T): T {
+    performanceTelemetry.beginSystem(name);
+    try {
+      return fn();
+    } finally {
+      performanceTelemetry.endSystem(name);
     }
   }
 
@@ -475,15 +640,20 @@ export class WarSimulator implements GameSystem {
           z: squad.objectiveZ,
           arrivalRadius: this.resolveSquadGoalRadius(squad),
           kind: 'objective',
-        }];
+      }];
+  }
+
+  private squadNeedsRoutePlan(squad: StrategicSquad): boolean {
+    const goalKey = this.buildSquadRouteGoalKey(squad);
+    return !(
+      squad.routeGoalKey === goalKey
+      && squad.routeWaypoints
+      && squad.routeWaypoints.length > 0
+    );
   }
 
   private buildSquadRouteGoalKey(squad: StrategicSquad): string {
-    return [
-      squad.objectiveZoneId ?? 'point',
-      Math.round(squad.objectiveX),
-      Math.round(squad.objectiveZ),
-    ].join(':');
+    return `${squad.objectiveZoneId ?? 'point'}:${Math.round(squad.objectiveX)}:${Math.round(squad.objectiveZ)}`;
   }
 
   private resolveSquadGoalRadius(squad: StrategicSquad): number {
@@ -521,13 +691,15 @@ export class WarSimulator implements GameSystem {
     squad.routeWaypointIndex = routeIndex;
   }
 
-  private getAgentTravelDestination(
+  private updateAgentTravelDestination(
     agent: StrategicAgent,
     squad: StrategicSquad,
-  ): { x: number; z: number } {
+  ): void {
     const waypoint = this.getCurrentSquadWaypoint(squad);
     if (!waypoint) {
-      return { x: squad.objectiveX, z: squad.objectiveZ };
+      agent.destX = squad.objectiveX;
+      agent.destZ = squad.objectiveZ;
+      return;
     }
 
     const routeIndex = Math.min(
@@ -536,10 +708,12 @@ export class WarSimulator implements GameSystem {
     );
     const lastIndex = Math.max((squad.routeWaypoints?.length ?? 1) - 1, 0);
     if (!squad.routeWaypoints || routeIndex < lastIndex || waypoint.kind !== 'objective') {
-      return { x: waypoint.x, z: waypoint.z };
+      agent.destX = waypoint.x;
+      agent.destZ = waypoint.z;
+      return;
     }
 
-    return this.applyFormationOffset(agent, squad, waypoint.x, waypoint.z, routeIndex, waypoint.arrivalRadius);
+    this.applyFormationOffset(agent, squad, waypoint.x, waypoint.z, routeIndex, waypoint.arrivalRadius);
   }
 
   private getCurrentSquadWaypoint(squad: StrategicSquad) {
@@ -561,10 +735,12 @@ export class WarSimulator implements GameSystem {
     baseZ: number,
     routeIndex: number,
     arrivalRadius?: number,
-  ): { x: number; z: number } {
+  ): void {
     const slot = agent.formationSlot ?? squad.members.indexOf(agent.id);
     if (slot <= 0) {
-      return { x: baseX, z: baseZ };
+      agent.destX = baseX;
+      agent.destZ = baseZ;
+      return;
     }
 
     const sourceWaypoint = routeIndex > 0
@@ -597,10 +773,8 @@ export class WarSimulator implements GameSystem {
       ? maxRadius / offsetLength
       : 1;
 
-    return {
-      x: baseX + rawOffsetX * offsetScale,
-      z: baseZ + rawOffsetZ * offsetScale,
-    };
+    agent.destX = baseX + rawOffsetX * offsetScale;
+    agent.destZ = baseZ + rawOffsetZ * offsetScale;
   }
 
   // -- Player tracking --
@@ -733,17 +907,24 @@ export class WarSimulator implements GameSystem {
 
     this.agents.clear();
     this.squads.clear();
+    this.agentList.length = 0;
+    this.squadList.length = 0;
+    this.agentMovementCursor = 0;
+    this.routePlanSquadCursor = 0;
+    this.centroidSquadCursor = 0;
 
     for (const a of state.agents) {
       // Reset materialized state on load - pipeline will re-materialize as needed
       a.tier = a.alive ? AgentTier.STRATEGIC : AgentTier.STRATEGIC;
       a.combatantId = undefined;
       this.agents.set(a.id, a);
+      this.agentList.push(a);
     }
 
     for (const s of state.squads) {
       s.combatActive = false;
       this.squads.set(s.id, s);
+      this.squadList.push(s);
     }
 
     this.elapsedTime = state.elapsedTime;

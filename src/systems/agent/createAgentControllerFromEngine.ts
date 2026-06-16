@@ -28,7 +28,10 @@ type EngineLike = {
       exitHelicopter(pos: THREE.Vector3): void;
       exitFixedWing(pos: THREE.Vector3): void;
     };
-    combatantSystem: { getAllCombatants(): ReadonlyArray<unknown> };
+    combatantSystem: {
+      getAllCombatants(): ReadonlyArray<unknown>;
+      getCombatantById?(id: string): unknown;
+    };
     zoneManager?: { getAllZones(): ReadonlyArray<unknown> };
     playerHealthSystem?: {
       isDead(): boolean;
@@ -83,6 +86,8 @@ export function createAgentControllerFromEngine(engine: EngineLike): AgentContro
     combatants: {
       getAllCombatants: () => adaptCombatants(sys.combatantSystem.getAllCombatants()),
       getCombatantById: (id) => {
+        const direct = sys.combatantSystem.getCombatantById?.(id);
+        if (direct) return adaptOne(direct);
         const list = sys.combatantSystem.getAllCombatants();
         for (let i = 0; i < list.length; i++) {
           const c = list[i] as { id?: string } | undefined;

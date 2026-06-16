@@ -21,11 +21,62 @@ interface SystemTimingEntry {
   emaMs: number;
 }
 
+export interface SystemTimingSnapshot {
+  name: string;
+  timeMs: number;
+  budgetMs: number;
+  lastMs: number;
+  emaMs: number;
+}
+
+function toSystemTimingSnapshot(entry: SystemTimingEntry): SystemTimingSnapshot {
+  return {
+    name: entry.name,
+    timeMs: entry.emaMs,
+    budgetMs: entry.budgetMs,
+    lastMs: entry.lastMs,
+    emaMs: entry.emaMs
+  };
+}
+
+function toFiniteSystemTimingSnapshot(entry: SystemTimingEntry): SystemTimingSnapshot | null {
+  const lastMs = Number.isFinite(entry.lastMs) ? entry.lastMs : entry.emaMs;
+  if (!Number.isFinite(lastMs) || lastMs < 0) return null;
+  const emaMs = Number.isFinite(entry.emaMs) ? entry.emaMs : lastMs;
+  const budgetMs = Number.isFinite(entry.budgetMs) ? entry.budgetMs : 0;
+  return {
+    name: entry.name,
+    timeMs: emaMs,
+    budgetMs,
+    lastMs,
+    emaMs
+  };
+}
+
+function insertTopSystemTiming(target: SystemTimingSnapshot[], timing: SystemTimingSnapshot, limit: number): void {
+  let insertAt = 0;
+  while (insertAt < target.length && target[insertAt].lastMs >= timing.lastMs) {
+    insertAt++;
+  }
+  if (insertAt >= limit) return;
+  const nextLength = Math.min(target.length + 1, limit);
+  for (let index = nextLength - 1; index > insertAt; index--) {
+    target[index] = target[index - 1];
+  }
+  target[insertAt] = timing;
+  target.length = nextLength;
+}
+
 const WORLD_CHILD_BUDGET_MS = {
   Zone: 0.12,
   Tickets: 0.08,
   Weather: 0.12,
   Atmosphere: 0.38,
+} as const;
+
+const PLAYER_CHILD_BUDGET_MS = {
+  Controller: 0.75,
+  Weapon: 0.25,
 } as const;
 
 /**
@@ -158,8 +209,16 @@ export class SystemUpdater {
 
     this.trackSystemUpdate('Player', SYSTEM_UPDATE_BUDGET_MS.Player, () => {
       performanceTelemetry.beginSystem('Player');
-      if (refs.playerController) refs.playerController.update(deltaTime);
-      if (refs.firstPersonWeapon) refs.firstPersonWeapon.update(deltaTime);
+      if (refs.playerController) {
+        this.trackInstrumentedSystemUpdate('Player.Controller', PLAYER_CHILD_BUDGET_MS.Controller, () => {
+          refs.playerController.update(deltaTime);
+        });
+      }
+      if (refs.firstPersonWeapon) {
+        this.trackInstrumentedSystemUpdate('Player.Weapon', PLAYER_CHILD_BUDGET_MS.Weapon, () => {
+          refs.firstPersonWeapon.update(deltaTime);
+        });
+      }
       performanceTelemetry.endSystem('Player');
     });
 
@@ -392,11 +451,19 @@ export class SystemUpdater {
     }
   }
 
-  getSystemTimings(): Array<{ name: string; timeMs: number; budgetMs: number }> {
-    return Array.from(this.systemTimings.values()).map(entry => ({
-      name: entry.name,
-      timeMs: entry.emaMs,
-      budgetMs: entry.budgetMs
-    }));
+  getSystemTimings(): SystemTimingSnapshot[] {
+    return Array.from(this.systemTimings.values()).map(toSystemTimingSnapshot);
+  }
+
+  getTopSystemTimingsByLast(limit: number): SystemTimingSnapshot[] {
+    if (!Number.isFinite(limit) || limit <= 0) return [];
+    const boundedLimit = Math.floor(limit);
+    const snapshot: SystemTimingSnapshot[] = [];
+    for (const entry of this.systemTimings.values()) {
+      const timing = toFiniteSystemTimingSnapshot(entry);
+      if (!timing) continue;
+      insertTopSystemTiming(snapshot, timing, boundedLimit);
+    }
+    return snapshot;
   }
 }

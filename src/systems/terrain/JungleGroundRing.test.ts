@@ -153,6 +153,87 @@ describe('JungleGroundRing', () => {
     expect(ring.getPendingCounts().adds).toBeGreaterThan(0);
   });
 
+  it('compacts processed residency queues without splice allocation', () => {
+    const internals = ring as unknown as {
+      activeCells: Set<string>;
+      pendingAdditions: string[];
+      pendingRemovals: string[];
+      lastPlayerCellX: number;
+      lastPlayerCellZ: number;
+      processPendingWork(maxAddsPerFrame: number, maxRemovalsPerFrame: number): boolean;
+    };
+    internals.activeCells = new Set(['8,8', '9,9']);
+    internals.pendingRemovals = ['8,8', '9,9'];
+    internals.pendingAdditions = ['8,8', '0,0'];
+    internals.lastPlayerCellX = 0;
+    internals.lastPlayerCellZ = 0;
+
+    const spliceSpy = vi.spyOn(Array.prototype, 'splice');
+    const didWork = internals.processPendingWork(0, 1);
+    const spliceCalls = spliceSpy.mock.calls.length;
+    spliceSpy.mockRestore();
+
+    expect(didWork).toBe(true);
+    expect(spliceCalls).toBe(0);
+    expect(billboard.removeChunkInstances).toHaveBeenCalledWith('jungle-ground-ring:8,8');
+    expect(billboard.addChunkInstances).toHaveBeenCalledWith('jungle-ground-ring:0,0', expect.any(Map));
+    expect(internals.pendingRemovals).toEqual(['9,9']);
+    expect(internals.pendingAdditions).toEqual(['8,8']);
+  });
+
+  it('deduplicates pending residency work when rebuilding the target ring', () => {
+    const internals = ring as unknown as {
+      activeCells: Set<string>;
+      targetCells: Set<string>;
+      pendingAdditions: string[];
+      pendingRemovals: string[];
+      rebuildResidencyTargets(cellX: number, cellZ: number): void;
+    };
+    internals.activeCells = new Set(['0,0', '9,9']);
+    internals.pendingAdditions = ['0,1', '9,9'];
+    internals.pendingRemovals = ['8,8', '9,9'];
+    const targetCells = internals.targetCells;
+
+    internals.rebuildResidencyTargets(0, 0);
+
+    expect(internals.targetCells).toBe(targetCells);
+    expect(internals.targetCells.size).toBe(9);
+    expect(internals.pendingRemovals).toEqual(['9,9']);
+    expect(internals.pendingAdditions.filter((key) => key === '0,1')).toHaveLength(1);
+    expect(internals.pendingAdditions).not.toContain('9,9');
+    expect(new Set(internals.pendingAdditions).size).toBe(internals.pendingAdditions.length);
+  });
+
+  it('orders residency additions by distance without sorting cell keys', () => {
+    const internals = ring as unknown as {
+      activeCells: Set<string>;
+      pendingAdditions: string[];
+      pendingRemovals: string[];
+      rebuildResidencyTargets(cellX: number, cellZ: number): void;
+    };
+    internals.activeCells = new Set();
+    internals.pendingAdditions = [];
+    internals.pendingRemovals = [];
+
+    const sortSpy = vi.spyOn(Array.prototype, 'sort');
+    internals.rebuildResidencyTargets(0, 0);
+    const sortCalls = sortSpy.mock.calls.length;
+    sortSpy.mockRestore();
+
+    expect(sortCalls).toBe(0);
+    expect(internals.pendingAdditions).toEqual([
+      '0,0',
+      '-1,0',
+      '0,-1',
+      '0,1',
+      '1,0',
+      '-1,-1',
+      '-1,1',
+      '1,-1',
+      '1,1',
+    ]);
+  });
+
   it('respects route and base exclusion zones before adding dense ground cover', () => {
     ring.setExclusionZones([{ x: 0, z: 0, radius: 80 }]);
 

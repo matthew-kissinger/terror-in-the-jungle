@@ -100,6 +100,28 @@ describe('KillAssistTracker', () => {
       expect(combatant.damageHistory![9].attackerId).toBe('attacker-14');
     });
 
+    it('reuses capped damage history records after overflow', () => {
+      const combatant = createMockCombatant();
+
+      for (let i = 0; i < 10; i++) {
+        KillAssistTracker.trackDamage(combatant, `attacker-${i}`, i);
+        vi.advanceTimersByTime(10);
+      }
+
+      const history = combatant.damageHistory!;
+      const refs = history.slice();
+
+      KillAssistTracker.trackDamage(combatant, 'attacker-10', 10);
+
+      expect(history).toHaveLength(10);
+      for (let index = 0; index < history.length; index++) {
+        expect(history[index]).toBe(refs[index]);
+      }
+      expect(history[0].attackerId).toBe('attacker-1');
+      expect(history[9].attackerId).toBe('attacker-10');
+      expect(history[9].damage).toBe(10);
+    });
+
     it('records timestamp using performance.now()', () => {
       const combatant = createMockCombatant();
 

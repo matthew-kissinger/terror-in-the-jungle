@@ -74,6 +74,25 @@ export class CrosshairSystem extends UIComponent {
    * boresight pipper. Pushed per-frame by the attack-helicopter adapter.
    */
   private rocketCueOffset = this.signal(0);
+  private infantryEl: HTMLElement | null = null;
+  private pipperEl: HTMLElement | null = null;
+  private tankGunnerEl: HTMLElement | null = null;
+  private emplacementMgEl: HTMLElement | null = null;
+  private doorGunEl: HTMLElement | null = null;
+  private fixedWingEl: HTMLElement | null = null;
+  private spreadRingEl: HTMLElement | null = null;
+  private mgStopUpEl: HTMLElement | null = null;
+  private mgStopDownEl: HTMLElement | null = null;
+  private mgStopLeftEl: HTMLElement | null = null;
+  private mgStopRightEl: HTMLElement | null = null;
+  private dgStopUpEl: HTMLElement | null = null;
+  private dgStopDownEl: HTMLElement | null = null;
+  private dgStopLeftEl: HTMLElement | null = null;
+  private dgStopRightEl: HTMLElement | null = null;
+  private pipperGunEl: HTMLElement | null = null;
+  private pipperRocketEl: HTMLElement | null = null;
+  private rocketCueEl: HTMLElement | null = null;
+  private pipperIconImgs: HTMLImageElement[] = [];
 
   protected build(): void {
     this.root.className = styles.container;
@@ -161,17 +180,18 @@ export class CrosshairSystem extends UIComponent {
   }
 
   protected onMount(): void {
+    this.cacheRefs();
+
     // Effect: mode switching
     this.effect(() => {
       const currentMode = this.mode.value;
       const visible = this.isVisible.value;
-
-      const infantry = this.$('[data-ref="infantry"]');
-      const pipper = this.$('[data-ref="pipper"]');
-      const tankGunner = this.$('[data-ref="tankGunner"]');
-      const emplacementMg = this.$('[data-ref="emplacementMg"]');
-      const doorGun = this.$('[data-ref="doorGun"]');
-      const fixedWing = this.$('[data-ref="fixedWing"]');
+      const infantry = this.infantryEl;
+      const pipper = this.pipperEl;
+      const tankGunner = this.tankGunnerEl;
+      const emplacementMg = this.emplacementMgEl;
+      const doorGun = this.doorGunEl;
+      const fixedWing = this.fixedWingEl;
       if (!infantry || !pipper || !tankGunner || !emplacementMg || !doorGun || !fixedWing) return;
 
       if (!visible) {
@@ -219,7 +239,7 @@ export class CrosshairSystem extends UIComponent {
 
     // Effect: spread ring size
     this.effect(() => {
-      const ring = this.$('[data-ref="spreadRing"]');
+      const ring = this.spreadRingEl;
       if (!ring) return;
       const diameter = this.spreadRadius.value * 2;
       ring.style.width = `${diameter}px`;
@@ -232,46 +252,78 @@ export class CrosshairSystem extends UIComponent {
     // element is visible, so a single source feeds both.
     this.effect(() => {
       const stop = this.traverseStop.value;
-      const up = this.$('[data-ref="mgStopUp"]');
-      const down = this.$('[data-ref="mgStopDown"]');
-      const left = this.$('[data-ref="mgStopLeft"]');
-      const right = this.$('[data-ref="mgStopRight"]');
+      const up = this.mgStopUpEl;
+      const down = this.mgStopDownEl;
+      const left = this.mgStopLeftEl;
+      const right = this.mgStopRightEl;
       up?.classList.toggle(styles.mgStopActive, stop === 'up');
       down?.classList.toggle(styles.mgStopActive, stop === 'down');
       left?.classList.toggle(styles.mgStopActive, stop === 'left');
       right?.classList.toggle(styles.mgStopActive, stop === 'right');
 
-      const dgUp = this.$('[data-ref="dgStopUp"]');
-      const dgDown = this.$('[data-ref="dgStopDown"]');
-      const dgLeft = this.$('[data-ref="dgStopLeft"]');
-      const dgRight = this.$('[data-ref="dgStopRight"]');
+      const dgUp = this.dgStopUpEl;
+      const dgDown = this.dgStopDownEl;
+      const dgLeft = this.dgStopLeftEl;
+      const dgRight = this.dgStopRightEl;
       dgUp?.classList.toggle(styles.dgStopActive, stop === 'up');
       dgDown?.classList.toggle(styles.dgStopActive, stop === 'down');
       dgLeft?.classList.toggle(styles.dgStopActive, stop === 'left');
       dgRight?.classList.toggle(styles.dgStopActive, stop === 'right');
     });
 
-    // Effect: attack-helicopter per-weapon reticle states. Gun selected → the
-    // gun pipper is prominent and the rocket-fall cue is hidden. Rockets
-    // selected → the rocket pipper is prominent and the CCIP cue is shown,
-    // dropped below the boresight by the live rocket-fall offset.
+    // Effect: attack-helicopter per-weapon reticle states. Keep this separate
+    // from the per-frame rocket cue offset so lead updates do not rewrite
+    // stable display properties.
+    this.effect(() => {
+      const weapon = this.heliWeapon.value;
+      const gun = this.pipperGunEl;
+      const rocket = this.pipperRocketEl;
+      const cue = this.rocketCueEl;
+
+      const rocketsActive = weapon === 'rockets';
+      this.setDisplayIfChanged(gun, rocketsActive ? 'none' : '');
+      this.setDisplayIfChanged(rocket, rocketsActive ? '' : 'none');
+      this.setDisplayIfChanged(cue, rocketsActive ? '' : 'none');
+    });
+
+    // Effect: attack-helicopter CCIP cue transform. This can be pushed
+    // per-frame by the adapter, so it only writes the transform that actually
+    // changes with the lead solution.
     this.effect(() => {
       const weapon = this.heliWeapon.value;
       const offset = this.rocketCueOffset.value;
-      const gun = this.$('[data-ref="pipperGun"]');
-      const rocket = this.$('[data-ref="pipperRocket"]');
-      const cue = this.$('[data-ref="rocketCue"]');
+      const cue = this.rocketCueEl;
+      if (weapon !== 'rockets' || !cue) return;
 
-      const rocketsActive = weapon === 'rockets';
-      if (gun) gun.style.display = rocketsActive ? 'none' : '';
-      if (rocket) rocket.style.display = rocketsActive ? '' : 'none';
-      if (cue) {
-        cue.style.display = rocketsActive ? '' : 'none';
-        // Drop the cue below the boresight pipper by the computed lead. The
-        // element is centered on the bore; translate it straight down.
-        cue.style.transform = `translate(-50%, calc(-50% + ${Math.max(0, offset)}px))`;
+      // Drop the cue below the boresight pipper by the computed lead. The
+      // element is centered on the bore; translate it straight down.
+      const transform = `translate(-50%, calc(-50% + ${Math.max(0, offset)}px))`;
+      if (cue.style.transform !== transform) {
+        cue.style.transform = transform;
       }
     });
+  }
+
+  protected onUnmount(): void {
+    this.infantryEl = null;
+    this.pipperEl = null;
+    this.tankGunnerEl = null;
+    this.emplacementMgEl = null;
+    this.doorGunEl = null;
+    this.fixedWingEl = null;
+    this.spreadRingEl = null;
+    this.mgStopUpEl = null;
+    this.mgStopDownEl = null;
+    this.mgStopLeftEl = null;
+    this.mgStopRightEl = null;
+    this.dgStopUpEl = null;
+    this.dgStopDownEl = null;
+    this.dgStopLeftEl = null;
+    this.dgStopRightEl = null;
+    this.pipperGunEl = null;
+    this.pipperRocketEl = null;
+    this.rocketCueEl = null;
+    this.pipperIconImgs = [];
   }
 
   // --- Public API (backward-compatible with CrosshairUI) ---
@@ -350,12 +402,39 @@ export class CrosshairSystem extends UIComponent {
   private loadPipperIcons(): void {
     if (this.pipperIconsLoaded) return;
     this.pipperIconsLoaded = true;
-    const imgs = this.root.querySelectorAll<HTMLImageElement>('[data-icon]');
-    for (const img of imgs) {
+    for (const img of this.pipperIconImgs) {
       const name = img.getAttribute('data-icon');
       if (name && !img.src) {
         img.src = icon(name);
       }
+    }
+  }
+
+  private cacheRefs(): void {
+    this.infantryEl = this.$('[data-ref="infantry"]');
+    this.pipperEl = this.$('[data-ref="pipper"]');
+    this.tankGunnerEl = this.$('[data-ref="tankGunner"]');
+    this.emplacementMgEl = this.$('[data-ref="emplacementMg"]');
+    this.doorGunEl = this.$('[data-ref="doorGun"]');
+    this.fixedWingEl = this.$('[data-ref="fixedWing"]');
+    this.spreadRingEl = this.$('[data-ref="spreadRing"]');
+    this.mgStopUpEl = this.$('[data-ref="mgStopUp"]');
+    this.mgStopDownEl = this.$('[data-ref="mgStopDown"]');
+    this.mgStopLeftEl = this.$('[data-ref="mgStopLeft"]');
+    this.mgStopRightEl = this.$('[data-ref="mgStopRight"]');
+    this.dgStopUpEl = this.$('[data-ref="dgStopUp"]');
+    this.dgStopDownEl = this.$('[data-ref="dgStopDown"]');
+    this.dgStopLeftEl = this.$('[data-ref="dgStopLeft"]');
+    this.dgStopRightEl = this.$('[data-ref="dgStopRight"]');
+    this.pipperGunEl = this.$('[data-ref="pipperGun"]');
+    this.pipperRocketEl = this.$('[data-ref="pipperRocket"]');
+    this.rocketCueEl = this.$('[data-ref="rocketCue"]');
+    this.pipperIconImgs = Array.from(this.root.querySelectorAll<HTMLImageElement>('[data-icon]'));
+  }
+
+  private setDisplayIfChanged(element: HTMLElement | null, display: string): void {
+    if (element && element.style.display !== display) {
+      element.style.display = display;
     }
   }
 }

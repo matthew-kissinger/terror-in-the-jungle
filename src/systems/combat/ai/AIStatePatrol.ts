@@ -14,6 +14,11 @@ import { SquadCommandConfig } from '../../../config/SquadCommandConfig'
 const _toTarget = new THREE.Vector3()
 const _offset = new THREE.Vector3()
 const PATROL_VISIBILITY_RECHECK_MS = 250
+const VERY_CLOSE_RANGE_SQ = 15 * 15
+const FOLLOW_ME_ARRIVAL_RADIUS_SQ = 2 * 2
+const HOLD_POSITION_ARRIVAL_RADIUS_SQ = 3 * 3
+const PATROL_DESTINATION_ARRIVAL_RADIUS_SQ = 5 * 5
+const ATTACK_HERE_ARRIVAL_RADIUS_SQ = SquadCommandConfig.attackArriveRadius * SquadCommandConfig.attackArriveRadius
 
 interface PatrolVisibilitySample {
   targetId: string
@@ -108,16 +113,17 @@ export class AIStatePatrol {
         return;
       }
 
-      const distance = combatant.position.distanceTo(targetPos);
-      const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize();
+      const distanceSq = combatant.position.distanceToSquared(targetPos);
+      const toTarget = _toTarget.subVectors(targetPos, combatant.position);
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
 
       // At very close range (<15m), NPCs should ALWAYS detect and engage
       // regardless of LOS checks - they would hear footsteps, see peripheral movement, etc.
-      const veryCloseRange = distance < 15;
+      const veryCloseRange = distanceSq < VERY_CLOSE_RANGE_SQ;
 
       if (veryCloseRange || this.hasPatrolLineOfSight(combatant, enemy, playerPosition, canSeeTarget)) {
         // At close range, always engage. At longer range, use probability
+        const distance = veryCloseRange ? 0 : Math.sqrt(distanceSq);
         if (veryCloseRange || shouldEngage(combatant, distance)) {
           combatant.state = CombatantState.ALERT;
           combatant.target = enemy;
@@ -184,9 +190,8 @@ export class AIStatePatrol {
         );
         
         const targetPos = _offset;
-        const distanceToTarget = combatant.position.distanceTo(targetPos);
 
-        if (distanceToTarget > 2) {
+        if (combatant.position.distanceToSquared(targetPos) > FOLLOW_ME_ARRIVAL_RADIUS_SQ) {
           combatant.destinationPoint = targetPos.clone();
         } else {
           combatant.destinationPoint = undefined;
@@ -194,7 +199,7 @@ export class AIStatePatrol {
         break;
 
       case SquadCommand.HOLD_POSITION:
-        if (squad.commandPosition && combatant.position.distanceTo(squad.commandPosition) > 3) {
+        if (squad.commandPosition && combatant.position.distanceToSquared(squad.commandPosition) > HOLD_POSITION_ARRIVAL_RADIUS_SQ) {
           combatant.destinationPoint = squad.commandPosition.clone();
         } else {
           combatant.destinationPoint = undefined;
@@ -210,7 +215,7 @@ export class AIStatePatrol {
           const basePos = squad.commandPosition;
 
           if (!combatant.destinationPoint ||
-              combatant.position.distanceTo(combatant.destinationPoint) < 5) {
+              combatant.position.distanceToSquared(combatant.destinationPoint) < PATROL_DESTINATION_ARRIVAL_RADIUS_SQ) {
             const angle = Math.random() * Math.PI * 2;
             // Math.sqrt keeps the wander point inside the radius with uniform area
             // coverage; either way |offset| <= patrolRadius so roam stays leashed.
@@ -232,7 +237,7 @@ export class AIStatePatrol {
         // it just arrived and ADVANCING self-terminated), keep it heading to the
         // anchor until it is on the objective footprint.
         if (squad.commandPosition &&
-            combatant.position.distanceTo(squad.commandPosition) > SquadCommandConfig.attackArriveRadius) {
+            combatant.position.distanceToSquared(squad.commandPosition) > ATTACK_HERE_ARRIVAL_RADIUS_SQ) {
           combatant.destinationPoint = squad.commandPosition.clone();
         } else {
           combatant.destinationPoint = undefined;
@@ -321,25 +326,23 @@ export class AIStatePatrol {
 
     combatant.lastDefenseReassignTime = Date.now();
 
-    // Find nearby zones owned by this faction
-    const nearbyOwnedZones = this.zoneQuery.getAllZones()
-      .filter(zone => {
-        if (zone.owner !== combatant.faction) return false;
-        if (zone.isHomeBase) return false;
+    const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
+    const squadSize = squad ? squad.members.length : 1;
+    const maxDefenders = Math.min(2, Math.floor(squadSize / 2));
+    if (maxDefenders <= 0) return;
 
-        const distance = combatant.position.distanceTo(zone.position);
-        return distance < 60;
-      })
-      .sort((a, b) => {
-        const distA = combatant.position.distanceTo(a.position);
-        const distB = combatant.position.distanceTo(b.position);
-        return distA - distB;
-      });
+    const maxDistanceSq = 60 * 60;
+    let selectedZone: ReturnType<IZoneQuery['getAllZones']>[number] | undefined;
+    let selectedDefenders: Set<string> | undefined;
+    let selectedDistanceSq = Number.POSITIVE_INFINITY;
 
-    if (nearbyOwnedZones.length === 0) return;
+    for (const zone of this.zoneQuery.getAllZones()) {
+      if (zone.owner !== combatant.faction) continue;
+      if (zone.isHomeBase) continue;
 
-    // Pick a zone that needs defenders
-    for (const zone of nearbyOwnedZones) {
+      const distanceSq = combatant.position.distanceToSquared(zone.position);
+      if (distanceSq >= maxDistanceSq) continue;
+
       const defenders = this.zoneDefenders.get(zone.id) || new Set();
       // Shed stale ids before counting slots. zoneDefenders Sets only ever grow
       // otherwise, so dead/despawned combatants permanently occupy slots and the
@@ -350,26 +353,27 @@ export class AIStatePatrol {
       // task's domain). An id is stale if it's gone from the map (despawned) or
       // present but DEAD.
       this.pruneStaleDefenders(defenders, allCombatants);
-      const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
-      const squadSize = squad ? squad.members.length : 1;
 
-      // Assign 1-2 defenders per zone based on squad size
-      const maxDefenders = Math.min(2, Math.floor(squadSize / 2));
+      if (defenders.size >= maxDefenders) continue;
+      if (distanceSq >= selectedDistanceSq) continue;
 
-      if (defenders.size < maxDefenders) {
-        // Assign this combatant to defend this zone
-        defenders.add(combatant.id);
-        this.zoneDefenders.set(zone.id, defenders);
-
-        combatant.state = CombatantState.DEFENDING;
-        combatant.defendingZoneId = zone.id;
-        combatant.defensePosition = this.calculateDefensePosition(zone, combatant, defenders.size - 1);
-        combatant.destinationPoint = combatant.defensePosition.clone();
-
-        Logger.info('combat-ai', ` ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
-        return;
-      }
+      selectedZone = zone;
+      selectedDefenders = defenders;
+      selectedDistanceSq = distanceSq;
     }
+
+    if (!selectedZone || !selectedDefenders) return;
+
+    const defenderIndex = selectedDefenders.size;
+    selectedDefenders.add(combatant.id);
+    this.zoneDefenders.set(selectedZone.id, selectedDefenders);
+
+    combatant.state = CombatantState.DEFENDING;
+    combatant.defendingZoneId = selectedZone.id;
+    combatant.defensePosition = this.calculateDefensePosition(selectedZone, combatant, defenderIndex);
+    combatant.destinationPoint = combatant.defensePosition.clone();
+
+    Logger.info('combat-ai', ` ${combatant.faction} defender assigned to zone ${selectedZone.id} (${selectedDefenders.size}/${maxDefenders} defenders)`);
   }
 
   /**

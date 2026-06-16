@@ -35,6 +35,7 @@ export class CombatantHitDetection {
   private readonly hitProxyScratch = createCombatantHitProxyScratch()
   private readonly playerHitProxyScratch = createCombatantHitProxyScratch()
   private readonly combatantHitPoint = new THREE.Vector3()
+  private readonly closestCombatantHitPoint = new THREE.Vector3()
   private readonly playerHitPoint = new THREE.Vector3()
   private readonly playerClosestHitPoint = new THREE.Vector3()
   private readonly playerMissPoint = new THREE.Vector3()
@@ -136,10 +137,11 @@ export class CombatantHitDetection {
         if (distance === null || distance > this.MAX_ENGAGEMENT_RANGE) continue
 
         if (!closest || distance < closest.distance) {
+          this.closestCombatantHitPoint.copy(this.combatantHitPoint)
           closest = {
             combatant,
             distance,
-            point: this.combatantHitPoint.clone(),
+            point: this.closestCombatantHitPoint,
             headshot: proxy.isHead
           }
         }

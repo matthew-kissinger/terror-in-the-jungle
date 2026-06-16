@@ -8,9 +8,31 @@ interface ImpactEffect {
   particles: THREE.Points;
   sparks: THREE.Points;
   decal: THREE.Sprite;
+  particlePositions: THREE.BufferAttribute;
+  sparkPositions: THREE.BufferAttribute;
+  particleArray: WritableNumberArray;
+  sparkArray: WritableNumberArray;
+  particleCount: number;
+  sparkCount: number;
   aliveUntil: number;
   startTime: number;
   velocity: THREE.Vector3[];
+}
+
+type WritableNumberArray = ArrayLike<number> & { [index: number]: number };
+
+function markAttributeRangeDirty(attribute: THREE.BufferAttribute, start = 0, count = attribute.count * attribute.itemSize): void {
+  if (typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(start, count);
+  }
+  attribute.needsUpdate = true;
+}
+
+function writePosition(array: WritableNumberArray, index: number, x: number, y: number, z: number): void {
+  const offset = index * 3;
+  array[offset] = x;
+  array[offset + 1] = y;
+  array[offset + 2] = z;
 }
 
 /**
@@ -22,8 +44,7 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
   private decalMaterial: THREE.SpriteMaterial;
   private decalTexture: THREE.Texture;
 
-  // Pre-allocated scratch vectors to avoid per-frame allocations
-  private readonly gravity = new THREE.Vector3(0, -9.8, 0);
+  private readonly gravityY = -9.8;
 
   constructor(scene: THREE.Scene, maxEffects = 32) {
     super(scene, maxEffects);
@@ -70,7 +91,8 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
     const particleCount = 20;
     const particleGeometry = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const particlePositions = new THREE.BufferAttribute(positions, 3);
+    particleGeometry.setAttribute('position', particlePositions);
     const particles = new THREE.Points(particleGeometry, this.particleMaterial);
     particles.visible = false;
     particles.matrixAutoUpdate = true;
@@ -79,7 +101,8 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
     const sparkCount = 15;
     const sparkGeometry = new THREE.BufferGeometry();
     const sparkPositions = new Float32Array(sparkCount * 3);
-    sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+    const sparkPositionAttribute = new THREE.BufferAttribute(sparkPositions, 3);
+    sparkGeometry.setAttribute('position', sparkPositionAttribute);
     const sparks = new THREE.Points(sparkGeometry, this.sparkMaterial);
     sparks.visible = false;
     sparks.matrixAutoUpdate = true;
@@ -96,7 +119,20 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
       velocity.push(new THREE.Vector3());
     }
 
-    return { particles, sparks, decal, aliveUntil: 0, startTime: 0, velocity };
+    return {
+      particles,
+      sparks,
+      decal,
+      particlePositions,
+      sparkPositions: sparkPositionAttribute,
+      particleArray: particlePositions.array as WritableNumberArray,
+      sparkArray: sparkPositionAttribute.array as WritableNumberArray,
+      particleCount,
+      sparkCount,
+      aliveUntil: 0,
+      startTime: 0,
+      velocity,
+    };
   }
 
   protected isExpired(effect: ImpactEffect, now: number): boolean {
@@ -157,11 +193,13 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
     effect.decal.visible = true;
 
     // Initialize particle positions and velocities
-    const particlePositions = effect.particles.geometry.attributes.position as THREE.BufferAttribute;
-    const sparkPositions = effect.sparks.geometry.attributes.position as THREE.BufferAttribute;
+    const particlePositions = effect.particlePositions;
+    const sparkPositions = effect.sparkPositions;
+    const particleArray = effect.particleArray;
+    const sparkArray = effect.sparkArray;
 
-    for (let i = 0; i < particlePositions.count; i++) {
-      particlePositions.setXYZ(i, position.x, position.y, position.z);
+    for (let i = 0; i < effect.particleCount; i++) {
+      writePosition(particleArray, i, position.x, position.y, position.z);
 
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.random() * Math.PI * 0.5;
@@ -174,21 +212,22 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
       );
       effect.velocity[i].addScaledVector(normal, speed * 0.5);
     }
-    particlePositions.needsUpdate = true;
+    markAttributeRangeDirty(particlePositions);
 
-    for (let i = 0; i < sparkPositions.count; i++) {
-      sparkPositions.setXYZ(i, position.x, position.y, position.z);
+    for (let i = 0; i < effect.sparkCount; i++) {
+      writePosition(sparkArray, i, position.x, position.y, position.z);
 
       const speed = 6 + Math.random() * 6;
       const spread = 0.4;
 
-      effect.velocity[particlePositions.count + i].copy(normal);
-      effect.velocity[particlePositions.count + i].multiplyScalar(speed);
-      effect.velocity[particlePositions.count + i].x += (Math.random() - 0.5) * spread * speed;
-      effect.velocity[particlePositions.count + i].y += (Math.random() - 0.5) * spread * speed;
-      effect.velocity[particlePositions.count + i].z += (Math.random() - 0.5) * spread * speed;
+      const velocityIndex = effect.particleCount + i;
+      effect.velocity[velocityIndex].copy(normal);
+      effect.velocity[velocityIndex].multiplyScalar(speed);
+      effect.velocity[velocityIndex].x += (Math.random() - 0.5) * spread * speed;
+      effect.velocity[velocityIndex].y += (Math.random() - 0.5) * spread * speed;
+      effect.velocity[velocityIndex].z += (Math.random() - 0.5) * spread * speed;
     }
-    sparkPositions.needsUpdate = true;
+    markAttributeRangeDirty(sparkPositions);
 
     effect.particles.visible = true;
     effect.sparks.visible = true;
@@ -201,6 +240,8 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
   }
 
   update(deltaTime: number): void {
+    if (this.active.length === 0) return;
+
     const now = performance.now();
 
     // Update physics on active effects before sweeping
@@ -208,27 +249,30 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
       if (effect.aliveUntil <= now) continue;
 
       const elapsed = now - effect.startTime;
-      const particlePositions = effect.particles.geometry.attributes.position as THREE.BufferAttribute;
-      const sparkPositions = effect.sparks.geometry.attributes.position as THREE.BufferAttribute;
+      const particlePositions = effect.particlePositions;
+      const sparkPositions = effect.sparkPositions;
+      const particleArray = effect.particleArray;
+      const sparkArray = effect.sparkArray;
 
-      for (let j = 0; j < particlePositions.count; j++) {
-        effect.velocity[j].addScaledVector(this.gravity, deltaTime);
-        const x = particlePositions.getX(j) + effect.velocity[j].x * deltaTime;
-        const y = particlePositions.getY(j) + effect.velocity[j].y * deltaTime;
-        const z = particlePositions.getZ(j) + effect.velocity[j].z * deltaTime;
-        particlePositions.setXYZ(j, x, y, z);
+      for (let j = 0; j < effect.particleCount; j++) {
+        const velocity = effect.velocity[j];
+        velocity.y += this.gravityY * deltaTime;
+        const offset = j * 3;
+        particleArray[offset] += velocity.x * deltaTime;
+        particleArray[offset + 1] += velocity.y * deltaTime;
+        particleArray[offset + 2] += velocity.z * deltaTime;
       }
-      particlePositions.needsUpdate = true;
+      markAttributeRangeDirty(particlePositions);
 
-      for (let j = 0; j < sparkPositions.count; j++) {
-        const idx = particlePositions.count + j;
+      for (let j = 0; j < effect.sparkCount; j++) {
+        const idx = effect.particleCount + j;
         effect.velocity[idx].multiplyScalar(0.95);
-        const x = sparkPositions.getX(j) + effect.velocity[idx].x * deltaTime;
-        const y = sparkPositions.getY(j) + effect.velocity[idx].y * deltaTime;
-        const z = sparkPositions.getZ(j) + effect.velocity[idx].z * deltaTime;
-        sparkPositions.setXYZ(j, x, y, z);
+        const offset = j * 3;
+        sparkArray[offset] += effect.velocity[idx].x * deltaTime;
+        sparkArray[offset + 1] += effect.velocity[idx].y * deltaTime;
+        sparkArray[offset + 2] += effect.velocity[idx].z * deltaTime;
       }
-      sparkPositions.needsUpdate = true;
+      markAttributeRangeDirty(sparkPositions);
 
       const fadeStart = 300;
       if (elapsed > fadeStart) {

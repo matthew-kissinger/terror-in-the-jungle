@@ -15,6 +15,7 @@ export class WeaponModel {
   private animations: WeaponAnimations
   private reload: WeaponReload
   private boundOnWindowResize!: () => void
+  private activeRigFreshForRender: THREE.Object3D | null = null
 
   constructor(
     animations: WeaponAnimations,
@@ -25,6 +26,10 @@ export class WeaponModel {
 
     // Create separate scene for weapon overlay
     this.weaponScene = new THREE.Scene()
+    // The overlay scene keeps every loadout rig resident, with only one visible
+    // at a time. Avoid a full scene matrix walk during the overlay render; the
+    // active rig is updated explicitly after its animation transform changes.
+    this.weaponScene.matrixWorldAutoUpdate = false
 
     // Create orthographic camera for weapon rendering
     const aspect = window.innerWidth / window.innerHeight
@@ -96,6 +101,9 @@ export class WeaponModel {
     const baseCant = THREE.MathUtils.degToRad(-8) // Negative for proper cant
     const adsCant = 0 // No cant in ADS
     weaponRig.rotation.z = THREE.MathUtils.lerp(baseCant, adsCant, adsProgress) + reloadRotation.z
+
+    weaponRig.updateMatrixWorld(true)
+    this.activeRigFreshForRender = weaponRig
   }
 
   /**
@@ -104,6 +112,11 @@ export class WeaponModel {
   render(renderer: THREE.WebGLRenderer, rigManager: WeaponRigManager): void {
     const currentRig = rigManager.getCurrentRig()
     if (!currentRig || currentRig.visible === false) return
+    if (this.activeRigFreshForRender === currentRig) {
+      this.activeRigFreshForRender = null
+    } else {
+      currentRig.updateMatrixWorld(true)
+    }
 
     // Save current renderer state
     const currentAutoClear = renderer.autoClear

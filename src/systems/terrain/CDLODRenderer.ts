@@ -154,6 +154,9 @@ export class CDLODRenderer {
     // WebGL attribute compatibility; the shader rounds via bit extraction.
     this.tileParams0Attr = new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4);
     this.tileParams1Attr = new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.tileParams0Attr.setUsage(THREE.DynamicDrawUsage);
+    this.tileParams1Attr.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('tileParams0', this.tileParams0Attr);
     geo.setAttribute('tileParams1', this.tileParams1Attr);
 
@@ -179,30 +182,74 @@ export class CDLODRenderer {
     const count = Math.min(tiles.length, this.maxInstances);
     this.mesh.count = count;
     this.mesh.visible = count > 0;
+    this.clearAttributeUpdateRanges(this.mesh.instanceMatrix);
+    this.clearAttributeUpdateRanges(this.tileParams0Attr);
+    this.clearAttributeUpdateRanges(this.tileParams1Attr);
 
     for (let i = 0; i < count; i++) {
       const tile = tiles[i];
+      const base = i * 4;
+      const tileX = Math.fround(tile.x);
+      const tileZ = Math.fround(tile.z);
+      const tileSize = Math.fround(tile.size);
+      const lodLevel = Math.fround(tile.lodLevel);
 
-      // Position at tile center, scale to tile size
-      this._matrix.makeScale(tile.size, 1, tile.size);
-      this._matrix.setPosition(tile.x, 0, tile.z);
-
+      // Keep matrix and tileParams0 coherent. The vertex node combines both:
+      // matrix supplies rendered XZ placement while tileParams0 supplies the
+      // world-space heightmap sample. Sparse uploads can leave one buffer newer
+      // than the other on renderer backends, which manifests as terrain bands
+      // or inverted/see-through CDLOD tiles.
+      this._matrix.makeScale(tileSize, 1, tileSize);
+      this._matrix.setPosition(tileX, 0, tileZ);
       this.mesh.setMatrixAt(i, this._matrix);
 
-      const base = i * 4;
-      this.tileParams0Attr.array[base] = tile.x;
-      this.tileParams0Attr.array[base + 1] = tile.z;
-      this.tileParams0Attr.array[base + 2] = tile.size;
-      this.tileParams0Attr.array[base + 3] = tile.lodLevel;
-      this.tileParams1Attr.array[base] = tile.morphFactor;
-      this.tileParams1Attr.array[base + 1] = tile.edgeMorphMask;
-      this.tileParams1Attr.array[base + 2] = 0;
-      this.tileParams1Attr.array[base + 3] = 0;
+      const morphFactor = Math.fround(tile.morphFactor);
+      const edgeMorphMask = Math.fround(Number(tile.edgeMorphMask ?? 0));
+      this.writeTileParams(
+        this.tileParams0Attr,
+        this.tileParams1Attr,
+        base,
+        tileX,
+        tileZ,
+        tileSize,
+        lodLevel,
+        morphFactor,
+        edgeMorphMask,
+      );
     }
 
     this.mesh.instanceMatrix.needsUpdate = true;
     this.tileParams0Attr.needsUpdate = true;
     this.tileParams1Attr.needsUpdate = true;
+  }
+
+  private writeTileParams(
+    tileParams0Attr: THREE.InstancedBufferAttribute,
+    tileParams1Attr: THREE.InstancedBufferAttribute,
+    base: number,
+    tileX: number,
+    tileZ: number,
+    tileSize: number,
+    lodLevel: number,
+    morphFactor: number,
+    edgeMorphMask: number,
+  ): void {
+    tileParams0Attr.array[base] = tileX;
+    tileParams0Attr.array[base + 1] = tileZ;
+    tileParams0Attr.array[base + 2] = tileSize;
+    tileParams0Attr.array[base + 3] = lodLevel;
+    tileParams1Attr.array[base] = morphFactor;
+    tileParams1Attr.array[base + 1] = edgeMorphMask;
+    tileParams1Attr.array[base + 2] = 0;
+    tileParams1Attr.array[base + 3] = 0;
+  }
+
+  private clearAttributeUpdateRanges(
+    attribute: THREE.BufferAttribute | THREE.InstancedBufferAttribute,
+  ): void {
+    if (typeof attribute.clearUpdateRanges === 'function') {
+      attribute.clearUpdateRanges();
+    }
   }
 
   /**

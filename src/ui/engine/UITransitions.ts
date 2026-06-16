@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import { isSandboxMode } from '../../core/SandboxModeDetector';
 
 type UiTransitionIntent = 'menu' | 'live-entry';
@@ -50,7 +50,7 @@ function resolveUiTransitionDebugState(intent: UiTransitionIntent): UiTransition
     return { enabled: supported, reason: 'query-enabled', supported };
   }
 
-  if (isSandboxMode() || isPerfDiagnosticsEnabled()) {
+  if (isSandboxMode() || isPerfHarnessEnabled()) {
     return { enabled: false, reason: 'automation', supported };
   }
 

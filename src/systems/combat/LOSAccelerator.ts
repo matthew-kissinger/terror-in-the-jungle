@@ -7,7 +7,10 @@ import { Logger } from '../../utils/Logger';
 const _losDirection = new THREE.Vector3();
 const _rayBox = new THREE.Box3();
 const _losRaycaster = new THREE.Raycaster();
+const _losRaycasterWithBvh = _losRaycaster as THREE.Raycaster & { firstHitOnly?: boolean };
 const _registeredChunkBox = new THREE.Box3();
+const _relevantMeshes: THREE.Mesh[] = [];
+const _losIntersections: THREE.Intersection[] = [];
 
 // Prefix used to namespace static-obstacle registrations (buildings, towers,
 // hangars) inside the same cache as terrain chunks. Keeps a single iteration
@@ -114,9 +117,11 @@ export class LOSAccelerator {
     // Perform raycast using BVH acceleration
     _losRaycaster.set(origin, _losDirection);
     _losRaycaster.far = distance;
+    _losRaycasterWithBvh.firstHitOnly = true;
 
     // Raycast against relevant meshes (BVH acceleration happens automatically)
-    const intersects = _losRaycaster.intersectObjects(relevantMeshes, false);
+    _losIntersections.length = 0;
+    const intersects = _losRaycaster.intersectObjects(relevantMeshes, false, _losIntersections);
 
     if (intersects.length > 0) {
       const hit = intersects[0];
@@ -148,21 +153,23 @@ export class LOSAccelerator {
    * Uses spatial culling to avoid checking distant chunks
    */
   private getRelevantChunks(origin: THREE.Vector3, target: THREE.Vector3): THREE.Mesh[] {
-    const meshes: THREE.Mesh[] = [];
+    _relevantMeshes.length = 0;
 
     // Calculate bounding box of the ray
-    _rayBox.setFromPoints([origin, target]);
+    _rayBox.makeEmpty();
+    _rayBox.expandByPoint(origin);
+    _rayBox.expandByPoint(target);
     _rayBox.expandByScalar(2); // Small buffer for edge cases
 
     // Check each cached chunk
     for (const [, entry] of this.chunkCache.entries()) {
       // Only include if ray box intersects chunk box
       if (_rayBox.intersectsBox(entry.bounds)) {
-        meshes.push(entry.mesh);
+        _relevantMeshes.push(entry.mesh);
       }
     }
 
-    return meshes;
+    return _relevantMeshes;
   }
 
   /**

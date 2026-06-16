@@ -213,6 +213,39 @@ describe('SpatialOctree', () => {
 
       expect(octree.queryNearestK(new THREE.Vector3(0, 0, 0), 10)).toHaveLength(2);
     });
+
+    it('returns nearest entities in ascending distance order', () => {
+      const octree = new SpatialOctree();
+      octree.updatePosition('far', new THREE.Vector3(90, 0, 0));
+      octree.updatePosition('near', new THREE.Vector3(10, 0, 0));
+      octree.updatePosition('middle', new THREE.Vector3(40, 0, 0));
+
+      expect(octree.queryNearestK(new THREE.Vector3(0, 0, 0), 3)).toEqual([
+        'near',
+        'middle',
+        'far',
+      ]);
+    });
+
+    it('returns no nearest entities when k is zero or negative', () => {
+      const octree = new SpatialOctree();
+      octree.updatePosition('near', new THREE.Vector3(10, 0, 0));
+
+      expect(octree.queryNearestK(new THREE.Vector3(0, 0, 0), 0)).toEqual([]);
+      expect(octree.queryNearestK(new THREE.Vector3(0, 0, 0), -1)).toEqual([]);
+    });
+
+    it('keeps earlier discovered equal-distance entities ahead of later ties', () => {
+      const octree = new SpatialOctree();
+      octree.updatePosition('tie-a', new THREE.Vector3(10, 0, 0));
+      octree.updatePosition('tie-b', new THREE.Vector3(-10, 0, 0));
+      octree.updatePosition('tie-c', new THREE.Vector3(0, 0, 10));
+
+      expect(octree.queryNearestK(new THREE.Vector3(0, 0, 0), 2)).toEqual([
+        'tie-a',
+        'tie-b',
+      ]);
+    });
   });
 
   describe('setWorldSize', () => {

@@ -54,16 +54,23 @@ export class AIStateDefend {
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy && this.isEnemyWithinCommandLeash(combatant, isPlayerTarget(enemy) ? playerPosition : enemy.position)) {
       const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
-      const distance = combatant.position.distanceTo(targetPos);
+      const distanceSq = combatant.position.distanceToSquared(targetPos);
 
       // At very close range (<15m), defenders should ALWAYS react regardless of facing
       // This prevents the "standing right next to them" issue
-      const veryCloseRange = distance < 15;
+      const veryCloseRange = distanceSq < 225;
 
-      if (distance < 50) {
+      if (distanceSq < 2500) {
+        const distance = veryCloseRange ? 0 : Math.sqrt(distanceSq);
+
         // Turn to face the enemy BEFORE checking LOS
         // This fixes the bug where defenders facing outward wouldn't see approaching enemies
-        _toTarget.subVectors(targetPos, combatant.position).normalize();
+        _toTarget.subVectors(targetPos, combatant.position);
+        if (!veryCloseRange && distance > 0) {
+          _toTarget.multiplyScalar(1 / distance);
+        } else {
+          _toTarget.normalize();
+        }
         combatant.rotation = Math.atan2(_toTarget.z, _toTarget.x);
 
         // At very close range, skip LOS check entirely - they would hear/sense you
@@ -99,12 +106,14 @@ export class AIStateDefend {
       return;
     }
 
-    const distanceToDefensePos = combatant.position.distanceTo(combatant.defensePosition);
-    if (distanceToDefensePos > 3) {
+    const distanceToDefensePosSq = combatant.position.distanceToSquared(combatant.defensePosition);
+    if (distanceToDefensePosSq > 9) {
+      const distanceToDefensePos = Math.sqrt(distanceToDefensePosSq);
+
       combatant.destinationPoint = combatant.defensePosition.clone();
       _toDefensePos
         .subVectors(combatant.defensePosition, combatant.position)
-        .normalize();
+        .multiplyScalar(1 / distanceToDefensePos);
       combatant.rotation = Math.atan2(_toDefensePos.z, _toDefensePos.x);
     } else {
       combatant.destinationPoint = undefined;

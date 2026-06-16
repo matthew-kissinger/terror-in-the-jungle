@@ -13,6 +13,7 @@ export class AudioDuckingSystem {
     private readonly DUCKING_AMOUNT = 0.4; // Reduce ambient to 40% during combat
     private readonly DUCK_FADE_TIME = 0.3; // Fade in/out time in seconds
     private lastCombatSoundTime = 0;
+    private hasCombatSound = false;
     private readonly COMBAT_TIMEOUT = 2000; // 2 seconds after last shot before unduck
 
     /**
@@ -20,12 +21,17 @@ export class AudioDuckingSystem {
      */
     markCombatSound(): void {
         this.lastCombatSoundTime = performance.now();
+        this.hasCombatSound = true;
     }
 
     /**
      * Update ducking state and apply to ambient sounds
      */
     update(deltaTime: number, ambientSounds: THREE.Audio[]): void {
+        if (!this.hasCombatSound && !this.isDucking && this.duckingProgress === 0) {
+            return;
+        }
+
         const now = performance.now();
         const timeSinceLastShot = now - this.lastCombatSoundTime;
 

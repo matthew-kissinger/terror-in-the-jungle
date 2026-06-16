@@ -93,4 +93,18 @@ describe('HelicopterWeaponSystem hitscan fire-rate is dt-accurate', () => {
     expect(roundsLarge).toBeGreaterThan(roundsSmall);
     expect(roundsLarge).toBeGreaterThan(1);
   });
+
+  it('reuses one damage resolver across a multi-round frame while preserving damage', () => {
+    ws.update(0.2, HELI_ID, pos, quat, false, false);
+
+    const calls = (cs.handlePlayerShot as any).mock.calls as Array<[
+      THREE.Ray,
+      (distance: number, isHeadshot: boolean) => number,
+      string,
+    ]>;
+    expect(calls.length).toBeGreaterThan(1);
+    const resolver = calls[0][1];
+    expect(resolver(40, false)).toBe(MINIGUN.damage);
+    expect(calls.every(([, damage]) => damage === resolver)).toBe(true);
+  });
 });

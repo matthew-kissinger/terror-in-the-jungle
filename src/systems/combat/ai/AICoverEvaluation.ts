@@ -24,13 +24,14 @@ export function evaluateSandbagCover(
   const spots: CoverSpot[] = []
   const now = Date.now()
   const sandbagBounds = sandbagSystem.getSandbagBounds()
+  const maxRadiusSq = maxRadius * maxRadius
 
   for (const bounds of sandbagBounds) {
     const center = _sandbagCenter
     bounds.getCenter(center)
     bounds.getSize(_sandbagSize)
 
-    if (combatantPos.distanceTo(center) > maxRadius) continue
+    if (combatantPos.distanceToSquared(center) > maxRadiusSq) continue
 
     // Position behind sandbag relative to threat
     const threatToSandbag = _threatToSandbag.subVectors(center, threatPos).normalize()
@@ -84,11 +85,11 @@ export function evaluateCoverQuality(
   score += angleScore * 30
 
   // 4. Distance from threat (medium range preferred)
-  const threatDistance = spot.position.distanceTo(threatPos)
+  const threatDistanceSq = spot.position.distanceToSquared(threatPos)
   let threatDistanceScore = 0
-  if (threatDistance > 20 && threatDistance < 50) {
+  if (threatDistanceSq > 400 && threatDistanceSq < 2500) {
     threatDistanceScore = 1.0
-  } else if (threatDistance >= 10 && threatDistance <= 70) {
+  } else if (threatDistanceSq >= 100 && threatDistanceSq <= 4900) {
     threatDistanceScore = 0.5
   }
   score += threatDistanceScore * 15

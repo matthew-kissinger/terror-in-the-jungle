@@ -83,6 +83,19 @@ type CaptureSummary = {
     npcCloseModelsDisabled?: boolean;
     terrainShadowsDisabled?: boolean;
   };
+  droppedFrameMetrics?: {
+    browserRaf?: {
+      estimatedDropped60HzFrames?: number;
+      estimatedDropped60HzFramesPerSecond?: number;
+      overBudget60HzMs?: number;
+      overBudget60HzMsPerSecond?: number;
+      droppedFrameTime60HzMs?: number;
+      droppedFrameTime60HzMsPerSecond?: number;
+    };
+  };
+  tailAttribution?: {
+    conclusion?: string;
+  };
 };
 
 type Threshold = { pass: number; warn: number };
@@ -114,6 +127,14 @@ type ExtractedMetrics = {
   maxFrameMs: number;
   hitch50Pct: number;
   hitch100Pct: number;
+  rafDropped60HzFrames: number;
+  rafDropped60HzFramesPerSecond: number;
+  rafOverBudget60HzMs: number;
+  rafOverBudget60HzMsPerSecond: number;
+  rafDroppedFrameTime60HzMs: number;
+  rafDroppedFrameTime60HzMsPerSecond: number;
+  hasRafTimeMetrics: boolean;
+  tailAttributionConclusion: string | null;
   overBudgetPct: number;
   heapGrowthMb: number;
   sampleCount: number;
@@ -163,7 +184,6 @@ function listCaptureDirs(options: { includeDiagnosticRuntimeVariants?: boolean }
       try {
         const summary = JSON.parse(readFileSync(summaryPath, 'utf-8')) as Partial<CaptureSummary>;
         const samples = JSON.parse(readFileSync(samplesPath, 'utf-8')) as unknown;
-        if (summary.status === 'failed') return false;
         if (!options.includeDiagnosticRuntimeVariants && isDiagnosticRuntimeVariant(summary)) return false;
         const finalFrameCount = Number(summary.finalFrameCount ?? 0);
         return Array.isArray(samples) && (samples.length > 0 || finalFrameCount > 0);
@@ -288,6 +308,18 @@ function extractMetrics(
     if (h50) hitch50Pct = h50.value;
     if (h100) hitch100Pct = h100.value;
   }
+  const browserRaf = summary.droppedFrameMetrics?.browserRaf;
+  const rafDropped60HzFrames = Number(browserRaf?.estimatedDropped60HzFrames ?? 0);
+  const rafDropped60HzFramesPerSecond = Number(browserRaf?.estimatedDropped60HzFramesPerSecond ?? 0);
+  const rafOverBudget60HzMs = Number(browserRaf?.overBudget60HzMs ?? 0);
+  const rafOverBudget60HzMsPerSecond = Number(browserRaf?.overBudget60HzMsPerSecond ?? 0);
+  const rafDroppedFrameTime60HzMs = Number(browserRaf?.droppedFrameTime60HzMs ?? 0);
+  const rafDroppedFrameTime60HzMsPerSecond = Number(browserRaf?.droppedFrameTime60HzMsPerSecond ?? 0);
+  const hasRafTimeMetrics = typeof browserRaf?.overBudget60HzMs === 'number'
+    || typeof browserRaf?.droppedFrameTime60HzMs === 'number';
+  const tailAttributionConclusion = typeof summary.tailAttribution?.conclusion === 'string'
+    ? summary.tailAttribution.conclusion
+    : null;
 
   // Heap growth: last sample heap - average of first 3 samples
   const heapSamples = samples.filter(s => typeof s.heapUsedMb === 'number');
@@ -311,6 +343,14 @@ function extractMetrics(
     maxFrameMs,
     hitch50Pct,
     hitch100Pct,
+    rafDropped60HzFrames,
+    rafDropped60HzFramesPerSecond,
+    rafOverBudget60HzMs,
+    rafOverBudget60HzMsPerSecond,
+    rafDroppedFrameTime60HzMs,
+    rafDroppedFrameTime60HzMsPerSecond,
+    hasRafTimeMetrics,
+    tailAttributionConclusion,
     overBudgetPct: avgOverBudget,
     heapGrowthMb,
     sampleCount: samples.length,
@@ -411,6 +451,8 @@ function buildComparison(
   if (t.maxFrameMs) rows.push(compareMetric('maxFrameMs', metrics.maxFrameMs, 'ms', t.maxFrameMs, Number(lm?.maxFrameMs ?? 0) || undefined));
   if (t.hitch50Pct) rows.push(compareMetric('hitch50Pct', metrics.hitch50Pct, '%', t.hitch50Pct, Number(lm?.hitch50Pct ?? 0) || undefined));
   if (t.hitch100Pct) rows.push(compareMetric('hitch100Pct', metrics.hitch100Pct, '%', t.hitch100Pct, Number(lm?.hitch100Pct ?? 0) || undefined));
+  if (t.rafDropped60HzFramesPerSecond) rows.push(compareMetric('rafDrop60Hz/s', metrics.rafDropped60HzFramesPerSecond, '/s', t.rafDropped60HzFramesPerSecond, Number(lm?.rafDropped60HzFramesPerSecond ?? 0) || undefined));
+  if (t.rafDroppedFrameTime60HzMsPerSecond && metrics.hasRafTimeMetrics) rows.push(compareMetric('rafDropTime60Hz/s', metrics.rafDroppedFrameTime60HzMsPerSecond, 'ms/s', t.rafDroppedFrameTime60HzMsPerSecond, Number(lm?.rafDroppedFrameTime60HzMsPerSecond ?? 0) || undefined));
   if (t.overBudgetPct) rows.push(compareMetric('overBudgetPct', metrics.overBudgetPct, '%', t.overBudgetPct, Number(lm?.overBudgetPct ?? 0) || undefined));
   if (t.heapGrowthMb) rows.push(compareMetric('heapGrowthMb', metrics.heapGrowthMb, 'MB', t.heapGrowthMb, Number(lm?.heapGrowthMb ?? 0) || undefined));
 
@@ -455,7 +497,47 @@ function printTable(rows: ComparisonRow[]): void {
 function printMetricsSummary(metrics: ExtractedMetrics, artifactDir: string): void {
   console.log(`\nArtifact: ${artifactDir}`);
   console.log(`Mode: ${metrics.mode} | NPCs: ${metrics.npcs} | Duration: ${metrics.durationSeconds}s | Samples: ${metrics.sampleCount} | Status: ${metrics.status}`);
+  if (metrics.tailAttributionConclusion) {
+    console.log(`Tail attribution: ${metrics.tailAttributionConclusion}`);
+  }
   console.log('');
+}
+
+function printRawMetrics(metrics: ExtractedMetrics): void {
+  console.log(`avgFrameMs:                  ${metrics.avgFrameMs.toFixed(2)} ms`);
+  console.log(`p95FrameMs:                  ${metrics.p95FrameMs.toFixed(2)} ms`);
+  console.log(`p99FrameMs:                  ${metrics.p99FrameMs.toFixed(2)} ms`);
+  console.log(`maxFrameMs:                  ${metrics.maxFrameMs.toFixed(2)} ms`);
+  console.log(`hitch50Pct:                  ${metrics.hitch50Pct.toFixed(3)}%`);
+  console.log(`hitch100Pct:                 ${metrics.hitch100Pct.toFixed(3)}%`);
+  console.log(`rafDropped60HzFrames:        ${metrics.rafDropped60HzFrames.toFixed(0)}`);
+  console.log(`rafDropped60HzFramesPerSec:  ${metrics.rafDropped60HzFramesPerSecond.toFixed(2)}/s`);
+  if (metrics.hasRafTimeMetrics) {
+    console.log(`rafOverBudget60HzMs:         ${metrics.rafOverBudget60HzMs.toFixed(1)} ms`);
+    console.log(`rafOverBudget60HzMsPerSec:   ${metrics.rafOverBudget60HzMsPerSecond.toFixed(2)} ms/s`);
+    console.log(`rafDroppedFrameTime60HzMs:   ${metrics.rafDroppedFrameTime60HzMs.toFixed(1)} ms`);
+    console.log(`rafDroppedFrameTime60HzMsPerSec: ${metrics.rafDroppedFrameTime60HzMsPerSecond.toFixed(2)} ms/s`);
+  } else {
+    console.log('rafOverBudget60HzMs:         unavailable (artifact predates rAF time metrics)');
+    console.log('rafDroppedFrameTime60HzMs:   unavailable (artifact predates rAF time metrics)');
+  }
+  console.log(`overBudgetPct:               ${metrics.overBudgetPct.toFixed(2)}%`);
+  console.log(`heapGrowthMb:                ${metrics.heapGrowthMb.toFixed(2)} MB`);
+}
+
+function printFailedValidationSummary(summary: CaptureSummary, validation: ValidationReport | null): void {
+  console.log(`Capture failed: ${summary.failureReason ?? 'unknown reason'}`);
+  if (!validation) {
+    return;
+  }
+  const blockingChecks = validation.checks.filter(check => check.status !== 'pass');
+  if (blockingChecks.length === 0) {
+    return;
+  }
+  console.log(`Validation overall: ${validation.overall.toUpperCase()}`);
+  for (const check of blockingChecks) {
+    console.log(`- [${check.status}] ${check.id}: ${check.message}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -489,6 +571,16 @@ function updateBaseline(
     maxFrameMs: Number(metrics.maxFrameMs.toFixed(2)),
     hitch50Pct: Number(metrics.hitch50Pct.toFixed(3)),
     hitch100Pct: Number(metrics.hitch100Pct.toFixed(3)),
+    rafDropped60HzFrames: Number(metrics.rafDropped60HzFrames.toFixed(0)),
+    rafDropped60HzFramesPerSecond: Number(metrics.rafDropped60HzFramesPerSecond.toFixed(3)),
+    ...(metrics.hasRafTimeMetrics
+      ? {
+          rafOverBudget60HzMs: Number(metrics.rafOverBudget60HzMs.toFixed(1)),
+          rafOverBudget60HzMsPerSecond: Number(metrics.rafOverBudget60HzMsPerSecond.toFixed(3)),
+          rafDroppedFrameTime60HzMs: Number(metrics.rafDroppedFrameTime60HzMs.toFixed(1)),
+          rafDroppedFrameTime60HzMsPerSecond: Number(metrics.rafDroppedFrameTime60HzMsPerSecond.toFixed(3)),
+        }
+      : {}),
     overBudgetPct: Number(metrics.overBudgetPct.toFixed(2)),
     heapGrowthMb: Number(metrics.heapGrowthMb.toFixed(2)),
   };
@@ -568,28 +660,22 @@ function main(): void {
     ? JSON.parse(readFileSync(validationPath, 'utf-8'))
     : null;
 
-  if (summary.status === 'failed') {
-    console.error(`Capture failed: ${summary.failureReason ?? 'unknown reason'}`);
-    console.error(`Artifact: ${artifactPath}`);
-    process.exit(2);
-  }
-
   // Extract metrics
   const metrics = extractMetrics(summary, samples, validation);
   printMetricsSummary(metrics, artifactPath);
+
+  if (summary.status === 'failed') {
+    printRawMetrics(metrics);
+    console.log('');
+    printFailedValidationSummary(summary, validation);
+    process.exit(2);
+  }
 
   // Load baselines
   const baselines = loadBaselines();
   if (!baselines) {
     console.log('No perf-baselines.json found. Printing raw metrics only.\n');
-    console.log(`avgFrameMs:    ${metrics.avgFrameMs.toFixed(2)} ms`);
-    console.log(`p95FrameMs:    ${metrics.p95FrameMs.toFixed(2)} ms`);
-    console.log(`p99FrameMs:    ${metrics.p99FrameMs.toFixed(2)} ms`);
-    console.log(`maxFrameMs:    ${metrics.maxFrameMs.toFixed(2)} ms`);
-    console.log(`hitch50Pct:    ${metrics.hitch50Pct.toFixed(3)}%`);
-    console.log(`hitch100Pct:   ${metrics.hitch100Pct.toFixed(3)}%`);
-    console.log(`overBudgetPct: ${metrics.overBudgetPct.toFixed(2)}%`);
-    console.log(`heapGrowthMb:  ${metrics.heapGrowthMb.toFixed(2)} MB`);
+    printRawMetrics(metrics);
     process.exit(0);
   }
 
@@ -620,14 +706,7 @@ function main(): void {
     console.log('Use --scenario <name> to specify explicitly.\n');
 
     // Still print raw metrics
-    console.log(`avgFrameMs:    ${metrics.avgFrameMs.toFixed(2)} ms`);
-    console.log(`p95FrameMs:    ${metrics.p95FrameMs.toFixed(2)} ms`);
-    console.log(`p99FrameMs:    ${metrics.p99FrameMs.toFixed(2)} ms`);
-    console.log(`maxFrameMs:    ${metrics.maxFrameMs.toFixed(2)} ms`);
-    console.log(`hitch50Pct:    ${metrics.hitch50Pct.toFixed(3)}%`);
-    console.log(`hitch100Pct:   ${metrics.hitch100Pct.toFixed(3)}%`);
-    console.log(`overBudgetPct: ${metrics.overBudgetPct.toFixed(2)}%`);
-    console.log(`heapGrowthMb:  ${metrics.heapGrowthMb.toFixed(2)} MB`);
+    printRawMetrics(metrics);
     process.exit(0);
   }
 

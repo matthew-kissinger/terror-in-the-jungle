@@ -19,10 +19,30 @@ function sanitizeTimeRemaining(timeRemaining: number): number {
   return Number.isFinite(timeRemaining) ? Math.max(0, timeRemaining) : 0;
 }
 
+type TimerStatusBucket = 'normal' | 'warning' | 'critical';
+
+function getDisplaySeconds(timeRemaining: number): number {
+  return Math.floor(sanitizeTimeRemaining(timeRemaining));
+}
+
+function getStatusBucket(timeRemaining: number): TimerStatusBucket {
+  const t = sanitizeTimeRemaining(timeRemaining);
+  if (t <= 30) return 'critical';
+  if (t <= 60) return 'warning';
+  return 'normal';
+}
+
 export class MobileStatusBar extends UIComponent {
   private timeRemaining = this.signal(Infinity);
   private usTickets = this.signal(0);
   private opforTickets = this.signal(0);
+  private timerEl?: HTMLElement;
+  private usEl?: HTMLElement;
+  private opforEl?: HTMLElement;
+  private displayedSeconds = getDisplaySeconds(this.timeRemaining.value);
+  private statusBucket = getStatusBucket(this.timeRemaining.value);
+  private displayedUsTickets = Math.round(this.usTickets.value);
+  private displayedOpforTickets = Math.round(this.opforTickets.value);
 
   protected build(): void {
     this.root.className = styles.bar;
@@ -38,36 +58,65 @@ export class MobileStatusBar extends UIComponent {
   }
 
   protected onMount(): void {
+    this.timerEl = this.$('[data-ref="timer"]') ?? undefined;
+    this.usEl = this.$('[data-ref="us"]') ?? undefined;
+    this.opforEl = this.$('[data-ref="opfor"]') ?? undefined;
+
     // Timer formatting + warning/critical states
     this.effect(() => {
       const t = sanitizeTimeRemaining(this.timeRemaining.value);
       const m = Math.floor(t / 60);
       const s = Math.floor(t % 60);
-      const timerEl = this.$('[data-ref="timer"]');
-      if (timerEl) {
-        timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-        timerEl.classList.toggle(styles.timerWarning, t <= 60 && t > 30);
-        timerEl.classList.toggle(styles.timerCritical, t <= 30);
+      if (this.timerEl) {
+        this.timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+        this.timerEl.classList.toggle(styles.timerWarning, t <= 60 && t > 30);
+        this.timerEl.classList.toggle(styles.timerCritical, t <= 30);
       }
     });
 
     this.effect(() => {
-      this.text('[data-ref="us"]', String(Math.round(this.usTickets.value)));
+      if (this.usEl) {
+        this.usEl.textContent = String(Math.round(this.usTickets.value));
+      }
     });
 
     this.effect(() => {
-      this.text('[data-ref="opfor"]', String(Math.round(this.opforTickets.value)));
+      if (this.opforEl) {
+        this.opforEl.textContent = String(Math.round(this.opforTickets.value));
+      }
     });
+  }
+
+  protected onUnmount(): void {
+    this.timerEl = undefined;
+    this.usEl = undefined;
+    this.opforEl = undefined;
   }
 
   // --- Public API ---
 
   setTime(t: number): void {
-    this.timeRemaining.value = t;
+    const nextDisplayedSeconds = getDisplaySeconds(t);
+    const nextStatusBucket = getStatusBucket(t);
+    if (nextDisplayedSeconds === this.displayedSeconds && nextStatusBucket === this.statusBucket) {
+      return;
+    }
+
+    this.displayedSeconds = nextDisplayedSeconds;
+    this.statusBucket = nextStatusBucket;
+    this.timeRemaining.value = sanitizeTimeRemaining(t);
   }
 
   setTickets(us: number, opfor: number): void {
-    this.usTickets.value = us;
-    this.opforTickets.value = opfor;
+    const nextUsTickets = Math.round(us);
+    const nextOpforTickets = Math.round(opfor);
+    if (nextUsTickets === this.displayedUsTickets && nextOpforTickets === this.displayedOpforTickets) {
+      return;
+    }
+
+    this.displayedUsTickets = nextUsTickets;
+    this.displayedOpforTickets = nextOpforTickets;
+    this.usTickets.value = nextUsTickets;
+    this.opforTickets.value = nextOpforTickets;
   }
 }

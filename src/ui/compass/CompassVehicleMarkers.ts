@@ -38,6 +38,8 @@ export interface IVehicleMarkerQuery {
 type VehicleMarkerState = {
   markers: Map<VehicleMarkerCategory, HTMLDivElement>;
   seenCategories: Set<VehicleMarkerCategory>;
+  nearestEntries: Map<VehicleMarkerCategory, VehicleMarkerEntry>;
+  bestDistSq: Map<VehicleMarkerCategory, number>;
 };
 
 type UpdateVehicleMarkersParams = {
@@ -53,6 +55,13 @@ const CATEGORY_LABEL: Record<VehicleMarkerCategory, string> = {
   watercraft: 'W',
   emplacement: 'E'
 };
+
+type MarkerLabelRefs = {
+  letterNode: Text;
+  distanceSpan: HTMLSpanElement;
+};
+
+const markerLabelRefs = new WeakMap<HTMLDivElement, MarkerLabelRefs>();
 
 /**
  * Place a bearing chevron + distance label on the compass rose for the
@@ -80,12 +89,12 @@ export function updateVehicleMarkers({
     return;
   }
 
-  const nearest = pickNearestPerCategory(entries, _cameraPos);
+  pickNearestPerCategory(entries, _cameraPos, state);
 
   const compassWidth = 200;
   const centerX = compassWidth / 2;
 
-  nearest.forEach((entry, category) => {
+  state.nearestEntries.forEach((entry, category) => {
     state.seenCategories.add(category);
 
     _diff.subVectors(entry.position, _cameraPos);
@@ -110,16 +119,16 @@ export function updateVehicleMarkers({
       markersContainer.appendChild(marker);
     }
 
-    marker.className = factionMarkerClass(entry.faction, category);
+    setClassName(marker, factionMarkerClass(entry.faction, category));
 
     const distText = formatDistance(distance);
     setMarkerLabel(marker, CATEGORY_LABEL[category], distText);
 
     if (isVisible) {
-      marker.style.display = 'flex';
-      marker.style.left = `${markerX}px`;
+      setDisplay(marker, 'flex');
+      setLeft(marker, `${markerX}px`);
     } else {
-      marker.style.display = 'none';
+      setDisplay(marker, 'none');
     }
   });
 
@@ -128,10 +137,11 @@ export function updateVehicleMarkers({
 
 function pickNearestPerCategory(
   entries: readonly VehicleMarkerEntry[],
-  origin: THREE.Vector3
-): Map<VehicleMarkerCategory, VehicleMarkerEntry> {
-  const bestDistSq = new Map<VehicleMarkerCategory, number>();
-  const best = new Map<VehicleMarkerCategory, VehicleMarkerEntry>();
+  origin: THREE.Vector3,
+  state: VehicleMarkerState
+): void {
+  state.bestDistSq.clear();
+  state.nearestEntries.clear();
 
   for (const entry of entries) {
     if (!isDrivableCategory(entry.category)) continue;
@@ -139,14 +149,12 @@ function pickNearestPerCategory(
     const dy = entry.position.y - origin.y;
     const dz = entry.position.z - origin.z;
     const distSq = dx * dx + dy * dy + dz * dz;
-    const prior = bestDistSq.get(entry.category);
+    const prior = state.bestDistSq.get(entry.category);
     if (prior === undefined || distSq < prior) {
-      bestDistSq.set(entry.category, distSq);
-      best.set(entry.category, entry);
+      state.bestDistSq.set(entry.category, distSq);
+      state.nearestEntries.set(entry.category, entry);
     }
   }
-
-  return best;
 }
 
 function isDrivableCategory(c: string): c is VehicleMarkerCategory {
@@ -164,7 +172,25 @@ function createMarkerElement(category: VehicleMarkerCategory): HTMLDivElement {
   const marker = document.createElement('div');
   marker.className = `compass-marker compass-marker-vehicle compass-marker-vehicle-${category} neutral`;
   marker.style.display = 'none';
+  const letterNode = document.createTextNode('');
+  const distanceSpan = document.createElement('span');
+  distanceSpan.className = 'compass-marker-distance';
+  marker.appendChild(letterNode);
+  marker.appendChild(distanceSpan);
+  markerLabelRefs.set(marker, { letterNode, distanceSpan });
   return marker;
+}
+
+function setClassName(marker: HTMLDivElement, className: string): void {
+  if (marker.className !== className) marker.className = className;
+}
+
+function setDisplay(marker: HTMLDivElement, display: string): void {
+  if (marker.style.display !== display) marker.style.display = display;
+}
+
+function setLeft(marker: HTMLDivElement, left: string): void {
+  if (marker.style.left !== left) marker.style.left = left;
 }
 
 /**
@@ -172,25 +198,28 @@ function createMarkerElement(category: VehicleMarkerCategory): HTMLDivElement {
  * separate child span so the chevron stays round.
  */
 function setMarkerLabel(marker: HTMLDivElement, letter: string, distText: string): void {
-  // Reuse existing children to avoid per-frame DOM churn.
-  let letterNode = marker.firstChild as Text | null;
-  if (!letterNode || letterNode.nodeType !== Node.TEXT_NODE) {
-    marker.textContent = '';
-    letterNode = document.createTextNode(letter);
-    marker.appendChild(letterNode);
-  } else if (letterNode.nodeValue !== letter) {
+  const { letterNode, distanceSpan } = getMarkerLabelRefs(marker);
+  if (distanceSpan.textContent !== distText) {
+    distanceSpan.textContent = distText;
+  }
+  if (letterNode.nodeValue !== letter) {
     letterNode.nodeValue = letter;
   }
+}
 
-  let distSpan = marker.querySelector('.compass-marker-distance') as HTMLSpanElement | null;
-  if (!distSpan) {
-    distSpan = document.createElement('span');
-    distSpan.className = 'compass-marker-distance';
-    marker.appendChild(distSpan);
-  }
-  if (distSpan.textContent !== distText) {
-    distSpan.textContent = distText;
-  }
+function getMarkerLabelRefs(marker: HTMLDivElement): MarkerLabelRefs {
+  const existing = markerLabelRefs.get(marker);
+  if (existing) return existing;
+
+  marker.textContent = '';
+  const letterNode = document.createTextNode('');
+  const distanceSpan = document.createElement('span');
+  distanceSpan.className = 'compass-marker-distance';
+  marker.appendChild(letterNode);
+  marker.appendChild(distanceSpan);
+  const refs = { letterNode, distanceSpan };
+  markerLabelRefs.set(marker, refs);
+  return refs;
 }
 
 function formatDistance(meters: number): string {
@@ -214,7 +243,9 @@ function pruneStaleMarkers(state: VehicleMarkerState): void {
 export function createVehicleMarkerState(): VehicleMarkerState {
   return {
     markers: new Map<VehicleMarkerCategory, HTMLDivElement>(),
-    seenCategories: new Set<VehicleMarkerCategory>()
+    seenCategories: new Set<VehicleMarkerCategory>(),
+    nearestEntries: new Map<VehicleMarkerCategory, VehicleMarkerEntry>(),
+    bestDistSq: new Map<VehicleMarkerCategory, number>()
   };
 }
 

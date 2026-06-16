@@ -73,14 +73,20 @@ export interface INpcEmplacementVehicle {
 
 /**
  * Query surface for scanning candidate emplacements. The real
- * `VehicleManager` exposes `getVehiclesInRadius(center, radius)`; tests can
- * pass a one-line fake.
+ * `VehicleManager` exposes `getVehiclesInRadius(center, radius)` and the
+ * allocation-free `forEachVehicleInRadius(center, radius, visitor)` sibling;
+ * tests can pass a one-line fake.
  */
 export interface INpcEmplacementQuery {
   getVehiclesInRadius(
     center: THREE.Vector3,
     radius: number
   ): readonly INpcEmplacementVehicle[]
+  forEachVehicleInRadius?(
+    center: THREE.Vector3,
+    radius: number,
+    visitor: (vehicle: INpcEmplacementVehicle) => void
+  ): void
 }
 
 /**
@@ -170,17 +176,25 @@ export function findMountableEmplacement(
   query: INpcEmplacementQuery,
   radius: number = MOUNT_SEEK_RADIUS_M
 ): INpcEmplacementVehicle | null {
-  const candidates = query.getVehiclesInRadius(origin, radius)
   let best: INpcEmplacementVehicle | null = null
   let bestDistSq = Number.POSITIVE_INFINITY
-  for (const v of candidates) {
-    if (v.category !== 'emplacement') continue
-    if (!isAlly(v.faction, combatant.faction)) continue
-    if (!v.hasFreeSeats('gunner')) continue
+  const considerVehicle = (v: INpcEmplacementVehicle): void => {
+    if (v.category !== 'emplacement') return
+    if (!isAlly(v.faction, combatant.faction)) return
+    if (!v.hasFreeSeats('gunner')) return
     const distSq = v.getPosition().distanceToSquared(origin)
     if (distSq < bestDistSq) {
       bestDistSq = distSq
       best = v
+    }
+  }
+
+  if (query.forEachVehicleInRadius) {
+    query.forEachVehicleInRadius(origin, radius, considerVehicle)
+  } else {
+    const candidates = query.getVehiclesInRadius(origin, radius)
+    for (const v of candidates) {
+      considerVehicle(v)
     }
   }
   return best

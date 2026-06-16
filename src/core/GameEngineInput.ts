@@ -7,6 +7,8 @@ import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { InputContextManager } from '../systems/input/InputContextManager';
 import type { InspectorEntityKind } from '../ui/debug/EntityInspectorPanel';
 import { pickEntityFromClick } from '../ui/debug/FreeFlyPick';
+import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
+import { summarizeVegetationDebugInfo } from './RuntimeDebugStats';
 
 let engineRef: GameEngine | null = null;
 let listenersAttached = false;
@@ -259,17 +261,12 @@ export function togglePerformanceStats(engine: GameEngine): void {
   Logger.info('engine-input', `Memory: geometries=${perfStats.geometries}, textures=${perfStats.textures}, programs=${perfStats.programs}`);
   Logger.info('engine-input', `Combat update: last=${combatTelemetry.lastMs.toFixed(2)}ms avg=${combatTelemetry.emaMs.toFixed(2)}ms`);
   Logger.info('engine-input', `LOD counts: high=${combatTelemetry.lodHigh}, medium=${combatTelemetry.lodMedium}, low=${combatTelemetry.lodLow}, culled=${combatTelemetry.lodCulled}`);
-  const vegetationActive = Object.entries(debugInfo)
-    .filter(([key]) => key.endsWith('Active'))
-    .reduce((sum, [, value]) => sum + (value as number), 0);
-  const vegetationReserved = Object.entries(debugInfo)
-    .filter(([key]) => key.endsWith('HighWater'))
-    .reduce((sum, [, value]) => sum + (value as number), 0);
+  const vegetation = summarizeVegetationDebugInfo(debugInfo);
   const terrainReady = engine.systemManager.terrainSystem.isTerrainReady();
   const terrainTiles = engine.systemManager.terrainSystem.getActiveTerrainTileCount();
   const workerStats = engine.systemManager.terrainSystem.getWorkerStats?.();
   const terrainStreams = engine.systemManager.terrainSystem.getStreamingMetrics?.() ?? [];
-  Logger.info('engine-input', `Vegetation: ${vegetationActive} active / ${vegetationReserved} reserved`);
+  Logger.info('engine-input', `Vegetation: ${vegetation.active} active / ${vegetation.reserved} reserved`);
   Logger.info('engine-input', `Combatants - US: ${combatStats.us}, OPFOR: ${combatStats.opfor}`);
   Logger.info(
     'engine-input',
@@ -297,7 +294,10 @@ export function toggleRealtimeStatsOverlay(engine: GameEngine): void {
   if (!engine.gameStarted) return;
   engine.debugHud.togglePanel('performance');
   const overlayVisible = engine.performanceOverlay.isVisible();
-  performanceTelemetry.setEnabled(overlayVisible || engine.sandboxEnabled);
+  performanceTelemetry.setEnabled(
+    overlayVisible
+    || ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
+  );
 }
 
 /** Legacy debug API retained for callers; runtime post-processing is disabled. */

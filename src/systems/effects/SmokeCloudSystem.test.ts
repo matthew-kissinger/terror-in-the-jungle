@@ -133,6 +133,29 @@ describe('SmokeCloudSystem', () => {
       }
     });
 
+    it('should cache sprite materials for pooled cloud updates', () => {
+      smokeCloudSystem.spawn(new THREE.Vector3(0, 0, 0));
+
+      const cloud = (smokeCloudSystem as any).clouds[0];
+      expect(cloud.materials).toHaveLength(cloud.sprites.length);
+      for (let i = 0; i < cloud.sprites.length; i++) {
+        expect(cloud.materials[i]).toBe(cloud.sprites[i].material);
+      }
+    });
+
+    it('should store sprite edge radii matching normalized offset spread', () => {
+      smokeCloudSystem.spawn(new THREE.Vector3(0, 0, 0));
+
+      const cloud = (smokeCloudSystem as any).clouds[0];
+      for (let i = 0; i < cloud.sprites.length; i++) {
+        const idx = i * 3;
+        const x = cloud.offsets[idx];
+        const y = cloud.offsets[idx + 1];
+        const z = cloud.offsets[idx + 2];
+        expect(cloud.radii[i]).toBeCloseTo(Math.min(1, Math.sqrt(x * x + y * y + z * z)), 5);
+      }
+    });
+
     it('should reuse clouds from pool when available', () => {
       const pool = (smokeCloudSystem as any).pool;
       const initialPoolSize = pool.length;
@@ -274,6 +297,47 @@ describe('SmokeCloudSystem', () => {
 
       const overlayOpacity = (smokeCloudSystem as any).overlayOpacity;
       expect(overlayOpacity).toBe(0);
+    });
+
+    it('should not rewrite overlay style when opacity is unchanged', () => {
+      const overlay = (smokeCloudSystem as any).overlay as HTMLDivElement;
+      let opacityValue = '0';
+      let writes = 0;
+      Object.defineProperty(overlay.style, 'opacity', {
+        configurable: true,
+        get: () => opacityValue,
+        set: (value: string) => {
+          writes++;
+          opacityValue = value;
+        },
+      });
+
+      smokeCloudSystem.update(1.0);
+      smokeCloudSystem.update(1.0);
+
+      expect(writes).toBe(0);
+      expect(opacityValue).toBe('0');
+    });
+
+    it('should still fade the overlay after the last cloud clears', () => {
+      camera.position.set(0, 0, 0);
+      smokeCloudSystem.spawn(new THREE.Vector3(0, 0, 0));
+
+      const cloud = (smokeCloudSystem as any).clouds[0];
+      cloud.expandDuration = 0.1;
+      cloud.lingerDuration = 0.1;
+      cloud.dissipateDuration = 0.1;
+
+      smokeCloudSystem.update(0.15);
+      const visibleOpacity = (smokeCloudSystem as any).overlayOpacity;
+      expect(visibleOpacity).toBeGreaterThan(0);
+
+      smokeCloudSystem.update(0.2);
+      expect((smokeCloudSystem as any).clouds.length).toBe(0);
+
+      smokeCloudSystem.update(0.1);
+      const fadedOpacity = (smokeCloudSystem as any).overlayOpacity;
+      expect(fadedOpacity).toBeLessThan(visibleOpacity);
     });
 
     it('should show overlay when camera is inside a cloud', () => {
@@ -430,6 +494,21 @@ describe('SmokeCloudSystem', () => {
       const to = new THREE.Vector3(10, 0, 15);
 
       expect(smokeCloudSystem.isLineBlocked(from, to)).toBe(true);
+    });
+
+    it('should not block when line is exactly on the cloud radius boundary', () => {
+      smokeCloudSystem.spawn(new THREE.Vector3(0, 0, 0));
+
+      const cloud = (smokeCloudSystem as any).clouds[0];
+      cloud.expandDuration = 0.1;
+      cloud.maxRadius = 5;
+
+      smokeCloudSystem.update(0.2);
+
+      const from = new THREE.Vector3(5, 0.5, -10);
+      const to = new THREE.Vector3(5, 0.5, 10);
+
+      expect(smokeCloudSystem.isLineBlocked(from, to)).toBe(false);
     });
 
     it('should return false for zero-length line', () => {

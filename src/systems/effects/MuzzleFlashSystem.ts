@@ -29,6 +29,7 @@ const MAX_NPC    = 64;  // ring buffer shared across all NPC weapons
 const HIDDEN_POINT = 99999;
 const PLAYER_POINT_SIZE = 12;
 const NPC_POINT_SIZE = 0.55;
+const MUZZLE_FLASH_PERF_CATEGORY = 'muzzle_flash_fx';
 
 // CPU-side particle state (plain arrays for tight memory layout)
 interface CpuParticle {
@@ -51,11 +52,9 @@ function buildPoints(max: number, options: { size: number; sizeAttenuation: bool
   points: THREE.Points;
   positions: Float32Array;
   colors: Float32Array;
-  lives: Float32Array;
 } {
   const positions = new Float32Array(max * 3);
   const colors    = new Float32Array(max * 3);
-  const lives     = new Float32Array(max);
 
   for (let i = 0; i < max; i++) {
     const i3 = i * 3;
@@ -83,22 +82,26 @@ function buildPoints(max: number, options: { size: number; sizeAttenuation: bool
   });
 
   const points = new THREE.Points(geo, mat);
+  points.name = options.name.replace(/Material$/, '');
+  points.userData.perfCategory = MUZZLE_FLASH_PERF_CATEGORY;
   points.frustumCulled = false;
 
-  return { points, positions, colors, lives };
+  return { points, positions, colors };
 }
 
 // Emit one particle into a slot
 function emitParticle(
   slot: CpuParticle,
   pos: THREE.Vector3,
-  forwardDir: { x: number; y: number; z: number },
+  forwardX: number,
+  forwardY: number,
+  forwardZ: number,
   preset: typeof PRESETS[number],
   sizeScale = 1,
 ): void {
   slot.x = pos.x; slot.y = pos.y; slot.z = pos.z;
 
-  // Random direction in a cone around forwardDir
+  // Random direction in a cone around the supplied forward direction.
   const theta  = Math.random() * Math.PI * 2;
   const phi    = Math.random() * preset.spread;
   const sinPhi = Math.sin(phi);
@@ -109,9 +112,9 @@ function emitParticle(
   const perpY = sinPhi * Math.sin(theta);
 
   const spd = preset.speed * (0.7 + Math.random() * 0.6);
-  slot.vx = (forwardDir.x * cosPhi + perpX) * spd;
-  slot.vy = (forwardDir.y * cosPhi + perpY) * spd;
-  slot.vz = forwardDir.z * cosPhi * spd;
+  slot.vx = (forwardX * cosPhi + perpX) * spd;
+  slot.vy = (forwardY * cosPhi + perpY) * spd;
+  slot.vz = forwardZ * cosPhi * spd;
 
   slot.life  = 1.0;
   slot.decay = 1.0 / (preset.lifetime * (0.8 + Math.random() * 0.4));
@@ -126,10 +129,15 @@ function uploadSlots(
   slots: CpuParticle[],
   positions: Float32Array,
   colors: Float32Array,
-  lives: Float32Array,
   geo: THREE.BufferGeometry,
+  firstDirtySlot = 0,
+  lastDirtySlot = slots.length - 1,
 ): void {
-  for (let i = 0; i < slots.length; i++) {
+  if (lastDirtySlot < firstDirtySlot) {
+    return;
+  }
+
+  for (let i = firstDirtySlot; i <= lastDirtySlot; i++) {
     const s = slots[i];
     const i3 = i * 3;
     if (s.life > 0) {
@@ -145,10 +153,86 @@ function uploadSlots(
     colors[i3]        = s.r * intensity;
     colors[i3 + 1]    = s.g * intensity;
     colors[i3 + 2]    = s.b * intensity;
-    lives[i]          = s.life;
   }
-  (geo.getAttribute('position')  as THREE.BufferAttribute).needsUpdate = true;
-  (geo.getAttribute('color')     as THREE.BufferAttribute).needsUpdate = true;
+
+  const slotCount = lastDirtySlot - firstDirtySlot + 1;
+  const rangeStart = firstDirtySlot * 3;
+  const rangeCount = slotCount * 3;
+  const positionAttr = geo.getAttribute('position') as THREE.BufferAttribute;
+  const colorAttr = geo.getAttribute('color') as THREE.BufferAttribute;
+  addAttributeUpdateRange(positionAttr, rangeStart, rangeCount);
+  addAttributeUpdateRange(colorAttr, rangeStart, rangeCount);
+  positionAttr.needsUpdate = true;
+  colorAttr.needsUpdate = true;
+}
+
+function addAttributeUpdateRange(attribute: THREE.BufferAttribute, start: number, count: number): void {
+  if (typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(start, count);
+  }
+}
+
+function makeActiveSlotPositions(max: number): Int16Array {
+  const positions = new Int16Array(max);
+  positions.fill(-1);
+  return positions;
+}
+
+function activateSlot(slotIndex: number, activeSlots: number[], activeSlotPositions: Int16Array): void {
+  if (activeSlotPositions[slotIndex] >= 0) {
+    return;
+  }
+  activeSlotPositions[slotIndex] = activeSlots.length;
+  activeSlots.push(slotIndex);
+}
+
+function removeActiveSlotAt(activeIndex: number, activeSlots: number[], activeSlotPositions: Int16Array): void {
+  const slotIndex = activeSlots[activeIndex];
+  const lastActiveIndex = activeSlots.length - 1;
+  const lastSlotIndex = activeSlots[lastActiveIndex];
+  activeSlotPositions[slotIndex] = -1;
+  if (activeIndex !== lastActiveIndex) {
+    activeSlots[activeIndex] = lastSlotIndex;
+    activeSlotPositions[lastSlotIndex] = activeIndex;
+  }
+  activeSlots.pop();
+}
+
+function updateActiveSlots(
+  slots: CpuParticle[],
+  activeSlots: number[],
+  activeSlotPositions: Int16Array,
+  positions: Float32Array,
+  colors: Float32Array,
+  geo: THREE.BufferGeometry,
+  dt: number,
+): void {
+  let firstDirty = slots.length;
+  let lastDirty = -1;
+
+  for (let activeIndex = 0; activeIndex < activeSlots.length;) {
+    const slotIndex = activeSlots[activeIndex];
+    const s = slots[slotIndex];
+
+    if (s.life > 0) {
+      s.life -= s.decay * dt;
+      if (s.life < 0) s.life = 0;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.z += s.vz * dt;
+    }
+
+    firstDirty = Math.min(firstDirty, slotIndex);
+    lastDirty = Math.max(lastDirty, slotIndex);
+
+    if (s.life <= 0) {
+      removeActiveSlotAt(activeIndex, activeSlots, activeSlotPositions);
+    } else {
+      activeIndex++;
+    }
+  }
+
+  uploadSlots(slots, positions, colors, geo, firstDirty, lastDirty);
 }
 
 // Scratch vectors to avoid allocation
@@ -168,21 +252,23 @@ const _scratchVec = new THREE.Vector3();
 export class MuzzleFlashSystem {
   // ---- Player path ----
   private playerSlots: CpuParticle[]  = makeCpuSlots(MAX_PLAYER);
+  private playerActiveSlots: number[] = [];
+  private playerActiveSlotPositions = makeActiveSlotPositions(MAX_PLAYER);
   private playerRing  = 0;
   private playerGeo!: THREE.BufferGeometry;
   private playerPos!: Float32Array;
   private playerCol!: Float32Array;
-  private playerLif!: Float32Array;
   private playerMesh?: THREE.Points;
   private playerScene: THREE.Scene | null = null;
 
   // ---- NPC path ----
   private npcSlots: CpuParticle[];
+  private npcActiveSlots: number[] = [];
+  private npcActiveSlotPositions = makeActiveSlotPositions(MAX_NPC);
   private npcRing  = 0;
   private npcGeo:   THREE.BufferGeometry;
   private npcPos:   Float32Array;
   private npcCol:   Float32Array;
-  private npcLif:   Float32Array;
   private npcMesh:  THREE.Points;
 
   constructor(scene: THREE.Scene, _maxInstances = 64) {
@@ -196,10 +282,13 @@ export class MuzzleFlashSystem {
     this.npcGeo   = npc.points.geometry as THREE.BufferGeometry;
     this.npcPos   = npc.positions;
     this.npcCol   = npc.colors;
-    this.npcLif   = npc.lives;
     this.npcMesh  = npc.points;
     this.npcMesh.matrixAutoUpdate = true;
     scene.add(this.npcMesh);
+  }
+
+  preparePlayerOverlayScene(overlayScene: THREE.Scene): void {
+    this.ensurePlayerOverlayScene(overlayScene);
   }
 
   /**
@@ -212,13 +301,17 @@ export class MuzzleFlashSystem {
     variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE,
   ): void {
     const preset = PRESETS[variant as number] ?? PRESETS[0];
-    const fwd = { x: direction.x, y: direction.y, z: direction.z };
+    const forwardX = direction.x;
+    const forwardY = direction.y;
+    const forwardZ = direction.z;
+    _scratchVec.copy(position).addScaledVector(direction, 0.05);
 
     for (let i = 0; i < preset.count; i++) {
-      const slot = this.npcSlots[this.npcRing];
+      const slotIndex = this.npcRing;
+      const slot = this.npcSlots[slotIndex];
       this.npcRing = (this.npcRing + 1) % MAX_NPC;
-      _scratchVec.copy(position).addScaledVector(direction, 0.05);
-      emitParticle(slot, _scratchVec, fwd, preset, scale * 0.3);
+      emitParticle(slot, _scratchVec, forwardX, forwardY, forwardZ, preset, scale * 0.3);
+      activateSlot(slotIndex, this.npcActiveSlots, this.npcActiveSlotPositions);
     }
   }
 
@@ -232,26 +325,7 @@ export class MuzzleFlashSystem {
     _direction: THREE.Vector3,
     variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE,
   ): void {
-    // Lazily build the player Points geometry and add to the overlay scene
-    if (this.playerScene !== overlayScene) {
-      if (this.playerMesh && this.playerScene) {
-        this.playerScene.remove(this.playerMesh);
-      }
-      const player = buildPoints(MAX_PLAYER, {
-        size: PLAYER_POINT_SIZE,
-        sizeAttenuation: false,
-        name: 'PlayerMuzzleFlashPointsMaterial',
-      });
-      this.playerSlots = makeCpuSlots(MAX_PLAYER);
-      this.playerGeo   = player.points.geometry as THREE.BufferGeometry;
-      this.playerPos   = player.positions;
-      this.playerCol   = player.colors;
-      this.playerLif   = player.lives;
-      this.playerMesh  = player.points;
-      this.playerRing  = 0;
-      overlayScene.add(this.playerMesh);
-      this.playerScene = overlayScene;
-    }
+    this.ensurePlayerOverlayScene(overlayScene);
 
     const preset = PRESETS[variant as number] ?? PRESETS[0];
 
@@ -260,17 +334,40 @@ export class MuzzleFlashSystem {
     const fx = -muzzleWorldPos.x;
     const fy = -muzzleWorldPos.y;
     const fLen = Math.sqrt(fx * fx + fy * fy) || 1;
-    const fwd = {
-      x: (fx / fLen) * 0.85,
-      y: (fy / fLen) * 0.85,
-      z: -0.3,
-    };
+    const forwardX = (fx / fLen) * 0.85;
+    const forwardY = (fy / fLen) * 0.85;
+    const forwardZ = -0.3;
 
     for (let i = 0; i < preset.count; i++) {
-      const slot = this.playerSlots[this.playerRing];
+      const slotIndex = this.playerRing;
+      const slot = this.playerSlots[slotIndex];
       this.playerRing = (this.playerRing + 1) % MAX_PLAYER;
-      emitParticle(slot, muzzleWorldPos, fwd, preset, 1.0);
+      emitParticle(slot, muzzleWorldPos, forwardX, forwardY, forwardZ, preset, 1.0);
+      activateSlot(slotIndex, this.playerActiveSlots, this.playerActiveSlotPositions);
     }
+  }
+
+  private ensurePlayerOverlayScene(overlayScene: THREE.Scene): void {
+    if (this.playerScene === overlayScene) return;
+
+    if (this.playerMesh && this.playerScene) {
+      this.playerScene.remove(this.playerMesh);
+    }
+    const player = buildPoints(MAX_PLAYER, {
+      size: PLAYER_POINT_SIZE,
+      sizeAttenuation: false,
+      name: 'PlayerMuzzleFlashPointsMaterial',
+    });
+    this.playerSlots = makeCpuSlots(MAX_PLAYER);
+    this.playerActiveSlots.length = 0;
+    this.playerActiveSlotPositions.fill(-1);
+    this.playerGeo   = player.points.geometry as THREE.BufferGeometry;
+    this.playerPos   = player.positions;
+    this.playerCol   = player.colors;
+    this.playerMesh  = player.points;
+    this.playerRing  = 0;
+    overlayScene.add(this.playerMesh);
+    this.playerScene = overlayScene;
   }
 
   /**
@@ -278,41 +375,31 @@ export class MuzzleFlashSystem {
    */
   update(deltaTime?: number): void {
     const dt = deltaTime ?? 0.016;
-    let playerDirty = false;
-    let npcDirty    = false;
 
     // Player slots
-    if (this.playerMesh) {
-      for (let i = 0; i < MAX_PLAYER; i++) {
-        const s = this.playerSlots[i];
-        if (s.life > 0) {
-          s.life -= s.decay * dt;
-          if (s.life < 0) s.life = 0;
-          s.x += s.vx * dt;
-          s.y += s.vy * dt;
-          s.z += s.vz * dt;
-          playerDirty = true;
-        }
-      }
-      if (playerDirty) {
-        uploadSlots(this.playerSlots, this.playerPos, this.playerCol, this.playerLif, this.playerGeo);
-      }
+    if (this.playerMesh && this.playerActiveSlots.length > 0) {
+      updateActiveSlots(
+        this.playerSlots,
+        this.playerActiveSlots,
+        this.playerActiveSlotPositions,
+        this.playerPos,
+        this.playerCol,
+        this.playerGeo,
+        dt,
+      );
     }
 
     // NPC slots
-    for (let i = 0; i < MAX_NPC; i++) {
-      const s = this.npcSlots[i];
-      if (s.life > 0) {
-        s.life -= s.decay * dt;
-        if (s.life < 0) s.life = 0;
-        s.x += s.vx * dt;
-        s.y += s.vy * dt;
-        s.z += s.vz * dt;
-        npcDirty = true;
-      }
-    }
-    if (npcDirty) {
-      uploadSlots(this.npcSlots, this.npcPos, this.npcCol, this.npcLif, this.npcGeo);
+    if (this.npcActiveSlots.length > 0) {
+      updateActiveSlots(
+        this.npcSlots,
+        this.npcActiveSlots,
+        this.npcActiveSlotPositions,
+        this.npcPos,
+        this.npcCol,
+        this.npcGeo,
+        dt,
+      );
     }
   }
 

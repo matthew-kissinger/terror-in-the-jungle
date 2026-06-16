@@ -7,6 +7,9 @@ import { AudioPoolManager } from './AudioPoolManager';
 import { AudioDuckingSystem } from './AudioDuckingSystem';
 import { Logger } from '../../utils/Logger';
 
+const BULLET_WHIZ_MAX_DISTANCE_M = 3;
+const BULLET_WHIZ_MAX_DISTANCE_SQ = BULLET_WHIZ_MAX_DISTANCE_M * BULLET_WHIZ_MAX_DISTANCE_M;
+
 /**
  * Manages weapon-specific sound playback.
  * Handles player weapon sounds, positional weapon sounds, and weapon effects.
@@ -22,6 +25,7 @@ export class AudioWeaponSounds {
     // Reusable Object3D pool to avoid per-call allocations
     private readonly obj3dPool: THREE.Object3D[] = [];
     private readonly OBJ3D_POOL_SIZE = 16;
+    private readonly deathSoundScratchPool: THREE.PositionalAudio[] = [];
 
     private getPooledObject3D(): THREE.Object3D {
         return this.obj3dPool.pop() || new THREE.Object3D();
@@ -166,8 +170,7 @@ export class AudioWeaponSounds {
     // Play death sound at position
     playDeathSound(position: THREE.Vector3, isAlly: boolean): void {
         // Select appropriate sound from pool
-        const soundIndex = isAlly ? 0 : 1; // Even indices for ally, odd for enemy
-        const soundPool = this.poolManager.getDeathSoundPool().filter((_, i) => i % 2 === soundIndex);
+        const soundPool = this.getDeathSoundPoolForAllegiance(isAlly);
 
         const sound = this.poolManager.getAvailablePositionalSound(soundPool);
         if (sound && !sound.isPlaying) {
@@ -185,6 +188,16 @@ export class AudioWeaponSounds {
                 this.returnPooledObject3D(tempObj);
             };
         }
+    }
+
+    private getDeathSoundPoolForAllegiance(isAlly: boolean): THREE.PositionalAudio[] {
+        const soundIndex = isAlly ? 0 : 1; // Even indices for ally, odd for enemy
+        const deathSoundPool = this.poolManager.getDeathSoundPool();
+        this.deathSoundScratchPool.length = 0;
+        for (let index = soundIndex; index < deathSoundPool.length; index += 2) {
+            this.deathSoundScratchPool.push(deathSoundPool[index]);
+        }
+        return this.deathSoundScratchPool;
     }
 
     // Play explosion sound at position
@@ -312,16 +325,21 @@ export class AudioWeaponSounds {
      * Uses loaded WAV file from pool, falls back gracefully if not loaded
      */
     playBulletWhizSound(bulletPosition: THREE.Vector3, playerPosition: THREE.Vector3): void {
-        const distance = bulletPosition.distanceTo(playerPosition);
+        const dx = bulletPosition.x - playerPosition.x;
+        const dy = bulletPosition.y - playerPosition.y;
+        const dz = bulletPosition.z - playerPosition.z;
+        const distanceSq = (dx * dx) + (dy * dy) + (dz * dz);
 
         // Only play whiz sound for very close near-misses (within 3 meters)
-        if (distance > 3) return;
+        if (distanceSq > BULLET_WHIZ_MAX_DISTANCE_SQ) return;
+
+        const distance = Math.sqrt(distanceSq);
 
         // Use pooled sound if available
         const sound = this.poolManager.getAvailableSound(this.poolManager.getBulletWhizPool());
         if (sound) {
             // Volume based on proximity - closer = louder
-            const proximityFactor = 1 - (distance / 3);
+            const proximityFactor = 1 - (distance / BULLET_WHIZ_MAX_DISTANCE_M);
             sound.setVolume(0.4 * proximityFactor);
             // Slight pitch variation for variety
             sound.setPlaybackRate(0.9 + Math.random() * 0.2);

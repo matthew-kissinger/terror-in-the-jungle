@@ -12,6 +12,7 @@
 import type { AirframeState } from './airframe/types';
 import type { FixedWingPilotIntent } from './FixedWingControlLaw';
 import { stepState, type StateContext } from './npcPilot/states';
+import { BoundedRingBuffer } from '../../core/BoundedRingBuffer';
 import {
   DEFAULT_NPC_PILOT_CONFIG,
   type Mission,
@@ -35,8 +36,10 @@ export class NPCFixedWingPilot {
   private readonly config: NPCFixedWingPilotConfig;
   private readonly terrain: TerrainProbe | null;
   /** Bounded transition log for debug / playtest evidence. */
-  private readonly transitionLog: Array<{ from: PilotState; to: PilotState; missionTimeSec: number }> = [];
   private static readonly TRANSITION_LOG_CAP = 64;
+  private readonly transitionLog = new BoundedRingBuffer<{ from: PilotState; to: PilotState; missionTimeSec: number }>(
+    NPCFixedWingPilot.TRANSITION_LOG_CAP,
+  );
 
   constructor(
     config: NPCFixedWingPilotConfig = DEFAULT_NPC_PILOT_CONFIG,
@@ -80,7 +83,7 @@ export class NPCFixedWingPilot {
   }
 
   getTransitionLog(): ReadonlyArray<{ from: PilotState; to: PilotState; missionTimeSec: number }> {
-    return this.transitionLog;
+    return this.transitionLog.snapshotLatest();
   }
 
   /** Compute the pilot intent for this tick, or null if no mission is set. */
@@ -130,9 +133,6 @@ export class NPCFixedWingPilot {
       to: next,
       missionTimeSec: this.missionElapsedSec,
     });
-    if (this.transitionLog.length > NPCFixedWingPilot.TRANSITION_LOG_CAP) {
-      this.transitionLog.shift();
-    }
     this.state = next;
     this.timeInStateSec = 0;
   }

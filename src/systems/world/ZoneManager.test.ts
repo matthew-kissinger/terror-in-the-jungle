@@ -126,6 +126,31 @@ describe('ZoneManager', () => {
       expect(zones[0].id).toBe('test_zone');
     });
 
+    it('should iterate capturable zones without yielding home bases', () => {
+      const homeZone: CaptureZone = {
+        id: 'home_zone',
+        name: 'Home Zone',
+        position: new THREE.Vector3(50, 0, 0),
+        radius: 15,
+        height: 20,
+        owner: Faction.US,
+        state: ZoneState.BLUFOR_CONTROLLED,
+        captureProgress: 100,
+        captureSpeed: 1,
+        isHomeBase: true,
+        ticketBleedRate: 1,
+        currentFlagHeight: 0,
+      };
+      zoneManager['zones'].set(homeZone.id, homeZone);
+
+      const visited: string[] = [];
+      zoneManager.forEachCapturableZone((zone) => {
+        visited.push(zone.id);
+      });
+
+      expect(visited).toEqual(['test_zone']);
+    });
+
     it('should get zone at position', () => {
       const zone = zoneManager.getZoneAtPosition(new THREE.Vector3(5, 0, 5));
       expect(zone).not.toBeNull();

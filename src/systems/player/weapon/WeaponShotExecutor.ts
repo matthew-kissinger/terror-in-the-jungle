@@ -30,6 +30,7 @@ export class WeaponShotExecutor {
   executeSingleShot(command: ShotCommand): ShotResult {
     // Use the ray from the command - no recalculation
     const result = this.combatantSystem.handlePlayerShot(command.ray, command.damage, command.weaponType)
+    const resultDistance = this.camera.position.distanceTo(result.point)
 
     if (result.hit) {
       // Spawn impact effect
@@ -49,8 +50,7 @@ export class WeaponShotExecutor {
           this.statsTracker.addHeadshot()
         }
         if (isKill) {
-          const distance = this.camera.position.distanceTo(result.point)
-          this.statsTracker.updateLongestKill(distance)
+          this.statsTracker.updateLongestKill(resultDistance)
         }
       }
 
@@ -74,7 +74,7 @@ export class WeaponShotExecutor {
         killed: isKill,
         headshot: isHeadshot,
         damageDealt,
-        distance: this.camera.position.distanceTo(result.point)
+        distance: resultDistance
       }
     }
 
@@ -84,7 +84,7 @@ export class WeaponShotExecutor {
       killed: false,
       headshot: false,
       damageDealt: 0,
-      distance: this.camera.position.distanceTo(result.point),
+      distance: resultDistance,
     }
   }
 
@@ -125,6 +125,8 @@ export class WeaponShotExecutor {
       }
     }
 
+    const bestHitDistance = bestHit ? this.camera.position.distanceTo(bestHit.point) : undefined
+
     // Track stats
     if (anyHit && this.statsTracker && bestHit) {
       if (totalDamage > 0) {
@@ -133,9 +135,8 @@ export class WeaponShotExecutor {
       if (headshotHit) {
         this.statsTracker.addHeadshot()
       }
-      if (killedByShot) {
-        const distance = this.camera.position.distanceTo(bestHit.point)
-        this.statsTracker.updateLongestKill(distance)
+      if (killedByShot && bestHitDistance !== undefined) {
+        this.statsTracker.updateLongestKill(bestHitDistance)
       }
     }
 
@@ -159,7 +160,7 @@ export class WeaponShotExecutor {
       killed: killedByShot,
       headshot: headshotHit,
       damageDealt: totalDamage,
-      distance: bestHit ? this.camera.position.distanceTo(bestHit.point) : undefined
+      distance: bestHitDistance
     }
   }
 }

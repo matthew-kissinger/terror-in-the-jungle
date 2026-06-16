@@ -38,6 +38,11 @@ export interface FrustumPlane {
 }
 
 const MAX_TILES = 2048;
+const EDGE_PROBE_EPSILON = 1e-3;
+// computeMaxLODLevels currently caps CDLOD depth at 8. Keep a wider stride so
+// numeric grid keys stay collision-free if that cap moves modestly.
+const TILE_KEY_STRIDE = 2048;
+const TILE_KEY_LEVEL_STRIDE = TILE_KEY_STRIDE * TILE_KEY_STRIDE;
 
 export class CDLODQuadtree {
   private readonly worldSize: number;
@@ -47,11 +52,13 @@ export class CDLODQuadtree {
 
   // Pre-allocated output buffer
   private readonly tileBuffer: CDLODTile[] = [];
+  private readonly selectedTiles: CDLODTile[] = [];
   private tileCount = 0;
 
   // Reused index map for the neighbor-resolution pass. Cleared and refilled
   // each frame; integer-cell key (see tileKey()) -> tile index in tileBuffer.
-  private readonly tileIndex: Map<string, number> = new Map();
+  private readonly tileIndex: Map<number, number> = new Map();
+  private selectionSaturated = false;
 
   constructor(worldSize: number, maxLOD: number, lodRanges: readonly number[], morphStart = 0.8) {
     this.worldSize = worldSize;
@@ -76,31 +83,29 @@ export class CDLODQuadtree {
     frustumPlanes: readonly FrustumPlane[] | null,
   ): readonly CDLODTile[] {
     this.tileCount = 0;
+    this.selectionSaturated = false;
 
     const rootSize = this.worldSize;
     const halfWorld = rootSize / 2;
 
     // Start recursion at the 4 quadrants of the root
     const quadSize = rootSize / 2;
-    const offsets = [
-      [-halfWorld + quadSize / 2, -halfWorld + quadSize / 2],
-      [quadSize / 2, -halfWorld + quadSize / 2],
-      [-halfWorld + quadSize / 2, quadSize / 2],
-      [quadSize / 2, quadSize / 2],
-    ];
+    const low = -halfWorld + quadSize / 2;
+    const high = quadSize / 2;
+    const rootLOD = this.maxLOD - 1;
 
-    for (const [ox, oz] of offsets) {
-      this.selectNode(
-        ox, oz, quadSize,
-        this.maxLOD - 1,
-        cameraX, cameraY, cameraZ,
-        frustumPlanes,
-      );
-    }
+    this.selectNode(low, low, quadSize, rootLOD, cameraX, cameraY, cameraZ, frustumPlanes);
+    this.selectNode(high, low, quadSize, rootLOD, cameraX, cameraY, cameraZ, frustumPlanes);
+    this.selectNode(low, high, quadSize, rootLOD, cameraX, cameraY, cameraZ, frustumPlanes);
+    this.selectNode(high, high, quadSize, rootLOD, cameraX, cameraY, cameraZ, frustumPlanes);
 
     this.resolveEdgeMorphMasks();
 
-    return this.tileBuffer.slice(0, this.tileCount);
+    this.selectedTiles.length = this.tileCount;
+    for (let i = 0; i < this.tileCount; i++) {
+      this.selectedTiles[i] = this.tileBuffer[i];
+    }
+    return this.selectedTiles;
   }
 
   /**
@@ -130,27 +135,31 @@ export class CDLODQuadtree {
       // Probe points just outside each edge, then walk up the size
       // ladder snapping to that scale's centred grid.
       // Bit layout: 1=+Z (N), 2=+X (E), 4=-Z (S), 8=-X (W)
-      const probes: ReadonlyArray<readonly [number, number, number]> = [
-        [t.x, t.z + half + 1e-3, 1],
-        [t.x + half + 1e-3, t.z, 2],
-        [t.x, t.z - half - 1e-3, 4],
-        [t.x - half - 1e-3, t.z, 8],
-      ];
+      this.applyEdgeMorphProbe(t, t.x, t.z + half + EDGE_PROBE_EPSILON, 1, halfWorld);
+      this.applyEdgeMorphProbe(t, t.x + half + EDGE_PROBE_EPSILON, t.z, 2, halfWorld);
+      this.applyEdgeMorphProbe(t, t.x, t.z - half - EDGE_PROBE_EPSILON, 4, halfWorld);
+      this.applyEdgeMorphProbe(t, t.x - half - EDGE_PROBE_EPSILON, t.z, 8, halfWorld);
+    }
+  }
 
-      for (const [px, pz, bit] of probes) {
-        // Probe outside the world bounds means the world edge - leave bit 0.
-        if (px < -halfWorld || px > halfWorld || pz < -halfWorld || pz > halfWorld) continue;
+  private applyEdgeMorphProbe(
+    tile: CDLODTile,
+    px: number,
+    pz: number,
+    bit: number,
+    halfWorld: number,
+  ): void {
+    // Probe outside the world bounds means the world edge - leave bit 0.
+    if (px < -halfWorld || px > halfWorld || pz < -halfWorld || pz > halfWorld) return;
 
-        for (let s = t.size * 2; s <= this.worldSize; s *= 2) {
-          // Snap probe point to the centred grid at scale `s`. Tiles of
-          // size `s` have centres at `floor((p + halfWorld) / s) * s + s/2 - halfWorld`.
-          const cx = Math.floor((px + halfWorld) / s) * s + s / 2 - halfWorld;
-          const cz = Math.floor((pz + halfWorld) / s) * s + s / 2 - halfWorld;
-          if (this.tileIndex.has(this.tileKey(cx, cz, s))) {
-            t.edgeMorphMask |= bit;
-            break;
-          }
-        }
+    for (let s = tile.size * 2; s <= this.worldSize; s *= 2) {
+      // Snap probe point to the centred grid at scale `s`. Tiles of
+      // size `s` have centres at `floor((p + halfWorld) / s) * s + s/2 - halfWorld`.
+      const cx = Math.floor((px + halfWorld) / s) * s + s / 2 - halfWorld;
+      const cz = Math.floor((pz + halfWorld) / s) * s + s / 2 - halfWorld;
+      if (this.tileIndex.has(this.tileKey(cx, cz, s))) {
+        tile.edgeMorphMask |= bit;
+        return;
       }
     }
   }
@@ -161,12 +170,12 @@ export class CDLODQuadtree {
   // and the probe path (`Math.floor((p + halfWorld) / s) * s + s/2 - halfWorld`),
   // so non-dyadic worldSize (e.g. A Shau 21000m, baseTileSize ≈ 82.03m)
   // can't drop Map hits via float-formatting drift in template literals.
-  private tileKey(cx: number, cz: number, size: number): string {
+  private tileKey(cx: number, cz: number, size: number): number {
     const halfWorld = this.worldSize / 2;
     const ix = Math.floor((cx + halfWorld) / size);
     const iz = Math.floor((cz + halfWorld) / size);
     const li = Math.round(Math.log2(this.worldSize / size));
-    return `${ix}|${iz}|${li}`;
+    return li * TILE_KEY_LEVEL_STRIDE + iz * TILE_KEY_STRIDE + ix;
   }
 
   /**
@@ -176,13 +185,20 @@ export class CDLODQuadtree {
     return this.tileCount;
   }
 
+  wasLastSelectionSaturated(): boolean {
+    return this.selectionSaturated;
+  }
+
   private selectNode(
     cx: number, cz: number, size: number,
     lodLevel: number,
     camX: number, camY: number, camZ: number,
     frustum: readonly FrustumPlane[] | null,
   ): void {
-    if (this.tileCount >= MAX_TILES) return;
+    if (this.tileCount >= MAX_TILES) {
+      this.selectionSaturated = true;
+      return;
+    }
 
     // Frustum cull
     if (frustum && !this.intersectsFrustum(cx, cz, size, frustum)) {
@@ -232,7 +248,10 @@ export class CDLODQuadtree {
   }
 
   private emitTile(cx: number, cz: number, size: number, lodLevel: number, morphFactor: number): void {
-    if (this.tileCount >= MAX_TILES) return;
+    if (this.tileCount >= MAX_TILES) {
+      this.selectionSaturated = true;
+      return;
+    }
     const tile = this.tileBuffer[this.tileCount];
     tile.x = cx;
     tile.z = cz;

@@ -115,6 +115,8 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
   }
 
   update(deltaTime: number): void {
+    if (this.active.length === 0) return;
+
     const now = performance.now();
 
     // Update active effects before sweeping

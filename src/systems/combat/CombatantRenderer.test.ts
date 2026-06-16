@@ -17,6 +17,7 @@ import {
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+  PIXEL_FORGE_NPC_RUNTIME_FACTIONS,
 } from './PixelForgeNpcRuntime';
 import { Logger } from '../../utils/Logger';
 import { GameEventBus } from '../../core/GameEventBus';
@@ -90,6 +91,7 @@ vi.mock('../assets/ModelLoader', () => ({
       root.add(receiver, barrel);
       return root;
     }),
+    preload: vi.fn().mockResolvedValue(undefined),
     disposeInstance: vi.fn(),
   },
 }));
@@ -165,6 +167,7 @@ vi.mock('./CombatantMeshFactory', () => ({
   disposeCombatantMeshes: vi.fn(),
   updateCombatantTexture: vi.fn(),
   reportBucketOverflow: vi.fn(),
+  markPixelForgeNpcImpostorAttributesDirty: vi.fn(),
   setPixelForgeNpcImpostorAttributes: vi.fn(),
   getPixelForgeNpcBucketKey: (faction: string, clip: string) => `${faction}_${clip}`,
   getPixelForgeNpcClipForCombatant: (combatant: Combatant) => {
@@ -323,6 +326,49 @@ describe('CombatantRenderer', () => {
       expect(activeCloseModels.get('near-1')?.weaponRoot).toBeDefined();
     });
 
+    it('keeps close-model weapon and arm pose stable across repeated active updates', () => {
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant('near-pose-stable', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      combatants.set('near-pose-stable', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, {
+          hasWeapon: boolean;
+          weaponPivot?: THREE.Group;
+          bones: Map<string, THREE.Object3D>;
+        }>;
+      }).activeCloseModels;
+      const instance = activeCloseModels.get('near-pose-stable');
+      expect(instance?.hasWeapon).toBe(true);
+      expect(instance?.weaponPivot).toBeDefined();
+      if (!instance?.weaponPivot) throw new Error('Expected close-model weapon pivot');
+
+      const weaponPivot = instance.weaponPivot;
+      const firstWeaponPosition = weaponPivot.position.clone();
+      const firstWeaponQuaternion = weaponPivot.quaternion.clone();
+      const rightArm = instance.bones.get('RightArm');
+      const leftArm = instance.bones.get('LeftArm');
+      if (!rightArm || !leftArm) throw new Error('Expected close-model arm bones');
+      const firstRightArmQuaternion = rightArm.quaternion.clone();
+      const firstLeftArmQuaternion = leftArm.quaternion.clone();
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      expect(instance?.hasWeapon).toBe(true);
+      expect(weaponPivot.position.distanceTo(firstWeaponPosition)).toBeLessThan(0.000001);
+      expect(Math.abs(weaponPivot.quaternion.dot(firstWeaponQuaternion))).toBeGreaterThan(0.999999);
+      expect(Number.isFinite(weaponPivot.position.x)).toBe(true);
+      expect(Number.isFinite(weaponPivot.position.y)).toBe(true);
+      expect(Number.isFinite(weaponPivot.position.z)).toBe(true);
+      expect(weaponPivot.quaternion.length()).toBeCloseTo(1, 5);
+      expect(rightArm.quaternion.length()).toBeCloseTo(1, 5);
+      expect(leftArm.quaternion.length()).toBeCloseTo(1, 5);
+      expect(Math.abs(rightArm.quaternion.dot(firstRightArmQuaternion))).toBeGreaterThan(0.999999);
+      expect(Math.abs(leftArm.quaternion.dot(firstLeftArmQuaternion))).toBeGreaterThan(0.999999);
+    });
+
     it('reports nearest NPC materialization modes for spawn-adjacent diagnosis', () => {
       const combatants = new Map<string, Combatant>();
       const closeCombatant = createMockCombatant('near-mesh', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
@@ -429,7 +475,7 @@ describe('CombatantRenderer', () => {
     });
 
     it('renders hard-close NPCs as impostors when perf isolation disables close models', async () => {
-      vi.stubGlobal('window', { location: { search: '?perf=1&perfDisableNpcCloseModels=1' } });
+      vi.stubGlobal('window', { location: { search: '?diagnostics=1&perfDisableNpcCloseModels=1' } });
       const isolatedRenderer = new CombatantRenderer(scene, camera, assetLoader);
       await isolatedRenderer.createFactionBillboards({ eagerCloseModelPools: true });
       const combatants = new Map<string, Combatant>();
@@ -608,6 +654,48 @@ describe('CombatantRenderer', () => {
         lazyRenderer.dispose();
         await vi.runOnlyPendingTimersAsync();
         vi.useRealTimers();
+      }
+    });
+
+    it('primes all faction close-model assets without expanding close-model residency', async () => {
+      const lazyRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      try {
+        await lazyRenderer.createFactionBillboards();
+        const combatants = new Map<string, Combatant>();
+        combatants.set(
+          'far-us',
+          createMockCombatant('far-us', Faction.US, new THREE.Vector3(800, 0, 0)),
+        );
+
+        const expectedPaths = new Set<string>();
+        for (const config of PIXEL_FORGE_NPC_RUNTIME_FACTIONS) {
+          expectedPaths.add(config.modelPath);
+          expectedPaths.add(config.weapon.modelPath);
+        }
+        const squadConfig = getPixelForgeNpcRuntimeFaction('SQUAD');
+        expectedPaths.add(squadConfig.modelPath);
+        expectedPaths.add(squadConfig.weapon.modelPath);
+
+        const summary = await lazyRenderer.prewarmCloseModelsForSpawn(
+          combatants,
+          new THREE.Vector3(0, 0, 0),
+          { maxActive: 3, primeFactionAssets: true },
+        );
+
+        const state = lazyRenderer as unknown as {
+          activeCloseModels: Map<string, unknown>;
+          closeModelPoolLoads: Map<string, Promise<void>>;
+        };
+        expect(summary.skippedReason).toBe('no-candidates');
+        expect(summary.candidatesWithinCloseRadius).toBe(0);
+        expect(summary.primedAssetPaths).toBe(expectedPaths.size);
+        expect(modelLoader.preload).toHaveBeenCalledWith([...expectedPaths]);
+        expect(modelLoader.loadAnimatedModel).not.toHaveBeenCalled();
+        expect(modelLoader.loadModel).not.toHaveBeenCalled();
+        expect(state.activeCloseModels.size).toBe(0);
+        expect(state.closeModelPoolLoads.size).toBe(0);
+      } finally {
+        lazyRenderer.dispose();
       }
     });
 
@@ -1068,6 +1156,30 @@ describe('CombatantRenderer', () => {
 
       expect(maps.factionMeshes.has('NVA_walk_fight_forward')).toBe(true);
       expect(combatant.billboardIndex).toBe(0);
+    });
+
+    it('batches impostor attribute upload flags once per touched bucket', () => {
+      const combatants = new Map<string, Combatant>();
+      const first = createMockCombatant('patrol-1', Faction.NVA, new THREE.Vector3(160, 0, 0), CombatantState.PATROLLING);
+      const second = createMockCombatant('patrol-2', Faction.NVA, new THREE.Vector3(170, 0, 0), CombatantState.PATROLLING);
+      combatants.set(first.id, first);
+      combatants.set(second.id, second);
+      const markDirty = vi.mocked(CombatantMeshFactoryModule.markPixelForgeNpcImpostorAttributesDirty);
+      const setAttributes = vi.mocked(CombatantMeshFactoryModule.setPixelForgeNpcImpostorAttributes);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      expect(setAttributes).toHaveBeenCalledTimes(2);
+      expect(setAttributes.mock.calls.every((call) => call[7] === false)).toBe(true);
+      expect(markDirty).toHaveBeenCalledTimes(1);
+      const mesh = (renderer as unknown as { factionMeshes: Map<string, THREE.InstancedMesh> })
+        .factionMeshes.get('NVA_patrol_walk')!;
+      expect(markDirty.mock.calls[0][0]).toBe(mesh);
+      expect(markDirty.mock.calls[0][1]).toBe(2);
+      expect(mesh.instanceMatrix.updateRanges.at(-1)).toEqual({
+        start: 0,
+        count: 2 * mesh.instanceMatrix.itemSize,
+      });
     });
 
     it('culls combatants beyond render distance', () => {

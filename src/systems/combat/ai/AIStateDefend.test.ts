@@ -80,6 +80,18 @@ describe('AIStateDefend', () => {
       expect(combatant.rotation).toBeCloseTo(Math.atan2(10, 10));
     });
 
+    it('should hold position at the exact defense-position arrival boundary', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      combatant.defensePosition = new THREE.Vector3(3, 0, 0);
+
+      aiStateDefend.handleDefending(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget
+      );
+
+      expect(combatant.destinationPoint).toBeUndefined();
+    });
+
     it('should face outward from zone center when at defensePosition', () => {
       const zonePos = new THREE.Vector3(0, 0, 0);
       const defensePos = new THREE.Vector3(10, 0, 0); // East of zone
@@ -150,6 +162,41 @@ describe('AIStateDefend', () => {
       );
 
       expect(combatant.state).toBe(CombatantState.ALERT);
+    });
+
+    it('should not bypass LOS at the exact very-close boundary', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      combatant.defensePosition = combatant.position.clone();
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(15, 0, 0));
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(false);
+
+      aiStateDefend.handleDefending(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget
+      );
+
+      expect(canSeeTarget).toHaveBeenCalledWith(combatant, enemy, playerPosition);
+      expect(combatant.state).toBe(CombatantState.DEFENDING);
+    });
+
+    it('should not engage at the exact defense reaction range boundary', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      combatant.defensePosition = combatant.position.clone();
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(50, 0, 0));
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(true);
+
+      aiStateDefend.handleDefending(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget
+      );
+
+      expect(canSeeTarget).not.toHaveBeenCalled();
+      expect(combatant.state).toBe(CombatantState.DEFENDING);
+      expect(combatant.target).toBeUndefined();
     });
 
     it('should apply staggered reaction delay when local cluster density is high', () => {

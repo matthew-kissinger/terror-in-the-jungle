@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import { Faction } from '../combat/types';
-import { ZoneState } from './ZoneManager';
+import { type CaptureZone, ZoneState } from './ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { GamePhase, PhaseTimings } from './TicketSystemPhases';
 
@@ -35,6 +35,21 @@ interface VictoryCheckParams {
 }
 
 export class VictoryConditions {
+  private countedTotalZones = 0;
+  private countedUsControlled = 0;
+  private countedOpforControlled = 0;
+  private readonly countZoneControl = (zone: CaptureZone): void => {
+    this.countedTotalZones++;
+    switch (zone.state) {
+      case ZoneState.BLUFOR_CONTROLLED:
+        this.countedUsControlled++;
+        break;
+      case ZoneState.OPFOR_CONTROLLED:
+        this.countedOpforControlled++;
+        break;
+    }
+  };
+
   /**
    * Check all victory conditions and return result
    */
@@ -82,21 +97,35 @@ export class VictoryConditions {
    * Check if either faction controls all capturable zones
    */
   private checkTotalZoneControl(zoneQuery: IZoneQuery): VictoryResult {
-    const capturableZones = zoneQuery.getCapturableZones();
+    this.resetZoneControlCounts();
+    const iterableZoneQuery = zoneQuery as IZoneQuery & {
+      forEachCapturableZone?: (callback: (zone: CaptureZone) => void) => void;
+    };
+    if (iterableZoneQuery.forEachCapturableZone) {
+      iterableZoneQuery.forEachCapturableZone(this.countZoneControl);
+    } else {
+      const capturableZones = zoneQuery.getCapturableZones();
+      for (const zone of capturableZones) {
+        this.countZoneControl(zone);
+      }
+    }
 
     // Only check total control if there are capturable zones
-    if (capturableZones.length > 0) {
-      const usControlled = capturableZones.filter(z => z.state === ZoneState.BLUFOR_CONTROLLED).length;
-      const opforControlled = capturableZones.filter(z => z.state === ZoneState.OPFOR_CONTROLLED).length;
-
-      if (usControlled === capturableZones.length) {
+    if (this.countedTotalZones > 0) {
+      if (this.countedUsControlled === this.countedTotalZones) {
         return { winner: Faction.US, reason: 'TOTAL_CONTROL', shouldEnterOvertime: false };
-      } else if (opforControlled === capturableZones.length) {
+      } else if (this.countedOpforControlled === this.countedTotalZones) {
         return { winner: Faction.NVA, reason: 'TOTAL_CONTROL', shouldEnterOvertime: false };
       }
     }
 
     return { winner: null, reason: null, shouldEnterOvertime: false };
+  }
+
+  private resetZoneControlCounts(): void {
+    this.countedTotalZones = 0;
+    this.countedUsControlled = 0;
+    this.countedOpforControlled = 0;
   }
 
   /**

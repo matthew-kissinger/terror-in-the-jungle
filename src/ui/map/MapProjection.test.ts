@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import {
   worldToNorthUpMap,
   worldToPlayerCenteredMap,
+  worldToPlayerCenteredMapInto,
   playerCenteredMapToWorld,
   factionMarkerFill,
 } from './MapProjection';
@@ -61,6 +62,16 @@ describe('worldToPlayerCenteredMap (minimap / tactical map projection)', () => {
     // rotatedX = dx*cos + dz*sin = 10*0 + 0 = 0; rotatedZ = -dx*sin = -10.
     expect(p.x).toBeCloseTo(100, 6);
     expect(p.y).toBeCloseTo(90, 6);
+  });
+
+  it('can project into a caller-owned point with the same coordinates', () => {
+    const out = { x: 999, y: 999 };
+    const projected = worldToPlayerCenteredMapInto(out, 37, -12, 5, 8, Math.PI / 3, 320, 320 / 600);
+    const allocated = worldToPlayerCenteredMap(37, -12, 5, 8, Math.PI / 3, 320, 320 / 600);
+
+    expect(projected).toBe(out);
+    expect(out.x).toBeCloseTo(allocated.x, 6);
+    expect(out.y).toBeCloseTo(allocated.y, 6);
   });
 });
 

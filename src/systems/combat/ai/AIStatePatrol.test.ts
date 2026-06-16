@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { AIStatePatrol } from './AIStatePatrol';
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from '../types';
 import { clusterManager } from '../ClusterManager';
+import { SquadCommandConfig } from '../../../config/SquadCommandConfig';
 
 vi.mock('../ClusterManager', () => ({
   clusterManager: {
@@ -132,6 +133,42 @@ describe('AIStatePatrol', () => {
       expect(canSeeTarget).not.toHaveBeenCalled();
     });
 
+    it('does not treat the exact 15m patrol range boundary as very close', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(15, 0, 0));
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(false);
+      shouldEngage.mockReturnValue(true);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(canSeeTarget).toHaveBeenCalledTimes(1);
+      expect(shouldEngage).not.toHaveBeenCalled();
+      expect(combatant.state).toBe(CombatantState.PATROLLING);
+      expect(combatant.target).toBeUndefined();
+    });
+
+    it('passes the exact non-close patrol distance to the engagement policy', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(30, 0, 0));
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(true);
+      shouldEngage.mockReturnValue(false);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(shouldEngage).toHaveBeenCalledWith(combatant, 30);
+      expect(combatant.state).toBe(CombatantState.PATROLLING);
+    });
+
     it('reuses a recent blocked patrol LOS result inside the cadence window', () => {
       vi.useFakeTimers();
       vi.setSystemTime(10_000);
@@ -254,6 +291,19 @@ describe('AIStatePatrol', () => {
       expect(combatant.destinationPoint?.length()).toBeCloseTo(4, 1);
     });
 
+    it('treats the exact FOLLOW_ME arrival boundary as arrived', () => {
+      squad.currentCommand = SquadCommand.FOLLOW_ME;
+      combatant.position.set(2, 0, 0);
+      combatant.destinationPoint = new THREE.Vector3(100, 0, 100);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(combatant.destinationPoint).toBeUndefined();
+    });
+
     it('should handle HOLD_POSITION command', () => {
       squad.currentCommand = SquadCommand.HOLD_POSITION;
       const holdPos = new THREE.Vector3(50, 0, 50);
@@ -265,6 +315,19 @@ describe('AIStatePatrol', () => {
       );
 
       expect(combatant.destinationPoint?.clone()).toEqual(holdPos);
+    });
+
+    it('treats the exact HOLD_POSITION arrival boundary as arrived', () => {
+      squad.currentCommand = SquadCommand.HOLD_POSITION;
+      squad.commandPosition = new THREE.Vector3(13, 0, 10);
+      combatant.destinationPoint = new THREE.Vector3(100, 0, 100);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(combatant.destinationPoint).toBeUndefined();
     });
 
     it('should handle PATROL_HERE command', () => {
@@ -280,6 +343,20 @@ describe('AIStatePatrol', () => {
       expect(combatant.destinationPoint?.distanceTo(squad.commandPosition!)).toBeLessThanOrEqual(20);
     });
 
+    it('keeps an existing PATROL_HERE destination at the exact arrival boundary', () => {
+      squad.currentCommand = SquadCommand.PATROL_HERE;
+      squad.commandPosition = new THREE.Vector3(50, 0, 50);
+      const existingDestination = new THREE.Vector3(15, 0, 10);
+      combatant.destinationPoint = existingDestination;
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(combatant.destinationPoint).toBe(existingDestination);
+    });
+
     it('should handle ATTACK_HERE command as a directed attack point', () => {
       squad.currentCommand = SquadCommand.ATTACK_HERE;
       const attackPos = new THREE.Vector3(60, 0, 40);
@@ -291,6 +368,23 @@ describe('AIStatePatrol', () => {
       );
 
       expect(combatant.destinationPoint?.clone()).toEqual(attackPos);
+    });
+
+    it('treats the exact ATTACK_HERE arrival boundary as arrived', () => {
+      squad.currentCommand = SquadCommand.ATTACK_HERE;
+      squad.commandPosition = new THREE.Vector3(
+        combatant.position.x + SquadCommandConfig.attackArriveRadius,
+        combatant.position.y,
+        combatant.position.z,
+      );
+      combatant.destinationPoint = new THREE.Vector3(100, 0, 100);
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(combatant.destinationPoint).toBeUndefined();
     });
 
     it('rallies a RETREAT (FALL BACK) command to the marked point (SVYAZ-4 Stage 3)', () => {
@@ -458,6 +552,37 @@ describe('AIStatePatrol', () => {
       );
 
       expect(combatant.defendingZoneId).toBe('zone-near');
+    });
+
+    it('skips a full nearer owned zone and claims the nearest available slot', () => {
+      const zoneFull = {
+        id: 'zone-full',
+        owner: Faction.US,
+        isHomeBase: false,
+        position: new THREE.Vector3(15, 0, 15),
+        radius: 10,
+      };
+      const zoneAvailable = {
+        id: 'zone-available',
+        owner: Faction.US,
+        isHomeBase: false,
+        position: new THREE.Vector3(25, 0, 25),
+        radius: 10,
+      };
+      mockZoneManager.getAllZones.mockReturnValue([zoneAvailable, zoneFull]);
+      allCombatants.set('c2', createMockCombatant('c2', Faction.US));
+      allCombatants.set('c3', createMockCombatant('c3', Faction.US));
+      aiStatePatrol.getZoneDefenders().set('zone-full', new Set(['c2', 'c3']));
+
+      aiStatePatrol.handlePatrolling(
+        combatant, 0.016, playerPosition, allCombatants, undefined,
+        findNearestEnemy, canSeeTarget, shouldEngage
+      );
+
+      expect(combatant.state).toBe(CombatantState.DEFENDING);
+      expect(combatant.defendingZoneId).toBe('zone-available');
+      expect(aiStatePatrol.getZoneDefenders().get('zone-full')?.has('c1')).toBe(false);
+      expect(aiStatePatrol.getZoneDefenders().get('zone-available')?.has('c1')).toBe(true);
     });
 
     it('lets a fresh combatant claim a defender slot after the prior defenders die', () => {

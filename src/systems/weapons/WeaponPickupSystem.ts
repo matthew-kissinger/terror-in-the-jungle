@@ -32,6 +32,7 @@ export class WeaponPickupSystem implements GameSystem {
 
   // Constants
   private readonly PICKUP_RADIUS = 2.0; // meters
+  private readonly PICKUP_RADIUS_SQ = this.PICKUP_RADIUS * this.PICKUP_RADIUS;
   private readonly PICKUP_LIFETIME = 60000; // 60 seconds
   private readonly DROP_CHANCE = 0.30; // 30% chance
   private readonly BILLBOARD_HEIGHT = 1.5;
@@ -153,12 +154,12 @@ export class WeaponPickupSystem implements GameSystem {
 
     // Check for nearby pickups
     this.nearestPickup = undefined;
-    let nearestDist = this.PICKUP_RADIUS;
+    let nearestDistSq = this.PICKUP_RADIUS_SQ;
 
     this.pickups.forEach(pickup => {
-      const dist = pickup.position.distanceTo(this.playerPosition);
-      if (dist < nearestDist) {
-        nearestDist = dist;
+      const distSq = pickup.position.distanceToSquared(this.playerPosition);
+      if (distSq < nearestDistSq) {
+        nearestDistSq = distSq;
         this.nearestPickup = pickup;
       }
     });

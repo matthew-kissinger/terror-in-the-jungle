@@ -122,4 +122,35 @@ describe('ZoneCaptureLogic', () => {
     expect(bleed.us).toBe(0);
     expect(bleed.opfor).toBe(0);
   });
+
+  it('ignores home bases and neutral zones when calculating ticket bleed majority', () => {
+    const logic = new ZoneCaptureLogic();
+    const usForward = createZone();
+    usForward.id = 'us_forward';
+    usForward.owner = Faction.US;
+
+    const opforForward = createZone();
+    opforForward.id = 'opfor_forward';
+    opforForward.owner = Faction.NVA;
+
+    const opforHome = createZone();
+    opforHome.id = 'opfor_home';
+    opforHome.owner = Faction.NVA;
+    opforHome.isHomeBase = true;
+
+    const neutral = createZone();
+    neutral.id = 'neutral';
+
+    const zones = new Map<string, CaptureZone>([
+      [usForward.id, usForward],
+      [opforForward.id, opforForward],
+      [opforHome.id, opforHome],
+      [neutral.id, neutral],
+    ]);
+
+    const bleed = logic.calculateTicketBleedRate(zones);
+
+    expect(bleed.us).toBe(0);
+    expect(bleed.opfor).toBe(0);
+  });
 });

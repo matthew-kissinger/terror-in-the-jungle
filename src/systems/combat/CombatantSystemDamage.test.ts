@@ -13,6 +13,7 @@ import type { TicketSystem } from '../world/TicketSystem';
 import { GameEventBus } from '../../core/GameEventBus';
 import { Tank } from '../vehicle/Tank';
 import { GroundVehicle } from '../vehicle/GroundVehicle';
+import type { IVehicle } from '../vehicle/IVehicle';
 import { spatialGridManager } from './SpatialGridManager';
 
 vi.mock('./KillAssistTracker', () => ({
@@ -75,6 +76,22 @@ describe('CombatantSystemDamage', () => {
 
     expect(target.health).toBeCloseTo(80);
     expect(target.state).not.toBe(CombatantState.DEAD);
+  });
+
+  it('ignores conservative spatial-grid combatant candidates outside the explosion radius', () => {
+    const target = createTestCombatant({
+      id: 'target-outside-radius',
+      faction: Faction.NVA,
+      health: 100,
+      position: new THREE.Vector3(10.1, 0, 0),
+    });
+    combatants.set(target.id, target);
+
+    damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+
+    expect(target.health).toBe(100);
+    expect(target.state).not.toBe(CombatantState.DEAD);
+    expect(KillAssistTracker.trackDamage).not.toHaveBeenCalled();
   });
 
   it('lets the WorldBuilder one-shot flag make player-authored explosions lethal', () => {
@@ -287,6 +304,57 @@ describe('CombatantSystemDamage', () => {
       );
 
       expect(jeep.getHealthPercent()).toBeCloseTo(0.5, 5);
+      expect(jeep.isDestroyed()).toBe(false);
+    });
+
+    it('uses the allocation-free vehicle radius iterator when available', () => {
+      const jeep = new GroundVehicle('nva_m151', positionedObject(new THREE.Vector3(0, 0, 0)), Faction.NVA);
+      const getVehiclesInRadius = vi.fn(() => {
+        throw new Error('fallback vehicle radius array should not be materialized');
+      });
+      const forEachVehicleInRadius = vi.fn((
+        _center: THREE.Vector3,
+        _radius: number,
+        visitor: (vehicle: IVehicle) => void,
+      ) => {
+        visitor(jeep);
+      });
+      damage.setVehicleDamageQuery({
+        getVehiclesInRadius,
+        forEachVehicleInRadius,
+      });
+
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        125,
+        'shooter-vehicle',
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(forEachVehicleInRadius).toHaveBeenCalledTimes(1);
+      expect(getVehiclesInRadius).not.toHaveBeenCalled();
+      expect(jeep.getHealthPercent()).toBeCloseTo(0.5, 5);
+      expect(jeep.isDestroyed()).toBe(false);
+    });
+
+    it('ignores conservative vehicle-query candidates outside the explosion radius', () => {
+      const jeep = new GroundVehicle('nva_m151', positionedObject(new THREE.Vector3(9.1, 0, 0)), Faction.NVA);
+      damage.setVehicleDamageQuery({
+        getVehiclesInRadius: vi.fn(() => [jeep]),
+      });
+
+      damage.applyExplosionDamage(
+        new THREE.Vector3(0, 0, 0),
+        9,
+        125,
+        'shooter-vehicle',
+        'tank_cannon',
+        Faction.US,
+      );
+
+      expect(jeep.getHealthPercent()).toBe(1);
       expect(jeep.isDestroyed()).toBe(false);
     });
 

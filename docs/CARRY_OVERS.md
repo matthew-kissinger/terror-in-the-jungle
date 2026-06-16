@@ -50,6 +50,17 @@ the cycle that re-opens it.
 
 History log:
 
+- 2026-06-15/16 — budget-ratchet stabilization re-base
+  (dropped-frame-perf-harness): the dropped-frame harness/perf recovery branch
+  intentionally grew several already-grandfathered orchestration, combat,
+  terrain, renderer, and HUD files while adding telemetry, runtime proof
+  surfaces, and targeted fixes. `src/core/GameEngineLoop.ts` and
+  `src/systems/combat/CombatantCombat.ts` crossed the base LOC limit during
+  that same stabilization window and are admitted to the grandfather list with
+  split targets. This is an orchestrator re-base to get the branch green for
+  deployment, not a closure of the underlying split debt; future work should
+  extract helpers instead of raising these snapshots again.
+
 - 2026-06-10 — budget-ratchet re-base (ashau-load-freeze):
   `src/systems/navigation/NavmeshSystem.ts` snapshot raised 808→833 LOC —
   pre-baked navmesh loads now route through the new time-sliced

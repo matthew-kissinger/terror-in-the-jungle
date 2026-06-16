@@ -188,6 +188,37 @@ describe('HelicopterWeaponSystem', () => {
       expect(damageCalc(100, false)).toBe(15);
     });
 
+    it('routes hitscan fire through a normalized shot ray without mutating helicopter pose inputs', () => {
+      ws.dispose(HELI_ID);
+      const directGun = { ...MINIGUN, spreadDeg: 0 };
+      ws.initWeapons(HELI_ID, [directGun], Faction.US);
+      ws.startFiring(HELI_ID);
+
+      const positionBefore = pos.clone();
+      const quaternionBefore = quat.clone();
+      ws.update(0.02, HELI_ID, pos, quat, false, false);
+
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+      const [ray, damage, weaponType, shooterFaction] = (cs.handlePlayerShot as any).mock.calls[0] as [
+        THREE.Ray,
+        (distance: number, isHeadshot: boolean) => number,
+        string,
+        Faction,
+      ];
+      const expectedOrigin = new THREE.Vector3(...directGun.localPosition)
+        .applyQuaternion(quat)
+        .add(pos);
+      const expectedDirection = new THREE.Vector3(0, 0, 1).applyQuaternion(quat).normalize();
+      expect(ray.origin.distanceTo(expectedOrigin)).toBeLessThan(0.000001);
+      expect(ray.direction.length()).toBeCloseTo(1, 6);
+      expect(ray.direction.angleTo(expectedDirection)).toBeLessThan(0.000001);
+      expect(damage(50, false)).toBe(directGun.damage);
+      expect(weaponType).toBe('helicopter_minigun');
+      expect(shooterFaction).toBe(Faction.US);
+      expect(pos.distanceTo(positionBefore)).toBe(0);
+      expect(quat.dot(quaternionBefore)).toBeCloseTo(1, 6);
+    });
+
     it('should show hit marker on hit', () => {
       (cs.handlePlayerShot as any).mockReturnValue({
         hit: true,

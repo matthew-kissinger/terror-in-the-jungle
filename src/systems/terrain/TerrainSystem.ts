@@ -16,7 +16,12 @@ import type { IHeightProvider } from './IHeightProvider';
 import type { CompiledTerrainFeatureSet } from './TerrainFeatureTypes';
 import type { PreparedHeightmapGrid } from './PreparedTerrainSource';
 
-import { TerrainRenderRuntime } from './TerrainRenderRuntime';
+import {
+  TerrainRenderRuntime,
+  type TerrainDebugTile,
+  type TerrainRenderSelectionSyncResult,
+  type TerrainRenderSubmissionStats,
+} from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
 import { bakeGameplayQueryGrid, computeGameplayQueryGridSize, computeTerrainSurfaceGridSize, TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
@@ -34,7 +39,7 @@ interface TerrainStreamingMetricDebug {
   budgetMs: number;
   timeMs: number;
   pendingUnits: number;
-  debug?: TerrainVegetationRuntimeDebugInfo;
+  debug?: TerrainVegetationRuntimeDebugInfo | TerrainRenderSubmissionStats;
 }
 
 interface TerrainModeSurfaceOptions {
@@ -55,6 +60,29 @@ interface TerrainAtmosphereLightingInput {
   daylightFactor: number;
   nightBlend: number;
   sunAboveHorizon: boolean;
+}
+
+const ATMOSPHERE_LIGHTING_EPSILON = 1e-5;
+
+function readPerfTerrainBooleanFlag(name: string): boolean {
+  if (!(import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')) return false;
+  if (typeof window === 'undefined') return false;
+  try {
+    const value = new URLSearchParams(window.location.search).get(name);
+    if (value === null) return false;
+    const normalized = value.toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  } catch {
+    return false;
+  }
+}
+
+function isTerrainFarCanopyTintDisabledForPerf(): boolean {
+  return readPerfTerrainBooleanFlag('perfDisableTerrainFarCanopyTint');
+}
+
+function isTerrainLowSunOcclusionDisabledForPerf(): boolean {
+  return readPerfTerrainBooleanFlag('perfDisableTerrainLowSunOcclusion');
 }
 
 function smoothstep01(edge0: number, edge1: number, value: number): number {
@@ -92,6 +120,9 @@ export class TerrainSystem implements GameSystem {
   private readinessProbe = new THREE.Vector3();
   private atmosphereNightFillColor = new THREE.Color(0, 0, 0);
   private atmosphereDirectLightDirection = new THREE.Vector3(0, 1, 0);
+  private nextAtmosphereDirectLightDirection = new THREE.Vector3(0, 1, 0);
+  private atmosphereDaylightFactor = 1;
+  private atmosphereLowSunOcclusionStrength = 0;
   private isInitialized = false;
   private vegetationAddThrottleFrame = false;
   private frameCounter = 0;
@@ -173,6 +204,7 @@ export class TerrainSystem implements GameSystem {
         lodRanges: this.config.lodRanges,
         tileResolution: this.config.tileResolution,
       },
+      (x, z) => this.getHeightAt(x, z),
     );
     this.renderRuntime.init();
 
@@ -257,6 +289,23 @@ export class TerrainSystem implements GameSystem {
     this.renderRuntime?.setCameraOverride(camera);
   }
 
+  syncRenderSelectionForCamera(camera: THREE.Camera | null | undefined): TerrainRenderSelectionSyncResult {
+    if (!this.isInitialized || !this.renderRuntime) {
+      return {
+        didSync: false,
+        reason: 'uninitialized',
+        selectionRechecked: false,
+        poseWasStale: false,
+        projectionChanged: false,
+        positionDeltaMeters: 0,
+        rotationDeltaDeg: 0,
+        tileCount: 0,
+        tileSelectionSaturated: false,
+      };
+    }
+    return this.renderRuntime.syncSelectionForCamera(camera);
+  }
+
   setSurfaceWetness(wetness: number): void {
     const clampedWetness = THREE.MathUtils.clamp(wetness, 0, 1);
     if (Math.abs(clampedWetness - this.surfaceWetness) < 0.001) {
@@ -267,16 +316,30 @@ export class TerrainSystem implements GameSystem {
   }
 
   setFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): void {
-    this.surfaceRuntime.setFarCanopyTint(farCanopyTint);
+    this.surfaceRuntime.setFarCanopyTint(
+      isTerrainFarCanopyTintDisabledForPerf() ? { enabled: false } : farCanopyTint,
+    );
   }
 
   setAtmosphereLighting(lighting: TerrainAtmosphereLightingInput): void {
     const daylightFactor = THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1);
-    this.atmosphereDirectLightDirection.copy(lighting.directLightDirection);
-    if (this.atmosphereDirectLightDirection.lengthSq() < 1e-8) this.atmosphereDirectLightDirection.set(0, 1, 0);
-    else this.atmosphereDirectLightDirection.normalize();
-    const lowSunOcclusionStrength = lighting.sunAboveHorizon
-      ? daylightFactor * (1 - smoothstep01(0.16, 0.5, this.atmosphereDirectLightDirection.y)) * 0.85 : 0;
+    this.nextAtmosphereDirectLightDirection.copy(lighting.directLightDirection);
+    if (this.nextAtmosphereDirectLightDirection.lengthSq() < 1e-8) this.nextAtmosphereDirectLightDirection.set(0, 1, 0);
+    else this.nextAtmosphereDirectLightDirection.normalize();
+    const rawLowSunOcclusionStrength = lighting.sunAboveHorizon
+      ? daylightFactor * (1 - smoothstep01(0.16, 0.5, this.nextAtmosphereDirectLightDirection.y)) * 0.85 : 0;
+    const lowSunOcclusionStrength = isTerrainLowSunOcclusionDisabledForPerf()
+      ? 0
+      : rawLowSunOcclusionStrength;
+    if (
+      Math.abs(this.atmosphereDirectLightDirection.x - this.nextAtmosphereDirectLightDirection.x) <= ATMOSPHERE_LIGHTING_EPSILON
+      && Math.abs(this.atmosphereDirectLightDirection.y - this.nextAtmosphereDirectLightDirection.y) <= ATMOSPHERE_LIGHTING_EPSILON
+      && Math.abs(this.atmosphereDirectLightDirection.z - this.nextAtmosphereDirectLightDirection.z) <= ATMOSPHERE_LIGHTING_EPSILON
+      && Math.abs(this.atmosphereDaylightFactor - daylightFactor) <= ATMOSPHERE_LIGHTING_EPSILON
+      && Math.abs(this.atmosphereLowSunOcclusionStrength - lowSunOcclusionStrength) <= ATMOSPHERE_LIGHTING_EPSILON
+    ) {
+      return;
+    }
     // Rig path is the only path (`legacy-path-deletion`). The rig's
     // ambientRadiance is the single night floor — driven into the terrain PBR
     // via the rig scene lights — so the legacy night-fill emissive re-shaping is
@@ -285,6 +348,9 @@ export class TerrainSystem implements GameSystem {
     // kept for out-of-scope writers). The direct-light direction and
     // daylight factor still drive the horizon-occlusion relief that the rig path
     // retains ("keep the effect, kill the bespoke inputs").
+    this.atmosphereDirectLightDirection.copy(this.nextAtmosphereDirectLightDirection);
+    this.atmosphereDaylightFactor = daylightFactor;
+    this.atmosphereLowSunOcclusionStrength = lowSunOcclusionStrength;
     this.atmosphereNightFillColor.setRGB(0, 0, 0);
     this.surfaceRuntime.setAtmosphereLighting({
       nightFillColor: this.atmosphereNightFillColor,
@@ -459,9 +525,22 @@ export class TerrainSystem implements GameSystem {
     return this.renderRuntime?.getActiveTerrainTileCount() ?? 0;
   }
 
-  /** Additive debug accessor for `world-overlay-debugger`. See TerrainRenderRuntime. */
-  getActiveTilesForDebug(): ReadonlyArray<{ x: number; z: number; size: number; lodLevel: number; morphFactor: number }> {
+  /** Additive debug accessor for artifact truth. See TerrainRenderRuntime. */
+  getActiveTilesForDebug(): ReadonlyArray<TerrainDebugTile> {
     return this.renderRuntime?.getActiveTilesForDebug() ?? [];
+  }
+
+  wasLastTileSelectionSaturated(): boolean {
+    return this.renderRuntime?.wasLastTileSelectionSaturated() ?? false;
+  }
+
+  /** Explicit fresh selection probe for interactive overlays only. */
+  selectTilesForDebugOverlay(): ReadonlyArray<TerrainDebugTile> {
+    return this.renderRuntime?.selectTilesForDebugOverlay() ?? [];
+  }
+
+  getRenderSubmissionStatsForDebug(): TerrainRenderSubmissionStats | null {
+    return this.renderRuntime?.getSubmissionStatsForDebug() ?? null;
   }
 
   getChunkSize(): number {
@@ -470,12 +549,14 @@ export class TerrainSystem implements GameSystem {
 
   getStreamingMetrics(): TerrainStreamingMetricDebug[] {
     const vegetationDebug = this.vegetationRuntime.getDebugInfo();
+    const renderDebug = this.getRenderSubmissionStatsForDebug();
     return this.streamingScheduler.getMetrics().map(metric => ({
       name: metric.name,
       budgetMs: metric.budgetMs,
       timeMs: metric.emaMs,
       pendingUnits: metric.pendingUnits,
       ...(metric.name === 'vegetation' ? { debug: vegetationDebug } : {}),
+      ...(metric.name === 'render' && renderDebug ? { debug: renderDebug } : {}),
     }));
   }
 

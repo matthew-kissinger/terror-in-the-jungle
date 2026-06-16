@@ -92,25 +92,20 @@ export class UnifiedWeaponBar {
 
   setActiveSlot(index: number): void {
     if (index >= 0 && index < 6 && index !== this.activeIndex) {
+      const previousIndex = this.activeIndex;
       this.activeIndex = index;
-      this.updateHighlight();
+      this.updateSlotHighlight(previousIndex);
+      this.updateSlotHighlight(index);
     }
   }
 
   setSlotDefinitions(definitions: WeaponBarSlotConfig[]): void {
-    this.slotConfig = Array.from({ length: 6 }, (_, index) => definitions[index] ?? {
-      enabled: false,
-      shortLabel: '--',
-      fullLabel: 'Disabled'
-    });
-
     for (const slot of this.slots) {
-      const config = this.slotConfig[slot.index];
-      slot.label = config.shortLabel;
-      this.setSlotIcon(slot.iconContainer, config.shortLabel);
-      slot.element.title = config.fullLabel;
-      slot.element.style.display = config.enabled ? 'flex' : 'none';
-      slot.element.classList.toggle('uwb-slot--disabled', !config.enabled);
+      this.applySlotConfig(slot, definitions[slot.index] ?? {
+        enabled: false,
+        shortLabel: '--',
+        fullLabel: 'Disabled'
+      });
     }
 
     if (!this.slotConfig[this.activeIndex]?.enabled) {
@@ -177,8 +172,10 @@ export class UnifiedWeaponBar {
         slot.setPointerCapture(e.pointerId);
       }
       slot.classList.add('uwb-slot--pressed');
+      const previousIndex = this.activeIndex;
       this.activeIndex = index;
-      this.updateHighlight();
+      this.updateSlotHighlight(previousIndex);
+      this.updateSlotHighlight(index);
       this.onWeaponSelect?.(index);
     };
 
@@ -206,7 +203,37 @@ export class UnifiedWeaponBar {
     this.container.appendChild(slot);
   }
 
+  private applySlotConfig(slot: WeaponSlotEl, config: WeaponBarSlotConfig): void {
+    const current = this.slotConfig[slot.index];
+    const enabledChanged = current.enabled !== config.enabled;
+    const labelChanged = current.shortLabel !== config.shortLabel;
+    const titleChanged = current.fullLabel !== config.fullLabel;
+
+    if (!enabledChanged && !labelChanged && !titleChanged) return;
+
+    current.enabled = config.enabled;
+    current.shortLabel = config.shortLabel;
+    current.fullLabel = config.fullLabel;
+    slot.label = config.shortLabel;
+
+    if (labelChanged) {
+      this.setSlotIcon(slot.iconContainer, config.shortLabel);
+    }
+    if (titleChanged && slot.element.title !== config.fullLabel) {
+      slot.element.title = config.fullLabel;
+    }
+    if (enabledChanged) {
+      const display = config.enabled ? 'flex' : 'none';
+      if (slot.element.style.display !== display) {
+        slot.element.style.display = display;
+      }
+      slot.element.classList.toggle('uwb-slot--disabled', !config.enabled);
+    }
+  }
+
   private setSlotIcon(container: HTMLDivElement, shortLabel: string): void {
+    if (container.dataset.iconLabel === shortLabel) return;
+    container.dataset.iconLabel = shortLabel;
     container.innerHTML = '';
     const iconName = SLOT_ICON_MAP[shortLabel];
     if (iconName) {
@@ -224,13 +251,15 @@ export class UnifiedWeaponBar {
 
   private updateHighlight(): void {
     for (const slot of this.slots) {
-      const enabled = this.slotConfig[slot.index]?.enabled ?? false;
-      if (slot.index === this.activeIndex && enabled) {
-        slot.element.classList.add('uwb-slot--active');
-      } else {
-        slot.element.classList.remove('uwb-slot--active');
-      }
+      this.updateSlotHighlight(slot.index);
     }
+  }
+
+  private updateSlotHighlight(index: number): void {
+    const slot = this.slots[index];
+    if (!slot) return;
+    const enabled = this.slotConfig[slot.index]?.enabled ?? false;
+    slot.element.classList.toggle('uwb-slot--active', slot.index === this.activeIndex && enabled);
   }
 
   private injectStyles(): void {

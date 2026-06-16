@@ -156,10 +156,17 @@ describe('WeaponAnimations', () => {
       expect(camera.fov).toBeCloseTo(initialFov)
     })
 
-    it('updateProjectionMatrix called during update when camera is PerspectiveCamera', () => {
+    it('updateProjectionMatrix called during update when PerspectiveCamera FOV changes', () => {
       animations.setADS(true)
       animations.update(0.05, false, new THREE.Vector3())
       expect(camera.updateProjectionMatrix).toHaveBeenCalled()
+    })
+
+    it('does not refresh the projection matrix on stable hip-fire frames', () => {
+      animations.update(0.05, false, new THREE.Vector3())
+      animations.update(0.05, false, new THREE.Vector3())
+      expect(camera.fov).toBe(75)
+      expect(camera.updateProjectionMatrix).not.toHaveBeenCalled()
     })
 
     it('updateProjectionMatrix not called if camera is not PerspectiveCamera', () => {
@@ -376,6 +383,46 @@ describe('WeaponAnimations', () => {
       expect(swayDecay.y).toBeLessThan(swayActiveY)
       expect(swayDecay.x).toBeCloseTo(0, 3) // Should decay close to 0
       expect(swayDecay.y).toBeCloseTo(0, 3)
+    })
+
+    it('preserves proportional sway below the look-velocity cap', () => {
+      const sqrtSpy = vi.spyOn(Math, 'sqrt')
+
+      try {
+        animations.update(0.016, false, new THREE.Vector3(3, 4, 0))
+
+        expect(sqrtSpy).toHaveBeenCalledWith(25)
+        expect(animations.getSwayOffset().x).toBeCloseTo(0.00128)
+        expect(animations.getSwayOffset().y).toBeCloseTo(0.00128)
+      } finally {
+        sqrtSpy.mockRestore()
+      }
+    })
+
+    it('saturates sway at and above the look-velocity cap', () => {
+      animations.update(0.016, false, new THREE.Vector3(10, 0, 0))
+
+      expect(animations.getSwayOffset().x).toBeCloseTo(0.00256)
+      expect(animations.getSwayOffset().y).toBeCloseTo(0.00256)
+
+      animations.reset()
+      animations.update(0.016, false, new THREE.Vector3(50, 0, 0))
+
+      expect(animations.getSwayOffset().x).toBeCloseTo(0.00256)
+      expect(animations.getSwayOffset().y).toBeCloseTo(0.00256)
+    })
+
+    it('skips exact look-velocity square root once sway is saturated', () => {
+      const sqrtSpy = vi.spyOn(Math, 'sqrt')
+
+      try {
+        animations.update(0.016, false, new THREE.Vector3(50, 0, 0))
+
+        expect(sqrtSpy).not.toHaveBeenCalled()
+        expect(animations.getSwayOffset().x).toBeGreaterThan(0)
+      } finally {
+        sqrtSpy.mockRestore()
+      }
     })
   })
 

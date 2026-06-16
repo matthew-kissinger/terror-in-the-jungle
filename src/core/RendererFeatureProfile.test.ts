@@ -42,11 +42,31 @@ describe('buildRendererFeatureProfile', () => {
 
     expect(profile.posture).toBe('webgpuPrimary');
     expect(profile.webglCompatibilityMode).toBe('none');
+    expect(profile.requiredLimits.worldFieldStorageBufferFloorBytes).toBeGreaterThan(0);
+    expect(profile.deviceLoss.diagnosticLanesReprofileAfterRestore).toBe(true);
     expect(profile.decisions.webgpuCompute.available).toBe(true);
     expect(profile.decisions.webgpuCompute.policy).toBe('requiredWebGPU');
+    expect(profile.decisions.webgpuCompute.requiredLimits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'maxComputeInvocationsPerWorkgroup',
+          satisfied: true,
+        }),
+      ]),
+    );
     expect(profile.decisions.storageBufferWorldFields.available).toBe(true);
+    expect(profile.decisions.terrainHeightfieldErosion.policy).toBe('diagnosticOnly');
+    expect(profile.decisions.terrainHeightfieldErosion.proofHooks).toContain('terrainBaselineProof');
+    expect(profile.decisions.debugWaterLevelProof.available).toBe(true);
+    expect(profile.decisions.debugWaterLevelProof.policy).toBe('diagnosticOnly');
+    expect(profile.decisions.debugWaterLevelProof.reason).toContain('cannot become gameplay water');
     expect(profile.decisions.volumetricCloudPrototype.policy).toBe('diagnosticOnly');
     expect(profile.decisions.gpuForestCulling.policy).toBe('diagnosticOnly');
+    expect(profile.decisions.aggregateForestLod.proofHooks).toContain('assetAcceptanceReview');
+    expect(profile.decisions.naniteLiteClusterStudy.reason).toContain('true meshlet Nanite remains out of scope');
+    expect(profile.decisions.vietnamSpeciesSourceSpecs.available).toBe(true);
+    expect(profile.decisions.vietnamSpeciesSourceSpecs.deviceLossPolicy).toBe('noRuntimeGpuState');
+    expect(profile.proofHookDescriptions.todCoherenceGate).toContain('sky');
   });
 
   it('keeps the unified WebGL2 fallback as compatibility without mirroring WebGPU-only systems', () => {
@@ -65,6 +85,9 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.webgpuCompute.available).toBe(false);
     expect(profile.decisions.volumetricCloudPrototype.available).toBe(false);
     expect(profile.decisions.gpuForestCulling.available).toBe(false);
+    expect(profile.decisions.terrainHeightfieldErosion.available).toBe(false);
+    expect(profile.decisions.debugWaterLevelProof.available).toBe(false);
+    expect(profile.decisions.vietnamSpeciesSourceSpecs.available).toBe(true);
   });
 
   it('treats explicit legacy WebGL as diagnostic instead of a new feature target', () => {
@@ -96,7 +119,16 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.webgpuCompute.available).toBe(true);
     expect(profile.decisions.storageBufferWorldFields.available).toBe(false);
     expect(profile.decisions.storageBufferWorldFields.policy).toBe('diagnosticOnly');
+    expect(profile.decisions.storageBufferWorldFields.requiredLimits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'maxStorageBufferBindingSize',
+          satisfied: false,
+        }),
+      ]),
+    );
     expect(profile.decisions.hydrologyAnalysis.available).toBe(false);
+    expect(profile.decisions.debugWaterLevelProof.available).toBe(false);
   });
 
   it('keeps runtime water disabled even when the WebGPU backend is fully capable', () => {
@@ -105,5 +137,18 @@ describe('buildRendererFeatureProfile', () => {
     expect(profile.decisions.runtimeWater.available).toBe(false);
     expect(profile.decisions.runtimeWater.policy).toBe('disabled');
     expect(profile.decisions.runtimeWater.reason).toContain('out of scope');
+    expect(profile.decisions.runtimeWater.deviceLossPolicy).toBe('disabledUntilFutureCycle');
+    expect(profile.deviceLoss.runtimeWaterRestores).toBe(false);
+  });
+
+  it('requires strict WebGPU proof mode to revalidate the backend after device loss', () => {
+    const profile = buildRendererFeatureProfile(makeCapabilities({
+      requestedMode: 'webgpu-strict',
+      strictWebGPU: true,
+    }));
+
+    expect(profile.deviceLoss.strictWebGPURequiresBackendReinit).toBe(true);
+    expect(profile.deviceLoss.notes.join(' ')).toContain('fail loudly');
+    expect(profile.decisions.storageBufferWorldFields.deviceLossPolicy).toBe('requiresRendererReinit');
   });
 });

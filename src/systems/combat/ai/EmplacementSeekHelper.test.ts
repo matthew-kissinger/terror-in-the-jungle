@@ -280,6 +280,46 @@ describe('buildEmplacementContext: candidate selection', () => {
     expect(ctx?.vehicleId).toBe('us_close')
   })
 
+  it('uses the radius iterator query when available', () => {
+    const self = makeCombatant('c', Faction.US, new THREE.Vector3())
+    const closer = makeFakeEmplacement('us_close', new THREE.Vector3(2, 0, 0), Faction.US)
+    const farther = makeFakeEmplacement('us_far', new THREE.Vector3(6, 0, 0), Faction.US)
+    const vehicles = [farther, closer]
+    const getVehiclesInRadius = vi.fn((
+      _center: THREE.Vector3,
+      _radius: number,
+    ): readonly INpcEmplacementVehicle[] => {
+      throw new Error('fallback radius array should not be materialized')
+    })
+    const forEachVehicleInRadius = vi.fn((
+      center: THREE.Vector3,
+      radius: number,
+      visitor: (vehicle: INpcEmplacementVehicle) => void,
+    ) => {
+      const r2 = radius * radius
+      for (const v of vehicles) {
+        if (v.getPosition().distanceToSquared(center) <= r2) {
+          visitor(v)
+        }
+      }
+    })
+    const query: INpcEmplacementQuery = {
+      getVehiclesInRadius,
+      forEachVehicleInRadius,
+    }
+
+    const ctx = buildEmplacementContext(
+      self,
+      new THREE.Vector3(20, 0, 0),
+      query,
+      makeAimAtThreatResolver(new THREE.Vector3(20, 0, 0)),
+    )
+
+    expect(forEachVehicleInRadius).toHaveBeenCalledTimes(1)
+    expect(getVehiclesInRadius).not.toHaveBeenCalled()
+    expect(ctx?.vehicleId).toBe('us_close')
+  })
+
   it('uses a live weapon cone when the resolver returns one (threat outside cone -> false)', () => {
     const self = makeCombatant('c', Faction.US, new THREE.Vector3())
     const emp = makeFakeEmplacement('us_1', new THREE.Vector3(2, 0, 0), Faction.US)

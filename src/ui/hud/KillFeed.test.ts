@@ -50,6 +50,25 @@ describe('KillFeed', () => {
     expect(entryCount()).toBe(0);
   });
 
+  it('does not read the clock while the feed is empty', () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockClear();
+
+    killFeed.update(0);
+
+    expect(nowSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses one timestamp read when adding a kill entry', () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockClear();
+
+    killFeed.addKill('Killer', Faction.US, 'Victim', Faction.NVA);
+
+    expect(nowSpy).toHaveBeenCalledTimes(1);
+    expect(entryCount()).toBe(1);
+  });
+
   it('shows killer and victim names when a kill is added', () => {
     killFeed.addKill('Killer', Faction.US, 'Victim', Faction.NVA);
 
@@ -80,8 +99,12 @@ describe('KillFeed', () => {
       vi.advanceTimersByTime(10);
     }
 
-    expect(entryCount()).toBeLessThan(10);
+    const entries = Array.from(parent.querySelector('.container')?.children ?? []);
+    expect(entries).toHaveLength(6);
     expect(feedText()).not.toContain('Killer0');
+    expect(feedText()).not.toContain('Killer3');
+    expect(entries[0].textContent).toContain('Killer4');
+    expect(entries.at(-1)?.textContent).toContain('Killer9');
     expect(feedText()).toContain('Killer9');
   });
 
@@ -133,6 +156,20 @@ describe('KillFeed', () => {
     killFeed.update(0);
     vi.advanceTimersByTime(1_000);
 
+    expect(entryCount()).toBe(0);
+  });
+
+  it('keeps an expired entry in slide-out until the fallback removes it', () => {
+    killFeed.addKill('K', Faction.US, 'V', Faction.NVA);
+
+    vi.advanceTimersByTime(10_000);
+    killFeed.update(0);
+
+    const entry = parent.querySelector('.container')?.children[0] as HTMLElement;
+    expect(entry).not.toBeUndefined();
+    expect(entry.className).toContain('entrySlideOut');
+
+    vi.advanceTimersByTime(1_000);
     expect(entryCount()).toBe(0);
   });
 

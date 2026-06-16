@@ -8,6 +8,7 @@ import { FrameTimingTracker } from './FrameTimingTracker'
 import { Logger } from '../../utils/Logger'
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics'
 import {
+  MovementArtifactCell,
   MovementArtifactEvent,
   MovementArtifactEventKind,
   MovementArtifactReport,
@@ -78,6 +79,8 @@ interface TrackedNPCArtifactState {
   id: string
   simLane: 'high' | 'medium' | 'low' | 'culled'
   points: MovementArtifactTrackPoint[]
+  pointStartIndex: number
+  pointCount: number
   occupancyCooldownMs: number
   trackCooldownMs: number
 }
@@ -104,6 +107,32 @@ const NPC_TRACK_SAMPLE_MS_BY_LOD: Record<'high' | 'medium' | 'low' | 'culled', n
   medium: 1400,
   low: 2200,
   culled: 2800
+}
+
+function compareMovementArtifactCells(a: MovementArtifactCell, b: MovementArtifactCell): number {
+  return b.count - a.count || a.x - b.x || a.z - b.z
+}
+
+function compareMovementArtifactEvents(a: MovementArtifactEvent, b: MovementArtifactEvent): number {
+  return b.count - a.count || a.kind.localeCompare(b.kind) || a.x - b.x || a.z - b.z
+}
+
+function sortedMovementCells(cells: Iterable<MovementArtifactCell>): MovementArtifactCell[] {
+  const output: MovementArtifactCell[] = []
+  for (const cell of cells) {
+    output.push(cell)
+  }
+  output.sort(compareMovementArtifactCells)
+  return output
+}
+
+function sortedMovementEvents(events: Iterable<MovementArtifactEvent>): MovementArtifactEvent[] {
+  const output: MovementArtifactEvent[] = []
+  for (const event of events) {
+    output.push(event)
+  }
+  output.sort(compareMovementArtifactEvents)
+  return output
 }
 
 function createEmptyPlayerMovementAccumulator(): PlayerMovementAccumulator {
@@ -200,6 +229,8 @@ export class PerformanceTelemetry {
   private npcOccupancy = new Map<string, SparseArtifactCell>()
   private movementHotspots = new Map<string, MovementArtifactEvent>()
   private playerTrack: MovementArtifactTrackPoint[] = []
+  private playerTrackStartIndex = 0
+  private playerTrackCount = 0
   private playerOccupancyCooldownMs = 0
   private playerTrackCooldownMs = 0
   private playerTerrainBlockedActive = false
@@ -513,6 +544,11 @@ export class PerformanceTelemetry {
     return this.frameTiming.getSystemBreakdown()
   }
 
+  getTopSystemBreakdownByLast(limit: number): SystemTiming[] {
+    if (!this.enabled) return []
+    return this.frameTiming.getTopSystemBreakdownByLast(limit)
+  }
+
   /**
    * Get full telemetry report
    */
@@ -584,7 +620,7 @@ export class PerformanceTelemetry {
     const player = this.playerMovementTelemetry
     const npc = this.npcMovementTelemetry
     const playerPinnedSummary = this.getPinnedSummary(player, this.playerAreaTracker)
-    const npcPinnedSummary = this.getPinnedSummary(npc, ...Array.from(this.npcAreaTrackers.values()))
+    const npcPinnedSummary = this.getPinnedSummary(npc, null, this.npcAreaTrackers.values())
     return {
       player: {
         samples: player.samples,
@@ -625,29 +661,27 @@ export class PerformanceTelemetry {
   }
 
   getMovementArtifacts(): MovementArtifactReport {
+    const tracks: MovementArtifactTrack[] = [{
+      id: 'player',
+      subject: 'player',
+      points: this.getTrackSnapshot(this.playerTrack, this.playerTrackStartIndex, this.playerTrackCount),
+    }]
+    for (const track of this.trackedNPCArtifacts.values()) {
+      if (track.pointCount <= 0) continue
+      tracks.push({
+        id: track.id,
+        subject: 'npc',
+        simLane: track.simLane,
+        points: this.getTrackSnapshot(track.points, track.pointStartIndex, track.pointCount),
+      })
+    }
+
     return {
       cellSize: MOVEMENT_ARTIFACT_CELL_SIZE,
-      playerOccupancy: Array.from(this.playerOccupancy.values())
-        .sort((a, b) => b.count - a.count || a.x - b.x || a.z - b.z),
-      npcOccupancy: Array.from(this.npcOccupancy.values())
-        .sort((a, b) => b.count - a.count || a.x - b.x || a.z - b.z),
-      hotspots: Array.from(this.movementHotspots.values())
-        .sort((a, b) => b.count - a.count || a.kind.localeCompare(b.kind) || a.x - b.x || a.z - b.z),
-      tracks: [
-        {
-          id: 'player',
-          subject: 'player',
-          points: this.playerTrack.slice(),
-        },
-        ...Array.from(this.trackedNPCArtifacts.values())
-          .filter((track) => track.points.length > 0)
-          .map((track): MovementArtifactTrack => ({
-            id: track.id,
-            subject: 'npc',
-            simLane: track.simLane,
-            points: track.points.slice(),
-          })),
-      ],
+      playerOccupancy: sortedMovementCells(this.playerOccupancy.values()),
+      npcOccupancy: sortedMovementCells(this.npcOccupancy.values()),
+      hotspots: sortedMovementEvents(this.movementHotspots.values()),
+      tracks,
     }
   }
 
@@ -672,7 +706,9 @@ export class PerformanceTelemetry {
     this.playerOccupancy.clear()
     this.npcOccupancy.clear()
     this.movementHotspots.clear()
-    this.playerTrack = []
+    this.clearTrack(this.playerTrack)
+    this.playerTrackStartIndex = 0
+    this.playerTrackCount = 0
     this.playerOccupancyCooldownMs = 0
     this.playerTrackCooldownMs = 0
     this.playerTerrainBlockedActive = false
@@ -769,16 +805,15 @@ export class PerformanceTelemetry {
 
     this.playerTrackCooldownMs -= deltaTime * 1000
     if (this.playerTrackCooldownMs <= 0) {
-      this.appendTrackPoint(this.playerTrack, x, z, undefined, {
+      const updated = this.appendTrackPoint(this.playerTrack, MAX_PLAYER_TRACK_POINTS, this.playerTrackStartIndex, this.playerTrackCount, x, z, undefined, {
         requestedSpeed,
         actualSpeed,
         wantsMovement,
         blockedByTerrain,
       })
+      this.playerTrackStartIndex = updated.startIndex
+      this.playerTrackCount = updated.count
       this.playerTrackCooldownMs = PLAYER_TRACK_SAMPLE_MS
-      if (this.playerTrack.length > MAX_PLAYER_TRACK_POINTS) {
-        this.playerTrack.shift()
-      }
     }
   }
 
@@ -839,11 +874,18 @@ export class PerformanceTelemetry {
 
     trackState.trackCooldownMs -= deltaTime * 1000
     if (trackState.trackCooldownMs <= 0) {
-      this.appendTrackPoint(trackState.points, x, z, intent)
+      const updated = this.appendTrackPoint(
+        trackState.points,
+        MAX_TRACKED_NPC_TRACK_POINTS,
+        trackState.pointStartIndex,
+        trackState.pointCount,
+        x,
+        z,
+        intent,
+      )
+      trackState.pointStartIndex = updated.startIndex
+      trackState.pointCount = updated.count
       trackState.trackCooldownMs = NPC_TRACK_SAMPLE_MS_BY_LOD[simLane]
-      if (trackState.points.length > MAX_TRACKED_NPC_TRACK_POINTS) {
-        trackState.points.shift()
-      }
     }
   }
 
@@ -863,6 +905,8 @@ export class PerformanceTelemetry {
       id,
       simLane,
       points: [],
+      pointStartIndex: 0,
+      pointCount: 0,
       occupancyCooldownMs: 0,
       trackCooldownMs: 0,
     }
@@ -905,26 +949,52 @@ export class PerformanceTelemetry {
 
   private appendTrackPoint(
     points: MovementArtifactTrackPoint[],
+    limit: number,
+    startIndex: number,
+    count: number,
     x: number,
     z: number,
     intent?: MovementIntentTelemetryKey,
     extra?: Partial<Pick<MovementArtifactTrackPoint, 'requestedSpeed' | 'actualSpeed' | 'wantsMovement' | 'blockedByTerrain'>>,
-  ): void {
-    const previous = points[points.length - 1]
+  ): { startIndex: number; count: number } {
+    const previous = count > 0
+      ? points[(startIndex + count - 1) % limit]
+      : undefined
     if (previous) {
       const dx = x - previous.x
       const dz = z - previous.z
       if (dx * dx + dz * dz < 1) {
-        return
+        return { startIndex, count }
       }
     }
-    points.push({
+    const writeIndex = (startIndex + count) % limit
+    points[writeIndex] = {
       x,
       z,
       tMs: Math.round(performance.now()),
       intent,
       ...extra,
-    })
+    }
+    if (count < limit) {
+      return { startIndex, count: count + 1 }
+    }
+    return { startIndex: (startIndex + 1) % limit, count }
+  }
+
+  private getTrackSnapshot(
+    points: MovementArtifactTrackPoint[],
+    startIndex: number,
+    count: number,
+  ): MovementArtifactTrackPoint[] {
+    const output = new Array<MovementArtifactTrackPoint>(count)
+    for (let index = 0; index < count; index++) {
+      output[index] = { ...points[(startIndex + index) % points.length] }
+    }
+    return output
+  }
+
+  private clearTrack(points: MovementArtifactTrackPoint[]): void {
+    points.length = 0
   }
 
   private commitPinnedTracker(
@@ -941,19 +1011,27 @@ export class PerformanceTelemetry {
 
   private getPinnedSummary(
     accumulator: PlayerMovementAccumulator | NPCMovementAccumulator,
-    ...activeTrackers: Array<LocalAreaTracker | null | undefined>
+    activeTracker?: LocalAreaTracker | null,
+    activeTrackers?: Iterable<LocalAreaTracker | null | undefined>,
   ): { events: number; avgSeconds: number; maxSeconds: number; avgRadius: number } {
     let durationSumMs = accumulator.pinnedDurationSumMs
     let maxDurationMs = accumulator.maxPinnedDurationMs
     let radiusSum = accumulator.pinnedRadiusSum
 
-    for (const tracker of activeTrackers) {
-      if (!tracker?.pinned) {
-        continue
+    if (activeTracker?.pinned) {
+      durationSumMs += activeTracker.dwellMs
+      maxDurationMs = Math.max(maxDurationMs, activeTracker.dwellMs)
+      radiusSum += Math.sqrt(activeTracker.maxRadiusSq)
+    }
+    if (activeTrackers) {
+      for (const tracker of activeTrackers) {
+        if (!tracker?.pinned) {
+          continue
+        }
+        durationSumMs += tracker.dwellMs
+        maxDurationMs = Math.max(maxDurationMs, tracker.dwellMs)
+        radiusSum += Math.sqrt(tracker.maxRadiusSq)
       }
-      durationSumMs += tracker.dwellMs
-      maxDurationMs = Math.max(maxDurationMs, tracker.dwellMs)
-      radiusSum += Math.sqrt(tracker.maxRadiusSq)
     }
 
     const events = accumulator.pinnedAreaEvents

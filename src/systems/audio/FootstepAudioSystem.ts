@@ -49,6 +49,7 @@ export class FootstepAudioSystem implements GameSystem {
   // AI footstep tracking (limit concurrent sounds)
   private readonly MAX_CONCURRENT_AI_FOOTSTEPS = 5;
   private readonly AI_FOOTSTEP_RANGE = 30; // Only play within 30m
+  private readonly AI_FOOTSTEP_RANGE_SQ = this.AI_FOOTSTEP_RANGE * this.AI_FOOTSTEP_RANGE;
   
   // Terrain-based configurations
   private readonly terrainConfigs: Record<TerrainType, FootstepConfig> = {
@@ -195,16 +196,21 @@ export class FootstepAudioSystem implements GameSystem {
   ): boolean {
     if (!FOOTSTEP_AUDIO_ENABLED) return false;
 
-    // Check distance - don't play if too far
-    const distance = position.distanceTo(playerPosition);
-    if (distance > this.AI_FOOTSTEP_RANGE) {
+    const dx = position.x - playerPosition.x;
+    const dy = position.y - playerPosition.y;
+    const dz = position.z - playerPosition.z;
+    if ((dx * dx) + (dy * dy) + (dz * dz) > this.AI_FOOTSTEP_RANGE_SQ) {
       return false;
     }
     
     // Check concurrent limit
-    const playingCount = this.aiFootstepPool.filter(s => s.isPlaying).length;
-    if (playingCount >= this.MAX_CONCURRENT_AI_FOOTSTEPS) {
-      return false;
+    let playingCount = 0;
+    for (const sound of this.aiFootstepPool) {
+      if (!sound.isPlaying) continue;
+      playingCount++;
+      if (playingCount >= this.MAX_CONCURRENT_AI_FOOTSTEPS) {
+        return false;
+      }
     }
     
     // Detect terrain and play sound

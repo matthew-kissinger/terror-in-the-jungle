@@ -47,6 +47,16 @@ export const INITIAL_FOG_COLOR = 0x7a8f88;
  * runtime A/B toggle back to ACES (`toneMapping = 'aces'`) for playtest.
  */
 export const DEFAULT_TONE_MAPPING: THREE.ToneMapping = THREE.AgXToneMapping;
+const BACKGROUND_SHADER_PRECOMPILE_RECENT_SKIP_MS = 5000;
+
+export type ShaderPrecompileResult = 'complete' | 'failed' | 'skipped' | 'timeout';
+
+interface ShaderPrecompileOptions {
+  renderOnce?: boolean;
+  timeoutMs?: number;
+  reason?: string;
+  skipIfCompletedWithinMs?: number;
+}
 
 /**
  * Determine whether the WebGLRenderer should preserve its drawing buffer.
@@ -94,6 +104,7 @@ export class GameRenderer {
   private crosshairSystem = new CrosshairSystem();
   private loadingUI = new LoadingUI();
   private viewportUnsubscribe?: () => void;
+  private lastShaderPrecompileCompletedAtMs = -Infinity;
   /**
    * Registry hosting 3D debug overlays (navmesh wireframe, LOS rays, LOD tier
    * markers, etc.). Overlay content lives in its own `THREE.Group` under the
@@ -487,56 +498,84 @@ export class GameRenderer {
   }
 
   /**
-   * Pre-compile all shaders in the scene to prevent first-use frame drops.
-   * Call this after all systems are initialized but before gameplay starts.
+   * Pre-compile scene pipelines to prevent first-visible frame drops.
+   * Call this after mode systems have populated the scene. WebGPU also exposes
+   * `compileAsync`; skipping it leaves first-use material/shadow pipelines cold.
    */
-  precompileShaders(): void {
-    if (isWebGPURenderer(this.renderer)) {
-      Logger.warn('Renderer', 'Skipping legacy WebGL shader pre-compilation on WebGPURenderer path');
-      return;
-    }
-
-    Logger.info('Renderer', 'Pre-compiling shaders...');
+  async precompileShadersAsync(options: ShaderPrecompileOptions = {}): Promise<ShaderPrecompileResult> {
     const startTime = performance.now();
-
-    const rendererAny = this.renderer as THREE.WebGLRenderer & {
+    const reason = options.reason ? ` (${options.reason})` : '';
+    const recentSkipMs = Math.max(0, Number(options.skipIfCompletedWithinMs ?? 0));
+    if (recentSkipMs > 0 && startTime - this.lastShaderPrecompileCompletedAtMs < recentSkipMs) {
+      Logger.info('Renderer', `Skipping renderer pipeline prewarm${reason}; completed recently`);
+      return 'skipped';
+    }
+    const rendererAny = this.renderer as CommonRenderer & {
       compileAsync?: (scene: THREE.Object3D, camera: THREE.Camera) => Promise<unknown>;
-    };
-    const rendererWithExtensions = this.renderer as CommonRenderer & {
       extensions?: { has: (name: string) => boolean };
     };
-    const supportsParallelCompile = rendererWithExtensions.extensions?.has('KHR_parallel_shader_compile') === true;
+    const webGpuRenderer = isWebGPURenderer(this.renderer);
+    const supportsParallelCompile = rendererAny.extensions?.has('KHR_parallel_shader_compile') === true;
+    const timeoutMs = Math.max(0, Number(options.timeoutMs ?? 0));
 
-    if (!supportsParallelCompile) {
-      Logger.warn('Renderer', 'KHR_parallel_shader_compile unavailable; skipping async shader pre-compilation');
-      return;
+    if (typeof rendererAny.compileAsync !== 'function') {
+      Logger.warn('Renderer', `compileAsync unavailable; skipping shader pre-compilation${reason}`);
+      return 'skipped';
     }
 
-    // Prefer async compile path to reduce main-thread stalls on startup.
-    if (typeof rendererAny.compileAsync === 'function') {
-      try {
-        void rendererAny.compileAsync(this.scene, this.camera)
-          .then(() => {
-            this.renderer.render(this.scene, this.camera);
-            const elapsed = performance.now() - startTime;
-            Logger.info('Renderer', `Shader pre-compilation complete async (${elapsed.toFixed(1)}ms)`);
-          })
-          .catch((error) => {
-            // Avoid sync fallback in runtime; it can cause multi-second stalls on some drivers/headless runs.
-            Logger.warn('Renderer', `Async shader pre-compilation failed; skipping fallback compile: ${error}`);
-            const elapsed = performance.now() - startTime;
-            Logger.info('Renderer', `Shader pre-compilation skipped fallback (${elapsed.toFixed(1)}ms)`);
-          });
-      } catch (error) {
-        Logger.warn('Renderer', `Async shader pre-compilation threw synchronously; skipping fallback compile: ${error}`);
-        const elapsed = performance.now() - startTime;
-        Logger.info('Renderer', `Shader pre-compilation skipped fallback (${elapsed.toFixed(1)}ms)`);
-      }
-      return;
+    if (!webGpuRenderer && !supportsParallelCompile) {
+      Logger.warn('Renderer', `KHR_parallel_shader_compile unavailable; skipping async shader pre-compilation${reason}`);
+      return 'skipped';
     }
 
-    // No sync fallback: better to pay small first-use shader costs than stall startup hard.
-    Logger.warn('Renderer', 'compileAsync unavailable; skipping synchronous shader pre-compilation');
+    Logger.info('Renderer', `Pre-compiling renderer pipelines${reason}...`);
+    let compilePromise: Promise<unknown>;
+    try {
+      compilePromise = rendererAny.compileAsync(this.scene, this.camera);
+    } catch (error) {
+      Logger.warn('Renderer', `Async shader pre-compilation threw synchronously; skipping fallback compile: ${error}`);
+      return 'failed';
+    }
+
+    compilePromise.catch(() => undefined);
+
+    const completed = timeoutMs > 0
+      ? await Promise.race([
+          compilePromise.then(() => true, () => false),
+          new Promise<'timeout'>((resolve) => {
+            globalThis.setTimeout(() => resolve('timeout'), timeoutMs);
+          }),
+        ])
+      : await compilePromise.then(() => true, () => false);
+
+    if (completed === 'timeout') {
+      Logger.warn('Renderer', `Async shader pre-compilation exceeded ${timeoutMs}ms${reason}; continuing without sync fallback`);
+      return 'timeout';
+    }
+
+    const elapsed = performance.now() - startTime;
+    if (!completed) {
+      Logger.warn('Renderer', `Async shader pre-compilation failed${reason}; skipping fallback compile (${elapsed.toFixed(1)}ms)`);
+      return 'failed';
+    }
+
+    if (options.renderOnce === true) {
+      this.renderer.render(this.scene, this.camera);
+    }
+    this.lastShaderPrecompileCompletedAtMs = performance.now();
+    Logger.info('Renderer', `Shader pre-compilation complete async${reason} (${elapsed.toFixed(1)}ms)`);
+    return 'complete';
+  }
+
+  /**
+   * Fire-and-forget compatibility wrapper for background warmup callers.
+   */
+  precompileShaders(): void {
+    void this.precompileShadersAsync({
+      renderOnce: true,
+      reason: 'background',
+      skipIfCompletedWithinMs: BACKGROUND_SHADER_PRECOMPILE_RECENT_SKIP_MS,
+    });
   }
 
   dispose(): void {

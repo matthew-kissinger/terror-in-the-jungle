@@ -12,7 +12,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { modelLoader } from '../assets/ModelLoader';
 import { StructureModels } from '../assets/modelPaths';
-import { MortarBallistics } from './MortarBallistics';
+import { BallisticTrajectory, MortarBallistics } from './MortarBallistics';
 import { MortarVisuals } from './MortarVisuals';
 import { MortarRoundManager } from './MortarRoundManager';
 import { MortarCamera } from './MortarCamera';
@@ -51,6 +51,12 @@ export class MortarSystem implements GameSystem {
   private ballistics: MortarBallistics;
   private visuals: MortarVisuals;
   private roundManager: MortarRoundManager;
+  private readonly previewVelocity = new THREE.Vector3();
+  private readonly previewTrajectory: BallisticTrajectory = {
+    points: [],
+    landingPoint: new THREE.Vector3(),
+    timeToImpact: 0,
+  };
 
   // Constants
   private readonly FUSE_TIME = 15; // Maximum flight time before auto-detonation
@@ -329,10 +335,12 @@ export class MortarSystem implements GameSystem {
     const velocity = this.ballistics.computeVelocityVector(
       this.pitch,
       this.yaw,
-      this.power
+      this.power,
+      this.previewVelocity
     );
 
-    const trajectory = this.ballistics.computeTrajectory(
+    const trajectory = this.ballistics.computeTrajectoryInto(
+      this.previewTrajectory,
       _deployPos,
       velocity,
       (x, z) => this.getGroundHeight(x, z)

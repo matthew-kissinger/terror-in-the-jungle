@@ -61,6 +61,7 @@ const _leadPos = new THREE.Vector3();
 const _tracerStart = new THREE.Vector3();
 const _tracerEnd = new THREE.Vector3();
 const _dir = new THREE.Vector3();
+const _shotRay = new THREE.Ray();
 
 const SCAN_INTERVAL = 0.5; // seconds between target scans
 const MIN_TARGET_ALTITUDE = 10; // only shoot at helicopters above this height
@@ -291,13 +292,14 @@ export class AAEmplacementSystem implements GameSystem {
       // Tracer from AA position to predicted target
       _tracerStart.copy(_aaPos);
       _tracerStart.y += 1.5; // gun barrel height
-      _tracerEnd.copy(_tracerStart).add(_dir.clone().multiplyScalar(Math.min(dist + 50, emp.config.range)));
+      _tracerEnd.copy(_tracerStart).addScaledVector(_dir, Math.min(dist + 50, emp.config.range));
 
       this.tracerPool.spawn(_tracerStart, _tracerEnd, 250);
 
       // Check hit (simplified: ray vs helicopter sphere)
-      const ray = new THREE.Ray(_tracerStart.clone(), _dir.clone());
-      const hit = this.helicopterModel.checkRayHit(ray, emp.config.range);
+      _shotRay.origin.copy(_tracerStart);
+      _shotRay.direction.copy(_dir);
+      const hit = this.helicopterModel.checkRayHit(_shotRay, emp.config.range);
       if (hit) {
         this.helicopterModel.applyDamage(hit.heliId, emp.config.damage);
       }

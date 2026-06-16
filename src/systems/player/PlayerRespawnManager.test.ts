@@ -1307,9 +1307,9 @@ describe('PlayerRespawnManager', () => {
       }
     });
 
-    it('auto-confirms initial deploy when perf diagnostics are enabled', async () => {
+    it('auto-confirms initial deploy when perf harness access is enabled', async () => {
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
-      (globalThis as any).__ENABLE_PERF_DIAGNOSTICS__ = true;
+      (globalThis as any).__ENABLE_PERF_HARNESS__ = true;
       try {
         const deployPromise = respawnManager.beginInitialDeploy();
 
@@ -1321,7 +1321,7 @@ describe('PlayerRespawnManager', () => {
         expect(mockDeployScreen.hide).toHaveBeenCalled();
         expect(mockPlayerController.setPosition).not.toHaveBeenCalled();
       } finally {
-        delete (globalThis as any).__ENABLE_PERF_DIAGNOSTICS__;
+        delete (globalThis as any).__ENABLE_PERF_HARNESS__;
         randomSpy.mockRestore();
       }
     });

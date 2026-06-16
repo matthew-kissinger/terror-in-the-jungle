@@ -4,11 +4,17 @@
 import * as THREE from 'three';
 import { BallisticTrajectory } from './MortarBallistics';
 
+const INITIAL_TRAJECTORY_POINT_CAPACITY = 128;
+const _landingScratch = new THREE.Vector3();
+
 export class MortarVisuals {
   private scene: THREE.Scene;
   private trajectoryLine?: THREE.Line;
   private landingIndicator?: THREE.Mesh;
   private damageRing?: THREE.Mesh;
+  private trajectoryPositions = new Float32Array(INITIAL_TRAJECTORY_POINT_CAPACITY * 3);
+  private trajectoryLineDistances = new Float32Array(INITIAL_TRAJECTORY_POINT_CAPACITY);
+  private trajectoryCapacity = INITIAL_TRAJECTORY_POINT_CAPACITY;
 
   private readonly DAMAGE_RADIUS = 20; // Match explosion radius
 
@@ -20,6 +26,9 @@ export class MortarVisuals {
 
   private createTrajectoryLine(): void {
     const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.trajectoryPositions, 3));
+    geometry.setAttribute('lineDistance', new THREE.BufferAttribute(this.trajectoryLineDistances, 1));
+    geometry.setDrawRange(0, 0);
     const material = new THREE.LineDashedMaterial({
       color: 0xff8800,
       linewidth: 2,
@@ -81,21 +90,64 @@ export class MortarVisuals {
    */
   updateTrajectory(trajectory: BallisticTrajectory): void {
     if (!this.trajectoryLine) return;
+    const pointCount = trajectory.pointCount ?? trajectory.points.length;
+    if (pointCount <= 0) return;
+    this.ensureTrajectoryCapacity(pointCount);
 
-    // Update line geometry
-    const geometry = new THREE.BufferGeometry().setFromPoints(trajectory.points);
-    this.trajectoryLine.geometry.dispose();
-    this.trajectoryLine.geometry = geometry;
-    this.trajectoryLine.computeLineDistances(); // Required for dashed lines
+    const geometry = this.trajectoryLine.geometry as THREE.BufferGeometry;
+    const positions = this.trajectoryPositions;
+    const lineDistances = this.trajectoryLineDistances;
+    let previousX = 0;
+    let previousY = 0;
+    let previousZ = 0;
+    let cumulativeDistance = 0;
+    for (let i = 0; i < pointCount; i++) {
+      const point = trajectory.points[i];
+      const i3 = i * 3;
+      positions[i3] = point.x;
+      positions[i3 + 1] = point.y;
+      positions[i3 + 2] = point.z;
+      if (i > 0) {
+        const dx = point.x - previousX;
+        const dy = point.y - previousY;
+        const dz = point.z - previousZ;
+        cumulativeDistance += Math.sqrt(dx * dx + dy * dy + dz * dz);
+      }
+      lineDistances[i] = cumulativeDistance;
+      previousX = point.x;
+      previousY = point.y;
+      previousZ = point.z;
+    }
+    geometry.setDrawRange(0, pointCount);
+    const positionAttribute = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const lineDistanceAttribute = geometry.getAttribute('lineDistance') as THREE.BufferAttribute;
+    positionAttribute.needsUpdate = true;
+    lineDistanceAttribute.needsUpdate = true;
 
     // Update landing indicator position
     if (this.landingIndicator && this.damageRing) {
-      const landingPos = trajectory.landingPoint.clone();
-      landingPos.y += 0.1; // Slightly above ground to prevent z-fighting
+      _landingScratch.copy(trajectory.landingPoint);
+      _landingScratch.y += 0.1; // Slightly above ground to prevent z-fighting
 
-      this.landingIndicator.position.copy(landingPos);
-      this.damageRing.position.copy(landingPos);
+      this.landingIndicator.position.copy(_landingScratch);
+      this.damageRing.position.copy(_landingScratch);
     }
+  }
+
+  private ensureTrajectoryCapacity(pointCount: number): void {
+    if (pointCount <= this.trajectoryCapacity || !this.trajectoryLine) return;
+
+    let nextCapacity = this.trajectoryCapacity;
+    while (nextCapacity < pointCount) {
+      nextCapacity *= 2;
+    }
+    this.trajectoryPositions = new Float32Array(nextCapacity * 3);
+    this.trajectoryLineDistances = new Float32Array(nextCapacity);
+    this.trajectoryCapacity = nextCapacity;
+
+    const geometry = this.trajectoryLine.geometry as THREE.BufferGeometry;
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.trajectoryPositions, 3));
+    geometry.setAttribute('lineDistance', new THREE.BufferAttribute(this.trajectoryLineDistances, 1));
   }
 
   /**

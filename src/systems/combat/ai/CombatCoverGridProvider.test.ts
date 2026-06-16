@@ -69,6 +69,20 @@ describe('CombatCoverGridProvider', () => {
     expect(provider.indexedCount).toBeGreaterThanOrEqual(2)
   })
 
+  it('returns a clone so the engage consumer cannot mutate indexed cover', () => {
+    const offered = spot(4, 0, 4)
+    const coverSystem = makeCoverSystem([offered])
+    const provider = new CombatCoverGridProvider(coverSystem, 30, nowProvider)
+    provider.setTerrainRuntime(mockTerrainRuntime())
+
+    const first = provider.queryWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(30, 0, 0))
+    first!.set(999, 999, 999)
+    const second = provider.queryWithLOS(new THREE.Vector3(0, 0, 0), new THREE.Vector3(30, 0, 0))
+
+    expect(second).not.toBeNull()
+    expect(second!.distanceTo(offered.position)).toBeLessThan(0.001)
+  })
+
   it('only returns cover the cover system actually offered (never invents cover)', () => {
     const offered = spot(4, 0, 4)
     const coverSystem = makeCoverSystem([offered])

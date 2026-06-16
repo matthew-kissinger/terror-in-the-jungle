@@ -126,6 +126,7 @@ const _up = new THREE.Vector3();
 const _rocketVel = new THREE.Vector3();
 const _tracerEnd = new THREE.Vector3();
 const _aimDir = new THREE.Vector3();
+const _shotRay = new THREE.Ray();
 
 export class HelicopterWeaponSystem {
   private scene: THREE.Scene;
@@ -141,6 +142,8 @@ export class HelicopterWeaponSystem {
   private grenadeSystem?: GrenadeSystem;
   private audioManager?: IAudioManager;
   private hudSystem?: IHUDSystem;
+  private currentHitscanDamage = 0;
+  private readonly hitscanDamageResolver = (): number => this.currentHitscanDamage;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -420,6 +423,7 @@ export class HelicopterWeaponSystem {
     faction: Faction,
   ): void {
     const interval = 1 / weapon.config.fireRate;
+    this.currentHitscanDamage = weapon.config.damage;
 
     // Accumulator: fire every round whose interval fits in the dt budget. The
     // caller (advanceCooldown) has already debited this frame's dt and floored
@@ -447,11 +451,11 @@ export class HelicopterWeaponSystem {
       this.applySpread(_forward, weapon.config.spreadDeg ?? 0);
 
       // Raycast against combatants
-      const ray = new THREE.Ray(_mountWorld.clone(), _forward.clone());
+      _shotRay.origin.copy(_mountWorld);
+      _shotRay.direction.copy(_forward);
       if (this.combatantSystem) {
-        const dmg = weapon.config.damage;
         // Pass the owning faction so friend-or-foe filtering only damages enemies.
-        const result = this.combatantSystem.handlePlayerShot(ray, () => dmg, 'helicopter_minigun', faction);
+        const result = this.combatantSystem.handlePlayerShot(_shotRay, this.hitscanDamageResolver, 'helicopter_minigun', faction);
 
         if (result.hit) {
           // Impact effect
@@ -476,20 +480,24 @@ export class HelicopterWeaponSystem {
         const tracerInterval = weapon.config.tracerInterval ?? 3;
         if (weapon.roundsSinceTracer >= tracerInterval) {
           weapon.roundsSinceTracer = 0;
-          _tracerEnd.copy(result.hit ? result.point : _mountWorld.clone().addScaledVector(_forward, MAX_TRACER_RANGE));
-          this.tracerPool.spawn(_mountWorld.clone(), _tracerEnd.clone(), 120);
+          if (result.hit) {
+            _tracerEnd.copy(result.point);
+          } else {
+            _tracerEnd.copy(_mountWorld).addScaledVector(_forward, MAX_TRACER_RANGE);
+          }
+          this.tracerPool.spawn(_mountWorld, _tracerEnd, 120);
         }
       }
 
       // Muzzle flash (throttled)
       if (this.muzzleFlashAccumulator >= MUZZLE_FLASH_THROTTLE) {
         this.muzzleFlashAccumulator = 0;
-        this.muzzleFlashSystem.spawnNPC(_mountWorld.clone(), _forward.clone(), 1.5, MuzzleFlashVariant.RIFLE);
+        this.muzzleFlashSystem.spawnNPC(_mountWorld, _forward, 1.5, MuzzleFlashVariant.RIFLE);
       }
 
       // Audio (throttled: play sound at ~10/sec, matching muzzle flash)
       if (this.audioManager && weapon.roundsSinceTracer === 0) {
-        this.audioManager.play('minigunBurst', _mountWorld.clone());
+        this.audioManager.play('minigunBurst', _mountWorld);
       }
     }
   }
@@ -522,11 +530,11 @@ export class HelicopterWeaponSystem {
     _rocketVel.copy(_forward).multiplyScalar(speed);
 
     // Spawn projectile via GrenadeSystem (handles physics, collision, explosion)
-    this.grenadeSystem.spawnProjectile(_mountWorld.clone(), _rocketVel.clone(), 10.0, 'helicopter_rocket');
+    this.grenadeSystem.spawnProjectile(_mountWorld, _rocketVel, 10.0, 'helicopter_rocket');
 
     // Audio
     if (this.audioManager) {
-      this.audioManager.play('rocketLaunch', _mountWorld.clone());
+      this.audioManager.play('rocketLaunch', _mountWorld);
     }
 
     // HUD feedback

@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
 import { WorldFeatureSystem } from './WorldFeatureSystem';
 import { modelLoader } from '../assets/ModelLoader';
-import { BuildingModels, GroundVehicleModels } from '../assets/modelPaths';
+import { BuildingModels, GroundVehicleModels, StructureModels } from '../assets/modelPaths';
 
 vi.mock('../assets/ModelLoader', () => ({
   modelLoader: {
@@ -32,6 +32,33 @@ vi.mock('../assets/ModelLoader', () => ({
 
 function flushPromises(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function collectMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      meshes.push(child);
+    }
+  });
+  return meshes;
+}
+
+function makeNamedMockModel(name: string): THREE.Group {
+  const group = new THREE.Group();
+  group.name = name;
+  const left = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 1, 2),
+    new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.8, metalness: 0.1 }),
+  );
+  left.position.x = -1.5;
+  const right = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 1, 2),
+    new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.8, metalness: 0.1 }),
+  );
+  right.position.x = 1.5;
+  group.add(left, right);
+  return group;
 }
 
 describe('WorldFeatureSystem', () => {
@@ -269,7 +296,7 @@ describe('WorldFeatureSystem', () => {
     expect(meshCount).toBe(1);
   });
 
-  it('registers M151 placements as ground vehicles without batching their meshes', async () => {
+  it('registers M151 placements as ground vehicles with optimized static body meshes', async () => {
     const vehicleManager = {
       register: vi.fn(),
       unregister: vi.fn(),
@@ -303,6 +330,7 @@ describe('WorldFeatureSystem', () => {
     expect(vehicle.category).toBe('ground');
     expect(vehicle.hasFreeSeats('pilot')).toBe(true);
     expect(vehicle.getPosition().y).toBeCloseTo(5.45);
+    expect(scene.children.some((child) => child.userData.perfCategory === 'ground_vehicles')).toBe(true);
     expect(terrainManager.registerCollisionObject).toHaveBeenCalledWith(
       'test_motor_pool_m151',
       expect.any(Object),
@@ -319,7 +347,7 @@ describe('WorldFeatureSystem', () => {
         }
       }
     });
-    expect(meshCount).toBe(2);
+    expect(meshCount).toBe(1);
     expect(frozenMeshCount).toBe(0);
 
     currentConfig = {
@@ -365,11 +393,68 @@ describe('WorldFeatureSystem', () => {
     expect(vehicle.vehicleId).toBe('test_motor_pool_m35');
     expect(vehicle.category).toBe('ground');
     expect(vehicle.hasFreeSeats('pilot')).toBe(true);
+    const placed = scene.children.find((child) => child.userData.worldFeatureGroundVehicleId === 'test_motor_pool_m35');
+    expect(placed).toBeDefined();
+    expect(placed?.userData.perfCategory).toBe('ground_vehicles');
+    expect(collectMeshes(placed as THREE.Object3D)).toHaveLength(1);
+    expect(placed?.userData.groundVehicleDrawCallOptimization).toMatchObject({
+      sourceMeshCount: 2,
+      mergedMeshCount: 1,
+    });
     expect(terrainManager.registerCollisionObject).toHaveBeenCalledWith(
       'test_motor_pool_m35',
       expect.any(Object),
       { dynamic: true },
     );
+  });
+
+  it('distance-culls dynamic support vehicles without unregistering them', async () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
+    camera.position.set(0, 30, 0);
+    system = new WorldFeatureSystem(scene, camera);
+    system.setTerrainManager(terrainManager);
+    const vehicleManager = {
+      register: vi.fn(),
+      unregister: vi.fn(),
+    };
+    system.setVehicleManager(vehicleManager as any);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'near_motor_pool',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, 0),
+          staticPlacements: [{ id: 'm35', modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(0, 0, 0) }],
+        },
+        {
+          id: 'far_motor_pool',
+          kind: 'village',
+          position: new THREE.Vector3(1600, 0, 0),
+          staticPlacements: [{ id: 'm35', modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(0, 0, 0) }],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    system.update(0.016);
+
+    const near = scene.children.find((child) => child.userData.worldFeatureGroundVehicleId === 'near_motor_pool_m35');
+    const far = scene.children.find((child) => child.userData.worldFeatureGroundVehicleId === 'far_motor_pool_m35');
+    expect(vehicleManager.register).toHaveBeenCalledTimes(2);
+    expect(near?.visible).toBe(true);
+    expect(far?.visible).toBe(false);
+
+    camera.position.set(1600, 30, 0);
+    system.update(0.016);
+
+    expect(near?.visible).toBe(false);
+    expect(far?.visible).toBe(true);
+    expect(vehicleManager.unregister).not.toHaveBeenCalled();
   });
 
   it('batches compatible static placements across features in the same culling sector', async () => {
@@ -504,6 +589,50 @@ describe('WorldFeatureSystem', () => {
     expect(far?.visible).toBe(true);
   });
 
+  it('skips static feature frustum refresh while camera pose is unchanged', async () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
+    camera.position.set(0, 30, 0);
+    camera.lookAt(0, 20, -100);
+    camera.updateMatrixWorld(true);
+    system = new WorldFeatureSystem(scene, camera);
+    system.setTerrainManager(terrainManager);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'static_visibility_feature',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, -500),
+          staticPlacements: [
+            {
+              modelPath: 'static_visibility.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    const frustumSpy = vi.spyOn(THREE.Frustum.prototype, 'setFromProjectionMatrix');
+    frustumSpy.mockClear();
+
+    system.update(0.016);
+
+    expect(frustumSpy).not.toHaveBeenCalled();
+
+    camera.position.x += 2;
+    camera.updateMatrixWorld(true);
+    system.update(0.016);
+
+    expect(frustumSpy).toHaveBeenCalledTimes(1);
+    frustumSpy.mockRestore();
+  });
+
   it('frustum-culls distant static feature sectors that are behind the camera', async () => {
     const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
     camera.position.set(0, 30, 0);
@@ -553,5 +682,134 @@ describe('WorldFeatureSystem', () => {
 
     expect(front?.visible).toBe(true);
     expect(rear?.visible).toBe(false);
+  });
+
+  it('uses optimized static content bounds for sector frustum culling', async () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
+    camera.position.set(0, 30, 0);
+    camera.lookAt(0, 20, -100);
+    camera.updateMatrixWorld(true);
+    system = new WorldFeatureSystem(scene, camera);
+    system.setTerrainManager(terrainManager);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'large_footprint_rear_base',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, 500),
+          footprint: { shape: 'circle', radius: 700 },
+          staticPlacements: [
+            {
+              modelPath: 'rear_base.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    system.update(0.016);
+
+    const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
+    const sector = root.children.find((child) => child.name.startsWith('WorldFeatureSector_'));
+    expect(sector?.visible).toBe(false);
+
+    camera.lookAt(0, 20, 500);
+    camera.updateMatrixWorld(true);
+    system.update(0.016);
+
+    expect(sector?.visible).toBe(true);
+  });
+
+  it('close-culls micro-detail props without hiding the containing feature sector', async () => {
+    const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
+    camera.position.set(0, 30, 0);
+    camera.lookAt(0, 10, -150);
+    camera.updateMatrixWorld(true);
+    system = new WorldFeatureSystem(scene, camera);
+    system.setTerrainManager(terrainManager);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    vi.mocked(modelLoader.loadModel)
+      .mockResolvedValueOnce(makeNamedMockModel(BuildingModels.BUNKER_NVA))
+      .mockResolvedValueOnce(makeNamedMockModel(StructureModels.SUPPLY_CRATE));
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'detail_lod_bunker',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, -150),
+          staticPlacements: [
+            {
+              id: 'bunker',
+              modelPath: BuildingModels.BUNKER_NVA,
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+            {
+              id: 'supply',
+              modelPath: StructureModels.SUPPLY_CRATE,
+              offset: new THREE.Vector3(6, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    system.update(0.016);
+
+    const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
+    const sector = root.children.find((child) => child.name.startsWith('WorldFeatureSector_')) as THREE.Group;
+    const detail = root.getObjectByName(StructureModels.SUPPLY_CRATE) as THREE.Group;
+    expect(sector.visible).toBe(true);
+    expect(detail.visible).toBe(false);
+    expect(detail.userData.worldFeatureDetailRenderDistanceM).toBe(110);
+    expect(collectMeshes(detail)).toHaveLength(1);
+
+    camera.position.set(0, 30, -55);
+    camera.lookAt(0, 10, -150);
+    camera.updateMatrixWorld(true);
+    system.update(0.016);
+
+    expect(detail.visible).toBe(true);
+    const worldPositionSpy = vi.spyOn(detail, 'getWorldPosition');
+
+    let detailVisible = detail.visible;
+    let visibleWrites = 0;
+    Object.defineProperty(detail, 'visible', {
+      configurable: true,
+      get: () => detailVisible,
+      set: (value: boolean) => {
+        visibleWrites++;
+        detailVisible = value;
+      },
+    });
+    const hypot = vi.spyOn(Math, 'hypot');
+
+    system.update(0.016);
+
+    expect(hypot).not.toHaveBeenCalled();
+    expect(visibleWrites).toBe(0);
+    expect(detail.visible).toBe(true);
+
+    camera.position.set(0, 30, 0);
+    camera.lookAt(0, 10, -150);
+    camera.updateMatrixWorld(true);
+    system.update(0.016);
+
+    expect(detail.visible).toBe(false);
+    expect(visibleWrites).toBe(1);
+    expect(worldPositionSpy).not.toHaveBeenCalled();
+    worldPositionSpy.mockRestore();
+    hypot.mockRestore();
   });
 });

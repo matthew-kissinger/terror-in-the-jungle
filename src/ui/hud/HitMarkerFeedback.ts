@@ -8,10 +8,37 @@
 import { zIndex } from '../design/tokens';
 
 type HitMarkerType = 'hit' | 'headshot' | 'kill';
+type ScreenFlashType = Exclude<HitMarkerType, 'hit'>;
+
+const HIT_MARKER_CLASS_BY_TYPE: Record<HitMarkerType, string> = {
+  hit: 'hit-marker-cross hit-marker-hit',
+  headshot: 'hit-marker-cross hit-marker-headshot',
+  kill: 'hit-marker-cross hit-marker-kill',
+};
+
+const HIT_MARKER_DURATION_MS_BY_TYPE: Record<HitMarkerType, number> = {
+  hit: 300,
+  headshot: 350,
+  kill: 400,
+};
+
+const SCREEN_FLASH_CLASS_BY_TYPE: Record<ScreenFlashType, string> = {
+  headshot: 'vignette-headshot',
+  kill: 'vignette-kill',
+};
+
+const SCREEN_FLASH_DURATION_MS_BY_TYPE: Record<ScreenFlashType, number> = {
+  headshot: 350,
+  kill: 400,
+};
 
 export class HitMarkerFeedback {
   private container: HTMLDivElement;
   private vignetteOverlay: HTMLDivElement;
+  private markerPool: HTMLDivElement[] = [];
+  private markerTimeouts = new Map<HTMLDivElement, number>();
+  private vignetteTimer?: number;
+  private readonly MARKER_POOL_SIZE = 16;
 
   constructor() {
     // Create hit marker container
@@ -43,6 +70,46 @@ export class HitMarkerFeedback {
     `;
 
     this.injectStyles();
+
+    for (let i = 0; i < this.MARKER_POOL_SIZE; i++) {
+      this.markerPool.push(this.createMarkerElement());
+    }
+  }
+
+  private createMarkerElement(): HTMLDivElement {
+    const marker = document.createElement('div');
+    marker.className = 'hit-marker-cross';
+    return marker;
+  }
+
+  private acquireMarker(): HTMLDivElement {
+    const pooled = this.markerPool.pop();
+    if (pooled) {
+      return pooled;
+    }
+
+    const oldestActiveMarker = this.markerTimeouts.keys().next().value;
+    if (oldestActiveMarker) {
+      this.releaseMarker(oldestActiveMarker);
+      return this.markerPool.pop() ?? oldestActiveMarker;
+    }
+
+    return this.createMarkerElement();
+  }
+
+  private releaseMarker(marker: HTMLDivElement): void {
+    const timeoutId = this.markerTimeouts.get(marker);
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+      this.markerTimeouts.delete(marker);
+    }
+
+    marker.remove();
+    marker.className = 'hit-marker-cross';
+
+    if (this.markerPool.length < this.MARKER_POOL_SIZE) {
+      this.markerPool.push(marker);
+    }
   }
 
   private injectStyles(): void {
@@ -222,9 +289,8 @@ export class HitMarkerFeedback {
    * Show hit marker with enhanced animations
    */
   showHitMarker(type: HitMarkerType = 'hit'): void {
-    // Create marker element
-    const marker = document.createElement('div');
-    marker.className = `hit-marker-cross hit-marker-${type}`;
+    const marker = this.acquireMarker();
+    marker.className = HIT_MARKER_CLASS_BY_TYPE[type];
 
     this.container.appendChild(marker);
 
@@ -234,32 +300,32 @@ export class HitMarkerFeedback {
     }
 
     // Remove after animation completes
-    const duration = type === 'kill' ? 400 : type === 'headshot' ? 350 : 300;
-    setTimeout(() => {
-      if (marker.parentNode) {
-        marker.parentNode.removeChild(marker);
-      }
+    const duration = HIT_MARKER_DURATION_MS_BY_TYPE[type];
+    const timeoutId = window.setTimeout(() => {
+      this.releaseMarker(marker);
     }, duration);
+    this.markerTimeouts.set(marker, timeoutId);
   }
 
   /**
    * Show screen flash effect
    */
-  private showScreenFlash(type: 'headshot' | 'kill'): void {
+  private showScreenFlash(type: ScreenFlashType): void {
+    if (this.vignetteTimer !== undefined) {
+      window.clearTimeout(this.vignetteTimer);
+      this.vignetteTimer = undefined;
+    }
+
     // Reset classes
     this.vignetteOverlay.className = 'hit-feedback-vignette';
 
-    // Add appropriate class
-    if (type === 'kill') {
-      this.vignetteOverlay.classList.add('vignette-kill');
-    } else if (type === 'headshot') {
-      this.vignetteOverlay.classList.add('vignette-headshot');
-    }
+    this.vignetteOverlay.classList.add(SCREEN_FLASH_CLASS_BY_TYPE[type]);
 
     // Remove class after animation
-    const duration = type === 'kill' ? 400 : 350;
-    setTimeout(() => {
+    const duration = SCREEN_FLASH_DURATION_MS_BY_TYPE[type];
+    this.vignetteTimer = window.setTimeout(() => {
       this.vignetteOverlay.className = 'hit-feedback-vignette';
+      this.vignetteTimer = undefined;
     }, duration);
   }
 
@@ -270,6 +336,17 @@ export class HitMarkerFeedback {
   }
 
   dispose(): void {
+    const activeMarkers = Array.from(this.markerTimeouts.keys());
+    for (const marker of activeMarkers) {
+      this.releaseMarker(marker);
+    }
+    this.markerPool.length = 0;
+
+    if (this.vignetteTimer !== undefined) {
+      window.clearTimeout(this.vignetteTimer);
+      this.vignetteTimer = undefined;
+    }
+
     if (this.container.parentElement) {
       this.container.parentElement.removeChild(this.container);
     }

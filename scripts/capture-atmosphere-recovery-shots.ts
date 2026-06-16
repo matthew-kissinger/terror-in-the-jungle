@@ -4,6 +4,7 @@
 
 
 import { chromium, type Page } from 'playwright';
+import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import sharp from 'sharp';
@@ -30,6 +31,8 @@ type ScenarioPlan = {
 
 type CaptureSummary = {
   generatedAt: string;
+  sourceGitSha: string;
+  sourceGitStatus: string[];
   url: string;
   serverMode: string;
   outputDir: string;
@@ -71,6 +74,20 @@ const STARTUP_TIMEOUT_MS = 120_000;
 
 function logStep(msg: string): void {
   console.log(`[${new Date().toISOString()}] ${msg}`);
+}
+
+function gitOutputOrFallback(args: string[], fallback: string): string {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+  } catch {
+    return fallback;
+  }
+}
+
+function gitStatus(): string[] {
+  return gitOutputOrFallback(['status', '--short'], '')
+    .split(/\r?\n/)
+    .filter(Boolean);
 }
 
 function argValue(name: string): string | undefined {
@@ -410,6 +427,9 @@ async function poseAndRender(page: Page, view: ViewPlan): Promise<unknown> {
           activeTerrainTiles: typeof terrain.getActiveTerrainTileCount === 'function'
             ? terrain.getActiveTerrainTileCount()
             : null,
+          tileSelectionSaturated: typeof terrain.wasLastTileSelectionSaturated === 'function'
+            ? Boolean(terrain.wasLastTileSelectionSaturated())
+            : null,
           activeTilesSample: typeof terrain.getActiveTilesForDebug === 'function'
             ? terrain.getActiveTilesForDebug().slice(0, 8)
             : null,
@@ -720,6 +740,8 @@ async function main(): Promise<void> {
   const url = `http://127.0.0.1:${port}/?perf=1&diag=1&uiTransitions=0&logLevel=warn`;
   const summary: CaptureSummary = {
     generatedAt: new Date().toISOString(),
+    sourceGitSha: gitOutputOrFallback(['rev-parse', 'HEAD'], 'unknown'),
+    sourceGitStatus: gitStatus(),
     url,
     serverMode,
     outputDir,

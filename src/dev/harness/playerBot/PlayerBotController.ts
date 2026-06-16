@@ -69,6 +69,9 @@ interface PlayerBotControllerApplyResult {
 const PITCH_LIMIT_RAD = (80 * Math.PI) / 180;
 /** Aim-dot threshold for the fire gate (cos ≈ 0.8 ≈ 37° cone). */
 const FIRE_AIM_DOT_THRESHOLD = 0.8;
+/** Humanized synthetic-camera slew caps, aligned with perf-active-driver.cjs. */
+export const DRIVER_VIEW_MAX_YAW_STEP_RAD = (12 * Math.PI) / 180;
+export const DRIVER_VIEW_MAX_PITCH_STEP_RAD = (4 * Math.PI) / 180;
 
 function clampPitch(pitch: number): number {
   if (!Number.isFinite(pitch)) return 0;
@@ -86,7 +89,7 @@ function wrapYaw(yaw: number): number {
 
 /** Lerp two angles (radians) along the shortest arc. `t` in [0,1]. */
 export function lerpAngle(from: number, to: number, t: number): number {
-  const delta = wrapYaw(to - from);
+  const delta = signedYawDelta(from, to);
   const clamped = Math.max(0, Math.min(1, t));
   return wrapYaw(from + delta * clamped);
 }
@@ -94,6 +97,49 @@ export function lerpAngle(from: number, to: number, t: number): number {
 function lerp(from: number, to: number, t: number): number {
   const c = Math.max(0, Math.min(1, t));
   return from + (to - from) * c;
+}
+
+export function signedYawDelta(fromYaw: number, toYaw: number): number {
+  let delta = Number(toYaw) - Number(fromYaw);
+  if (!Number.isFinite(delta)) return 0;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  return delta;
+}
+
+function clampSigned(value: number, maxAbs: number): number {
+  const limit = Math.max(0, Number(maxAbs) || 0);
+  if (!Number.isFinite(value)) return 0;
+  if (value > limit) return limit;
+  if (value < -limit) return -limit;
+  return value;
+}
+
+export function applyViewSlewLimit(
+  currentYaw: number,
+  currentPitch: number,
+  targetYaw: number,
+  targetPitch: number,
+  limits?: { yaw?: number; pitch?: number },
+): { yaw: number; pitch: number; yawDelta: number; pitchDelta: number; yawClamped: boolean; pitchClamped: boolean } {
+  const yawLimit = Number.isFinite(Number(limits?.yaw))
+    ? Math.max(0, Number(limits?.yaw))
+    : DRIVER_VIEW_MAX_YAW_STEP_RAD;
+  const pitchLimit = Number.isFinite(Number(limits?.pitch))
+    ? Math.max(0, Number(limits?.pitch))
+    : DRIVER_VIEW_MAX_PITCH_STEP_RAD;
+  const yawDelta = signedYawDelta(currentYaw, targetYaw);
+  const pitchDelta = Number(targetPitch) - Number(currentPitch);
+  const clampedYawDelta = clampSigned(yawDelta, yawLimit);
+  const clampedPitchDelta = clampSigned(pitchDelta, pitchLimit);
+  return {
+    yaw: wrapYaw(Number(currentYaw) + clampedYawDelta),
+    pitch: clampPitch(Number(currentPitch) + clampedPitchDelta),
+    yawDelta,
+    pitchDelta,
+    yawClamped: Math.abs(clampedYawDelta - yawDelta) > 1e-9,
+    pitchClamped: Math.abs(clampedPitchDelta - pitchDelta) > 1e-9,
+  };
 }
 
 // Scratch vectors — reused to avoid per-tick allocations.
@@ -129,9 +175,9 @@ export class PlayerBotController {
 
     // Aim — use camera.lookAt() to convert the intent's world-space point
     // into (yaw, pitch) in the Three.js convention, then lerp from our
-    // last-committed angles toward that target. At aimLerpRate=1 this is
-    // an effective snap-to-target (matching the harness default); at
-    // lower rates it's a slew.
+    // last-committed angles toward that target. aimLerpRate=1 requests the
+    // target angle, but the driver still applies per-tick yaw/pitch caps;
+    // lower rates blend before those caps.
     let yawNext = this.lastYaw;
     let pitchNext = this.lastPitch;
     let aimDot: number | undefined;
@@ -162,8 +208,11 @@ export class PlayerBotController {
       camera.rotation.x = savedX;
       camera.rotation.order = prevOrder;
 
-      yawNext = lerpAngle(this.lastYaw, targetYaw, intent.aimLerpRate);
-      pitchNext = clampPitch(lerp(this.lastPitch, targetPitch, intent.aimLerpRate));
+      const desiredYaw = lerpAngle(this.lastYaw, targetYaw, intent.aimLerpRate);
+      const desiredPitch = clampPitch(lerp(this.lastPitch, targetPitch, intent.aimLerpRate));
+      const slewedView = applyViewSlewLimit(this.lastYaw, this.lastPitch, desiredYaw, desiredPitch);
+      yawNext = slewedView.yaw;
+      pitchNext = slewedView.pitch;
       this.target.setViewAngles(yawNext, pitchNext);
       this.lastYaw = yawNext;
       this.lastPitch = pitchNext;

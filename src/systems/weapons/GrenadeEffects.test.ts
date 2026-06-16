@@ -45,6 +45,7 @@ vi.mock('three', async (importOriginal) => {
       return this;
     });
     this.length = vi.fn(() => Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z));
+    this.lengthSq = vi.fn(() => this.x * this.x + this.y * this.y + this.z * this.z);
     this.set = vi.fn(function (xVal: number, yVal: number, zVal: number) {
       this.x = xVal;
       this.y = yVal;
@@ -670,6 +671,24 @@ describe('GrenadeEffects', () => {
       expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 2 NPCs');
     });
 
+    it('should include exact full and partial disorientation boundaries on query provider path', () => {
+      const npcFullEdge = createMockCombatant('npc_full_edge', new THREE.Vector3(15, 0, 0));
+      const npcPartialEdge = createMockCombatant('npc_partial_edge', new THREE.Vector3(25, 0, 0));
+      mockCombatantSystem.combatants.set(npcFullEdge.id, npcFullEdge);
+      mockCombatantSystem.combatants.set(npcPartialEdge.id, npcPartialEdge);
+
+      (mockCombatantSystem as any).querySpatialRadius.mockReturnValue([
+        npcFullEdge.id,
+        npcPartialEdge.id,
+      ]);
+
+      (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
+
+      expect(npcFullEdge.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 3000);
+      expect(npcPartialEdge.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 1500);
+      expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 2 NPCs');
+    });
+
     it('should apply partial disorientation to NPCs between 15-25m (query provider path)', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(16, 0, 0)); // 16m - partial disorient
       mockCombatantSystem.combatants.set(npc1.id, npc1);
@@ -727,6 +746,21 @@ describe('GrenadeEffects', () => {
       expect(npc1.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 3000);
       expect(npc2.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 1500);
       expect(npc3.flashDisorientedUntil).toBeUndefined();
+      expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 2 NPCs');
+    });
+
+    it('should include exact full and partial disorientation boundaries on fallback path', () => {
+      const npcFullEdge = createMockCombatant('npc_full_edge', new THREE.Vector3(15, 0, 0));
+      const npcPartialEdge = createMockCombatant('npc_partial_edge', new THREE.Vector3(25, 0, 0));
+      mockCombatantSystem.combatants.set(npcFullEdge.id, npcFullEdge);
+      mockCombatantSystem.combatants.set(npcPartialEdge.id, npcPartialEdge);
+
+      (mockCombatantSystem as any).querySpatialRadius = undefined;
+
+      (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
+
+      expect(npcFullEdge.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 3000);
+      expect(npcPartialEdge.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 1500);
       expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 2 NPCs');
     });
 

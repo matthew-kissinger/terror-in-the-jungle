@@ -38,6 +38,8 @@ export class CompassSystem implements GameSystem {
   };
 
   private readonly vehicleMarkerState: VehicleMarkerState = createVehicleMarkerState();
+  private lastHeadingText = '000°';
+  private lastRoseTransform = '';
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -70,11 +72,19 @@ export class CompassSystem implements GameSystem {
     while (headingDegrees >= 360) headingDegrees -= 360;
 
     const displayDegrees = Math.round(headingDegrees);
-    this.headingText.textContent = `${displayDegrees.toString().padStart(3, '0')}°`;
+    const headingText = `${displayDegrees.toString().padStart(3, '0')}°`;
+    if (headingText !== this.lastHeadingText) {
+      this.headingText.textContent = headingText;
+      this.lastHeadingText = headingText;
+    }
 
     const pixelsPerDegree = 2;
     const offset = -headingDegrees * pixelsPerDegree + 720;
-    this.compassRose.style.transform = `translate(calc(-50% + ${offset}px), -50%)`;
+    const roseTransform = `translate(calc(-50% + ${offset}px), -50%)`;
+    if (roseTransform !== this.lastRoseTransform) {
+      this.compassRose.style.transform = roseTransform;
+      this.lastRoseTransform = roseTransform;
+    }
 
     if (this.zoneQuery) {
       this.zoneUpdateTimer += deltaTime * 1000;

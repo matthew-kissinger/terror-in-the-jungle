@@ -7,7 +7,7 @@ import { GameSystem } from '../../types';
 import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction, isBlufor } from '../../systems/combat/types';
+import { isBlufor } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 import { FullMapInput } from './FullMapInput';
 import {
@@ -27,34 +27,14 @@ import type { HelipadMarker } from '../minimap/MinimapRenderer';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
-import type { IVehicle } from '../../systems/vehicle/IVehicle';
 import { worldToNorthUpMap, factionMarkerFill } from './MapProjection';
+import { refreshVehicleMarkersFromSource, type VehicleMarker, type VehicleMarkerSource } from './VehicleMarkers';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
 
-/**
- * Drivable vehicle marker rendered on both the minimap and the full
- * map. Defined locally here for now; the sibling minimap task may
- * land its own copy. If both land independently a small follow-up
- * will move this to a shared module.
- */
-export type VehicleMarker = {
-  worldPos: THREE.Vector3;
-  category: 'ground' | 'watercraft' | 'emplacement';
-  faction: Faction;
-  vehicleType: string;
-};
-
-export interface FullMapVehicleSource {
-  getVehiclesByCategory(category: 'ground' | 'watercraft' | 'emplacement'): readonly IVehicle[];
-}
-
-const VEHICLE_MARKER_CATEGORIES: ReadonlyArray<'ground' | 'watercraft' | 'emplacement'> = [
-  'ground',
-  'watercraft',
-  'emplacement',
-];
+export type { VehicleMarker } from './VehicleMarkers';
+export type FullMapVehicleSource = VehicleMarkerSource;
 
 export class FullMapSystem implements GameSystem {
   private camera: THREE.Camera;
@@ -669,19 +649,7 @@ export class FullMapSystem implements GameSystem {
   }
 
   private refreshVehicleMarkers(source: FullMapVehicleSource): void {
-    this.vehicleMarkers.length = 0;
-    for (const category of VEHICLE_MARKER_CATEGORIES) {
-      const vehicles = source.getVehiclesByCategory(category);
-      for (const vehicle of vehicles) {
-        if (vehicle.isDestroyed()) continue;
-        this.vehicleMarkers.push({
-          worldPos: vehicle.getPosition().clone(),
-          category,
-          faction: vehicle.faction,
-          vehicleType: vehicle.vehicleId,
-        });
-      }
-    }
+    refreshVehicleMarkersFromSource(this.vehicleMarkers, source);
   }
 
   private drawCommandMarker(ctx: CanvasRenderingContext2D): void {

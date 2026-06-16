@@ -18,6 +18,8 @@
 import { UIComponent } from '../engine/UIComponent';
 import styles from './TicketDisplay.module.css';
 
+type TicketUrgencyBucket = 'normal' | 'low' | 'critical';
+
 export class TicketDisplay extends UIComponent {
   // --- Reactive state ---
   private usTickets = this.signal(0);
@@ -32,6 +34,19 @@ export class TicketDisplay extends UIComponent {
   /** Threshold below which tickets pulse (conquest only) */
   private readonly LOW_THRESHOLD = 50;
   private readonly CRITICAL_THRESHOLD = 20;
+  private headerEl?: HTMLElement;
+  private usFactionEl?: HTMLElement;
+  private opforFactionEl?: HTMLElement;
+  private usLabelEl?: HTMLElement;
+  private opforLabelEl?: HTMLElement;
+  private usCountEl?: HTMLElement;
+  private opforCountEl?: HTMLElement;
+  private usBleedEl?: HTMLElement;
+  private opforBleedEl?: HTMLElement;
+  private displayedUsTickets = Math.round(this.usTickets.value);
+  private displayedOpforTickets = Math.round(this.opforTickets.value);
+  private urgencyKey = this.getUrgencyKey(this.usTickets.value, this.opforTickets.value);
+  private bleedVisualKey = this.getBleedVisualKey(this.bleedSide.value, this.bleedRate.value);
 
   protected build(): void {
     this.root.className = styles.container;
@@ -52,14 +67,24 @@ export class TicketDisplay extends UIComponent {
   }
 
   protected onMount(): void {
+    this.headerEl = this.$('[data-ref="header"]') ?? undefined;
+    this.usFactionEl = this.$('[data-ref="us-faction"]') ?? undefined;
+    this.opforFactionEl = this.$('[data-ref="opfor-faction"]') ?? undefined;
+    this.usLabelEl = this.$('[data-ref="us-label"]') ?? undefined;
+    this.opforLabelEl = this.$('[data-ref="opfor-label"]') ?? undefined;
+    this.usCountEl = this.$('[data-ref="us-count"]') ?? undefined;
+    this.opforCountEl = this.$('[data-ref="opfor-count"]') ?? undefined;
+    this.usBleedEl = this.$('[data-ref="us-bleed"]') ?? undefined;
+    this.opforBleedEl = this.$('[data-ref="opfor-bleed"]') ?? undefined;
+
     // Effect: update US ticket count
     this.effect(() => {
-      this.text('[data-ref="us-count"]', String(Math.round(this.usTickets.value)));
+      this.setTextIfChanged(this.usCountEl, String(Math.round(this.usTickets.value)));
     });
 
     // Effect: update OPFOR ticket count
     this.effect(() => {
-      this.text('[data-ref="opfor-count"]', String(Math.round(this.opforTickets.value)));
+      this.setTextIfChanged(this.opforCountEl, String(Math.round(this.opforTickets.value)));
     });
 
     // Effect: mode switch (TDM vs standard) + faction labels
@@ -67,18 +92,15 @@ export class TicketDisplay extends UIComponent {
       const tdm = this.isTDM.value;
       const bLabel = this.bluforLabel.value;
       const oLabel = this.opforLabel.value;
-      const header = this.$('[data-ref="header"]');
-      const usLabelEl = this.$('[data-ref="us-label"]');
-      const opforLabelEl = this.$('[data-ref="opfor-label"]');
 
-      if (usLabelEl) usLabelEl.textContent = tdm ? `${bLabel} Kills` : bLabel;
-      if (opforLabelEl) opforLabelEl.textContent = tdm ? `${oLabel} Kills` : oLabel;
+      this.setTextIfChanged(this.usLabelEl, tdm ? `${bLabel} Kills` : bLabel);
+      this.setTextIfChanged(this.opforLabelEl, tdm ? `${oLabel} Kills` : oLabel);
 
-      if (header) {
+      if (this.headerEl) {
         if (tdm) {
-          header.classList.remove(styles.headerHidden);
+          this.headerEl.classList.remove(styles.headerHidden);
         } else {
-          header.classList.add(styles.headerHidden);
+          this.headerEl.classList.add(styles.headerHidden);
         }
       }
     });
@@ -87,7 +109,7 @@ export class TicketDisplay extends UIComponent {
     this.effect(() => {
       const target = this.killTarget.value;
       if (target > 0) {
-        this.text('[data-ref="header"]', `FIRST TO ${target} KILLS`);
+        this.setTextIfChanged(this.headerEl, `FIRST TO ${target} KILLS`);
       }
     });
 
@@ -96,23 +118,21 @@ export class TicketDisplay extends UIComponent {
       const side = this.bleedSide.value;
       const rate = this.bleedRate.value;
       const tdm = this.isTDM.value;
-      const usBleed = this.$('[data-ref="us-bleed"]');
-      const opforBleed = this.$('[data-ref="opfor-bleed"]');
-      if (!usBleed || !opforBleed) return;
+      if (!this.usBleedEl || !this.opforBleedEl) return;
 
       if (tdm || side === null || rate <= 0) {
-        usBleed.textContent = '';
-        opforBleed.textContent = '';
+        this.setTextIfChanged(this.usBleedEl, '');
+        this.setTextIfChanged(this.opforBleedEl, '');
         return;
       }
 
       const arrow = rate >= 2 ? '\u25bc\u25bc' : '\u25bc';
       if (side === 'us') {
-        usBleed.textContent = arrow;
-        opforBleed.textContent = '';
+        this.setTextIfChanged(this.usBleedEl, arrow);
+        this.setTextIfChanged(this.opforBleedEl, '');
       } else {
-        usBleed.textContent = '';
-        opforBleed.textContent = arrow;
+        this.setTextIfChanged(this.usBleedEl, '');
+        this.setTextIfChanged(this.opforBleedEl, arrow);
       }
     });
 
@@ -122,8 +142,6 @@ export class TicketDisplay extends UIComponent {
       const opfor = this.opforTickets.value;
       const tdm = this.isTDM.value;
       const target = this.killTarget.value;
-      const usEl = this.$('[data-ref="us-faction"]');
-      const opforEl = this.$('[data-ref="opfor-faction"]');
 
       if (tdm && target > 0) {
         // TDM: urgency when either team approaches the kill target
@@ -133,26 +151,38 @@ export class TicketDisplay extends UIComponent {
         const imminent = ratio >= 0.9;
         // Highlight the leading team
         const usLeads = us >= opfor;
-        if (usEl) {
-          usEl.classList.toggle(styles.critical, imminent && usLeads);
-          usEl.classList.toggle(styles.low, approaching && !imminent && usLeads);
+        if (this.usFactionEl) {
+          this.usFactionEl.classList.toggle(styles.critical, imminent && usLeads);
+          this.usFactionEl.classList.toggle(styles.low, approaching && !imminent && usLeads);
         }
-        if (opforEl) {
-          opforEl.classList.toggle(styles.critical, imminent && !usLeads);
-          opforEl.classList.toggle(styles.low, approaching && !imminent && !usLeads);
+        if (this.opforFactionEl) {
+          this.opforFactionEl.classList.toggle(styles.critical, imminent && !usLeads);
+          this.opforFactionEl.classList.toggle(styles.low, approaching && !imminent && !usLeads);
         }
       } else {
         // Conquest: low ticket warning
-        if (usEl) {
-          usEl.classList.toggle(styles.critical, us <= this.CRITICAL_THRESHOLD);
-          usEl.classList.toggle(styles.low, us > this.CRITICAL_THRESHOLD && us <= this.LOW_THRESHOLD);
+        if (this.usFactionEl) {
+          this.usFactionEl.classList.toggle(styles.critical, us <= this.CRITICAL_THRESHOLD);
+          this.usFactionEl.classList.toggle(styles.low, us > this.CRITICAL_THRESHOLD && us <= this.LOW_THRESHOLD);
         }
-        if (opforEl) {
-          opforEl.classList.toggle(styles.critical, opfor <= this.CRITICAL_THRESHOLD);
-          opforEl.classList.toggle(styles.low, opfor > this.CRITICAL_THRESHOLD && opfor <= this.LOW_THRESHOLD);
+        if (this.opforFactionEl) {
+          this.opforFactionEl.classList.toggle(styles.critical, opfor <= this.CRITICAL_THRESHOLD);
+          this.opforFactionEl.classList.toggle(styles.low, opfor > this.CRITICAL_THRESHOLD && opfor <= this.LOW_THRESHOLD);
         }
       }
     });
+  }
+
+  protected onUnmount(): void {
+    this.headerEl = undefined;
+    this.usFactionEl = undefined;
+    this.opforFactionEl = undefined;
+    this.usLabelEl = undefined;
+    this.opforLabelEl = undefined;
+    this.usCountEl = undefined;
+    this.opforCountEl = undefined;
+    this.usBleedEl = undefined;
+    this.opforBleedEl = undefined;
   }
 
   // --- Public API ---
@@ -162,6 +192,20 @@ export class TicketDisplay extends UIComponent {
    * Only triggers DOM updates when values actually change (signal dedup).
    */
   setTickets(us: number, opfor: number): void {
+    const nextUsTickets = Math.round(us);
+    const nextOpforTickets = Math.round(opfor);
+    const nextUrgencyKey = this.getUrgencyKey(us, opfor);
+    if (
+      nextUsTickets === this.displayedUsTickets &&
+      nextOpforTickets === this.displayedOpforTickets &&
+      nextUrgencyKey === this.urgencyKey
+    ) {
+      return;
+    }
+
+    this.displayedUsTickets = nextUsTickets;
+    this.displayedOpforTickets = nextOpforTickets;
+    this.urgencyKey = nextUrgencyKey;
     this.usTickets.value = us;
     this.opforTickets.value = opfor;
   }
@@ -172,6 +216,7 @@ export class TicketDisplay extends UIComponent {
   setMode(isTDM: boolean, killTarget: number = 0): void {
     this.isTDM.value = isTDM;
     this.killTarget.value = killTarget;
+    this.urgencyKey = this.getUrgencyKey(this.usTickets.value, this.opforTickets.value, isTDM, killTarget);
   }
 
   /**
@@ -188,7 +233,51 @@ export class TicketDisplay extends UIComponent {
    * Pass null/0 to hide.
    */
   setBleedIndicator(side: 'us' | 'opfor' | null, rate: number = 0): void {
+    const nextBleedVisualKey = this.getBleedVisualKey(side, rate);
+    if (nextBleedVisualKey === this.bleedVisualKey) {
+      return;
+    }
+
+    this.bleedVisualKey = nextBleedVisualKey;
     this.bleedSide.value = side;
     this.bleedRate.value = rate;
+  }
+
+  private getUrgencyKey(
+    us: number,
+    opfor: number,
+    isTDM = this.isTDM.value,
+    killTarget = this.killTarget.value,
+  ): string {
+    if (isTDM && killTarget > 0) {
+      const leadKills = Math.max(us, opfor);
+      const ratio = leadKills / killTarget;
+      const bucket: TicketUrgencyBucket = ratio >= 0.9
+        ? 'critical'
+        : ratio >= 0.75
+          ? 'low'
+          : 'normal';
+      const leader = us >= opfor ? 'us' : 'opfor';
+      return `tdm:${leader}:${bucket}`;
+    }
+
+    return `conquest:${this.getConquestBucket(us)}:${this.getConquestBucket(opfor)}`;
+  }
+
+  private getConquestBucket(tickets: number): TicketUrgencyBucket {
+    if (tickets <= this.CRITICAL_THRESHOLD) return 'critical';
+    if (tickets <= this.LOW_THRESHOLD) return 'low';
+    return 'normal';
+  }
+
+  private getBleedVisualKey(side: 'us' | 'opfor' | null, rate: number): string {
+    if (side === null || rate <= 0) return 'none';
+    return `${side}:${rate >= 2 ? 'double' : 'single'}`;
+  }
+
+  private setTextIfChanged(element: HTMLElement | undefined, text: string): void {
+    if (element && element.textContent !== text) {
+      element.textContent = text;
+    }
   }
 }

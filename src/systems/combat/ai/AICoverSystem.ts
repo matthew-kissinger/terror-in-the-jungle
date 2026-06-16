@@ -76,6 +76,7 @@ export class AICoverSystem {
     this.coverSearchesThisFrame++
 
     const candidates: CoverSpot[] = []
+    const maxSearchRadiusSq = maxSearchRadius * maxSearchRadius
 
     // Get chunks to search
     const chunkKeys = this.getChunksInRadius(combatant.position, maxSearchRadius)
@@ -103,8 +104,8 @@ export class AICoverSystem {
 
     for (const spot of candidates) {
       // Skip if too far
-      const distanceToCover = combatant.position.distanceTo(spot.position)
-      if (distanceToCover > maxSearchRadius) continue
+      const distanceToCoverSq = combatant.position.distanceToSquared(spot.position)
+      if (distanceToCoverSq > maxSearchRadiusSq) continue
 
       // Skip if occupied by someone else
       const coverKey = this.getCoverKey(spot.position)
@@ -121,6 +122,7 @@ export class AICoverSystem {
       }
 
       // Evaluate cover quality against threat
+      const distanceToCover = Math.sqrt(distanceToCoverSq)
       const score = evaluateCoverQuality(
         spot,
         combatant.position,
@@ -176,12 +178,13 @@ export class AICoverSystem {
     maxSearchRadius: number = 30
   ): CoverSpot[] {
     const candidates: CoverSpot[] = []
+    const maxSearchRadiusSq = maxSearchRadius * maxSearchRadius
 
     const chunkKeys = this.getChunksInRadius(origin, maxSearchRadius)
     for (const chunkKey of chunkKeys) {
       const cachedSpots = this.getCachedCoverSpots(chunkKey, origin)
       for (const spot of cachedSpots) {
-        if (origin.distanceTo(spot.position) > maxSearchRadius) continue
+        if (origin.distanceToSquared(spot.position) > maxSearchRadiusSq) continue
         // Clone so the caller (grid) owns a stable position independent of
         // the per-chunk cache, which is rebuilt on its own TTL.
         candidates.push({ ...spot, position: spot.position.clone() })
@@ -196,7 +199,7 @@ export class AICoverSystem {
         maxSearchRadius
       )
       for (const spot of sandbagSpots) {
-        if (origin.distanceTo(spot.position) <= maxSearchRadius) {
+        if (origin.distanceToSquared(spot.position) <= maxSearchRadiusSq) {
           // evaluateSandbagCover hands back pooled Vector3s; copy out and
           // release so the pool stays balanced and the caller owns a clone.
           const pooled = spot.position
@@ -289,10 +292,10 @@ export class AICoverSystem {
     }
 
     // Check if threat has moved significantly
-    const distanceFromCoverToThreat = combatant.coverPosition.distanceTo(threatPosition)
+    const distanceFromCoverToThreatSq = combatant.coverPosition.distanceToSquared(threatPosition)
 
     // If threat is closer to cover than we are to cover, reposition
-    if (distanceFromCoverToThreat < combatant.position.distanceTo(combatant.coverPosition)) {
+    if (distanceFromCoverToThreatSq < combatant.position.distanceToSquared(combatant.coverPosition)) {
       return { effective: false, shouldReposition: true }
     }
 
@@ -312,8 +315,8 @@ export class AICoverSystem {
     const heightAdvantage = Math.max(0, Math.min(1, (coverHeight - threatHeight) / 5))
 
     // Distance score (prefer medium distance)
-    const distance = coverPosition.distanceTo(threatPosition)
-    const distanceScore = distance > 15 && distance < 60 ? 1.0 : 0.5
+    const distanceSq = coverPosition.distanceToSquared(threatPosition)
+    const distanceScore = distanceSq > 225 && distanceSq < 3600 ? 1.0 : 0.5
 
     return (heightAdvantage + distanceScore) / 2
   }

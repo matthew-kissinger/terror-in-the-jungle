@@ -389,6 +389,17 @@ describe('WeaponPickupSystem', () => {
       expect(nearestPickup).toBeUndefined();
     });
 
+    it('should keep the exact pickup-radius boundary out of range', () => {
+      mockPlayerController.getPosition = vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0));
+
+      weaponPickupSystem.spawnPickup(WeaponType.RIFLE, new THREE.Vector3(2, 0, 0));
+
+      weaponPickupSystem.update(0.016);
+
+      const nearestPickup = (weaponPickupSystem as any).nearestPickup;
+      expect(nearestPickup).toBeUndefined();
+    });
+
     it('should find the closest pickup when multiple are in range', () => {
       mockPlayerController.getPosition = vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0));
 

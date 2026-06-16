@@ -70,6 +70,20 @@ export class VehicleManager implements GameSystem {
     return result;
   }
 
+  forEachVehicleInRadius(
+    center: THREE.Vector3,
+    radius: number,
+    visitor: (vehicle: IVehicle) => void,
+  ): void {
+    const radiusSq = radius * radius;
+    for (const vehicle of this.vehicles.values()) {
+      _diff.subVectors(vehicle.getPosition(), center);
+      if (_diff.lengthSq() <= radiusSq) {
+        visitor(vehicle);
+      }
+    }
+  }
+
   getVehiclesByCategory(category: VehicleCategory): IVehicle[] {
     const result: IVehicle[] = [];
     for (const vehicle of this.vehicles.values()) {
@@ -78,6 +92,14 @@ export class VehicleManager implements GameSystem {
       }
     }
     return result;
+  }
+
+  forEachVehicleByCategory(category: VehicleCategory, visitor: (vehicle: IVehicle) => void): void {
+    for (const vehicle of this.vehicles.values()) {
+      if (vehicle.category === category) {
+        visitor(vehicle);
+      }
+    }
   }
 
   getVehicleByOccupant(occupantId: string): IVehicle | null {
@@ -299,6 +321,12 @@ export class VehicleManager implements GameSystem {
 
   getAllVehicles(): IVehicle[] {
     return Array.from(this.vehicles.values());
+  }
+
+  forEachVehicle(visitor: (vehicle: IVehicle) => void): void {
+    for (const vehicle of this.vehicles.values()) {
+      visitor(vehicle);
+    }
   }
 
   getVehicleCount(): number {

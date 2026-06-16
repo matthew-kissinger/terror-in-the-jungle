@@ -15,6 +15,10 @@ export class HUDZoneDisplay {
   private overflowLabel?: HTMLDivElement;
   private dominanceBar?: DominanceBarRefs;
   private playerAlliance: Alliance = Alliance.BLUFOR;
+  private readonly capturableZonesScratch: CaptureZone[] = [];
+  private readonly sortedZonesScratch: CaptureZone[] = [];
+  private readonly visibleZoneIdsScratch: string[] = [];
+  private readonly zoneIdScratch = new Set<string>();
 
   constructor(elements: HUDElements) {
     this.elements = elements;
@@ -26,14 +30,13 @@ export class HUDZoneDisplay {
 
   updateObjectivesDisplay(zoneQuery: IZoneQuery, isTDM: boolean = false, playerPosition?: { x: number; y: number; z: number }): void {
     if (isTDM) {
-      this.elements.objectivesList.style.display = 'none';
+      setDisplay(this.elements.objectivesList, 'none');
       return;
     }
-    this.elements.objectivesList.style.display = 'block';
+    setDisplay(this.elements.objectivesList, 'block');
 
     const zones = zoneQuery.getAllZones();
-    const capturableZones = zones.filter(z => !z.isHomeBase);
-    const zoneIds = capturableZones.map(zone => zone.id);
+    const capturableZones = this.collectCapturableZones(zones);
     const titleElement = this.elements.objectivesList.querySelector('.objectives-title');
 
     // Update zone dominance bar
@@ -60,8 +63,9 @@ export class HUDZoneDisplay {
       this.elements.objectivesList.removeChild(this.emptyStateEl);
     }
 
+    const zoneIds = this.collectZoneIds(capturableZones);
     for (const [zoneId, element] of this.zoneElements.entries()) {
-      if (!zoneIds.includes(zoneId)) {
+      if (!zoneIds.has(zoneId)) {
         if (element.root.parentElement === this.elements.objectivesList) {
           this.elements.objectivesList.removeChild(element.root);
         }
@@ -71,37 +75,38 @@ export class HUDZoneDisplay {
 
     // Priority sort: contested first, then by distance (nearest first)
     const sortedZones = this.prioritySortZones(capturableZones, playerPosition);
-    const visibleZones = sortedZones.slice(0, HUDZoneDisplay.MAX_VISIBLE_ZONES);
-    const hiddenCount = sortedZones.length - visibleZones.length;
-    const visibleIds = visibleZones.map(z => z.id);
+    const visibleIds = this.collectVisibleZoneIds(sortedZones);
+    const hiddenCount = sortedZones.length - visibleIds.length;
 
     // Create/update elements for all zones (keep cached for when they rotate in)
-    capturableZones.forEach(zone => {
+    for (const zone of capturableZones) {
       let zoneElement = this.zoneElements.get(zone.id);
       if (!zoneElement) {
         zoneElement = this.createZoneElement(zone);
         this.zoneElements.set(zone.id, zoneElement);
       }
       this.updateZoneElement(zoneElement, zone, playerPosition);
-    });
+    }
 
     const orderChanged = visibleIds.length !== this.zoneOrder.length
       || visibleIds.some((zoneId, index) => zoneId !== this.zoneOrder[index]);
 
     if (orderChanged) {
-      Array.from(this.elements.objectivesList.children).forEach(child => {
+      const children = this.elements.objectivesList.children;
+      for (let index = children.length - 1; index >= 0; index--) {
+        const child = children[index];
         if (child !== titleElement && child !== this.dominanceBar?.root) {
           this.elements.objectivesList.removeChild(child);
         }
-      });
+      }
 
       const fragment = document.createDocumentFragment();
-      visibleIds.forEach(zoneId => {
+      for (const zoneId of visibleIds) {
         const zoneElement = this.zoneElements.get(zoneId);
         if (zoneElement) {
           fragment.appendChild(zoneElement.root);
         }
-      });
+      }
 
       // Show overflow count when zones are hidden
       if (hiddenCount > 0) {
@@ -109,24 +114,28 @@ export class HUDZoneDisplay {
           this.overflowLabel = document.createElement('div');
           this.overflowLabel.className = 'zone-overflow';
         }
-        this.overflowLabel.textContent = `+${hiddenCount} more zones`;
+        setTextContent(this.overflowLabel, `+${hiddenCount} more zones`);
         fragment.appendChild(this.overflowLabel);
       } else if (this.overflowLabel?.parentElement) {
         this.overflowLabel.parentElement.removeChild(this.overflowLabel);
       }
 
       this.elements.objectivesList.appendChild(fragment);
-      this.zoneOrder = visibleIds;
+      this.copyZoneOrder(visibleIds);
     } else if (hiddenCount > 0 && this.overflowLabel) {
-      this.overflowLabel.textContent = `+${hiddenCount} more zones`;
+      setTextContent(this.overflowLabel, `+${hiddenCount} more zones`);
     }
   }
 
   private prioritySortZones(
-    zones: CaptureZone[],
+    zones: readonly CaptureZone[],
     playerPosition?: { x: number; y: number; z: number }
   ): CaptureZone[] {
-    return zones.slice().sort((a, b) => {
+    this.sortedZonesScratch.length = 0;
+    for (const zone of zones) {
+      this.sortedZonesScratch.push(zone);
+    }
+    this.sortedZonesScratch.sort((a, b) => {
       // Contested zones first (most actionable)
       const aContested = a.state === ZoneState.CONTESTED ? 1 : 0;
       const bContested = b.state === ZoneState.CONTESTED ? 1 : 0;
@@ -152,6 +161,41 @@ export class HUDZoneDisplay {
 
       return 0;
     });
+    return this.sortedZonesScratch;
+  }
+
+  private collectCapturableZones(zones: readonly CaptureZone[]): CaptureZone[] {
+    this.capturableZonesScratch.length = 0;
+    for (const zone of zones) {
+      if (!zone.isHomeBase) {
+        this.capturableZonesScratch.push(zone);
+      }
+    }
+    return this.capturableZonesScratch;
+  }
+
+  private collectZoneIds(zones: CaptureZone[]): Set<string> {
+    this.zoneIdScratch.clear();
+    for (const zone of zones) {
+      this.zoneIdScratch.add(zone.id);
+    }
+    return this.zoneIdScratch;
+  }
+
+  private collectVisibleZoneIds(zones: CaptureZone[]): string[] {
+    this.visibleZoneIdsScratch.length = 0;
+    const visibleCount = Math.min(zones.length, HUDZoneDisplay.MAX_VISIBLE_ZONES);
+    for (let index = 0; index < visibleCount; index++) {
+      this.visibleZoneIdsScratch.push(zones[index].id);
+    }
+    return this.visibleZoneIdsScratch;
+  }
+
+  private copyZoneOrder(visibleIds: string[]): void {
+    this.zoneOrder.length = visibleIds.length;
+    for (let index = 0; index < visibleIds.length; index++) {
+      this.zoneOrder[index] = visibleIds[index];
+    }
   }
 
   private createZoneElement(zone: CaptureZone): ZoneElementRefs {
@@ -223,12 +267,12 @@ export class HUDZoneDisplay {
       const dz = Number(zone.position.z) - Number(playerPosition.z);
       distance = Math.round(Math.hypot(dx, dz));
     }
-    element.nameEl.textContent = zone.name;
-    element.distanceEl.textContent = `${distance}m`;
-    element.iconEl.className = `zone-icon ${zoneClass}`;
+    setTextContent(element.nameEl, zone.name);
+    setTextContent(element.distanceEl, `${distance}m`);
+    setClassName(element.iconEl, `zone-icon ${zoneClass}`);
 
     const statusText = this.getStatusText(zone);
-    element.statusTextEl.textContent = statusText;
+    setTextContent(element.statusTextEl, statusText);
 
     // Tactical status coloring
     element.statusTextEl.classList.toggle('status-losing', statusText === 'LOSING');
@@ -241,18 +285,18 @@ export class HUDZoneDisplay {
 
     const showProgress = zone.state === ZoneState.CONTESTED || (zone.owner === null && zone.captureProgress > 0);
     if (showProgress) {
-      element.progressContainer.style.display = 'block';
-      element.progressBar.style.width = `${zone.captureProgress}%`;
+      setDisplay(element.progressContainer, 'block');
+      setWidth(element.progressBar, `${zone.captureProgress}%`);
       // Color the progress bar contextually
       if (playerOwned) {
-        element.progressBar.className = 'capture-bar capture-bar-losing';
+        setClassName(element.progressBar, 'capture-bar capture-bar-losing');
       } else if (enemyOwned) {
-        element.progressBar.className = 'capture-bar capture-bar-attacking';
+        setClassName(element.progressBar, 'capture-bar capture-bar-attacking');
       } else {
-        element.progressBar.className = 'capture-bar';
+        setClassName(element.progressBar, 'capture-bar');
       }
     } else {
-      element.progressContainer.style.display = 'none';
+      setDisplay(element.progressContainer, 'none');
     }
   }
 
@@ -317,8 +361,8 @@ export class HUDZoneDisplay {
     const bluforPct = (blufor / total) * 100;
     const contestedPct = (contested / total) * 100;
 
-    bar.bluforFill.style.width = `${bluforPct}%`;
-    bar.contestedFill.style.width = `${contestedPct}%`;
+    setWidth(bar.bluforFill, `${bluforPct}%`);
+    setWidth(bar.contestedFill, `${contestedPct}%`);
 
     // Label: show zone counts from player perspective
     const friendly = this.playerAlliance === Alliance.BLUFOR ? blufor : opfor;
@@ -327,7 +371,7 @@ export class HUDZoneDisplay {
     if (friendly > 0) parts.push(`${friendly} HELD`);
     if (contested > 0) parts.push(`${contested} CONTESTED`);
     if (enemy > 0) parts.push(`${enemy} HOSTILE`);
-    bar.label.textContent = parts.join(' \u2022 ');
+    setTextContent(bar.label, parts.join(' \u2022 '));
   }
 
   private getStatusText(zone: CaptureZone): string {
@@ -350,6 +394,22 @@ export class HUDZoneDisplay {
     if (enemyOwned) return 'HOSTILE';
     return 'NEUTRAL';
   }
+}
+
+function setTextContent(element: HTMLElement, text: string): void {
+  if (element.textContent !== text) element.textContent = text;
+}
+
+function setClassName(element: HTMLElement, className: string): void {
+  if (element.className !== className) element.className = className;
+}
+
+function setDisplay(element: HTMLElement, display: string): void {
+  if (element.style.display !== display) element.style.display = display;
+}
+
+function setWidth(element: HTMLElement, width: string): void {
+  if (element.style.width !== width) element.style.width = width;
 }
 
 interface DominanceBarRefs {

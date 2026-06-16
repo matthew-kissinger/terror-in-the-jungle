@@ -93,13 +93,10 @@ export const NPC_CLOSE_MODEL_TARGET_HEIGHT = NPC_SPRITE_HEIGHT;
 export const DEFAULT_MESH_BUCKET_CAPACITY = 512;
 export const MOUNTED_MESH_BUCKET_CAPACITY = 128;
 const NPC_GROUND_MARKER_PERF_CATEGORY = 'npc_ground_markers';
+export { PIXEL_FORGE_NPC_STARTUP_CLIP_IDS } from '../../config/pixelForgeAssets';
+
 // KB-LOAD: allocate only the common startup loops during combat-system init.
-// Other faction/clip pairs are created on demand for the first visible far NPC,
-// keeping unused Pixel Forge atlases out of first reveal.
-export const PIXEL_FORGE_NPC_STARTUP_CLIP_IDS: readonly PixelForgeNpcClipId[] = [
-  'idle',
-  'patrol_walk',
-];
+// Other faction/clip pairs are created on demand for the first visible far NPC.
 const PIXEL_FORGE_NPC_ALL_CLIP_IDS: readonly PixelForgeNpcClipId[] = PIXEL_FORGE_NPC_CLIPS.map((clip) => clip.id);
 
 const OVERFLOW_LOG_INTERVAL_MS = 1000;
@@ -280,6 +277,31 @@ export function getPixelForgeNpcBucketKey(factionKey: Faction | 'SQUAD', clipId:
   return `${factionKey}_${clipId}`;
 }
 
+interface PixelForgeNpcImpostorAttributeSet {
+  phase?: THREE.InstancedBufferAttribute;
+  viewColumn?: THREE.InstancedBufferAttribute;
+  viewRow?: THREE.InstancedBufferAttribute;
+  animationProgress?: THREE.InstancedBufferAttribute;
+  opacity?: THREE.InstancedBufferAttribute;
+}
+
+const pixelForgeNpcImpostorAttributeCache = new WeakMap<THREE.BufferGeometry, PixelForgeNpcImpostorAttributeSet>();
+
+function getPixelForgeNpcImpostorAttributeSet(mesh: THREE.InstancedMesh): PixelForgeNpcImpostorAttributeSet {
+  const cached = pixelForgeNpcImpostorAttributeCache.get(mesh.geometry);
+  if (cached) return cached;
+
+  const attributes = {
+    phase: mesh.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute | undefined,
+    viewColumn: mesh.geometry.getAttribute('instanceViewColumn') as THREE.InstancedBufferAttribute | undefined,
+    viewRow: mesh.geometry.getAttribute('instanceViewRow') as THREE.InstancedBufferAttribute | undefined,
+    animationProgress: mesh.geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute | undefined,
+    opacity: mesh.geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute | undefined,
+  };
+  pixelForgeNpcImpostorAttributeCache.set(mesh.geometry, attributes);
+  return attributes;
+}
+
 export function setPixelForgeNpcImpostorAttributes(
   mesh: THREE.InstancedMesh,
   index: number,
@@ -288,31 +310,47 @@ export function setPixelForgeNpcImpostorAttributes(
   viewRow: number,
   animationProgress = 0,
   opacity = 1,
+  markDirty = true,
 ): void {
-  const phaseAttribute = mesh.geometry.getAttribute('instancePhase') as THREE.InstancedBufferAttribute | undefined;
-  const viewAttribute = mesh.geometry.getAttribute('instanceViewColumn') as THREE.InstancedBufferAttribute | undefined;
-  const viewRowAttribute = mesh.geometry.getAttribute('instanceViewRow') as THREE.InstancedBufferAttribute | undefined;
-  const animationProgressAttribute = mesh.geometry.getAttribute('instanceAnimationProgress') as THREE.InstancedBufferAttribute | undefined;
-  const opacityAttribute = mesh.geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute | undefined;
-  if (phaseAttribute) {
-    phaseAttribute.setX(index, phase);
-    phaseAttribute.needsUpdate = true;
+  const attributes = getPixelForgeNpcImpostorAttributeSet(mesh);
+  if (attributes.phase) {
+    attributes.phase.setX(index, phase);
   }
-  if (viewAttribute) {
-    viewAttribute.setX(index, viewColumn);
-    viewAttribute.needsUpdate = true;
+  if (attributes.viewColumn) {
+    attributes.viewColumn.setX(index, viewColumn);
   }
-  if (viewRowAttribute) {
-    viewRowAttribute.setX(index, viewRow);
-    viewRowAttribute.needsUpdate = true;
+  if (attributes.viewRow) {
+    attributes.viewRow.setX(index, viewRow);
   }
-  if (animationProgressAttribute) {
-    animationProgressAttribute.setX(index, animationProgress);
-    animationProgressAttribute.needsUpdate = true;
+  if (attributes.animationProgress) {
+    attributes.animationProgress.setX(index, animationProgress);
   }
-  if (opacityAttribute) {
-    opacityAttribute.setX(index, opacity);
-    opacityAttribute.needsUpdate = true;
+  if (attributes.opacity) {
+    attributes.opacity.setX(index, opacity);
+  }
+  if (markDirty) {
+    markPixelForgeNpcImpostorAttributesDirty(mesh);
+  }
+}
+
+function markInstancedAttributeDirty(attribute: THREE.InstancedBufferAttribute, activeCount?: number): void {
+  const count = activeCount === undefined
+    ? attribute.count
+    : Math.max(0, Math.min(attribute.count, activeCount));
+  if (count > 0 && typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(0, count * attribute.itemSize);
+  }
+  attribute.needsUpdate = true;
+}
+
+export function markPixelForgeNpcImpostorAttributesDirty(mesh: THREE.InstancedMesh, activeCount?: number): void {
+  const attributes = getPixelForgeNpcImpostorAttributeSet(mesh);
+  if (attributes.phase) markInstancedAttributeDirty(attributes.phase, activeCount);
+  if (attributes.viewColumn) markInstancedAttributeDirty(attributes.viewColumn, activeCount);
+  if (attributes.viewRow) markInstancedAttributeDirty(attributes.viewRow, activeCount);
+  if (attributes.animationProgress) markInstancedAttributeDirty(attributes.animationProgress, activeCount);
+  if (attributes.opacity) {
+    markInstancedAttributeDirty(attributes.opacity, activeCount);
   }
 }
 

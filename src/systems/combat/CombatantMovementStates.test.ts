@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {
   updatePatrolMovement,
   updateCombatMovement,
+  updateAdvancingMovement,
   updateCoverSeekingMovement,
   updateRetreatingMovement,
   updateDefendingMovement,
@@ -28,7 +29,9 @@ vi.mock('three', () => ({
     subVectors(a: any, b: any) { this.x = a.x - b.x; this.y = a.y - b.y; this.z = a.z - b.z; return this; }
     normalize() { const l = Math.sqrt(this.x ** 2 + this.y ** 2 + this.z ** 2); if (l > 0) { this.x /= l; this.y /= l; this.z /= l; } return this; }
     length() { return Math.sqrt(this.x ** 2 + this.y ** 2 + this.z ** 2); }
+    lengthSq() { return this.x ** 2 + this.y ** 2 + this.z ** 2; }
     distanceTo(v: any) { return Math.sqrt((this.x - v.x) ** 2 + (this.y - v.y) ** 2 + (this.z - v.z) ** 2); }
+    distanceToSquared(v: any) { return (this.x - v.x) ** 2 + (this.y - v.y) ** 2 + (this.z - v.z) ** 2; }
     multiplyScalar(s: number) { this.x *= s; this.y *= s; this.z *= s; return this; }
   }
 }));
@@ -331,6 +334,26 @@ describe('CombatantMovementStates', () => {
       expect(zoneManager.getAllZones).not.toHaveBeenCalled();
       expect(combatant.lastZoneEvalTime).toBe(9000);
     });
+
+    it('keeps the exact destination-arrival boundary moving instead of re-evaluating', () => {
+      const combatant = createCombatant({
+        squadRole: 'leader',
+        destinationPoint: new THREE.Vector3(15, 0, 0),
+        lastZoneEvalTime: 9000
+      });
+      const zoneManager = { getAllZones: vi.fn(() => []) };
+
+      performanceNowSpy = vi.spyOn(performance, 'now').mockReturnValue(10000);
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+
+      updatePatrolMovement(combatant, 0.016, new Map(), new Map(), {
+        zoneManager: zoneManager as any,
+        getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
+      });
+
+      expect(zoneManager.getAllZones).not.toHaveBeenCalled();
+      expect(combatant.velocity.length()).toBeGreaterThan(0);
+    });
   });
 
   describe('updateCombatMovement', () => {
@@ -383,6 +406,26 @@ describe('CombatantMovementStates', () => {
     });
   });
 
+  describe('updateAdvancingMovement', () => {
+    it('sets velocity to zero when no anchor exists', () => {
+      const combatant = createCombatant({ destinationPoint: undefined, target: undefined, velocity: new THREE.Vector3(5, 0, 0) });
+      updateAdvancingMovement(combatant);
+      expect(combatant.velocity.length()).toBe(0);
+    });
+
+    it('stops just inside the committed advance destination arrival radius', () => {
+      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(2.9, 0, 0), velocity: new THREE.Vector3(5, 0, 0) });
+      updateAdvancingMovement(combatant);
+      expect(combatant.velocity.length()).toBe(0);
+    });
+
+    it('keeps moving at the exact committed advance destination arrival boundary', () => {
+      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(3, 0, 0) });
+      updateAdvancingMovement(combatant);
+      expect(combatant.velocity.length()).toBeGreaterThan(0);
+    });
+  });
+
   describe('updateCoverSeekingMovement', () => {
     it('sets velocity to zero when no destination', () => {
       const combatant = createCombatant({ destinationPoint: undefined, velocity: new THREE.Vector3(5, 0, 5) });
@@ -394,6 +437,12 @@ describe('CombatantMovementStates', () => {
       const combatant = createCombatant({ destinationPoint: new THREE.Vector3(1, 0, 0) });
       updateCoverSeekingMovement(combatant);
       expect(combatant.velocity.length()).toBe(0);
+    });
+
+    it('keeps moving at the exact cover arrival boundary', () => {
+      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(2, 0, 0) });
+      updateCoverSeekingMovement(combatant);
+      expect(combatant.velocity.length()).toBeGreaterThan(0);
     });
 
     it('moves toward destination at COVER_SEEKING_SPEED when not arrived', () => {
@@ -432,6 +481,17 @@ describe('CombatantMovementStates', () => {
 
       expect(combatant.velocity.length()).toBe(0);
     });
+
+    it('keeps moving at the exact retreat arrival boundary', () => {
+      const combatant = createCombatant({
+        state: CombatantState.RETREATING,
+        destinationPoint: new THREE.Vector3(2, 0, 0)
+      });
+
+      updateRetreatingMovement(combatant);
+
+      expect(combatant.velocity.length()).toBeGreaterThan(0);
+    });
   });
 
   describe('updateDefendingMovement', () => {
@@ -445,6 +505,12 @@ describe('CombatantMovementStates', () => {
       const combatant = createCombatant({ destinationPoint: new THREE.Vector3(1, 0, 0) });
       updateDefendingMovement(combatant);
       expect(combatant.velocity.length()).toBe(0);
+    });
+
+    it('keeps moving at the exact defend arrival boundary', () => {
+      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(2, 0, 0) });
+      updateDefendingMovement(combatant);
+      expect(combatant.velocity.length()).toBeGreaterThan(0);
     });
 
     it('moves toward destination at DEFEND_SPEED when not arrived', () => {

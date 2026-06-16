@@ -22,6 +22,10 @@ export class WeaponPill extends UIComponent {
   private activeIndex = this.signal(2); // Default: slot 3 (PRIMARY / AR)
   private magazine = this.signal(30);
   private reserve = this.signal(90);
+  private nameEl?: HTMLElement;
+  private magazineEl?: HTMLElement;
+  private reserveEl?: HTMLElement;
+  private ammoBucket: 'normal' | 'low' | 'empty' | 'noAmmo' = 'normal';
 
   private static readonly SLOT_COUNT = 6;
   private slotLabels = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
@@ -39,7 +43,9 @@ export class WeaponPill extends UIComponent {
       <button class="${styles.chevron} ${styles.chevronLeft}" data-ref="prev" aria-label="Previous weapon">\u2039</button>
       <div class="${styles.info}" data-ref="info">
         <span class="${styles.weaponName}" data-ref="name">AR</span>
-        <span class="${styles.ammo}" data-ref="ammo">30<span class="${styles.ammoSep}">/</span>90</span>
+        <span class="${styles.ammo}" data-ref="ammo">
+          <span data-ref="ammo-mag">30</span><span class="${styles.ammoSep}">/</span><span data-ref="ammo-reserve">90</span>
+        </span>
       </div>
       <button class="${styles.chevron} ${styles.chevronRight}" data-ref="next" aria-label="Next weapon">\u203A</button>
     `;
@@ -49,6 +55,9 @@ export class WeaponPill extends UIComponent {
     const prevBtn = this.$('[data-ref="prev"]')!;
     const nextBtn = this.$('[data-ref="next"]')!;
     const infoEl = this.$('[data-ref="info"]')!;
+    this.nameEl = this.$('[data-ref="name"]') ?? undefined;
+    this.magazineEl = this.$('[data-ref="ammo-mag"]') ?? undefined;
+    this.reserveEl = this.$('[data-ref="ammo-reserve"]') ?? undefined;
 
     // Chevron taps
     this.listen(prevBtn, 'pointerdown', (e: PointerEvent) => {
@@ -98,27 +107,24 @@ export class WeaponPill extends UIComponent {
     // Reactive: weapon name
     this.effect(() => {
       const idx = this.activeIndex.value;
-      this.text('[data-ref="name"]', this.slotLabels[idx] ?? 'WPN');
+      this.setTextIfChanged(this.nameEl, this.slotLabels[idx] ?? 'WPN');
     });
 
     // Reactive: ammo display + color coding
     this.effect(() => {
       const mag = this.magazine.value;
       const res = this.reserve.value;
-      const ammoEl = this.$('[data-ref="ammo"]');
-      if (ammoEl) {
-        ammoEl.innerHTML = `${mag}<span class="${styles.ammoSep}">/</span>${res}`;
-      }
+      this.setTextIfChanged(this.magazineEl, String(mag));
+      this.setTextIfChanged(this.reserveEl, String(res));
 
-      this.root.classList.remove(styles.low, styles.empty, styles.noAmmo);
-      if (mag === 0 && res === 0) {
-        this.root.classList.add(styles.noAmmo);
-      } else if (mag === 0) {
-        this.root.classList.add(styles.empty);
-      } else if (mag <= 10) {
-        this.root.classList.add(styles.low);
-      }
+      this.applyAmmoClass(mag, res);
     });
+  }
+
+  protected onUnmount(): void {
+    this.nameEl = undefined;
+    this.magazineEl = undefined;
+    this.reserveEl = undefined;
   }
 
   // --- Public API ---
@@ -134,6 +140,8 @@ export class WeaponPill extends UIComponent {
   }
 
   setAmmo(magazine: number, reserve: number): void {
+    if (this.magazine.value === magazine && this.reserve.value === reserve) return;
+
     this.magazine.value = magazine;
     this.reserve.value = reserve;
   }
@@ -175,5 +183,34 @@ export class WeaponPill extends UIComponent {
   private flashSwitch(): void {
     this.root.classList.add(styles.switching);
     setTimeout(() => this.root.classList.remove(styles.switching), 200);
+  }
+
+  private applyAmmoClass(magazine: number, reserve: number): void {
+    let nextBucket: typeof this.ammoBucket = 'normal';
+    if (magazine === 0 && reserve === 0) {
+      nextBucket = 'noAmmo';
+    } else if (magazine === 0) {
+      nextBucket = 'empty';
+    } else if (magazine <= 10) {
+      nextBucket = 'low';
+    }
+
+    if (nextBucket === this.ammoBucket) return;
+
+    this.root.classList.remove(styles.low, styles.empty, styles.noAmmo);
+    if (nextBucket === 'noAmmo') {
+      this.root.classList.add(styles.noAmmo);
+    } else if (nextBucket === 'empty') {
+      this.root.classList.add(styles.empty);
+    } else if (nextBucket === 'low') {
+      this.root.classList.add(styles.low);
+    }
+    this.ammoBucket = nextBucket;
+  }
+
+  private setTextIfChanged(element: HTMLElement | undefined, text: string): void {
+    if (element && element.textContent !== text) {
+      element.textContent = text;
+    }
   }
 }

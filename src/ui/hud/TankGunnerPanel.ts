@@ -31,14 +31,45 @@ import styles from './TankGunnerPanel.module.css';
 
 export type MainGunState = 'ready' | 'reloading';
 
+interface AzimuthViewState {
+  needleTransform: string;
+  azimuthText: string;
+}
+
+function getReloadWidth(progress01: number): string {
+  const pct = Math.max(0, Math.min(1, progress01)) * 100;
+  return `${pct}%`;
+}
+
+function getAzimuthViewState(yawRad: number): AzimuthViewState {
+  const deg = (yawRad * 180) / Math.PI;
+  return {
+    needleTransform: `translate(-50%, -100%) rotate(${deg}deg)`,
+    azimuthText: `${Math.round(deg)}°`,
+  };
+}
+
+function isSameAzimuthViewState(a: AzimuthViewState, b: AzimuthViewState): boolean {
+  return a.needleTransform === b.needleTransform && a.azimuthText === b.azimuthText;
+}
+
+function getMagnificationText(factor: number): string {
+  return `${factor.toFixed(1)}x`;
+}
+
 export class TankGunnerPanel extends UIComponent {
   private gunState = this.signal<MainGunState>('ready');
   /** Reload completion 0..1 (1 = loaded / ready). */
-  private reloadProgress = this.signal(1);
+  private reloadWidth = this.signal(getReloadWidth(1));
   /** Turret yaw relative to the hull, radians. 0 = barrel over the bow. */
-  private turretAzimuth = this.signal(0);
+  private azimuthViewState = this.signal(getAzimuthViewState(0));
   /** Current sight magnification (e.g. 1 = 1x, 3 = 3x zoom). */
-  private magnification = this.signal(1);
+  private magnificationText = this.signal(getMagnificationText(1));
+  private stateEl?: HTMLElement;
+  private reloadFillEl?: HTMLElement;
+  private needleEl?: HTMLElement;
+  private azimuthEl?: HTMLElement;
+  private zoomEl?: HTMLElement;
 
   protected build(): void {
     this.root.className = styles.panel;
@@ -66,73 +97,92 @@ export class TankGunnerPanel extends UIComponent {
   }
 
   protected onMount(): void {
+    this.stateEl = this.$('[data-ref="state"]') ?? undefined;
+    this.reloadFillEl = this.$('[data-ref="reloadFill"]') ?? undefined;
+    this.needleEl = this.$('[data-ref="needle"]') ?? undefined;
+    this.azimuthEl = this.$('[data-ref="azDeg"]') ?? undefined;
+    this.zoomEl = this.$('[data-ref="zoom"]') ?? undefined;
+
     // MAIN GUN state text + ready/reloading styling.
     this.effect(() => {
       const reloading = this.gunState.value === 'reloading';
-      const el = this.$('[data-ref="state"]');
-      if (el) {
-        el.textContent = reloading ? 'RELOADING' : 'READY';
-        el.classList.toggle(styles.stateReloading, reloading);
-        el.classList.toggle(styles.stateReady, !reloading);
+      if (this.stateEl) {
+        this.setTextIfChanged(this.stateEl, reloading ? 'RELOADING' : 'READY');
+        this.stateEl.classList.toggle(styles.stateReloading, reloading);
+        this.stateEl.classList.toggle(styles.stateReady, !reloading);
       }
     });
 
     // Reload bar fill.
     this.effect(() => {
-      const fill = this.$('[data-ref="reloadFill"]');
-      if (fill) {
-        const pct = Math.max(0, Math.min(1, this.reloadProgress.value)) * 100;
-        fill.style.width = `${pct}%`;
+      if (this.reloadFillEl && this.reloadFillEl.style.width !== this.reloadWidth.value) {
+        this.reloadFillEl.style.width = this.reloadWidth.value;
       }
     });
 
     // Turret azimuth needle + degree readout.
     this.effect(() => {
-      const rad = this.turretAzimuth.value;
-      const needle = this.$('[data-ref="needle"]');
-      if (needle) {
+      const viewState = this.azimuthViewState.value;
+      if (this.needleEl && this.needleEl.style.transform !== viewState.needleTransform) {
         // Needle points along the barrel: 0 rad is straight up (over the bow).
-        const deg = (rad * 180) / Math.PI;
-        needle.style.transform = `translate(-50%, -100%) rotate(${deg}deg)`;
+        this.needleEl.style.transform = viewState.needleTransform;
       }
-      const azEl = this.$('[data-ref="azDeg"]');
-      if (azEl) {
+      if (this.azimuthEl) {
         // Display as a signed bearing off the bow, rounded to whole degrees.
-        const deg = Math.round((rad * 180) / Math.PI);
-        azEl.textContent = `${deg}°`;
+        this.setTextIfChanged(this.azimuthEl, viewState.azimuthText);
       }
     });
 
     // Magnification readout.
     this.effect(() => {
-      const zoom = this.$('[data-ref="zoom"]');
-      if (zoom) zoom.textContent = `${this.magnification.value.toFixed(1)}x`;
+      this.setTextIfChanged(this.zoomEl, this.magnificationText.value);
     });
+  }
+
+  protected onUnmount(): void {
+    this.stateEl = undefined;
+    this.reloadFillEl = undefined;
+    this.needleEl = undefined;
+    this.azimuthEl = undefined;
+    this.zoomEl = undefined;
   }
 
   // --- Public API (driven by the gunner adapter each frame) ---
 
   /** Set the main-gun fire-gate state (drives READY / RELOADING). */
   setMainGunState(state: MainGunState): void {
+    if (this.gunState.value === state) return;
     this.gunState.value = state;
   }
 
   /** Set reload completion 0..1 (1 = loaded). Clamped on read. */
   setReloadProgress(progress01: number): void {
-    this.reloadProgress.value = progress01;
+    const nextReloadWidth = getReloadWidth(progress01);
+    if (this.reloadWidth.value === nextReloadWidth) return;
+    this.reloadWidth.value = nextReloadWidth;
   }
 
   /** Set turret yaw relative to the hull (radians). */
   setTurretAzimuth(yawRad: number): void {
-    this.turretAzimuth.value = yawRad;
+    const nextViewState = getAzimuthViewState(yawRad);
+    if (isSameAzimuthViewState(this.azimuthViewState.value, nextViewState)) return;
+    this.azimuthViewState.value = nextViewState;
   }
 
   /** Set the current sight magnification factor (1 = 1x). */
   setMagnification(factor: number): void {
-    this.magnification.value = factor;
+    const nextMagnificationText = getMagnificationText(factor);
+    if (this.magnificationText.value === nextMagnificationText) return;
+    this.magnificationText.value = nextMagnificationText;
   }
 
   getMainGunState(): MainGunState {
     return this.gunState.value;
+  }
+
+  private setTextIfChanged(element: HTMLElement | undefined, text: string): void {
+    if (element && element.textContent !== text) {
+      element.textContent = text;
+    }
   }
 }

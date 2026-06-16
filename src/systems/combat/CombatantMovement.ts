@@ -110,8 +110,10 @@ const NPC_RECOVERY_RADIUS_STEP = 1.25;
 const NPC_RECOVERY_MAX_RADIUS = 6.5;
 const NPC_RECOVERY_HEADING_SAMPLES = 8;
 const NPC_RECOVERY_LAST_GOOD_MAX_DISTANCE_SQ = 100;
+const NPC_RECOVERY_LAST_GOOD_MAX_GOAL_REGRESSION_M = 3;
 const NPC_NAVMESH_RECOVERY_SEARCH_RADIUS = 10;
 const NPC_STUCK_RECOVERY_WARN_INTERVAL_MS = 5000;
+const NPC_TERRAIN_RECOVERY_EVENT_LIMIT = 64;
 
 // ── Navmesh path-following ──
 /** Distance threshold: use navmesh path above this, terrain solver below. */
@@ -158,6 +160,22 @@ interface CachedNavPath {
    * obstacle during the throttle gap and re-feed the stall loop.
    */
   needsRequery?: boolean;
+}
+
+export interface TerrainRecoveryEvent {
+  atMs: number;
+  combatantId: string;
+  action: 'backtrack' | 'hold';
+  logged: boolean;
+  suppressedSinceLastLog: number | null;
+  state: CombatantState | 'unknown';
+  simLane: Combatant['simLane'] | 'unknown';
+  renderLane: Combatant['renderLane'] | 'unknown';
+  movementIntent: CombatantMovementIntent | null;
+  positionX: number | null;
+  positionZ: number | null;
+  destinationDistance: number | null;
+  backtrackDistance: number | null;
 }
 
 /**
@@ -225,6 +243,9 @@ export class CombatantMovement {
   private pathQueriesThisFrame = 0;
   private nextStuckRecoveryWarnAtMs = 0;
   private suppressedStuckRecoveryWarns = 0;
+  private readonly recentTerrainRecoveryEvents: TerrainRecoveryEvent[] = [];
+  private recentTerrainRecoveryEventStartIndex = 0;
+  private recentTerrainRecoveryEventCount = 0;
 
   // ── Per-tick current-position terrain-height memo ──
   // A single NPC's contour solve samples getTerrainHeight at its *current*
@@ -463,7 +484,7 @@ export class CombatantMovement {
     if (stuckAction === 'backtrack') {
       backtrackActivated = this.activateBacktrack(combatant);
       if (backtrackActivated) {
-        this.warnStuckRecovery(combatant.id, 'backtrack', now);
+        this.warnStuckRecovery(combatant, 'backtrack', now);
       }
     } else if (stuckAction === 'hold') {
       // Force the combatant out of whatever state it was anchored on so it
@@ -490,7 +511,7 @@ export class CombatantMovement {
         combatant.destinationPoint = undefined;
         combatant.lastZoneEvalTime = 0;
       }
-      this.warnStuckRecovery(combatant.id, 'hold', now);
+      this.warnStuckRecovery(combatant, 'hold', now);
     }
 
     const telemetryIntent: CombatantMovementIntent = backtrackActivated
@@ -1239,20 +1260,31 @@ export class CombatantMovement {
   }
 
   private activateBacktrack(combatant: Combatant): boolean {
-    // Prefer navmesh-backed recovery at an actual progress point. Snapping the
-    // current position can produce a zero-distance backtrack and immediate
-    // retry loop on terrain lips.
+    const lastGoodPosition = combatant.movementLastGoodPosition;
+    const hasUsableLastGood = Boolean(
+      lastGoodPosition &&
+      horizontalDistanceSq(combatant.position, lastGoodPosition) > NPC_BACKTRACK_ARRIVAL_RADIUS_SQ,
+    );
+    const preferLastGood = Boolean(
+      hasUsableLastGood &&
+      lastGoodPosition &&
+      this.shouldPreferLastGoodRecovery(combatant, lastGoodPosition),
+    );
+    const recoveryPoint = this.selectRecoveryPoint(combatant);
+
+    // Prefer navmesh-backed recovery at an actual progress point unless that
+    // point is clearly goal-regressive. On steep contested terrain, blindly
+    // returning to a stale "last good" point can read as NPCs stuttering
+    // backward; in that case try the scored side/forward recovery first.
     if (this.navmeshSystem?.isReady()) {
-      const lastGoodPosition = combatant.movementLastGoodPosition;
       if (
+        preferLastGood &&
         lastGoodPosition &&
-        horizontalDistanceSq(combatant.position, lastGoodPosition) > NPC_BACKTRACK_ARRIVAL_RADIUS_SQ &&
         this.trySetNavmeshBacktrackPoint(combatant, lastGoodPosition)
       ) {
         return true;
       }
 
-      const recoveryPoint = this.selectRecoveryPoint(combatant);
       if (recoveryPoint) {
         if (this.trySetNavmeshBacktrackPoint(combatant, recoveryPoint)) {
           return true;
@@ -1262,17 +1294,33 @@ export class CombatantMovement {
         return true;
       }
 
+      if (
+        !preferLastGood &&
+        lastGoodPosition &&
+        hasUsableLastGood &&
+        this.trySetNavmeshBacktrackPoint(combatant, lastGoodPosition)
+      ) {
+        return true;
+      }
+
       return false;
     }
 
     // Fallback: existing terrain-based recovery scoring
-    const recoveryPoint = this.selectRecoveryPoint(combatant);
     if (!recoveryPoint) {
       return false;
     }
 
     this.setBacktrackPoint(combatant, recoveryPoint);
     return true;
+  }
+
+  private shouldPreferLastGoodRecovery(combatant: Combatant, lastGoodPosition: THREE.Vector3): boolean {
+    const goalAnchor = this.resolvePrimaryGoalAnchor(combatant);
+    if (!goalAnchor) return true;
+    const currentGoalDistance = Math.sqrt(horizontalDistanceSq(combatant.position, goalAnchor));
+    const lastGoodGoalDistance = Math.sqrt(horizontalDistanceSq(lastGoodPosition, goalAnchor));
+    return lastGoodGoalDistance <= currentGoalDistance + NPC_RECOVERY_LAST_GOOD_MAX_GOAL_REGRESSION_M;
   }
 
   private trySetNavmeshBacktrackPoint(combatant: Combatant, candidate: THREE.Vector3): boolean {
@@ -1340,22 +1388,97 @@ export class CombatantMovement {
     return true;
   }
 
-  private warnStuckRecovery(combatantId: string, action: 'backtrack' | 'hold', now: number): void {
+  getRecentTerrainRecoveryEvents(): TerrainRecoveryEvent[] {
+    const events = new Array<TerrainRecoveryEvent>(this.recentTerrainRecoveryEventCount);
+    for (let index = 0; index < this.recentTerrainRecoveryEventCount; index++) {
+      events[index] = {
+        ...this.recentTerrainRecoveryEvents[
+          (this.recentTerrainRecoveryEventStartIndex + index) % NPC_TERRAIN_RECOVERY_EVENT_LIMIT
+        ],
+      };
+    }
+    return events;
+  }
+
+  clearRecentTerrainRecoveryEvents(): void {
+    this.recentTerrainRecoveryEvents.length = 0;
+    this.recentTerrainRecoveryEventStartIndex = 0;
+    this.recentTerrainRecoveryEventCount = 0;
+  }
+
+  private warnStuckRecovery(combatantOrId: Combatant | string, action: 'backtrack' | 'hold', now: number): void {
+    const willLog = now >= this.nextStuckRecoveryWarnAtMs;
     this.suppressedStuckRecoveryWarns++;
-    if (now < this.nextStuckRecoveryWarnAtMs) {
+    const suppressed = willLog
+      ? Math.max(0, this.suppressedStuckRecoveryWarns - 1)
+      : null;
+    this.recordTerrainRecoveryEvent(combatantOrId, action, now, willLog, suppressed);
+    if (!willLog) {
       return;
     }
 
-    const suppressed = Math.max(0, this.suppressedStuckRecoveryWarns - 1);
     this.suppressedStuckRecoveryWarns = 0;
     this.nextStuckRecoveryWarnAtMs = now + NPC_STUCK_RECOVERY_WARN_INTERVAL_MS;
+    const suppressedForLog = suppressed ?? 0;
     const actionText = action === 'backtrack'
       ? 'stalled on terrain, backtracking to last good progress point'
       : 'exceeded max recovery attempts, holding position';
-    const suffix = suppressed > 0
-      ? ` (${suppressed} additional terrain-stall recoveries suppressed)`
+    const suffix = suppressedForLog > 0
+      ? ` (${suppressedForLog} additional terrain-stall recoveries suppressed)`
       : '';
+    const combatantId = typeof combatantOrId === 'string' ? combatantOrId : combatantOrId.id;
     Logger.warn('combat', `NPC ${combatantId} ${actionText}${suffix}`);
+  }
+
+  private recordTerrainRecoveryEvent(
+    combatantOrId: Combatant | string,
+    action: 'backtrack' | 'hold',
+    now: number,
+    logged: boolean,
+    suppressedSinceLastLog: number | null,
+  ): void {
+    const combatantId = typeof combatantOrId === 'string' ? combatantOrId : combatantOrId.id;
+    const combatant = typeof combatantOrId === 'string' ? null : combatantOrId;
+    const position = combatant?.position;
+    const destinationDistance = combatant?.destinationPoint && position
+      ? Math.sqrt(horizontalDistanceSq(position, combatant.destinationPoint))
+      : null;
+    const backtrackDistance = combatant?.movementBacktrackPoint && position
+      ? Math.sqrt(horizontalDistanceSq(position, combatant.movementBacktrackPoint))
+      : null;
+    this.appendTerrainRecoveryEvent({
+      atMs: Number.isFinite(now) ? now : 0,
+      combatantId,
+      action,
+      logged,
+      suppressedSinceLastLog,
+      state: combatant?.state ?? 'unknown',
+      simLane: combatant?.simLane ?? 'unknown',
+      renderLane: combatant?.renderLane ?? 'unknown',
+      movementIntent: combatant?.movementIntent ?? null,
+      positionX: position && Number.isFinite(position.x) ? position.x : null,
+      positionZ: position && Number.isFinite(position.z) ? position.z : null,
+      destinationDistance: destinationDistance !== null && Number.isFinite(destinationDistance)
+        ? destinationDistance
+        : null,
+      backtrackDistance: backtrackDistance !== null && Number.isFinite(backtrackDistance)
+        ? backtrackDistance
+        : null,
+    });
+  }
+
+  private appendTerrainRecoveryEvent(event: TerrainRecoveryEvent): void {
+    const writeIndex = (
+      this.recentTerrainRecoveryEventStartIndex + this.recentTerrainRecoveryEventCount
+    ) % NPC_TERRAIN_RECOVERY_EVENT_LIMIT;
+    this.recentTerrainRecoveryEvents[writeIndex] = event;
+    if (this.recentTerrainRecoveryEventCount < NPC_TERRAIN_RECOVERY_EVENT_LIMIT) {
+      this.recentTerrainRecoveryEventCount++;
+      return;
+    }
+    this.recentTerrainRecoveryEventStartIndex = (
+      this.recentTerrainRecoveryEventStartIndex + 1
+    ) % NPC_TERRAIN_RECOVERY_EVENT_LIMIT;
   }
 
   private selectRecoveryPoint(combatant: Combatant): THREE.Vector3 | undefined {
@@ -1658,6 +1781,7 @@ export class CombatantMovement {
     this.slopeStuckDetector.clear();
     this.nextStuckRecoveryWarnAtMs = 0;
     this.suppressedStuckRecoveryWarns = 0;
+    this.clearRecentTerrainRecoveryEvents();
   }
 
   private getEnemyBasePosition(faction: Faction): THREE.Vector3 {

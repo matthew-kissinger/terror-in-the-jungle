@@ -60,4 +60,43 @@ describe('BreathGauge', () => {
     gauge.setBreath(0, 45);
     expect(text.textContent).toBe('0s');
   });
+
+  it('does not rewrite while the rendered breath state is unchanged', () => {
+    gauge.show();
+    gauge.setBreath(29.01, 45);
+    const fill = gauge.element.querySelector('[data-ref="fill"]') as HTMLElement;
+    const text = gauge.element.querySelector('[data-ref="text"]') as HTMLElement;
+    const label = gauge.element.querySelector('[data-ref="label"]') as HTMLElement;
+    const widthBefore = fill.style.width;
+    const textWrites = trackTextWrites(text);
+    const fillToggle = vi.spyOn(fill.classList, 'toggle');
+    const labelToggle = vi.spyOn(label.classList, 'toggle');
+
+    gauge.setBreath(29.02, 45);
+
+    expect(textWrites).toEqual([]);
+    expect(fill.style.width).toBe(widthBefore);
+    expect(fillToggle).not.toHaveBeenCalled();
+    expect(labelToggle).not.toHaveBeenCalled();
+
+    gauge.setBreath(29.08, 45);
+
+    expect(fill.style.width).not.toBe(widthBefore);
+    expect(fillToggle).toHaveBeenCalled();
+    expect(labelToggle).toHaveBeenCalled();
+  });
 });
+
+function trackTextWrites(element: HTMLElement): string[] {
+  let current = element.textContent ?? '';
+  const writes: string[] = [];
+  Object.defineProperty(element, 'textContent', {
+    configurable: true,
+    get: () => current,
+    set: (value: string | null) => {
+      current = value ?? '';
+      writes.push(current);
+    },
+  });
+  return writes;
+}

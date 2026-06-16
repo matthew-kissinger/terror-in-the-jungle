@@ -275,6 +275,14 @@ export class ZoneManager implements GameSystem, IZoneQuery {
     return this.getAllZones().filter(z => !z.isHomeBase);
   }
 
+  forEachCapturableZone(callback: (zone: CaptureZone) => void): void {
+    for (const zone of this.zones.values()) {
+      if (!zone.isHomeBase) {
+        callback(zone);
+      }
+    }
+  }
+
   getZonesByOwner(faction: Faction): CaptureZone[] {
     return Array.from(this.zones.values()).filter(z => z.owner === faction);
   }

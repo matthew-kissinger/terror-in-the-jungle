@@ -22,6 +22,8 @@ const _toTarget = new THREE.Vector3();
 const _spreadDir = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3();
+const _shotRay = new THREE.Ray();
+const _tracerEnd = new THREE.Vector3();
 
 interface GunnerState {
   config: AircraftWeaponMount;
@@ -46,6 +48,8 @@ export class HelicopterDoorGunner {
   private tracerPool: TracerPool;
   private muzzleFlashSystem: MuzzleFlashSystem;
   private muzzleFlashAccumulator = 0;
+  private currentShotDamage = 0;
+  private readonly shotDamageResolver = (): number => this.currentShotDamage;
 
   constructor(scene: THREE.Scene) {
     this.tracerPool = new TracerPool(scene, 16);
@@ -110,12 +114,11 @@ export class HelicopterDoorGunner {
     if (!this.combatantSystem) return null;
 
     const nearbyIds = this.combatantSystem.querySpatialRadius(heliPos, GUNNER_MAX_RANGE);
-    const combatants = this.combatantSystem.getAllCombatants();
     let bestId: string | null = null;
     let bestDist = Infinity;
 
     for (const id of nearbyIds) {
-      const c = combatants.find(c => c.id === id);
+      const c = this.combatantSystem.getCombatantById(id);
       if (!c || c.health <= 0 || c.isDying) continue;
 
       // Only shoot enemies — never allies of the gunship's faction.
@@ -135,8 +138,7 @@ export class HelicopterDoorGunner {
   private fireAtTarget(gunner: GunnerState, heliPos: THREE.Vector3, quaternion: THREE.Quaternion): void {
     if (!this.combatantSystem) return;
 
-    const combatants = this.combatantSystem.getAllCombatants();
-    const target = combatants.find(c => c.id === gunner.targetId);
+    const target = gunner.targetId ? this.combatantSystem.getCombatantById(gunner.targetId) : undefined;
     if (!target || target.health <= 0) {
       gunner.targetId = null;
       return;
@@ -158,17 +160,18 @@ export class HelicopterDoorGunner {
     this.applySpread(_toTarget, gunner.config.spreadDeg ?? 3);
 
     // Raycast
-    const ray = new THREE.Ray(_mountWorld.clone(), _toTarget.clone());
-    const dmg = gunner.config.damage;
-    const result = this.combatantSystem.handlePlayerShot(ray, () => dmg, 'rifle', gunner.faction);
+    _shotRay.origin.copy(_mountWorld);
+    _shotRay.direction.copy(_toTarget);
+    this.currentShotDamage = gunner.config.damage;
+    const result = this.combatantSystem.handlePlayerShot(_shotRay, this.shotDamageResolver, 'rifle', gunner.faction);
 
     // Tracer every 4th round
     if (gunner.roundsSinceTracer >= 4) {
       gunner.roundsSinceTracer = 0;
       const tracerEnd = result.hit
-        ? result.point.clone()
-        : _mountWorld.clone().addScaledVector(_toTarget, TRACER_RANGE);
-      this.tracerPool.spawn(_mountWorld.clone(), tracerEnd, 120);
+        ? result.point
+        : _tracerEnd.copy(_mountWorld).addScaledVector(_toTarget, TRACER_RANGE);
+      this.tracerPool.spawn(_mountWorld, tracerEnd, 120);
     }
 
     // Impact effects on hit
@@ -179,12 +182,12 @@ export class HelicopterDoorGunner {
     // Muzzle flash (throttled)
     if (this.muzzleFlashAccumulator >= MUZZLE_FLASH_THROTTLE) {
       this.muzzleFlashAccumulator = 0;
-      this.muzzleFlashSystem.spawnNPC(_mountWorld.clone(), _toTarget.clone(), 1.2, MuzzleFlashVariant.RIFLE);
+      this.muzzleFlashSystem.spawnNPC(_mountWorld, _toTarget, 1.2, MuzzleFlashVariant.RIFLE);
     }
 
     // Audio
     if (this.audioManager && gunner.roundsSinceTracer === 0) {
-      this.audioManager.play('doorGunBurst', _mountWorld.clone());
+      this.audioManager.play('doorGunBurst', _mountWorld);
     }
   }
 

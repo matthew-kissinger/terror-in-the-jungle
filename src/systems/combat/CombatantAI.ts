@@ -11,7 +11,7 @@ import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
 import { ISpatialQuery } from './SpatialOctree'
 import type { IZoneQuery } from '../../types/SystemInterfaces'
 import { TicketSystem } from '../world/TicketSystem'
-import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics'
+import { isPerfAttributionEnabled } from '../../core/PerfDiagnostics'
 import { AIStatePatrol } from './ai/AIStatePatrol'
 import { AIStateEngage, type CloseEngagementTelemetry } from './ai/AIStateEngage'
 import { AIStateMovement } from './ai/AIStateMovement'
@@ -202,10 +202,10 @@ export class CombatantAI {
   private readonly boundIsCoverFlanked = this.isCoverFlanked.bind(this)
   private readonly boundGetClusterDensity = this.getClusterDensity.bind(this)
 
-  // Cached per-instance: perf diagnostics gate. Read once at construction and
+  // Cached per-instance: heavy perf-attribution gate. Read once at construction and
   // refreshed once per frame in beginFrame() so the hot updateAI path never
   // re-parses window.location / globals per tick. OFF in prod by default.
-  private diagnosticsEnabled = isPerfDiagnosticsEnabled()
+  private diagnosticsEnabled = isPerfAttributionEnabled()
 
   private squads: Map<string, Squad> = new Map()
   private aiStateMs: Record<string, number> = {
@@ -560,9 +560,9 @@ export class CombatantAI {
   }
 
   beginFrame(deltaTime = 0): void {
-    // Refresh the perf-diagnostics gate once per frame. Cheap relative to a
+    // Refresh the perf-attribution gate once per frame. Cheap relative to a
     // frame; keeps updateAI's per-tick path free of window.location parsing.
-    this.diagnosticsEnabled = isPerfDiagnosticsEnabled()
+    this.diagnosticsEnabled = isPerfAttributionEnabled()
     // Advance the frame-synchronous stepper (NPC cannon flight) once per
     // frame with the scaled frame dt so flight respects TimeScale (dt=0 on
     // pause freezes shells instead of advancing them at wall-clock).
@@ -654,8 +654,8 @@ export class CombatantAI {
   private withAiMethodTiming<T>(name: string, fn: () => T): T {
     // Prod fast path: no timing instrumentation when diagnostics are OFF. The
     // wrapper collapses to a direct call — no performance.now(), no per-name
-    // bookkeeping, no per-update buffer writes. The perf-capture harness flips
-    // the gate ON (isPerfDiagnosticsEnabled) and gets the full breakdown below.
+    // bookkeeping, no per-update buffer writes. Deep perf captures flip the
+    // attribution gate ON and get the full breakdown below.
     if (!this.diagnosticsEnabled) {
       return fn()
     }

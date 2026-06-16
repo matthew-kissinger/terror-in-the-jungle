@@ -168,6 +168,77 @@ describe('ShotCommandFactory', () => {
       expect(b.ray.direction.x).toBeCloseTo(1)
     })
 
+    it('keeps command containers distinct within the same frame', () => {
+      const a = ShotCommandFactory.createSingleShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        'rifle',
+        () => 1,
+        false
+      )
+      const b = ShotCommandFactory.createSingleShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(1, 0, 0),
+        'smg',
+        () => 2,
+        true
+      )
+
+      expect(a).not.toBe(b)
+      expect(a.weaponType).toBe('rifle')
+      expect(a.isADS).toBe(false)
+      expect(b.weaponType).toBe('smg')
+      expect(b.isADS).toBe(true)
+    })
+
+    it('reuses command containers after a frame reset', () => {
+      const first = ShotCommandFactory.createSingleShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        'rifle',
+        () => 1,
+        false
+      )
+
+      ShotCommandFactory.resetPool()
+      const second = ShotCommandFactory.createSingleShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(1, 0, 0),
+        'smg',
+        () => 2,
+        true
+      )
+
+      expect(second).toBe(first)
+      expect(second.weaponType).toBe('smg')
+      expect(second.isADS).toBe(true)
+      expect(second.ray.direction.x).toBeCloseTo(1)
+    })
+
+    it('clears shotgun pellet state when a pooled command is reused for a single shot', () => {
+      const shotgun = ShotCommandFactory.createShotgunShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        [new THREE.Vector3(1, 0, 0)],
+        () => 8,
+        false
+      )
+      expect(shotgun.pelletRays).toHaveLength(1)
+
+      ShotCommandFactory.resetPool()
+      const single = ShotCommandFactory.createSingleShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        'rifle',
+        () => 1,
+        false
+      )
+
+      expect(single).toBe(shotgun)
+      expect(single.weaponType).toBe('rifle')
+      expect(single.pelletRays).toBeUndefined()
+    })
+
     it('keeps the base ray and pellet rays distinct within one shotgun command', () => {
       const command = ShotCommandFactory.createShotgunShot(
         new THREE.Vector3(),
@@ -178,6 +249,52 @@ describe('ShotCommandFactory', () => {
       )
       expect(command.pelletRays![0]).not.toBe(command.ray)
       expect(command.pelletRays![0]).not.toBe(command.pelletRays![1])
+    })
+
+    it('keeps shotgun pellet containers distinct within the same frame', () => {
+      const a = ShotCommandFactory.createShotgunShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        [new THREE.Vector3(1, 0, 0)],
+        () => 8,
+        false
+      )
+      const b = ShotCommandFactory.createShotgunShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        [new THREE.Vector3(0, 1, 0)],
+        () => 8,
+        false
+      )
+
+      expect(a.pelletRays).not.toBe(b.pelletRays)
+      expect(a.pelletRays![0].direction.x).toBeCloseTo(1)
+      expect(b.pelletRays![0].direction.y).toBeCloseTo(1)
+    })
+
+    it('reuses shotgun pellet containers after a frame reset', () => {
+      const first = ShotCommandFactory.createShotgunShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        [new THREE.Vector3(1, 0, 0)],
+        () => 8,
+        false
+      )
+      const firstPelletRays = first.pelletRays
+
+      ShotCommandFactory.resetPool()
+      const second = ShotCommandFactory.createShotgunShot(
+        new THREE.Vector3(),
+        new THREE.Vector3(0, 0, -1),
+        [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1)],
+        () => 8,
+        false
+      )
+
+      expect(second.pelletRays).toBe(firstPelletRays)
+      expect(second.pelletRays).toHaveLength(2)
+      expect(second.pelletRays![0].direction.y).toBeCloseTo(1)
+      expect(second.pelletRays![1].direction.z).toBeCloseTo(-1)
     })
   })
 })

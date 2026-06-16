@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MatchTimer } from './MatchTimer';
 
 describe('MatchTimer', () => {
@@ -36,4 +36,49 @@ describe('MatchTimer', () => {
 
     expect(timer.element.textContent).toContain('1:05');
   });
+
+  it('does not rewrite timer text or classes while the visible timer state is unchanged', () => {
+    const timer = new MatchTimer();
+    timer.mount(container);
+
+    timer.setTime(65.9);
+    const display = timer.element.querySelector<HTMLElement>('[data-ref="display"]')!;
+    const textWrites = trackTextWrites(display);
+    const classToggle = vi.spyOn(timer.element.classList, 'toggle');
+
+    timer.setTime(65.2);
+
+    expect(textWrites).toEqual([]);
+    expect(classToggle).not.toHaveBeenCalled();
+
+    timer.setTime(64.9);
+
+    expect(textWrites).toEqual(['1:04']);
+  });
+
+  it('still updates warning state when the threshold changes within the same displayed second', () => {
+    const timer = new MatchTimer();
+    timer.mount(container);
+
+    timer.setTime(60.5);
+    const classToggle = vi.spyOn(timer.element.classList, 'toggle');
+
+    timer.setTime(60);
+
+    expect(classToggle).toHaveBeenCalled();
+  });
 });
+
+function trackTextWrites(element: HTMLElement): string[] {
+  let current = element.textContent ?? '';
+  const writes: string[] = [];
+  Object.defineProperty(element, 'textContent', {
+    configurable: true,
+    get: () => current,
+    set: (value: string | null) => {
+      current = value ?? '';
+      writes.push(current);
+    },
+  });
+  return writes;
+}

@@ -100,15 +100,14 @@ export class CombatCoverGridProvider implements CoverGridQuery {
 
     this.refreshRegion(origin, targetPosition)
 
-    const results = this.grid.queryWithLOS(
+    const result = this.grid.queryNearestWithLOS(
       origin,
       targetPosition,
       this.terrainRuntime,
       this.queryRadius
     )
-    if (results.length === 0) return null
-    // queryWithLOS returns candidates sorted nearest-first; take the closest.
-    return results[0].position.clone()
+    if (!result) return null
+    return result.position.clone()
   }
 
   private refreshRegion(origin: THREE.Vector3, threatPosition: THREE.Vector3): void {

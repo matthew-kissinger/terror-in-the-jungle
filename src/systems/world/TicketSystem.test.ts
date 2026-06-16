@@ -253,6 +253,40 @@ describe('TicketSystem', () => {
       expect(ticketSystem.getTickets(Faction.NVA)).toBe(initialOpforTickets);
     });
 
+    it('should use the capturable-zone iterator when available', () => {
+      const zones = [
+        createMockCaptureZone('A', ZoneState.BLUFOR_CONTROLLED),
+        createMockCaptureZone('B', ZoneState.OPFOR_CONTROLLED),
+        createMockCaptureZone('Home', ZoneState.OPFOR_CONTROLLED, true),
+      ];
+      const getCapturableZones = vi.fn(() => {
+        throw new Error('array fallback should not be used');
+      });
+      const forEachCapturableZone = vi.fn((callback: (zone: CaptureZone) => void) => {
+        for (const zone of zones) {
+          if (!zone.isHomeBase) {
+            callback(zone);
+          }
+        }
+      });
+      mockZoneManager = {
+        ...createMockZoneManager(zones),
+        getCapturableZones,
+        forEachCapturableZone,
+      } as ZoneManager;
+      ticketSystem.setZoneManager(mockZoneManager);
+      ticketSystem.setMaxTickets(300);
+      ticketSystem['gameState'].matchDuration = ticketSystem.getSetupDuration() + 0.01;
+      ticketSystem['gameState'].phase = 'COMBAT';
+
+      ticketSystem.update(1);
+
+      expect(forEachCapturableZone).toHaveBeenCalled();
+      expect(getCapturableZones).not.toHaveBeenCalled();
+      expect(ticketSystem.getTickets(Faction.US)).toBe(300);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(300);
+    });
+
     it('should apply ticket bleed to US if OPFOR controls more zones', () => {
       const zones = [
         createMockCaptureZone('A', ZoneState.OPFOR_CONTROLLED),

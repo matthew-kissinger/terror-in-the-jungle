@@ -52,6 +52,8 @@ interface PreparedModeStartup {
   config: ReturnType<typeof getGameModeConfig>;
 }
 
+const NPC_TEXTURE_LOAD_BATCH_SIZE = 4;
+
 export async function prepareModeStartup(
   engine: GameEngine,
   launchSelection: GameLaunchSelection
@@ -97,6 +99,31 @@ export async function prepareModeStartup(
   await applyCompiledTerrainFeatures(engine, startupTerrain.compiledFeatures, emitProgress);
   markStartup(`engine-init.start-game.${mode}.terrain-features.apply.end`);
   emitProgress('vegetation', 1, 'Terrain features ready');
+  await yieldToRenderer();
+
+  emitProgress('npc_textures', 0, 'Preparing NPC textures...');
+  markStartup(`engine-init.start-game.${mode}.npc-textures.begin`);
+  let npcTextureLoaded = 0;
+  let npcTextureTotal = 0;
+  let npcTextureBatchYields = 0;
+  await engine.systemManager.assetLoader.ensurePixelForgeNpcImpostorTexturesLoaded((loaded, total) => {
+    npcTextureLoaded = loaded;
+    npcTextureTotal = total;
+    emitProgress('npc_textures', total > 0 ? loaded / total : 1, 'Preparing NPC textures...');
+  }, {
+    batchSize: NPC_TEXTURE_LOAD_BATCH_SIZE,
+    afterBatch: async () => {
+      npcTextureBatchYields++;
+      markStartup(`engine-init.start-game.${mode}.npc-textures.batch-yield-${npcTextureBatchYields}`);
+      await yieldToRenderer();
+    },
+  });
+  markStartup(`engine-init.start-game.${mode}.npc-textures.stats.loaded-${npcTextureLoaded}`);
+  markStartup(`engine-init.start-game.${mode}.npc-textures.stats.total-${npcTextureTotal}`);
+  markStartup(`engine-init.start-game.${mode}.npc-textures.stats.batch-size-${NPC_TEXTURE_LOAD_BATCH_SIZE}`);
+  markStartup(`engine-init.start-game.${mode}.npc-textures.stats.batch-yields-${npcTextureBatchYields}`);
+  markStartup(`engine-init.start-game.${mode}.npc-textures.end`);
+  emitProgress('npc_textures', 1, 'NPC textures ready');
   await yieldToRenderer();
 
   emitProgress('spawning', 0, 'Spawning combatants...');

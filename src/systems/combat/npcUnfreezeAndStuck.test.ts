@@ -112,6 +112,43 @@ describe('Layer 2a: rejoin watchdog', () => {
     expect(follower.isRejoiningSquad).toBe(false);
     expect(follower.rejoinStartedAtMs).toBeUndefined();
   });
+
+  it('rejoins toward the centroid of available non-rejoining squadmates only', () => {
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    const follower = createTestCombatant({
+      id: 'follower',
+      ...followerDefaults,
+      position: new THREE.Vector3(0, 0, 0),
+    });
+    const leader = createTestCombatant({
+      id: 'leader',
+      squadRole: 'leader',
+      position: new THREE.Vector3(60, 0, 0),
+    });
+    const rejoiningMate = createTestCombatant({
+      id: 'rejoining-mate',
+      squadRole: 'follower',
+      position: new THREE.Vector3(-60, 0, 0),
+    });
+    rejoiningMate.isRejoiningSquad = true;
+    beginRejoiningSquad(follower);
+    nowSpy.mockReturnValue(1500);
+
+    const squad = makeSquad({
+      members: ['leader', 'missing', 'rejoining-mate', 'follower'],
+    });
+    const combatants = new Map<string, Combatant>([
+      ['leader', leader],
+      ['rejoining-mate', rejoiningMate],
+      [follower.id, follower],
+    ]);
+
+    handleRejoiningMovement(follower, squad, combatants);
+
+    expect(follower.isRejoiningSquad).toBe(true);
+    expect(follower.velocity.x).toBeGreaterThan(0);
+    expect(Math.abs(follower.velocity.z)).toBeLessThan(0.001);
+  });
 });
 
 describe('Layer 2b: follower watchdog promotes squad-leader-stuck followers', () => {

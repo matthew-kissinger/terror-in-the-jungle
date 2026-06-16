@@ -18,10 +18,61 @@ import { UIComponent } from '../engine/UIComponent';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import styles from './AmmoDisplay.module.css';
 
+type AmmoStatusBucket = 'normal' | 'low' | 'empty' | 'noAmmo';
+
+interface AmmoViewState {
+  magazineText: string;
+  reserveText: string;
+  statusBucket: AmmoStatusBucket;
+  statusText: string;
+  statusHidden: boolean;
+}
+
+function getAmmoViewState(magazine: number, reserve: number): AmmoViewState {
+  let statusBucket: AmmoStatusBucket = 'normal';
+  let statusText = '';
+
+  if (magazine === 0 && reserve === 0) {
+    statusBucket = 'noAmmo';
+    statusText = 'No ammo!';
+  } else if (magazine === 0 && reserve > 0) {
+    statusBucket = 'empty';
+    statusText = isTouchDevice() ? 'Tap reload' : 'Press R to reload';
+  } else if (magazine <= 10 && magazine > 0) {
+    statusBucket = 'low';
+    statusText = 'Low ammo';
+  }
+
+  return {
+    magazineText: String(magazine),
+    reserveText: String(reserve),
+    statusBucket,
+    statusText,
+    statusHidden: statusText === '',
+  };
+}
+
+function isSameAmmoViewState(a: AmmoViewState, b: AmmoViewState): boolean {
+  return a.magazineText === b.magazineText
+    && a.reserveText === b.reserveText
+    && a.statusBucket === b.statusBucket
+    && a.statusText === b.statusText
+    && a.statusHidden === b.statusHidden;
+}
+
 export class AmmoDisplay extends UIComponent {
   // --- Reactive state ---
-  private magazine = this.signal(30);
-  private reserve = this.signal(90);
+  private ammoViewState = this.signal(getAmmoViewState(30, 90));
+  private magazineEl?: HTMLElement;
+  private reserveEl?: HTMLElement;
+  private statusEl?: HTMLElement;
+  private statusBucket: AmmoStatusBucket = 'normal';
+
+  private readonly statusClassByBucket: Partial<Record<AmmoStatusBucket, string>> = {
+    low: styles.low,
+    empty: styles.empty,
+    noAmmo: styles.noAmmo,
+  };
 
   protected build(): void {
     this.root.className = styles.container;
@@ -36,55 +87,53 @@ export class AmmoDisplay extends UIComponent {
   }
 
   protected onMount(): void {
-    // Effect: update magazine count text
+    this.magazineEl = this.$('[data-ref="magazine"]') ?? undefined;
+    this.reserveEl = this.$('[data-ref="reserve"]') ?? undefined;
+    this.statusEl = this.$('[data-ref="status"]') ?? undefined;
+
+    // Effect: apply one coherent visible ammo/status state per logical update.
     this.effect(() => {
-      this.text('[data-ref="magazine"]', String(this.magazine.value));
+      this.applyViewState(this.ammoViewState.value);
     });
+  }
 
-    // Effect: update reserve count text
-    this.effect(() => {
-      this.text('[data-ref="reserve"]', String(this.reserve.value));
-    });
-
-    // Effect: status text + color coding
-    this.effect(() => {
-      const mag = this.magazine.value;
-      const res = this.reserve.value;
-      const statusEl = this.$('[data-ref="status"]');
-      if (!statusEl) return;
-
-      // Clear all state classes
-      this.root.classList.remove(styles.low, styles.empty, styles.noAmmo);
-
-      if (mag === 0 && res === 0) {
-        // No ammo at all
-        statusEl.textContent = 'No ammo!';
-        statusEl.classList.remove(styles.statusHidden);
-        this.root.classList.add(styles.noAmmo);
-      } else if (mag === 0 && res > 0) {
-        // Magazine empty, reserve available
-        const reloadText = isTouchDevice() ? 'Tap reload' : 'Press R to reload';
-        statusEl.textContent = reloadText;
-        statusEl.classList.remove(styles.statusHidden);
-        this.root.classList.add(styles.empty);
-      } else if (mag <= 10 && mag > 0) {
-        // Low ammo
-        statusEl.textContent = 'Low ammo';
-        statusEl.classList.remove(styles.statusHidden);
-        this.root.classList.add(styles.low);
-      } else {
-        // Normal
-        statusEl.textContent = '';
-        statusEl.classList.add(styles.statusHidden);
-      }
-    });
+  protected onUnmount(): void {
+    this.magazineEl = undefined;
+    this.reserveEl = undefined;
+    this.statusEl = undefined;
   }
 
   // --- Public API ---
 
   /** Update ammo counts. Called by HUDElements per frame. */
   setAmmo(magazine: number, reserve: number): void {
-    this.magazine.value = magazine;
-    this.reserve.value = reserve;
+    const nextViewState = getAmmoViewState(magazine, reserve);
+    if (isSameAmmoViewState(this.ammoViewState.value, nextViewState)) return;
+    this.ammoViewState.value = nextViewState;
+  }
+
+  private applyViewState(viewState: AmmoViewState): void {
+    this.setTextIfChanged(this.magazineEl, viewState.magazineText);
+    this.setTextIfChanged(this.reserveEl, viewState.reserveText);
+    if (!this.statusEl) return;
+
+    if (viewState.statusBucket !== this.statusBucket) {
+      const previousClass = this.statusClassByBucket[this.statusBucket];
+      const nextClass = this.statusClassByBucket[viewState.statusBucket];
+      if (previousClass) this.root.classList.remove(previousClass);
+      if (nextClass) this.root.classList.add(nextClass);
+      this.statusBucket = viewState.statusBucket;
+    }
+
+    this.setTextIfChanged(this.statusEl, viewState.statusText);
+    if (this.statusEl.classList.contains(styles.statusHidden) !== viewState.statusHidden) {
+      this.statusEl.classList.toggle(styles.statusHidden, viewState.statusHidden);
+    }
+  }
+
+  private setTextIfChanged(element: HTMLElement | undefined, text: string): void {
+    if (element && element.textContent !== text) {
+      element.textContent = text;
+    }
   }
 }

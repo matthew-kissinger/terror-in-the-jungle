@@ -132,19 +132,16 @@ export class FlankingRoleManager {
     allCombatants: Map<string, Combatant>
   ): void {
     // All members switch to aggressive engagement
-    const allParticipants = [...operation.suppressors, ...operation.flankers]
-
-    for (const participantId of allParticipants) {
+    for (const participantId of operation.suppressors) {
       const combatant = allCombatants.get(participantId)
       if (!combatant || combatant.state === CombatantState.DEAD) continue
+      this.assignParticipantEngageBehavior(combatant)
+    }
 
-      combatant.state = CombatantState.ENGAGING
-      combatant.isFullAuto = true
-      combatant.skillProfile.burstLength = 6
-      combatant.skillProfile.burstPauseMs = 200
-      combatant.isFlankingMove = false
-      combatant.suppressionTarget = undefined
-      combatant.suppressionEndTime = undefined
+    for (const participantId of operation.flankers) {
+      const combatant = allCombatants.get(participantId)
+      if (!combatant || combatant.state === CombatantState.DEAD) continue
+      this.assignParticipantEngageBehavior(combatant)
     }
   }
 
@@ -191,18 +188,16 @@ export class FlankingRoleManager {
     operation.status = FlankingStatus.ABORTED
 
     // Reset all participants to normal engagement
-    const allParticipants = [...operation.suppressors, ...operation.flankers]
-
-    for (const participantId of allParticipants) {
+    for (const participantId of operation.suppressors) {
       const combatant = allCombatants.get(participantId)
       if (!combatant || combatant.state === CombatantState.DEAD) continue
+      this.resetParticipantAfterAbort(combatant)
+    }
 
-      combatant.state = CombatantState.ENGAGING
-      combatant.isFullAuto = false
-      combatant.isFlankingMove = false
-      combatant.suppressionTarget = undefined
-      combatant.suppressionEndTime = undefined
-      combatant.destinationPoint = undefined
+    for (const participantId of operation.flankers) {
+      const combatant = allCombatants.get(participantId)
+      if (!combatant || combatant.state === CombatantState.DEAD) continue
+      this.resetParticipantAfterAbort(combatant)
     }
   }
 
@@ -217,13 +212,35 @@ export class FlankingRoleManager {
     Logger.info('combat-ai', ` Squad ${squad.id} flanking operation complete`)
 
     // Clean up combatant state
-    const allParticipants = [...operation.suppressors, ...operation.flankers]
-
-    for (const participantId of allParticipants) {
+    for (const participantId of operation.suppressors) {
       const combatant = allCombatants.get(participantId)
       if (!combatant) continue
-
       combatant.isFlankingMove = false
     }
+
+    for (const participantId of operation.flankers) {
+      const combatant = allCombatants.get(participantId)
+      if (!combatant) continue
+      combatant.isFlankingMove = false
+    }
+  }
+
+  private assignParticipantEngageBehavior(combatant: Combatant): void {
+    combatant.state = CombatantState.ENGAGING
+    combatant.isFullAuto = true
+    combatant.skillProfile.burstLength = 6
+    combatant.skillProfile.burstPauseMs = 200
+    combatant.isFlankingMove = false
+    combatant.suppressionTarget = undefined
+    combatant.suppressionEndTime = undefined
+  }
+
+  private resetParticipantAfterAbort(combatant: Combatant): void {
+    combatant.state = CombatantState.ENGAGING
+    combatant.isFullAuto = false
+    combatant.isFlankingMove = false
+    combatant.suppressionTarget = undefined
+    combatant.suppressionEndTime = undefined
+    combatant.destinationPoint = undefined
   }
 }

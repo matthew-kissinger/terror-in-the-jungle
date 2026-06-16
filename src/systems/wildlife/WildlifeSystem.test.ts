@@ -9,7 +9,7 @@ import {
   type WildlifeModeProvider,
   type WildlifePlayerProvider,
 } from './WildlifeSystem';
-import { WILDLIFE_CONFIG } from '../../config/WildlifeConfig';
+import { WILDLIFE_CONFIG, WILDLIFE_ROSTER } from '../../config/WildlifeConfig';
 import { modelLoader } from '../assets/ModelLoader';
 
 vi.mock('../assets/ModelLoader', () => ({
@@ -20,14 +20,30 @@ vi.mock('../assets/ModelLoader', () => ({
       group.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 2)));
       return group;
     }),
+    preload: vi.fn().mockResolvedValue(undefined),
     disposeInstance: vi.fn((object: THREE.Object3D) => object.removeFromParent()),
   },
 }));
 
 const mockedLoadModel = vi.mocked(modelLoader.loadModel);
+const mockedPreload = vi.mocked(modelLoader.preload);
 
 function flushPromises(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function setRuntimeSearch(search: string): void {
+  const normalized = search.startsWith('?') ? search : search ? `?${search}` : '';
+  if (typeof window !== 'undefined' && window.history) {
+    window.history.replaceState({}, '', `http://localhost/${normalized}`);
+    return;
+  }
+  Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: {
+      location: { search: normalized },
+    },
+  });
 }
 
 interface Harness {
@@ -75,8 +91,29 @@ async function pump(system: WildlifeSystem, ticks: number): Promise<void> {
   }
 }
 
+function makeTwoMeshAnimal(): THREE.Group {
+  const group = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({ color: 0x5f4a2d });
+  const first = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+  const second = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material);
+  second.position.x = 1.5;
+  group.add(first, second);
+  return group;
+}
+
+function collectMeshes(root: THREE.Object3D): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      meshes.push(child);
+    }
+  });
+  return meshes;
+}
+
 describe('WildlifeSystem', () => {
   beforeEach(() => {
+    setRuntimeSearch('');
     vi.clearAllMocks();
   });
 
@@ -84,6 +121,41 @@ describe('WildlifeSystem', () => {
     const { system } = makeHarness();
     await pump(system, 30);
     expect(system.getActiveCount()).toBeGreaterThan(0);
+  });
+
+  it('preloads the current allowed-mode wildlife roster without spawning animals', async () => {
+    const { system } = makeHarness();
+
+    const primed = await system.preloadCurrentModeAssets();
+
+    const expectedPaths = [...new Set(WILDLIFE_ROSTER.map((species) => species.modelPath))];
+    expect(primed).toBe(expectedPaths.length);
+    expect(mockedPreload).toHaveBeenCalledWith(expectedPaths);
+    expect(system.getActiveCount()).toBe(0);
+    expect(mockedLoadModel).not.toHaveBeenCalled();
+  });
+
+  it('does not preload wildlife assets for disallowed modes', async () => {
+    const { system } = makeHarness({ mode: GameMode.AI_SANDBOX });
+
+    const primed = await system.preloadCurrentModeAssets();
+
+    expect(primed).toBe(0);
+    expect(mockedPreload).not.toHaveBeenCalled();
+    expect(mockedLoadModel).not.toHaveBeenCalled();
+  });
+
+  it('lets perf isolation disable allowed-mode wildlife without changing mode config', async () => {
+    setRuntimeSearch('?perfDisableWildlife=1');
+    const { system } = makeHarness({ mode: GameMode.A_SHAU_VALLEY });
+
+    const primed = await system.preloadCurrentModeAssets();
+    await pump(system, 30);
+
+    expect(primed).toBe(0);
+    expect(system.getActiveCount()).toBe(0);
+    expect(mockedPreload).not.toHaveBeenCalled();
+    expect(mockedLoadModel).not.toHaveBeenCalled();
   });
 
   it('never spawns animals closer to the player than the minimum spawn distance', async () => {
@@ -164,6 +236,30 @@ describe('WildlifeSystem', () => {
     expect(endDistance).toBeGreaterThan(startDistance);
   });
 
+  it('keeps flee trigger boundary semantics while avoiding exact-distance latching', () => {
+    const { system, player } = makeHarness();
+    const systemAny = system as any;
+    const object = new THREE.Group();
+    object.position.set(WILDLIFE_CONFIG.fleeTriggerDistanceM, 0, 0);
+    const agent = {
+      id: 'wildlife_boundary',
+      species: WILDLIFE_ROSTER[0],
+      object,
+      shadowMeshes: [],
+      heading: 0,
+      castingShadow: false,
+      fleeing: false,
+    };
+    systemAny.agents.push(agent);
+
+    systemAny.advanceAgents(0, player.position);
+    expect(agent.fleeing).toBe(false);
+
+    object.position.set(WILDLIFE_CONFIG.fleeTriggerDistanceM - 0.001, 0, 0);
+    systemAny.advanceAgents(0, player.position);
+    expect(agent.fleeing).toBe(true);
+  });
+
   it('despawns an animal that has fled out beyond the cull range', async () => {
     const { system, scene, player } = makeHarness();
     await pump(system, 60);
@@ -181,6 +277,28 @@ describe('WildlifeSystem', () => {
       }
     }
     expect(removed).toBe(true);
+  });
+
+  it('compacts removed wildlife agents without splicing the active agent list', async () => {
+    const { system, scene } = makeHarness();
+    (system as any).active = true;
+
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 10, 0);
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 20, 0);
+    const systemAny = system as any;
+    const agents = systemAny.agents as unknown[];
+    const removed = agents[0] as { object: THREE.Object3D };
+    const remaining = agents[1];
+    const spliceSpy = vi.spyOn(agents, 'splice');
+
+    systemAny.removeAgentAt(0);
+
+    expect(spliceSpy).not.toHaveBeenCalled();
+    spliceSpy.mockRestore();
+    expect(system.getActiveCount()).toBe(1);
+    expect(agents[0]).toBe(remaining);
+    expect(removed.object.parent).toBeNull();
+    expect(scene.children).toHaveLength(1);
   });
 
   it('disposes cleanly, removing every animal from the scene', async () => {
@@ -214,6 +332,136 @@ describe('WildlifeSystem', () => {
     await pump(system, WILDLIFE_CONFIG.maxActive * 4);
     expect(system.getActiveCount()).toBeLessThanOrEqual(WILDLIFE_CONFIG.maxActive);
     expect(system.getActiveCount()).toBe(WILDLIFE_CONFIG.maxActive);
+  });
+
+  it('collapses compatible static animal submeshes before adding wildlife to the scene', async () => {
+    mockedLoadModel.mockResolvedValueOnce(makeTwoMeshAnimal());
+    const { system, scene } = makeHarness();
+
+    await pump(system, 1);
+
+    expect(system.getActiveCount()).toBe(1);
+    expect(collectMeshes(scene.children[0])).toHaveLength(1);
+  });
+
+  it('reuses one optimized template for repeated same-species animal spawns', async () => {
+    mockedLoadModel.mockResolvedValueOnce(makeTwoMeshAnimal());
+    const { system, scene } = makeHarness();
+    (system as any).active = true;
+
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 10, 0);
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 20, 0);
+
+    expect(mockedLoadModel).toHaveBeenCalledTimes(1);
+    expect(system.getActiveCount()).toBe(2);
+    expect(scene.children).toHaveLength(2);
+
+    expect(collectMeshes(scene.children[0])).toHaveLength(1);
+    expect(collectMeshes(scene.children[1])).toHaveLength(1);
+  });
+
+  it('disposes cloned optimized wildlife resources once per spawned animal', async () => {
+    mockedLoadModel.mockResolvedValueOnce(makeTwoMeshAnimal());
+    const { system, scene } = makeHarness();
+    (system as any).active = true;
+
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 10, 0);
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 20, 0);
+    const [mergedMesh] = collectMeshes(scene.children[0]);
+    const geometryDispose = vi.spyOn(mergedMesh.geometry, 'dispose');
+    const material = mergedMesh.material as THREE.Material;
+    const materialDispose = vi.spyOn(material, 'dispose');
+
+    system.dispose();
+
+    expect(geometryDispose).toHaveBeenCalledTimes(1);
+    expect(materialDispose).toHaveBeenCalledTimes(1);
+    expect(scene.children.length).toBe(0);
+  });
+
+  it('keeps far ambient wildlife visible but out of the shadow-caster pass', async () => {
+    const { system, scene } = makeHarness();
+    (system as any).active = true;
+
+    const farEnoughToSpawn = Math.max(
+      WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 1,
+      WILDLIFE_CONFIG.shadowCastDistanceM + 5,
+    );
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], farEnoughToSpawn, 0);
+
+    expect(system.getActiveCount()).toBe(1);
+    expect(scene.children).toHaveLength(1);
+    const meshes = collectMeshes(scene.children[0]);
+    expect(meshes.length).toBeGreaterThan(0);
+    for (const mesh of meshes) {
+      expect(mesh.receiveShadow).toBe(true);
+      expect(mesh.castShadow).toBe(false);
+    }
+  });
+
+  it('enables wildlife shadow casting once an animal is close enough to matter visually', async () => {
+    const { system, scene, player } = makeHarness();
+    (system as any).active = true;
+
+    const farEnoughToSpawn = Math.max(
+      WILDLIFE_CONFIG.minPlayerSpawnDistanceM + 1,
+      WILDLIFE_CONFIG.shadowCastDistanceM + 5,
+    );
+    await (system as any).spawnSpecies(WILDLIFE_ROSTER[0], farEnoughToSpawn, 0);
+    const target = scene.children[0];
+    const meshes = collectMeshes(target);
+    expect(meshes.some((mesh) => mesh.castShadow)).toBe(false);
+
+    player.position.set(
+      farEnoughToSpawn - WILDLIFE_CONFIG.shadowCastDistanceM + 1,
+      0,
+      0,
+    );
+    (system as any).advanceAgents(0, player.position);
+
+    expect(meshes.length).toBeGreaterThan(0);
+    expect(meshes.every((mesh) => mesh.castShadow)).toBe(true);
+  });
+
+  it('freezes spawned animal transforms and syncs the root matrix when they move', async () => {
+    const { system, scene } = makeHarness();
+
+    await pump(system, 1);
+
+    const target = scene.children[0];
+    const frozenNodes: THREE.Object3D[] = [];
+    target.traverse((child) => frozenNodes.push(child));
+    expect(frozenNodes.length).toBeGreaterThan(1);
+    for (const node of frozenNodes) {
+      expect(node.matrixAutoUpdate).toBe(false);
+      expect(node.matrixWorldAutoUpdate).toBe(false);
+    }
+
+    const startX = target.position.x;
+    const startZ = target.position.z;
+    system.update(WILDLIFE_CONFIG.updateIntervalSeconds);
+    await flushPromises();
+
+    expect(Math.hypot(target.position.x - startX, target.position.z - startZ)).toBeGreaterThan(0);
+    expect(target.matrixWorld.elements[12]).toBeCloseTo(target.position.x, 5);
+    expect(target.matrixWorld.elements[14]).toBeCloseTo(target.position.z, 5);
+  });
+
+  it('disposes merged wildlife resources before removing an optimized animal', async () => {
+    mockedLoadModel.mockResolvedValueOnce(makeTwoMeshAnimal());
+    const { system, scene } = makeHarness();
+
+    await pump(system, 1);
+    const [mergedMesh] = collectMeshes(scene.children[0]);
+    const geometryDispose = vi.spyOn(mergedMesh.geometry, 'dispose');
+    const material = mergedMesh.material as THREE.Material;
+    const materialDispose = vi.spyOn(material, 'dispose');
+
+    system.dispose();
+
+    expect(geometryDispose).toHaveBeenCalledTimes(1);
+    expect(materialDispose).toHaveBeenCalledTimes(1);
+    expect(scene.children.length).toBe(0);
   });
 
   // Deterministic regression for the async-load race the probabilistic

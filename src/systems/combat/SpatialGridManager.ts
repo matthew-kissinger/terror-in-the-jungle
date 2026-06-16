@@ -54,6 +54,8 @@ export class SpatialGridManager {
   // Query timing for EMA
   private queryTimesMs: number[] = []
   private queryTimesSumMs = 0
+  private queryTimesSampleCount = 0
+  private queryTimesWriteIndex = 0
   private readonly MAX_QUERY_SAMPLES = 100
   private loggedUninitializedMethods: Set<string> = new Set()
 
@@ -201,16 +203,7 @@ export class SpatialGridManager {
     const results = this.grid.queryRadius(center, radius)
     const duration = performance.now() - start
 
-    // Update query timing
-    this.queryTimesMs.push(duration)
-    this.queryTimesSumMs += duration
-    if (this.queryTimesMs.length > this.MAX_QUERY_SAMPLES) {
-      const removed = this.queryTimesMs.shift() ?? 0
-      this.queryTimesSumMs -= removed
-    }
-
-    // Calculate EMA
-    const avgQueryTime = this.queryTimesSumMs / this.queryTimesMs.length
+    const avgQueryTime = this.recordQueryTiming(duration)
     this.telemetry.avgQueryTimeMs = avgQueryTime
     this.telemetry.queriesThisFrame++
 
@@ -236,12 +229,7 @@ export class SpatialGridManager {
     const results = this.grid.queryNearestK(center, k, maxDistance)
     const duration = performance.now() - start
 
-    this.queryTimesMs.push(duration)
-    this.queryTimesSumMs += duration
-    if (this.queryTimesMs.length > this.MAX_QUERY_SAMPLES) {
-      const removed = this.queryTimesMs.shift() ?? 0
-      this.queryTimesSumMs -= removed
-    }
+    this.recordQueryTiming(duration)
 
     this.telemetry.queriesThisFrame++
     return results
@@ -260,12 +248,7 @@ export class SpatialGridManager {
     const results = this.grid.queryRay(origin, direction, maxDistance)
     const duration = performance.now() - start
 
-    this.queryTimesMs.push(duration)
-    this.queryTimesSumMs += duration
-    if (this.queryTimesMs.length > this.MAX_QUERY_SAMPLES) {
-      const removed = this.queryTimesMs.shift() ?? 0
-      this.queryTimesSumMs -= removed
-    }
+    this.recordQueryTiming(duration)
 
     this.telemetry.queriesThisFrame++
     return results
@@ -279,8 +262,7 @@ export class SpatialGridManager {
       this.grid.clear()
     }
     this.telemetry.entityCount = 0
-    this.queryTimesMs = []
-    this.queryTimesSumMs = 0
+    this.resetQueryTiming()
   }
 
   reset(): void {
@@ -297,8 +279,7 @@ export class SpatialGridManager {
       lastSyncMs: 0,
       lastRebuildMs: 0
     }
-    this.queryTimesMs = []
-    this.queryTimesSumMs = 0
+    this.resetQueryTiming()
     this.loggedUninitializedMethods.clear()
   }
 
@@ -342,6 +323,28 @@ export class SpatialGridManager {
     if (this.loggedUninitializedMethods.has(method)) return
     this.loggedUninitializedMethods.add(method)
     Logger.error('spatial-grid', `${method} called before initialization!`)
+  }
+
+  private recordQueryTiming(duration: number): number {
+    if (this.queryTimesSampleCount < this.MAX_QUERY_SAMPLES) {
+      this.queryTimesMs[this.queryTimesWriteIndex] = duration
+      this.queryTimesSumMs += duration
+      this.queryTimesSampleCount++
+    } else {
+      const previousDuration = this.queryTimesMs[this.queryTimesWriteIndex] ?? 0
+      this.queryTimesMs[this.queryTimesWriteIndex] = duration
+      this.queryTimesSumMs += duration - previousDuration
+    }
+
+    this.queryTimesWriteIndex = (this.queryTimesWriteIndex + 1) % this.MAX_QUERY_SAMPLES
+    return this.queryTimesSumMs / Math.max(1, this.queryTimesSampleCount)
+  }
+
+  private resetQueryTiming(): void {
+    this.queryTimesMs.length = 0
+    this.queryTimesSumMs = 0
+    this.queryTimesSampleCount = 0
+    this.queryTimesWriteIndex = 0
   }
 }
 

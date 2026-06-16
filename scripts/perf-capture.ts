@@ -4,7 +4,7 @@
 
 
 import { chromium, type BrowserContext, type CDPSession, type Page } from 'playwright';
-import { spawn } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { createRequire } from 'node:module';
@@ -46,8 +46,83 @@ type RuntimeFrameEventSample = {
   hitch100: boolean;
 };
 
+type ShotVisualCapture = {
+  ts: string;
+  sampleIndex: number;
+  sampleElapsedMs: number;
+  frameCount: number;
+  reason: string;
+  file: string;
+  routeSnapDistanceMeters?: number;
+  routeSnapDeltaMs?: number;
+  terrainRecoveryDeltaMs?: number;
+  presentationGapDeltaMs?: number;
+  latestShotEpoch?: Record<string, unknown>;
+  latestRouteSnapEpoch?: Record<string, unknown>;
+  latestTerrainRecoveryEvent?: Record<string, unknown>;
+  latestPresentationGap?: PresentationGapContextSummary['latest'][number];
+};
+
+type ShotVisualCaptureTrigger = Omit<ShotVisualCapture, 'ts' | 'sampleIndex' | 'sampleElapsedMs' | 'frameCount' | 'file'> & {
+  key: string;
+};
+
+type ShotVisualCaptureState = {
+  enabled: boolean;
+  maxCaptures: number;
+  cooldownMs: number;
+  artifactDir: string;
+  captures: ShotVisualCapture[];
+  seenKeys: Set<string>;
+  lastCaptureElapsedMs: number;
+};
+
+type LoopFrameBreakdownSample = {
+  frameCount: number | null;
+  startedAtMs: number;
+  endedAtMs: number;
+  timestampDeltaMs: number;
+  callbackDurationMs: number;
+  segmentTotalMs: number;
+  unmeasuredCallbackMs: number;
+  segments: Record<string, number>;
+  systemTimings?: Array<{
+    name: string;
+    lastMs: number;
+    emaMs: number;
+    budgetMs: number;
+    overBudget: boolean;
+  }>;
+  telemetryTimings?: Array<{
+    name: string;
+    lastMs: number;
+    emaMs: number;
+    peakMs: number;
+    budgetMs: number;
+    overBudget: boolean;
+  }>;
+  combatTiming?: Record<string, unknown>;
+};
+
+type RuntimeCloseModelStats = {
+  closeRadiusMeters: number;
+  closeModelActiveCap: number;
+  candidatesWithinCloseRadius: number;
+  renderedCloseModels: number;
+  activeCloseModels: number;
+  fallbackCount: number;
+  fallbackCounts: Record<string, number>;
+  nearestFallbackDistanceMeters: number | null;
+  farthestFallbackDistanceMeters: number | null;
+  poolLoads: number;
+  poolTargets: Record<string, number>;
+  poolAvailable: Record<string, number>;
+};
+
 type RuntimeSample = {
   ts: string;
+  pagePerformanceNowMs?: number;
+  pageWallNowMs?: number;
   frameCount: number;
   avgFrameMs: number;
   p95FrameMs: number;
@@ -57,6 +132,7 @@ type RuntimeSample = {
   hitch50Count?: number;
   hitch100Count?: number;
   frameEvents?: RuntimeFrameEventSample[];
+  loopFrameBreakdown?: LoopFrameBreakdownSample[];
   combatantCount: number;
   overBudgetPercent: number;
   shotsThisSession?: number;
@@ -65,11 +141,24 @@ type RuntimeSample = {
   heapUsedMb?: number;
   heapTotalMb?: number;
   uiErrorPanelVisible?: boolean;
+  closeModelStats?: RuntimeCloseModelStats;
+  terrainRecoveryEvents?: Record<string, unknown>[];
+  materializationTierEvents?: Record<string, unknown>[];
   combatBreakdown?: {
     totalMs: number;
     aiUpdateMs: number;
     spatialSyncMs: number;
     billboardUpdateMs: number;
+    billboardProfile?: {
+      walkFrameMs: number;
+      closeModelMs: number;
+      bucketResetMs: number;
+      impostorWriteMs: number;
+      finalizeMs: number;
+      hitboxDebugMs: number;
+      materializationEventsMs: number;
+      shaderUniformMs: number;
+    };
     effectPoolsMs: number;
     influenceMapMs: number;
     aiStateMs?: Record<string, number>;
@@ -130,11 +219,14 @@ type RuntimeSample = {
       maxPerFrame: number;
       usedThisFrame: number;
       deniedThisFrame: number;
+      terrainBlockedThisFrame: number;
       totalExhaustedFrames: number;
       totalRequested: number;
       totalDenied: number;
+      totalTerrainBlocked: number;
       saturationRate: number;
       denialRate: number;
+      terrainBlockRate: number;
     };
     aiScheduling?: {
       frameCounter: number;
@@ -143,6 +235,9 @@ type RuntimeSample = {
       staggeredSkips: number;
       highFullUpdates: number;
       mediumFullUpdates: number;
+      projectedHighFullUpdateDeferrals: number;
+      highFullUpdateCostEmaMs: number;
+      highFullUpdateCostPeakMs: number;
       maxHighFullUpdatesPerFrame: number;
       maxMediumFullUpdatesPerFrame: number;
       aiBudgetExceededEvents: number;
@@ -150,6 +245,21 @@ type RuntimeSample = {
     };
   };
   renderer?: {
+    drawCalls: number;
+    triangles: number;
+    geometries: number;
+    textures: number;
+    programs: number;
+  };
+  rendererBackend?: {
+    requestedMode: string;
+    resolvedBackend: string;
+    initStatus: string;
+    strictWebGPU: boolean;
+  };
+  gpu?: {
+    available: boolean;
+    gpuTimeMs: number;
     drawCalls: number;
     triangles: number;
     geometries: number;
@@ -166,6 +276,8 @@ type RuntimeSample = {
       longAnimationFrame: boolean;
       userTiming: boolean;
       webglTextureUpload?: boolean;
+      rafCadence?: boolean;
+      resourceTiming?: boolean;
     };
     totals: {
       longTaskCount: number;
@@ -175,6 +287,10 @@ type RuntimeSample = {
       longAnimationFrameTotalDurationMs: number;
       longAnimationFrameMaxDurationMs: number;
       longAnimationFrameBlockingDurationMs: number;
+      resourceCount?: number;
+      resourceTotalDurationMs?: number;
+      resourceMaxDurationMs?: number;
+      resourceTransferSizeBytes?: number;
       webglTextureUploadCount?: number;
       webglTextureUploadTotalDurationMs?: number;
       webglTextureUploadMaxDurationMs?: number;
@@ -183,6 +299,19 @@ type RuntimeSample = {
         totalDurationMs: number;
         maxDurationMs: number;
       }>;
+      rafCadence?: {
+        intervalCount: number;
+        totalGapMs: number;
+        maxGapMs: number;
+        avgGapMs: number;
+        stutter25Count: number;
+        hitch33Count: number;
+        hitch50Count: number;
+        hitch100Count: number;
+        overBudget60HzMs: number;
+        droppedFrameTime60HzMs: number;
+        estimatedDropped60HzFrames: number;
+      };
       userTimingByName?: Record<string, {
         count: number;
         totalDurationMs: number;
@@ -249,6 +378,43 @@ type RuntimeSample = {
             pauseDuration: number;
             forcedStyleAndLayoutDuration: number;
           }>;
+        }>;
+      };
+      resources?: {
+        count: number;
+        totalDurationMs: number;
+        maxDurationMs: number;
+        transferSizeBytes: number;
+        entries: Array<{
+          name: string;
+          initiatorType: string;
+          startTime: number;
+          responseEnd: number;
+          duration: number;
+          transferSize: number;
+          encodedBodySize: number;
+          decodedBodySize: number;
+          renderBlockingStatus: string;
+        }>;
+      };
+      rafCadence?: {
+        count: number;
+        estimatedDropped60HzFrames: number;
+        overBudget60HzMs: number;
+        droppedFrameTime60HzMs: number;
+        maxGapMs: number;
+        entries: Array<{
+          atMs: number;
+          gapMs: number;
+          estimatedDropped60HzFrames: number;
+          overBudget60HzMs: number;
+          droppedFrameTime60HzMs: number;
+          stutter25: boolean;
+          hitch33: boolean;
+          hitch50: boolean;
+          hitch100: boolean;
+          presentationContext?: Record<string, unknown> | null;
+          harnessContext?: Record<string, unknown> | null;
         }>;
       };
       userTimingByName?: Record<string, {
@@ -318,10 +484,15 @@ type RuntimeSample = {
     // artifacts; readers should prefer `botState`.
     botState: string;
     movementState: string;
+    driverSeed?: number | null;
+    movementDecisionIntervalMs?: number | null;
     targetVisible: boolean;
     respawnCount: number;
     ammoRefillCount: number;
     healthTopUpCount: number;
+    frontlineCompressed?: boolean | null;
+    frontlineDistance?: number | null;
+    frontlineMoveCount?: number | null;
     lastShotAt: number;
     lastFireProbe?: Record<string, unknown> | null;
     // perf-harness-redesign surfaces. All optional: older capture artifacts
@@ -330,8 +501,58 @@ type RuntimeSample = {
     maxGradient?: number;
     stuckTimeoutSec?: number;
     losRejectedShots?: number;
+    losUnknownTargetChecks?: number;
+    fireUnknownLosRejectedShots?: number;
+    lastTargetLosStatus?: string | null;
+    lastTargetLosReason?: string | null;
+    lastFireLosStatus?: string | null;
+    lastFireLosReason?: string | null;
+    lastCurrentTargetLive?: boolean | null;
+    lastCurrentTargetHealth?: number | null;
+    lastCurrentTargetState?: string | null;
+    shotEpochs?: Record<string, unknown>[];
+    aimDotGateRejectedShots?: number;
+    fireStartRejected?: number;
+    droppedDeadTargetLocks?: number;
+    firingRetargets?: number;
+    firingRetargetFireStops?: number;
+    firingRetargetEpochs?: Record<string, unknown>[];
+    shotsFired?: number;
+    reloadsIssued?: number;
     stuckTeleportCount?: number;
     maxStuckSeconds?: number;
+    maxViewYawStepDeg?: number;
+    maxViewPitchStepDeg?: number;
+    lastViewStepYawDeg?: number;
+    lastViewStepPitchDeg?: number;
+    lastRequestedViewYawDeltaDeg?: number;
+    lastRequestedViewPitchDeltaDeg?: number;
+    lastRemainingViewYawErrorDeg?: number;
+    lastRemainingViewPitchErrorDeg?: number;
+    lastViewYawClamped?: boolean | null;
+    lastViewPitchClamped?: boolean | null;
+    lastViewTargetKind?: string | null;
+    lastViewAnchorResyncChanged?: boolean | null;
+    lastViewAnchorResyncYawDeg?: number | null;
+    lastViewAnchorResyncPitchDeg?: number | null;
+    lastViewUpdateAtMs?: number | null;
+    lastAimDot?: number | null;
+    lastFireIntent?: boolean | null;
+    lastAimGatePassed?: boolean | null;
+    lastAimGateReason?: string | null;
+    lastFireLosGatePassed?: boolean | null;
+    viewSlewClampCount?: number;
+    viewAnchorResyncCount?: number;
+    maxRequestedViewYawDeltaDeg?: number;
+    maxRequestedViewPitchDeltaDeg?: number;
+    maxRemainingViewYawErrorDeg?: number;
+    maxRemainingViewPitchErrorDeg?: number;
+    maxViewAnchorResyncYawDeg?: number;
+    maxViewAnchorResyncPitchDeg?: number;
+    largeViewTurnCount?: number;
+    maxAimMovementDivergenceDeg?: number;
+    aimMovementDivergenceSamples?: number;
+    aimMovementDivergenceOver45Count?: number;
     gradientProbeDeflections?: number;
     waypointsFollowedCount?: number;
     waypointReplanFailures?: number;
@@ -356,6 +577,10 @@ type RuntimeSample = {
     pathEndSnapped?: boolean | null;
     pathStartSnapDistance?: number | null;
     pathEndSnapDistance?: number | null;
+    maxPathStartSnapDistance?: number | null;
+    maxPathEndSnapDistance?: number | null;
+    untrustedPathSnapCount?: number | null;
+    routeSnapEpochs?: Record<string, unknown>[];
     routeProgressDistance?: number | null;
     routeProgressAgeMs?: number | null;
     routeProgressTravelMeters?: number | null;
@@ -365,6 +590,10 @@ type RuntimeSample = {
     playerDistanceMoved?: number | null;
     movementIntentCalls?: number | null;
     nonZeroMovementIntentCalls?: number | null;
+    worldMovementIntentCalls?: number | null;
+    cameraMovementIntentCalls?: number | null;
+    nonZeroWorldMovementIntentCalls?: number | null;
+    nonZeroCameraMovementIntentCalls?: number | null;
     lastMovementIntent?: Record<string, unknown> | null;
     lastNonZeroMovementIntent?: Record<string, unknown> | null;
     runtimeLiveness?: {
@@ -393,6 +622,7 @@ type RuntimeSample = {
       collisionContributorsAtPlayer: Array<Record<string, unknown>>;
       playerMovementDebug: Record<string, unknown> | null;
     } | null;
+    weaponHarness?: Record<string, unknown> | null;
     perceptionRange?: number | null;
     // Match-end lifecycle (harness-lifecycle-halt-on-match-end). Wall-clock ms
     // at which the harness driver first observed the match end; null while the
@@ -413,17 +643,70 @@ type RuntimeSample = {
 
 type HarnessDriverFinal = {
   respawnCount: number;
+  driverSeed?: number | null;
+  movementDecisionIntervalMs?: number | null;
   ammoRefillCount: number;
   healthTopUpCount: number;
+  frontlineCompressed?: boolean | null;
+  frontlineDistance?: number | null;
+  frontlineMoveCount?: number | null;
   movementTransitions: number;
   losRejectedShots: number;
+  losUnknownTargetChecks: number;
+  fireUnknownLosRejectedShots: number;
+  lastTargetLosStatus?: string | null;
+  lastTargetLosReason?: string | null;
+  lastFireLosStatus?: string | null;
+  lastFireLosReason?: string | null;
+  lastCurrentTargetLive?: boolean | null;
+  lastCurrentTargetHealth?: number | null;
+  lastCurrentTargetState?: string | null;
+  shotEpochs?: Record<string, unknown>[];
   aimDotGateRejectedShots: number;
+  fireStartRejected: number;
+  droppedDeadTargetLocks: number;
+  firingRetargets: number;
+  firingRetargetFireStops: number;
+  firingRetargetEpochs?: Record<string, unknown>[];
   waypointsFollowedCount: number;
   waypointReplanFailures: number;
   routeTargetResets?: number;
   routeNoProgressResets?: number;
   shotsFired: number;
   reloadsIssued: number;
+  maxViewYawStepDeg?: number;
+  maxViewPitchStepDeg?: number;
+  lastViewStepYawDeg?: number;
+  lastViewStepPitchDeg?: number;
+  lastRequestedViewYawDeltaDeg?: number;
+  lastRequestedViewPitchDeltaDeg?: number;
+  lastRemainingViewYawErrorDeg?: number;
+  lastRemainingViewPitchErrorDeg?: number;
+  lastViewYawClamped?: boolean | null;
+  lastViewPitchClamped?: boolean | null;
+  lastViewTargetKind?: string | null;
+  lastViewAnchorResyncChanged?: boolean | null;
+  lastViewAnchorResyncYawDeg?: number | null;
+  lastViewAnchorResyncPitchDeg?: number | null;
+  lastViewUpdateAtMs?: number | null;
+  lastAimDot?: number | null;
+  lastFireIntent?: boolean | null;
+  lastAimGatePassed?: boolean | null;
+  lastAimGateReason?: string | null;
+  lastFireLosGatePassed?: boolean | null;
+  viewSlewClampCount?: number;
+  viewAnchorResyncCount?: number;
+  maxRequestedViewYawDeltaDeg?: number;
+  maxRequestedViewPitchDeltaDeg?: number;
+  maxRemainingViewYawErrorDeg?: number;
+  maxRemainingViewPitchErrorDeg?: number;
+  maxViewAnchorResyncYawDeg?: number;
+  maxViewAnchorResyncPitchDeg?: number;
+  largeViewTurnCount?: number;
+  maxAimMovementDivergenceDeg?: number;
+  aimMovementDivergenceSamples?: number;
+  aimMovementDivergenceOver45Count?: number;
+  weaponHarness?: Record<string, unknown> | null;
   // Final values surfaced by the active driver's stop() call. These
   // are the canonical end-of-run combat numbers; the runtime-samples
   // stream contains per-sample readings of the same counters but they
@@ -452,6 +735,10 @@ type HarnessDriverFinal = {
   pathEndSnapped?: boolean | null;
   pathStartSnapDistance?: number | null;
   pathEndSnapDistance?: number | null;
+  maxPathStartSnapDistance?: number | null;
+  maxPathEndSnapDistance?: number | null;
+  untrustedPathSnapCount?: number | null;
+  routeSnapEpochs?: Record<string, unknown>[];
   routeProgressDistance?: number | null;
   routeProgressAgeMs?: number | null;
   routeProgressTravelMeters?: number | null;
@@ -461,6 +748,10 @@ type HarnessDriverFinal = {
   playerDistanceMoved?: number | null;
   movementIntentCalls?: number | null;
   nonZeroMovementIntentCalls?: number | null;
+  worldMovementIntentCalls?: number | null;
+  cameraMovementIntentCalls?: number | null;
+  nonZeroWorldMovementIntentCalls?: number | null;
+  nonZeroCameraMovementIntentCalls?: number | null;
   lastMovementIntent?: Record<string, unknown> | null;
   lastNonZeroMovementIntent?: Record<string, unknown> | null;
   runtimeLiveness?: RuntimeSample['harnessDriver'] extends infer Driver
@@ -474,6 +765,12 @@ type HarnessDriverFinal = {
 type CaptureSummary = {
   startedAt: string;
   endedAt: string;
+  sourceGitSha: string;
+  sourceGitStatus: string[];
+  captureEnvironment: {
+    quietMachineAttested: boolean;
+    quietMachineAttestationSource?: string;
+  };
   durationSeconds: number;
   npcs: number;
   requestedNpcs: number;
@@ -499,6 +796,12 @@ type CaptureSummary = {
     missedSampleErrors?: Record<string, number>;
   };
   measurementTrust: MeasurementTrustReport;
+  rendererBackend?: RuntimeSample['rendererBackend'];
+  gpuTiming?: GpuTimingSummary;
+  droppedFrameMetrics?: DroppedFrameSummary;
+  renderSubmissionMetrics?: RenderSubmissionSummary;
+  materializationTierMetrics?: MaterializationTierEventSummary;
+  presentationGapContexts?: PresentationGapContextSummary;
   sceneAttribution?: SceneAttributionEntry[];
   startupTiming?: {
     firstEngineSeenSec?: number;
@@ -519,6 +822,11 @@ type CaptureSummary = {
     matchDurationSeconds?: number;
     victoryConditionsDisabled: boolean;
     npcCloseModelsDisabled: boolean;
+    terrainShadowsDisabled: boolean;
+    terrainForceInstanceUploadEnabled: boolean;
+    terrainFarCanopyTintDisabled: boolean;
+    terrainLowSunOcclusionDisabled: boolean;
+    wildlifeDisabled: boolean;
   };
   // Match-end lifecycle (harness-lifecycle-halt-on-match-end).
   // matchEndedAtMs is wall-clock-ms-since-capture-start when the harness
@@ -532,12 +840,137 @@ type CaptureSummary = {
   // the active driver's stop() call. Optional: only present when the
   // active player scenario was enabled and the stop call returned data.
   harnessDriverFinal?: HarnessDriverFinal;
+  terrainRecoveryEvents?: Record<string, unknown>[];
+  materializationTierEvents?: Record<string, unknown>[];
+  shotVisualCaptures?: ShotVisualCapture[];
   // combat-p99-tail-attribution (DEFEKT-3): per-method attribution of the
   // single worst-p99 sample window, computed from the existing combatBreakdown
   // timers. Baseline-free — answers "where is the tail frame's time?" from one
   // capture. Undefined when no sample carried a combatBreakdown. Type +
   // implementation live in ./perf-tail-attribution.
   tailAttribution?: TailAttribution;
+};
+
+type DroppedFrameSummary = {
+  engine: {
+    frameCount: number;
+    hitch33Count: number;
+    hitch50Count: number;
+    hitch100Count: number;
+    hitch33Percent: number;
+    hitch50Percent: number;
+    hitch100Percent: number;
+  };
+  browserRaf?: {
+    intervalCount: number;
+    totalGapMs: number;
+    avgGapMs: number;
+    maxGapMs: number;
+    stutter25Count: number;
+    hitch33Count: number;
+    hitch50Count: number;
+    hitch100Count: number;
+    stutter25Percent: number;
+    hitch33Percent: number;
+    overBudget60HzMs: number;
+    overBudget60HzMsPerSecond: number;
+    droppedFrameTime60HzMs: number;
+    droppedFrameTime60HzMsPerSecond: number;
+    estimatedDropped60HzFrames: number;
+    estimatedDropped60HzFramesPerSecond: number;
+  };
+  observers?: {
+    longTaskCount: number;
+    longTaskTotalDurationMs: number;
+    longTaskMaxDurationMs: number;
+    longAnimationFrameCount: number;
+    longAnimationFrameTotalDurationMs: number;
+    longAnimationFrameMaxDurationMs: number;
+    longAnimationFrameBlockingDurationMs: number;
+    webglTextureUploadCount?: number;
+    webglTextureUploadTotalDurationMs?: number;
+    webglTextureUploadMaxDurationMs?: number;
+  };
+};
+
+type GpuTimingSummary = {
+  requested: boolean;
+  queryEnabled: boolean;
+  sampleCount: number;
+  availableSamples: number;
+  latest?: RuntimeSample['gpu'];
+  avgGpuTimeMs?: number;
+  peakGpuTimeMs?: number;
+  rendererBackend?: RuntimeSample['rendererBackend'];
+};
+
+type RenderSubmissionSummary = {
+  sampleCount: number;
+  latest?: {
+    mode?: string;
+    rawFrameCount?: number;
+    frameCountStart: number | null;
+    frameCountEnd: number | null;
+    topCategories: RuntimeRenderSubmissionCategory[];
+    unattributed?: RuntimeRenderSubmissionCategory;
+  };
+  peakFrame?: {
+    frameCount: number;
+    drawSubmissions: number;
+    triangles: number;
+    topCategories: RuntimeRenderSubmissionCategory[];
+    unattributed?: RuntimeRenderSubmissionCategory;
+  };
+};
+
+type MaterializationTierEventSummary = {
+  sampleCount: number;
+  totalEvents: number;
+  byTransition: Record<string, number>;
+  byReason: Record<string, number>;
+  byToRender: Record<string, number>;
+  peakSample?: {
+    ts: string;
+    frameCount: number;
+    eventCount: number;
+    byTransition: Record<string, number>;
+    byReason: Record<string, number>;
+  };
+};
+
+type PresentationGapContextSummary = {
+  sampleCount: number;
+  gapCount: number;
+  maxGapMs: number;
+  latest: Array<{
+    seq?: number;
+    startAtMs?: number;
+    endAtMs?: number;
+    atMs?: number;
+    gapMs: number;
+    estimatedDropped60HzFrames: number;
+    overBudget60HzMs?: number;
+    droppedFrameTime60HzMs?: number;
+    engineFrameCount?: number | null;
+    wallAtMs?: number | null;
+    visibilityState?: string | null;
+    presentationContext?: Record<string, unknown> | null;
+    harnessContext?: Record<string, unknown> | null;
+    sampleTs?: string;
+    sampleFrameCount?: number;
+  }>;
+};
+
+type ShotPresentationContextStats = {
+  shotEpochCount: number;
+  contextCount: number;
+  maxCameraYawDeltaDeg: number;
+  maxCameraPitchDeltaDeg: number;
+  maxCameraPositionDeltaMeters: number;
+  minClearanceMeters: number | null;
+  minEffectiveClearanceMeters: number | null;
+  terrainHashChurnEvents: number;
+  terrainNotReadyEvents: number;
 };
 
 type MovementViewerPayload = {
@@ -548,9 +981,11 @@ type MovementViewerPayload = {
 type StartupDiagnostics = {
   ts: string;
   readyState: string;
+  frameCount: number;
   hasMetrics: boolean;
   hasEngine: boolean;
   hasPerfApi: boolean;
+  rendererBackend?: RuntimeSample['rendererBackend'];
   bodyClassName: string;
   errorPanelVisible: boolean;
   gameStarted: boolean;
@@ -645,11 +1080,13 @@ type RuntimeRenderSubmissionCategory = {
   meshes: number;
   materials: number;
   geometries: number;
+  passTypes?: Record<string, number>;
   examples?: Array<{
     nameChain: string;
     type: string;
     modelPath: string | null;
     materialType: string | null;
+    passType?: string;
     triangles: number;
     instances: number;
   }>;
@@ -662,6 +1099,7 @@ type RuntimeRenderSubmissionFrame = {
   drawSubmissions: number;
   triangles: number;
   instances: number;
+  passTypes?: Record<string, number>;
   categories: RuntimeRenderSubmissionCategory[];
 };
 
@@ -708,6 +1146,9 @@ const DEFAULT_FRONTLINE_TRIGGER_DISTANCE = 500;
 const DEFAULT_MAX_COMPRESSED_PER_FACTION = 28;
 const DEFAULT_SAMPLE_INTERVAL_MS = 1000;
 const DEFAULT_DETAIL_EVERY_SAMPLES = 1;
+const SHOT_VISUAL_CORRELATION_WINDOW_MS = 3000;
+const SHOT_VISUAL_PRESENTATION_GAP_WINDOW_MS = 500;
+const SHOT_VISUAL_ROUTE_SNAP_THRESHOLD_M = 12;
 const STEP_TIMEOUT_MS = 30_000;
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const MIN_RUN_HARD_TIMEOUT_MS = 120_000;
@@ -734,6 +1175,23 @@ function nowIso(): string {
 
 function logStep(msg: string): void {
   console.log(`[${nowIso()}] ${msg}`);
+}
+
+function gitOutputOrFallback(args: string[], fallback: string): string {
+  try {
+    return execFileSync('git', args, { encoding: 'utf8' }).trim();
+  } catch {
+    return fallback;
+  }
+}
+
+function currentGitSha(): string {
+  return gitOutputOrFallback(['rev-parse', 'HEAD'], 'unknown');
+}
+
+function gitStatus(): string[] {
+  const output = gitOutputOrFallback(['status', '--short'], '');
+  return output.split(/\r?\n/).filter(Boolean);
 }
 
 async function safeAwait<T>(label: string, promise: Promise<T>, timeoutMs: number): Promise<T | null> {
@@ -870,6 +1328,250 @@ function objectOrNull(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null;
 }
 
+function objectArray(value: unknown, limit = 32): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  const rawMax = Math.floor(limit);
+  const max = Number.isFinite(rawMax) ? Math.max(1, rawMax) : value.length;
+  const start = Math.max(0, value.length - max);
+  const entries: Record<string, unknown>[] = [];
+  for (let index = start; index < value.length; index += 1) {
+    const entry = objectOrNull(value[index]);
+    if (entry) entries.push(entry);
+  }
+  return entries;
+}
+
+function latestObject(value: unknown): Record<string, unknown> | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  return objectOrNull(value[value.length - 1]);
+}
+
+function eventNumber(event: Record<string, unknown> | null, key: string): number | null {
+  if (!event) return null;
+  return nullableNumber(event[key]);
+}
+
+function eventSampleTimeMs(sample: RuntimeSample, event: Record<string, unknown> | null, key = 'atMs'): number | null {
+  const atMs = eventNumber(event, key);
+  if (atMs === null) return null;
+  const pagePerformanceNowMs = nullableNumber(sample.pagePerformanceNowMs);
+  const pageWallNowMs = nullableNumber(sample.pageWallNowMs);
+  if (
+    atMs > 1_000_000_000 &&
+    pagePerformanceNowMs !== null &&
+    pageWallNowMs !== null
+  ) {
+    return pagePerformanceNowMs - (pageWallNowMs - atMs);
+  }
+  return atMs;
+}
+
+function eventString(event: Record<string, unknown> | null, key: string): string | null {
+  if (!event) return null;
+  const value = event[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function routeSnapDistanceMeters(event: Record<string, unknown> | null): number {
+  if (!event) return 0;
+  return Math.max(
+    eventNumber(event, 'pathStartSnapDistance') ?? 0,
+    eventNumber(event, 'pathEndSnapDistance') ?? 0,
+    eventNumber(event, 'startSnapDistance') ?? 0,
+    eventNumber(event, 'endSnapDistance') ?? 0
+  );
+}
+
+function formatNullableMeters(value: number | null): string {
+  return value === null ? 'na' : `${value.toFixed(2)}m`;
+}
+
+function nearestPresentationGapToSampleTime(
+  sample: RuntimeSample,
+  atMs: number | null,
+): { gap: PresentationGapContextSummary['latest'][number]; deltaMs?: number } | null {
+  const entries = sample.browserStalls?.recent?.rafCadence?.entries ?? [];
+  let nearest: { gap: PresentationGapContextSummary['latest'][number]; deltaMs?: number } | null = null;
+  for (const entry of entries) {
+    const gapMs = Number(entry.gapMs ?? 0);
+    if (!Number.isFinite(gapMs) || gapMs <= 0) continue;
+    const gap: PresentationGapContextSummary['latest'][number] = {
+      atMs: Number(entry.atMs ?? 0),
+      gapMs,
+      estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
+      overBudget60HzMs: Number(entry.overBudget60HzMs ?? 0),
+      droppedFrameTime60HzMs: Number(entry.droppedFrameTime60HzMs ?? 0),
+      presentationContext: objectOrNull(entry.presentationContext),
+      harnessContext: objectOrNull(entry.harnessContext),
+      sampleTs: sample.ts,
+      sampleFrameCount: sample.frameCount,
+    };
+    const gapAtMs = nullableNumber(gap.atMs);
+    const deltaMs = atMs !== null && gapAtMs !== null
+      ? Math.abs(gapAtMs - atMs)
+      : undefined;
+    if (!nearest) {
+      nearest = { gap, deltaMs };
+      continue;
+    }
+    const nearestScore = nearest.deltaMs ?? Number.POSITIVE_INFINITY;
+    const score = deltaMs ?? Number.POSITIVE_INFINITY;
+    if (score < nearestScore || (score === nearestScore && gap.gapMs > nearest.gap.gapMs)) {
+      nearest = { gap, deltaMs };
+    }
+  }
+  return nearest;
+}
+
+function eventKey(kind: string, event: Record<string, unknown>): string {
+  const atMs = eventNumber(event, 'atMs');
+  const id = eventString(event, 'targetId')
+    ?? eventString(event, 'combatantId')
+    ?? eventString(event, 'pathTargetKind')
+    ?? eventString(event, 'status')
+    ?? 'unknown';
+  return `${kind}:${Number.isFinite(atMs) ? atMs!.toFixed(1) : 'na'}:${id}`;
+}
+
+function sanitizeFilePart(value: string): string {
+  const sanitized = value.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+  return sanitized.length > 0 ? sanitized : 'capture';
+}
+
+function selectShotVisualCaptureTrigger(sample: RuntimeSample): ShotVisualCaptureTrigger | null {
+  const latestShotEpoch = latestObject(sample.harnessDriver?.shotEpochs);
+  const latestRouteSnapEpoch = latestObject(sample.harnessDriver?.routeSnapEpochs);
+  const latestTerrainRecoveryEvent = latestObject(sample.terrainRecoveryEvents);
+  if (!latestShotEpoch && !latestRouteSnapEpoch && !latestTerrainRecoveryEvent) return null;
+
+  const shotAtMs = eventSampleTimeMs(sample, latestShotEpoch);
+  const routeAtMs = eventSampleTimeMs(sample, latestRouteSnapEpoch);
+  const recoveryAtMs = eventSampleTimeMs(sample, latestTerrainRecoveryEvent);
+  const shotRouteSnapDistance = routeSnapDistanceMeters(latestShotEpoch);
+  const epochRouteSnapDistance = routeSnapDistanceMeters(latestRouteSnapEpoch);
+  const maxRouteSnapDistance = Math.max(shotRouteSnapDistance, epochRouteSnapDistance);
+  const routeSnapDeltaMs = shotAtMs !== null && routeAtMs !== null
+    ? Math.abs(shotAtMs - routeAtMs)
+    : undefined;
+  const terrainRecoveryDeltaMs = shotAtMs !== null && recoveryAtMs !== null
+    ? Math.abs(shotAtMs - recoveryAtMs)
+    : undefined;
+  const nearestPresentationGap = nearestPresentationGapToSampleTime(
+    sample,
+    shotAtMs ?? routeAtMs ?? recoveryAtMs
+  );
+  const presentationGapDeltaMs = nearestPresentationGap?.deltaMs;
+  const presentationGapNearShot = latestShotEpoch !== null
+    && presentationGapDeltaMs !== undefined
+    && presentationGapDeltaMs <= SHOT_VISUAL_PRESENTATION_GAP_WINDOW_MS;
+
+  let reason: string | null = null;
+  let keyEvent: Record<string, unknown> | null = latestShotEpoch ?? latestRouteSnapEpoch ?? latestTerrainRecoveryEvent;
+  let keyKind = 'visual';
+  if (
+    latestShotEpoch &&
+    routeSnapDeltaMs !== undefined &&
+    routeSnapDeltaMs <= SHOT_VISUAL_CORRELATION_WINDOW_MS &&
+    maxRouteSnapDistance >= SHOT_VISUAL_ROUTE_SNAP_THRESHOLD_M
+  ) {
+    reason = 'shot_route_snap';
+    keyEvent = latestShotEpoch;
+    keyKind = 'shot-route';
+  } else if (
+    latestShotEpoch &&
+    terrainRecoveryDeltaMs !== undefined &&
+    terrainRecoveryDeltaMs <= SHOT_VISUAL_CORRELATION_WINDOW_MS
+  ) {
+    reason = 'shot_terrain_recovery';
+    keyEvent = latestShotEpoch;
+    keyKind = 'shot-recovery';
+  } else if (presentationGapNearShot) {
+    reason = 'shot_presentation_gap';
+    keyEvent = latestShotEpoch;
+    keyKind = 'shot-presentation';
+  } else if (latestShotEpoch && shotRouteSnapDistance >= SHOT_VISUAL_ROUTE_SNAP_THRESHOLD_M) {
+    reason = 'shot_path_snap';
+    keyEvent = latestShotEpoch;
+    keyKind = 'shot-path';
+  } else if (latestRouteSnapEpoch && epochRouteSnapDistance >= SHOT_VISUAL_ROUTE_SNAP_THRESHOLD_M) {
+    reason = 'route_snap';
+    keyEvent = latestRouteSnapEpoch;
+    keyKind = 'route';
+  } else if (latestShotEpoch) {
+    reason = 'shot_epoch';
+    keyEvent = latestShotEpoch;
+    keyKind = 'shot';
+  }
+
+  if (!reason || !keyEvent) return null;
+
+  return {
+    key: eventKey(keyKind, keyEvent),
+    reason,
+    routeSnapDistanceMeters: maxRouteSnapDistance > 0 ? maxRouteSnapDistance : undefined,
+    routeSnapDeltaMs,
+    terrainRecoveryDeltaMs,
+    presentationGapDeltaMs,
+    latestShotEpoch: latestShotEpoch ?? undefined,
+    latestRouteSnapEpoch: latestRouteSnapEpoch ?? undefined,
+    latestTerrainRecoveryEvent: latestTerrainRecoveryEvent ?? undefined,
+    latestPresentationGap: nearestPresentationGap?.gap
+  };
+}
+
+function writeShotVisualCaptureManifest(state: ShotVisualCaptureState): void {
+  if (state.captures.length === 0) return;
+  writeFileSync(
+    join(state.artifactDir, 'shot-visual-captures.json'),
+    JSON.stringify(state.captures, null, 2),
+    'utf-8'
+  );
+}
+
+async function maybeCaptureShotVisualFrame(
+  page: Page,
+  sample: RuntimeSample,
+  sampleIndex: number,
+  sampleElapsedMs: number,
+  state: ShotVisualCaptureState
+): Promise<void> {
+  if (!state.enabled || state.maxCaptures <= 0 || state.captures.length >= state.maxCaptures) return;
+  const trigger = selectShotVisualCaptureTrigger(sample);
+  if (!trigger || state.seenKeys.has(trigger.key)) return;
+  if (state.lastCaptureElapsedMs >= 0 && sampleElapsedMs - state.lastCaptureElapsedMs < state.cooldownMs) return;
+
+  state.seenKeys.add(trigger.key);
+  mkdirSync(join(state.artifactDir, 'shot-visual-captures'), { recursive: true });
+  const ordinal = String(state.captures.length + 1).padStart(2, '0');
+  const file = join('shot-visual-captures', `${ordinal}-${sanitizeFilePart(trigger.reason)}.png`);
+  const screenshot = await safeAwait(
+    'page.screenshot.shot-visual',
+    page.screenshot({ path: join(state.artifactDir, file), fullPage: false }),
+    3_000
+  );
+  if (!screenshot) return;
+
+  state.lastCaptureElapsedMs = sampleElapsedMs;
+  state.captures.push({
+    ts: nowIso(),
+    sampleIndex,
+    sampleElapsedMs,
+    frameCount: sample.frameCount,
+    reason: trigger.reason,
+    file,
+    routeSnapDistanceMeters: trigger.routeSnapDistanceMeters,
+    routeSnapDeltaMs: trigger.routeSnapDeltaMs,
+    terrainRecoveryDeltaMs: trigger.terrainRecoveryDeltaMs,
+    presentationGapDeltaMs: trigger.presentationGapDeltaMs,
+    latestShotEpoch: trigger.latestShotEpoch,
+    latestRouteSnapEpoch: trigger.latestRouteSnapEpoch,
+    latestTerrainRecoveryEvent: trigger.latestTerrainRecoveryEvent,
+    latestPresentationGap: trigger.latestPresentationGap
+  });
+  writeShotVisualCaptureManifest(state);
+  logStep(`📸 Shot visual capture ${ordinal}/${state.maxCaptures}: ${trigger.reason} -> ${file}`);
+}
+
 function normalizeRuntimeLiveness(value: unknown): NonNullable<RuntimeSample['harnessDriver']>['runtimeLiveness'] {
   const raw = objectOrNull(value);
   if (!raw) return null;
@@ -974,6 +1676,7 @@ Common options:
   --duration <seconds>
   --warmup <seconds>
   --seed <number>
+  --driver-seed <number>
   --sample-interval-ms <ms>
   --detail-every-samples <count>
   --runtime-scene-attribution <true|false>
@@ -983,11 +1686,20 @@ Common options:
   --runtime-render-submission-mode <full|summary>
   --runtime-preflight <true|false>
   --renderer <webgpu-strict|webgpu|webgl>
+  --gpu-timing
   --disable-npc-close-models
   --disable-terrain-shadows
+  --terrain-force-instance-upload
+  --disable-terrain-far-canopy-tint
+  --disable-terrain-low-sun-occlusion
+  --disable-wildlife
+  --deep-diagnostics
   --deep-cdp
   --cdp-profiler <true|false>
   --cdp-heap-sampling <true|false>
+  --shot-visual-capture
+  --shot-visual-capture-max <count>
+  --shot-visual-capture-cooldown-ms <ms>
   --trace-window-start-ms <ms>
   --trace-window-duration-ms <ms>
   --server-mode <perf|dev|preview>
@@ -1287,6 +1999,436 @@ function collectRuntimeRenderSubmissionSamples(runtimeSamples: RuntimeSample[]):
   });
 }
 
+function summarizeDroppedFrames(runtimeSamples: RuntimeSample[], durationSeconds: number): DroppedFrameSummary | undefined {
+  const lastSample = runtimeSamples[runtimeSamples.length - 1];
+  if (!lastSample) {
+    return undefined;
+  }
+
+  const frameCount = Number(lastSample.frameCount ?? 0);
+  const hitch33Count = Number(lastSample.hitch33Count ?? 0);
+  const hitch50Count = Number(lastSample.hitch50Count ?? 0);
+  const hitch100Count = Number(lastSample.hitch100Count ?? 0);
+  const percent = (count: number, total: number): number => total > 0 ? (count / total) * 100 : 0;
+  const rafCadence = lastSample.browserStalls?.totals?.rafCadence;
+  const browserRaf = rafCadence
+    ? (() => {
+        const intervalCount = Number(rafCadence.intervalCount ?? 0);
+        const stutter25Count = Number(rafCadence.stutter25Count ?? 0);
+        const hitch33Count = Number(rafCadence.hitch33Count ?? 0);
+        const overBudget60HzMs = Number(rafCadence.overBudget60HzMs ?? 0);
+        const droppedFrameTime60HzMs = Number(rafCadence.droppedFrameTime60HzMs ?? 0);
+        const estimatedDropped60HzFrames = Number(rafCadence.estimatedDropped60HzFrames ?? 0);
+        return {
+          intervalCount,
+          totalGapMs: Number(rafCadence.totalGapMs ?? 0),
+          avgGapMs: Number(rafCadence.avgGapMs ?? 0),
+          maxGapMs: Number(rafCadence.maxGapMs ?? 0),
+          stutter25Count,
+          hitch33Count,
+          hitch50Count: Number(rafCadence.hitch50Count ?? 0),
+          hitch100Count: Number(rafCadence.hitch100Count ?? 0),
+          stutter25Percent: percent(stutter25Count, intervalCount),
+          hitch33Percent: percent(hitch33Count, intervalCount),
+          overBudget60HzMs,
+          overBudget60HzMsPerSecond: durationSeconds > 0
+            ? overBudget60HzMs / durationSeconds
+            : 0,
+          droppedFrameTime60HzMs,
+          droppedFrameTime60HzMsPerSecond: durationSeconds > 0
+            ? droppedFrameTime60HzMs / durationSeconds
+            : 0,
+          estimatedDropped60HzFrames,
+          estimatedDropped60HzFramesPerSecond: durationSeconds > 0
+            ? estimatedDropped60HzFrames / durationSeconds
+            : 0
+        };
+      })()
+    : undefined;
+  const stalls = lastSample.browserStalls?.totals;
+  const observers = stalls
+    ? {
+        longTaskCount: Number(stalls.longTaskCount ?? 0),
+        longTaskTotalDurationMs: Number(stalls.longTaskTotalDurationMs ?? 0),
+        longTaskMaxDurationMs: Number(stalls.longTaskMaxDurationMs ?? 0),
+        longAnimationFrameCount: Number(stalls.longAnimationFrameCount ?? 0),
+        longAnimationFrameTotalDurationMs: Number(stalls.longAnimationFrameTotalDurationMs ?? 0),
+        longAnimationFrameMaxDurationMs: Number(stalls.longAnimationFrameMaxDurationMs ?? 0),
+        longAnimationFrameBlockingDurationMs: Number(stalls.longAnimationFrameBlockingDurationMs ?? 0),
+        webglTextureUploadCount: typeof stalls.webglTextureUploadCount === 'number' ? stalls.webglTextureUploadCount : undefined,
+        webglTextureUploadTotalDurationMs: typeof stalls.webglTextureUploadTotalDurationMs === 'number' ? stalls.webglTextureUploadTotalDurationMs : undefined,
+        webglTextureUploadMaxDurationMs: typeof stalls.webglTextureUploadMaxDurationMs === 'number' ? stalls.webglTextureUploadMaxDurationMs : undefined
+      }
+    : undefined;
+
+  return {
+    engine: {
+      frameCount,
+      hitch33Count,
+      hitch50Count,
+      hitch100Count,
+      hitch33Percent: percent(hitch33Count, frameCount),
+      hitch50Percent: percent(hitch50Count, frameCount),
+      hitch100Percent: percent(hitch100Count, frameCount)
+    },
+    browserRaf,
+    observers
+  };
+}
+
+function compactRenderSubmissionCategory(
+  category: RuntimeRenderSubmissionCategory | undefined
+): RuntimeRenderSubmissionCategory | undefined {
+  if (!category) {
+    return undefined;
+  }
+
+  return {
+    category: category.category,
+    drawSubmissions: category.drawSubmissions,
+    triangles: category.triangles,
+    instances: category.instances,
+    meshes: category.meshes,
+    materials: category.materials,
+    geometries: category.geometries,
+    passTypes: category.passTypes,
+    examples: category.examples?.slice(0, 4)
+  };
+}
+
+function summarizeRenderSubmissions(runtimeSamples: RuntimeSample[]): RenderSubmissionSummary | undefined {
+  const samples = collectRuntimeRenderSubmissionSamples(runtimeSamples)
+    .filter((sample): sample is RuntimeRenderSubmissionSample & { renderSubmissions: RuntimeRenderSubmissionDrain } => (
+      sample.renderSubmissions !== null
+    ));
+  if (samples.length === 0) {
+    return undefined;
+  }
+
+  const latest = samples[samples.length - 1].renderSubmissions;
+  let peakFrame: RuntimeRenderSubmissionFrame | undefined;
+  for (const sample of samples) {
+    for (const frame of sample.renderSubmissions.frames) {
+      if (!peakFrame || frame.drawSubmissions > peakFrame.drawSubmissions) {
+        peakFrame = frame;
+      }
+    }
+  }
+
+  const latestTopCategories = latest.totals
+    .slice()
+    .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles)
+    .slice(0, 8)
+    .map((category) => compactRenderSubmissionCategory(category))
+    .filter((category): category is RuntimeRenderSubmissionCategory => Boolean(category));
+  const latestUnattributed = compactRenderSubmissionCategory(
+    latest.totals.find((category) => category.category === 'unattributed')
+  );
+  const peakFrameTopCategories = peakFrame?.categories
+    .slice()
+    .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles)
+    .slice(0, 8)
+    .map((category) => compactRenderSubmissionCategory(category))
+    .filter((category): category is RuntimeRenderSubmissionCategory => Boolean(category));
+  const peakFrameUnattributed = compactRenderSubmissionCategory(
+    peakFrame?.categories.find((category) => category.category === 'unattributed')
+  );
+
+  return {
+    sampleCount: samples.length,
+    latest: {
+      mode: latest.mode,
+      rawFrameCount: latest.rawFrameCount,
+      frameCountStart: latest.frameCountStart,
+      frameCountEnd: latest.frameCountEnd,
+      topCategories: latestTopCategories,
+      unattributed: latestUnattributed
+    },
+    peakFrame: peakFrame
+      ? {
+          frameCount: peakFrame.frameCount,
+          drawSubmissions: peakFrame.drawSubmissions,
+          triangles: peakFrame.triangles,
+          topCategories: peakFrameTopCategories ?? [],
+          unattributed: peakFrameUnattributed
+        }
+      : undefined
+  };
+}
+
+function incrementCount(counts: Record<string, number>, key: string): void {
+  counts[key] = (counts[key] ?? 0) + 1;
+}
+
+function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): MaterializationTierEventSummary | undefined {
+  const inspectedSamples = runtimeSamples
+    .filter((sample) => Array.isArray(sample.materializationTierEvents))
+    .map((sample) => ({
+      ts: sample.ts,
+      frameCount: sample.frameCount,
+      events: objectArray(sample.materializationTierEvents, 512),
+    }));
+  if (inspectedSamples.length === 0) {
+    return undefined;
+  }
+  const samplesWithEvents = inspectedSamples.filter((sample) => sample.events.length > 0);
+
+  const byTransition: Record<string, number> = {};
+  const byReason: Record<string, number> = {};
+  const byToRender: Record<string, number> = {};
+  let totalEvents = 0;
+  let peakSample: MaterializationTierEventSummary['peakSample'];
+
+  for (const sample of samplesWithEvents) {
+    const sampleByTransition: Record<string, number> = {};
+    const sampleByReason: Record<string, number> = {};
+    for (const event of sample.events) {
+      const fromRender = typeof event.fromRender === 'string' ? event.fromRender : 'null';
+      const toRender = typeof event.toRender === 'string' ? event.toRender : 'unknown';
+      const reason = typeof event.reason === 'string' ? event.reason : 'unknown';
+      const transition = `${fromRender}->${toRender}`;
+      incrementCount(byTransition, transition);
+      incrementCount(byReason, reason);
+      incrementCount(byToRender, toRender);
+      incrementCount(sampleByTransition, transition);
+      incrementCount(sampleByReason, reason);
+      totalEvents++;
+    }
+
+    if (!peakSample || sample.events.length > peakSample.eventCount) {
+      peakSample = {
+        ts: sample.ts,
+        frameCount: sample.frameCount,
+        eventCount: sample.events.length,
+        byTransition: sampleByTransition,
+        byReason: sampleByReason,
+      };
+    }
+  }
+
+  return {
+    sampleCount: inspectedSamples.length,
+    totalEvents,
+    byTransition,
+    byReason,
+    byToRender,
+    peakSample,
+  };
+}
+
+function summarizePresentationGapContexts(
+  runtimeSamples: RuntimeSample[],
+  finalPresentationEpochs: Record<string, unknown>[] = [],
+): PresentationGapContextSummary | undefined {
+  const gaps: PresentationGapContextSummary['latest'] = [];
+
+  for (const entry of finalPresentationEpochs) {
+    const gapMs = Number(entry.gapMs ?? 0);
+    if (!Number.isFinite(gapMs) || gapMs <= 0) continue;
+    gaps.push({
+      seq: Number.isFinite(Number(entry.seq)) ? Number(entry.seq) : undefined,
+      startAtMs: Number.isFinite(Number(entry.startAtMs)) ? Number(entry.startAtMs) : undefined,
+      endAtMs: Number.isFinite(Number(entry.endAtMs)) ? Number(entry.endAtMs) : undefined,
+      gapMs,
+      estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
+      overBudget60HzMs: Number(entry.overBudget60HzMs ?? 0),
+      droppedFrameTime60HzMs: Number(entry.droppedFrameTime60HzMs ?? 0),
+      engineFrameCount: Number.isFinite(Number(entry.engineFrameCount)) ? Number(entry.engineFrameCount) : null,
+      wallAtMs: Number.isFinite(Number(entry.wallAtMs)) ? Number(entry.wallAtMs) : null,
+      visibilityState: typeof entry.visibilityState === 'string' ? entry.visibilityState : null,
+      presentationContext: objectOrNull(entry.presentationContext),
+      harnessContext: objectOrNull(entry.harnessContext),
+    });
+  }
+
+  if (gaps.length === 0) {
+    for (const sample of runtimeSamples) {
+      const entries = sample.browserStalls?.recent?.rafCadence?.entries ?? [];
+      for (const entry of entries) {
+        const gapMs = Number(entry.gapMs ?? 0);
+        if (!Number.isFinite(gapMs) || gapMs <= 0) continue;
+        gaps.push({
+          atMs: Number(entry.atMs ?? 0),
+          gapMs,
+          estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
+          overBudget60HzMs: Number(entry.overBudget60HzMs ?? 0),
+          droppedFrameTime60HzMs: Number(entry.droppedFrameTime60HzMs ?? 0),
+          presentationContext: entry.presentationContext ?? null,
+          harnessContext: entry.harnessContext ?? null,
+          sampleTs: sample.ts,
+          sampleFrameCount: sample.frameCount,
+        });
+      }
+    }
+  }
+
+  if (gaps.length === 0) {
+    return undefined;
+  }
+
+  const latest = gaps
+    .slice()
+    .sort((a, b) => {
+      const aSeq = Number(a.seq ?? -1);
+      const bSeq = Number(b.seq ?? -1);
+      if (aSeq !== bSeq) return aSeq - bSeq;
+      return Number(a.endAtMs ?? a.atMs ?? 0) - Number(b.endAtMs ?? b.atMs ?? 0);
+    })
+    .slice(-32);
+
+  return {
+    sampleCount: runtimeSamples.length,
+    gapCount: gaps.length,
+    maxGapMs: gaps.reduce((max, entry) => Math.max(max, Number(entry.gapMs ?? 0)), 0),
+    latest,
+  };
+}
+
+function collectHarnessShotEpochs(
+  runtimeSamples: RuntimeSample[],
+  harnessDriverFinal?: HarnessDriverFinal | null,
+): Record<string, unknown>[] {
+  const byKey = new Map<string, Record<string, unknown>>();
+  const addEpoch = (epoch: Record<string, unknown>): void => {
+    byKey.set(eventKey('shot', epoch), epoch);
+  };
+  for (const sample of runtimeSamples) {
+    for (const epoch of objectArray(sample.harnessDriver?.shotEpochs, 64)) {
+      addEpoch(epoch);
+    }
+  }
+  for (const epoch of objectArray(harnessDriverFinal?.shotEpochs, 64)) {
+    addEpoch(epoch);
+  }
+  return [...byKey.values()];
+}
+
+function collectShotTerrainEpochs(context: Record<string, unknown>): Record<string, unknown>[] {
+  const terrainEpochs: Record<string, unknown>[] = [];
+  const latestTerrain = objectOrNull(context.terrain);
+  if (latestTerrain) terrainEpochs.push(latestTerrain);
+  const terrainByStage = objectOrNull(context.terrainByStage);
+  if (terrainByStage) {
+    for (const value of Object.values(terrainByStage)) {
+      const terrain = objectOrNull(value);
+      if (terrain) terrainEpochs.push(terrain);
+    }
+  }
+  return terrainEpochs;
+}
+
+function summarizeShotPresentationContexts(
+  shotEpochs: Record<string, unknown>[],
+): ShotPresentationContextStats | null {
+  if (shotEpochs.length === 0) return null;
+  let contextCount = 0;
+  let maxCameraYawDeltaDeg = 0;
+  let maxCameraPitchDeltaDeg = 0;
+  let maxCameraPositionDeltaMeters = 0;
+  let minClearanceMeters: number | null = null;
+  let minEffectiveClearanceMeters: number | null = null;
+  let terrainHashChurnEvents = 0;
+  let terrainNotReadyEvents = 0;
+
+  for (const epoch of shotEpochs) {
+    const context = objectOrNull(epoch.presentationContext);
+    if (!context) continue;
+    contextCount++;
+
+    const cameraEpochs = Array.isArray(context.cameraEpochs)
+      ? context.cameraEpochs
+      : [];
+    for (const cameraEpoch of cameraEpochs) {
+      const camera = objectOrNull(cameraEpoch);
+      const delta = objectOrNull(camera?.deltaFromPrevious);
+      if (!delta) continue;
+      const yaw = Math.abs(Number(delta.yawDeg ?? 0));
+      const pitch = Math.abs(Number(delta.pitchDeg ?? 0));
+      const position = Math.abs(Number(delta.positionMeters ?? 0));
+      if (Number.isFinite(yaw)) maxCameraYawDeltaDeg = Math.max(maxCameraYawDeltaDeg, yaw);
+      if (Number.isFinite(pitch)) maxCameraPitchDeltaDeg = Math.max(maxCameraPitchDeltaDeg, pitch);
+      if (Number.isFinite(position)) maxCameraPositionDeltaMeters = Math.max(maxCameraPositionDeltaMeters, position);
+    }
+
+    const terrainHashes = new Set<string>();
+    for (const terrain of collectShotTerrainEpochs(context)) {
+      if (typeof terrain.tileHash === 'string' && terrain.tileHash.length > 0) {
+        terrainHashes.add(terrain.tileHash);
+      }
+      const sample = objectOrNull(terrain.cameraSample);
+      if (!sample) continue;
+      const clearance = nullableNumber(sample.clearanceMeters);
+      const effectiveClearance = nullableNumber(sample.effectiveClearanceMeters);
+      if (clearance !== null) {
+        minClearanceMeters = minClearanceMeters === null
+          ? clearance
+          : Math.min(minClearanceMeters, clearance);
+      }
+      if (effectiveClearance !== null) {
+        minEffectiveClearanceMeters = minEffectiveClearanceMeters === null
+          ? effectiveClearance
+          : Math.min(minEffectiveClearanceMeters, effectiveClearance);
+      }
+      if (sample.hasTerrain === false || sample.areaReady === false) {
+        terrainNotReadyEvents++;
+      }
+    }
+    if (terrainHashes.size > 1) {
+      terrainHashChurnEvents++;
+    }
+  }
+
+  return {
+    shotEpochCount: shotEpochs.length,
+    contextCount,
+    maxCameraYawDeltaDeg,
+    maxCameraPitchDeltaDeg,
+    maxCameraPositionDeltaMeters,
+    minClearanceMeters,
+    minEffectiveClearanceMeters,
+    terrainHashChurnEvents,
+    terrainNotReadyEvents,
+  };
+}
+
+function latestRendererBackend(runtimeSamples: RuntimeSample[]): RuntimeSample['rendererBackend'] | undefined {
+  for (let i = runtimeSamples.length - 1; i >= 0; i--) {
+    if (runtimeSamples[i].rendererBackend) {
+      return runtimeSamples[i].rendererBackend;
+    }
+  }
+  return undefined;
+}
+
+function summarizeGpuTiming(
+  runtimeSamples: RuntimeSample[],
+  requested: boolean,
+  queryEnabled: boolean,
+): GpuTimingSummary | undefined {
+  if (!requested) {
+    return undefined;
+  }
+
+  const samples = runtimeSamples
+    .map((sample) => sample.gpu)
+    .filter((gpu): gpu is NonNullable<RuntimeSample['gpu']> => Boolean(gpu));
+  const availableSamples = samples.filter((gpu) => gpu.available);
+  const gpuTimes = availableSamples
+    .map((gpu) => Number(gpu.gpuTimeMs ?? 0))
+    .filter((value) => Number.isFinite(value));
+
+  return {
+    requested,
+    queryEnabled,
+    sampleCount: samples.length,
+    availableSamples: availableSamples.length,
+    latest: samples[samples.length - 1],
+    avgGpuTimeMs: gpuTimes.length > 0 ? average(gpuTimes) : undefined,
+    peakGpuTimeMs: gpuTimes.length > 0 ? Math.max(...gpuTimes) : undefined,
+    rendererBackend: latestRendererBackend(runtimeSamples)
+  };
+}
+
 type HarnessModeThresholds = {
   minShotsFired: number;
   minHitsRecorded: number;
@@ -1365,6 +2507,7 @@ function validateRun(
     hitValidation?: 'strict' | 'relaxed' | 'critical' | 'off';
     sampleIntervalMs?: number;
     modeThresholds?: HarnessModeThresholds | null;
+    harnessDriverFinal?: HarnessDriverFinal | null;
   }
 ): ValidationReport {
   const checks: ValidationCheck[] = [];
@@ -1442,8 +2585,16 @@ function validateRun(
   const finalHitch33 = Number(lastSample?.hitch33Count ?? 0);
   const finalHitch50 = Number(lastSample?.hitch50Count ?? 0);
   const finalHitch100 = Number(lastSample?.hitch100Count ?? 0);
+  const hitch33Percent = finalFrameCount > 0 ? (finalHitch33 / finalFrameCount) * 100 : 0;
   const hitch50Percent = finalFrameCount > 0 ? (finalHitch50 / finalFrameCount) * 100 : 0;
   const hitch100Percent = finalFrameCount > 0 ? (finalHitch100 / finalFrameCount) * 100 : 0;
+
+  checks.push({
+    id: 'hitch_33ms_percent',
+    status: hitch33Percent < 0.25 ? 'pass' : hitch33Percent < 1.0 ? 'warn' : 'fail',
+    value: hitch33Percent,
+    message: `Frames >33ms ${hitch33Percent.toFixed(2)}% (${finalHitch33}/${finalFrameCount})`
+  });
 
   checks.push({
     id: 'hitch_50ms_percent',
@@ -1458,6 +2609,49 @@ function validateRun(
     value: hitch100Percent,
     message: `Frames >100ms ${hitch100Percent.toFixed(2)}% (${finalHitch100}/${finalFrameCount})`
   });
+
+  const finalRafCadence = lastSample?.browserStalls?.totals?.rafCadence;
+  if (finalRafCadence) {
+    const rafIntervalCount = Number(finalRafCadence.intervalCount ?? 0);
+    const rafStutter25Count = Number(finalRafCadence.stutter25Count ?? 0);
+    const rafHitch33Count = Number(finalRafCadence.hitch33Count ?? 0);
+    const rafDropped60HzFrames = Number(finalRafCadence.estimatedDropped60HzFrames ?? 0);
+    const rafDroppedFrameTime60HzMs = Number(finalRafCadence.droppedFrameTime60HzMs ?? 0);
+    const rafStutter25Percent = rafIntervalCount > 0 ? (rafStutter25Count / rafIntervalCount) * 100 : 0;
+    const rafHitch33Percent = rafIntervalCount > 0 ? (rafHitch33Count / rafIntervalCount) * 100 : 0;
+    const rafDroppedPerSecond = durationSeconds > 0 ? rafDropped60HzFrames / durationSeconds : 0;
+    const rafDroppedFrameTimePerSecond = durationSeconds > 0
+      ? rafDroppedFrameTime60HzMs / durationSeconds
+      : 0;
+
+    checks.push({
+      id: 'raf_stutter_25ms_percent',
+      status: rafStutter25Percent < 0.5 ? 'pass' : rafStutter25Percent < 2.0 ? 'warn' : 'fail',
+      value: rafStutter25Percent,
+      message: `Browser rAF gaps >25ms ${rafStutter25Percent.toFixed(2)}% (${rafStutter25Count}/${rafIntervalCount})`
+    });
+
+    checks.push({
+      id: 'raf_hitch_33ms_percent',
+      status: rafHitch33Percent < 0.25 ? 'pass' : rafHitch33Percent < 1.0 ? 'warn' : 'fail',
+      value: rafHitch33Percent,
+      message: `Browser rAF gaps >33ms ${rafHitch33Percent.toFixed(2)}% (${rafHitch33Count}/${rafIntervalCount})`
+    });
+
+    checks.push({
+      id: 'raf_estimated_dropped_60hz_frames_per_second',
+      status: rafDroppedPerSecond < 0.1 ? 'pass' : rafDroppedPerSecond < 0.5 ? 'warn' : 'fail',
+      value: rafDroppedPerSecond,
+      message: `Estimated dropped 60Hz presentation frames ${rafDropped60HzFrames} over ${durationSeconds}s (${rafDroppedPerSecond.toFixed(2)}/s)`
+    });
+
+    checks.push({
+      id: 'raf_dropped_frame_time_60hz_ms_per_second',
+      status: rafDroppedFrameTimePerSecond < 1 ? 'pass' : rafDroppedFrameTimePerSecond < 5 ? 'warn' : 'fail',
+      value: rafDroppedFrameTimePerSecond,
+      message: `Dropped-frame time over 60Hz budget ${rafDroppedFrameTime60HzMs.toFixed(1)}ms over ${durationSeconds}s (${rafDroppedFrameTimePerSecond.toFixed(2)}ms/s)`
+    });
+  }
 
   const avgOverBudget = average(runtimeSamples.map(s => s.overBudgetPercent));
   checks.push({
@@ -1522,34 +2716,55 @@ function validateRun(
   const hitValidationMode = options?.hitValidation ?? 'off';
   if (hitValidationMode !== 'off') {
     const shotSamples = runtimeSamples.filter(s => typeof s.shotsThisSession === 'number');
+    const driverShotSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.engineShotsFired))
+      .filter(Number.isFinite);
+    const driverHitSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.engineShotsHit))
+      .filter(Number.isFinite);
+    const finalDriverShots = Number(options?.harnessDriverFinal?.engineShotsFired);
+    const finalDriverHits = Number(options?.harnessDriverFinal?.engineShotsHit);
     const maxShots = shotSamples.length > 0
       ? Math.max(...shotSamples.map(s => Number(s.shotsThisSession ?? 0)))
       : 0;
+    const maxEngineShots = Math.max(
+      maxShots,
+      driverShotSamples.length > 0 ? Math.max(...driverShotSamples) : 0,
+      Number.isFinite(finalDriverShots) ? finalDriverShots : 0
+    );
     const maxHits = shotSamples.length > 0
       ? Math.max(...shotSamples.map(s => Number(s.hitsThisSession ?? 0)))
       : 0;
-    const peakHitRate = shotSamples.length > 0
+    const maxEngineHits = Math.max(
+      maxHits,
+      driverHitSamples.length > 0 ? Math.max(...driverHitSamples) : 0,
+      Number.isFinite(finalDriverHits) ? finalDriverHits : 0
+    );
+    const peakSampleHitRate = shotSamples.length > 0
       ? Math.max(...shotSamples.map(s => Number(s.hitRate ?? 0)))
       : 0;
+    const finalDriverHitRate = Number.isFinite(finalDriverShots) && finalDriverShots > 0 && Number.isFinite(finalDriverHits)
+      ? finalDriverHits / finalDriverShots
+      : 0;
+    const peakHitRate = Math.max(peakSampleHitRate, finalDriverHitRate);
 
-    const strict = hitValidationMode === 'strict';
     const isBehaviorCritical = hitValidationMode === 'strict' || hitValidationMode === 'critical';
     checks.push({
       id: 'player_shots_recorded',
       status: isBehaviorCritical
-        ? (maxShots >= 5 ? 'pass' : maxShots > 0 ? 'warn' : 'fail')
-        : (maxShots >= 3 ? 'pass' : 'warn'),
-      value: maxShots,
-      message: `Recorded player shots in sim=${maxShots}`
+        ? (maxEngineShots >= 5 ? 'pass' : maxEngineShots > 0 ? 'warn' : 'fail')
+        : (maxEngineShots >= 3 ? 'pass' : 'warn'),
+      value: maxEngineShots,
+      message: `Recorded player shots in sim=${maxEngineShots}`
     });
 
     checks.push({
       id: 'player_hits_recorded',
       status: isBehaviorCritical
-        ? (maxHits >= 1 ? 'pass' : 'fail')
-        : (maxHits >= 1 ? 'pass' : 'warn'),
-      value: maxHits,
-      message: `Recorded player hits in sim=${maxHits}`
+        ? (maxEngineHits >= 1 ? 'pass' : 'fail')
+        : (maxEngineHits >= 1 ? 'pass' : 'warn'),
+      value: maxEngineHits,
+      message: `Recorded player hits in sim=${maxEngineHits}`
     });
 
     checks.push({
@@ -1640,12 +2855,27 @@ function validateRun(
   const modeThresholds = options?.modeThresholds ?? null;
   if (modeThresholds) {
     const shotSamples = runtimeSamples.filter(s => typeof s.shotsThisSession === 'number');
-    const finalShots = shotSamples.length > 0
-      ? Number(shotSamples[shotSamples.length - 1].shotsThisSession ?? 0)
-      : 0;
-    const finalHits = shotSamples.length > 0
-      ? Number(shotSamples[shotSamples.length - 1].hitsThisSession ?? 0)
-      : 0;
+    const lastShotSample = shotSamples.length > 0 ? shotSamples[shotSamples.length - 1] : null;
+    const sampleFinalShots = lastShotSample ? Number(lastShotSample.shotsThisSession ?? 0) : 0;
+    const sampleFinalHits = lastShotSample ? Number(lastShotSample.hitsThisSession ?? 0) : 0;
+    const driverShotSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.engineShotsFired))
+      .filter(Number.isFinite);
+    const driverHitSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.engineShotsHit))
+      .filter(Number.isFinite);
+    const finalDriverShots = Number(options?.harnessDriverFinal?.engineShotsFired);
+    const finalDriverHits = Number(options?.harnessDriverFinal?.engineShotsHit);
+    const finalShots = Math.max(
+      sampleFinalShots,
+      driverShotSamples.length > 0 ? driverShotSamples[driverShotSamples.length - 1] : 0,
+      Number.isFinite(finalDriverShots) ? finalDriverShots : 0
+    );
+    const finalHits = Math.max(
+      sampleFinalHits,
+      driverHitSamples.length > 0 ? driverHitSamples[driverHitSamples.length - 1] : 0,
+      Number.isFinite(finalDriverHits) ? finalDriverHits : 0
+    );
     const maxStuckSeconds = runtimeSamples.reduce((max, s) => {
       const v = Number(s.harnessDriver?.maxStuckSeconds ?? 0);
       return v > max ? v : max;
@@ -1699,6 +2929,292 @@ function validateRun(
         message: `Harness movement transitions=${finalTransitions} (min=${modeThresholds.minMovementTransitions})`
       });
     }
+  }
+
+  const routeSnapStartDistances = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxPathStartSnapDistance ?? s.harnessDriver?.pathStartSnapDistance))
+    .filter(Number.isFinite);
+  const routeSnapEndDistances = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxPathEndSnapDistance ?? s.harnessDriver?.pathEndSnapDistance))
+    .filter(Number.isFinite);
+  const finalMaxStartSnap = Number(options?.harnessDriverFinal?.maxPathStartSnapDistance);
+  const finalMaxEndSnap = Number(options?.harnessDriverFinal?.maxPathEndSnapDistance);
+  if (Number.isFinite(finalMaxStartSnap)) routeSnapStartDistances.push(finalMaxStartSnap);
+  if (Number.isFinite(finalMaxEndSnap)) routeSnapEndDistances.push(finalMaxEndSnap);
+  const maxRouteSnapDistance = Math.max(
+    0,
+    routeSnapStartDistances.length > 0 ? Math.max(...routeSnapStartDistances) : 0,
+    routeSnapEndDistances.length > 0 ? Math.max(...routeSnapEndDistances) : 0
+  );
+  const sampleUntrustedSnapCount = runtimeSamples.reduce((max, s) => {
+    const v = Number(s.harnessDriver?.untrustedPathSnapCount ?? 0);
+    return Number.isFinite(v) && v > max ? v : max;
+  }, 0);
+  const finalUntrustedSnapCount = Number(options?.harnessDriverFinal?.untrustedPathSnapCount);
+  const untrustedSnapCount = Math.max(
+    sampleUntrustedSnapCount,
+    Number.isFinite(finalUntrustedSnapCount) ? finalUntrustedSnapCount : 0
+  );
+  if (maxRouteSnapDistance > 0 || untrustedSnapCount > 0) {
+    checks.push({
+      id: 'harness_route_snap_trust',
+      status: untrustedSnapCount === 0 && maxRouteSnapDistance <= 24 ? 'pass' : 'warn',
+      value: maxRouteSnapDistance,
+      message: `Harness max navmesh route snap ${maxRouteSnapDistance.toFixed(1)}m; untrusted snapped paths rejected=${untrustedSnapCount}`
+    });
+  }
+
+  const routeProgressTravelMeters = Math.max(
+    0,
+    ...runtimeSamples
+      .map(s => Number(s.harnessDriver?.routeProgressTravelMeters))
+      .filter(Number.isFinite),
+    Number.isFinite(Number(options?.harnessDriverFinal?.routeProgressTravelMeters))
+      ? Number(options?.harnessDriverFinal?.routeProgressTravelMeters)
+      : 0
+  );
+  const finalObjectiveDistanceClosed = Number(options?.harnessDriverFinal?.objectiveDistanceClosed);
+  const objectiveDistanceClosed = Number.isFinite(finalObjectiveDistanceClosed)
+    ? finalObjectiveDistanceClosed
+    : (() => {
+        const values = runtimeSamples
+          .map(s => Number(s.harnessDriver?.objectiveDistanceClosed))
+          .filter(Number.isFinite);
+        return values.length > 0 ? values[values.length - 1] : 0;
+      })();
+  const finalRouteProgressAgeMs = Number(options?.harnessDriverFinal?.routeProgressAgeMs);
+  const routeProgressAgeMs = Math.max(
+    0,
+    ...runtimeSamples
+      .map(s => Number(s.harnessDriver?.routeProgressAgeMs))
+      .filter(Number.isFinite),
+    Number.isFinite(finalRouteProgressAgeMs) ? finalRouteProgressAgeMs : 0
+  );
+  if (
+    routeProgressTravelMeters > 0
+    || Math.abs(objectiveDistanceClosed) > 0
+    || routeProgressAgeMs > 0
+  ) {
+    const movedWithoutClosure =
+      routeProgressTravelMeters >= 25
+      && objectiveDistanceClosed <= 0
+      && routeProgressAgeMs >= 6000;
+    checks.push({
+      id: 'harness_route_progress_trust',
+      status: movedWithoutClosure ? 'warn' : 'pass',
+      value: objectiveDistanceClosed,
+      message: `Harness route progress closed=${objectiveDistanceClosed.toFixed(1)}m after ${routeProgressTravelMeters.toFixed(1)}m travel; route age=${(routeProgressAgeMs / 1000).toFixed(1)}s`
+    });
+  }
+
+  const hasHarnessSamples = runtimeSamples.some(s => !!s.harnessDriver) || !!options?.harnessDriverFinal;
+  if (hasHarnessSamples) {
+    const finalFrontlineMoveCount = Number(options?.harnessDriverFinal?.frontlineMoveCount);
+    const finalFrontlineDistance = Number(options?.harnessDriverFinal?.frontlineDistance);
+    const finalFrontlineCompressed = options?.harnessDriverFinal?.frontlineCompressed === true;
+    if (options?.harnessDriverFinal) {
+      const movedActors = Number.isFinite(finalFrontlineMoveCount) ? finalFrontlineMoveCount : 0;
+      const distance = Number.isFinite(finalFrontlineDistance) ? finalFrontlineDistance : 0;
+      checks.push({
+        id: 'harness_frontline_compression_equivalence',
+        status: movedActors > 0 ? 'warn' : 'pass',
+        value: movedActors,
+        message: `Harness frontline compression compressed=${finalFrontlineCompressed ? 1 : 0}; movedActors=${movedActors}; distance=${distance.toFixed(1)}m`
+      });
+    }
+
+    const sampleWorldMovementCalls = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.worldMovementIntentCalls ?? 0);
+      return Number.isFinite(v) && v > max ? v : max;
+    }, 0);
+    const sampleCameraMovementCalls = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.cameraMovementIntentCalls ?? 0);
+      return Number.isFinite(v) && v > max ? v : max;
+    }, 0);
+    const sampleNonZeroWorldMovementCalls = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.nonZeroWorldMovementIntentCalls ?? 0);
+      return Number.isFinite(v) && v > max ? v : max;
+    }, 0);
+    const sampleNonZeroCameraMovementCalls = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.nonZeroCameraMovementIntentCalls ?? 0);
+      return Number.isFinite(v) && v > max ? v : max;
+    }, 0);
+    const finalWorldMovementCalls = Number(options?.harnessDriverFinal?.worldMovementIntentCalls);
+    const finalCameraMovementCalls = Number(options?.harnessDriverFinal?.cameraMovementIntentCalls);
+    const finalNonZeroWorldMovementCalls = Number(options?.harnessDriverFinal?.nonZeroWorldMovementIntentCalls);
+    const finalNonZeroCameraMovementCalls = Number(options?.harnessDriverFinal?.nonZeroCameraMovementIntentCalls);
+    const worldMovementCalls = Math.max(
+      sampleWorldMovementCalls,
+      Number.isFinite(finalWorldMovementCalls) ? finalWorldMovementCalls : 0
+    );
+    const cameraMovementCalls = Math.max(
+      sampleCameraMovementCalls,
+      Number.isFinite(finalCameraMovementCalls) ? finalCameraMovementCalls : 0
+    );
+    const nonZeroWorldMovementCalls = Math.max(
+      sampleNonZeroWorldMovementCalls,
+      Number.isFinite(finalNonZeroWorldMovementCalls) ? finalNonZeroWorldMovementCalls : 0
+    );
+    const nonZeroCameraMovementCalls = Math.max(
+      sampleNonZeroCameraMovementCalls,
+      Number.isFinite(finalNonZeroCameraMovementCalls) ? finalNonZeroCameraMovementCalls : 0
+    );
+    if (worldMovementCalls > 0 || cameraMovementCalls > 0) {
+      checks.push({
+        id: 'harness_movement_mode_equivalence',
+        status: worldMovementCalls > 0 ? 'warn' : 'pass',
+        value: worldMovementCalls,
+        message: `Harness movement modes world=${worldMovementCalls} camera=${cameraMovementCalls}; nonZeroWorld=${nonZeroWorldMovementCalls}; nonZeroCamera=${nonZeroCameraMovementCalls}`
+      });
+    }
+
+    const sampleUnknownTargetChecks = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.losUnknownTargetChecks ?? 0);
+      return Number.isFinite(v) && v > max ? v : max;
+    }, 0);
+    const sampleUnknownFireLos = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.fireUnknownLosRejectedShots ?? 0);
+      return Number.isFinite(v) && v > max ? v : max;
+    }, 0);
+    const finalUnknownTargetChecks = Number(options?.harnessDriverFinal?.losUnknownTargetChecks);
+    const finalUnknownFireLos = Number(options?.harnessDriverFinal?.fireUnknownLosRejectedShots);
+    const unknownTargetChecks = Math.max(
+      sampleUnknownTargetChecks,
+      Number.isFinite(finalUnknownTargetChecks) ? finalUnknownTargetChecks : 0
+    );
+    const unknownFireLos = Math.max(
+      sampleUnknownFireLos,
+      Number.isFinite(finalUnknownFireLos) ? finalUnknownFireLos : 0
+    );
+    checks.push({
+      id: 'harness_terrain_los_trust',
+      status: unknownFireLos === 0 && unknownTargetChecks === 0
+        ? 'pass'
+        : unknownFireLos > 0
+          ? 'fail'
+          : 'warn',
+      value: unknownFireLos,
+      message: `Harness terrain LOS unknown target checks=${unknownTargetChecks}; unknown fire rejections=${unknownFireLos}`
+    });
+  }
+
+  const aimMoveDivergenceValues = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxAimMovementDivergenceDeg))
+    .filter(Number.isFinite);
+  const finalAimMoveDivergence = Number(options?.harnessDriverFinal?.maxAimMovementDivergenceDeg);
+  if (Number.isFinite(finalAimMoveDivergence)) aimMoveDivergenceValues.push(finalAimMoveDivergence);
+  const maxAimMovementDivergence = aimMoveDivergenceValues.length > 0
+    ? Math.max(...aimMoveDivergenceValues)
+    : 0;
+  const sampleAimMovementSamples = runtimeSamples.reduce((max, s) => {
+    const v = Number(s.harnessDriver?.aimMovementDivergenceSamples ?? 0);
+    return Number.isFinite(v) && v > max ? v : max;
+  }, 0);
+  const sampleAimMovementOver45 = runtimeSamples.reduce((max, s) => {
+    const v = Number(s.harnessDriver?.aimMovementDivergenceOver45Count ?? 0);
+    return Number.isFinite(v) && v > max ? v : max;
+  }, 0);
+  const finalAimMovementSamples = Number(options?.harnessDriverFinal?.aimMovementDivergenceSamples);
+  const finalAimMovementOver45 = Number(options?.harnessDriverFinal?.aimMovementDivergenceOver45Count);
+  const aimMovementSamples = Math.max(
+    sampleAimMovementSamples,
+    Number.isFinite(finalAimMovementSamples) ? finalAimMovementSamples : 0
+  );
+  const aimMovementOver45 = Math.max(
+    sampleAimMovementOver45,
+    Number.isFinite(finalAimMovementOver45) ? finalAimMovementOver45 : 0
+  );
+  if (aimMovementSamples > 0) {
+    const divergenceRatio = aimMovementOver45 / aimMovementSamples;
+    const mechanicallyClean = maxAimMovementDivergence <= 45 && aimMovementOver45 === 0;
+    checks.push({
+      id: 'harness_aim_movement_equivalence',
+      status: mechanicallyClean ? 'pass' : 'warn',
+      value: maxAimMovementDivergence,
+      message: `Harness max aim/movement divergence ${maxAimMovementDivergence.toFixed(1)}deg; over45=${aimMovementOver45}/${aimMovementSamples} (${(divergenceRatio * 100).toFixed(1)}%)`
+    });
+  }
+
+  const maxRequestedViewYawDeltaValues = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxRequestedViewYawDeltaDeg))
+    .filter(Number.isFinite);
+  const maxRequestedViewPitchDeltaValues = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxRequestedViewPitchDeltaDeg))
+    .filter(Number.isFinite);
+  const maxRemainingViewYawErrorValues = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxRemainingViewYawErrorDeg))
+    .filter(Number.isFinite);
+  const maxRemainingViewPitchErrorValues = runtimeSamples
+    .map(s => Number(s.harnessDriver?.maxRemainingViewPitchErrorDeg))
+    .filter(Number.isFinite);
+  const finalMaxRequestedViewYawDelta = Number(options?.harnessDriverFinal?.maxRequestedViewYawDeltaDeg);
+  const finalMaxRequestedViewPitchDelta = Number(options?.harnessDriverFinal?.maxRequestedViewPitchDeltaDeg);
+  const finalMaxRemainingViewYawError = Number(options?.harnessDriverFinal?.maxRemainingViewYawErrorDeg);
+  const finalMaxRemainingViewPitchError = Number(options?.harnessDriverFinal?.maxRemainingViewPitchErrorDeg);
+  if (Number.isFinite(finalMaxRequestedViewYawDelta)) maxRequestedViewYawDeltaValues.push(finalMaxRequestedViewYawDelta);
+  if (Number.isFinite(finalMaxRequestedViewPitchDelta)) maxRequestedViewPitchDeltaValues.push(finalMaxRequestedViewPitchDelta);
+  if (Number.isFinite(finalMaxRemainingViewYawError)) maxRemainingViewYawErrorValues.push(finalMaxRemainingViewYawError);
+  if (Number.isFinite(finalMaxRemainingViewPitchError)) maxRemainingViewPitchErrorValues.push(finalMaxRemainingViewPitchError);
+  const maxRequestedViewYawDelta = maxRequestedViewYawDeltaValues.length > 0
+    ? Math.max(...maxRequestedViewYawDeltaValues)
+    : 0;
+  const maxRequestedViewPitchDelta = maxRequestedViewPitchDeltaValues.length > 0
+    ? Math.max(...maxRequestedViewPitchDeltaValues)
+    : 0;
+  const maxRemainingViewYawError = maxRemainingViewYawErrorValues.length > 0
+    ? Math.max(...maxRemainingViewYawErrorValues)
+    : 0;
+  const maxRemainingViewPitchError = maxRemainingViewPitchErrorValues.length > 0
+    ? Math.max(...maxRemainingViewPitchErrorValues)
+    : 0;
+  const finalLargeViewTurnCount = Number(options?.harnessDriverFinal?.largeViewTurnCount);
+  const sampleLargeViewTurnCount = runtimeSamples.reduce((max, s) => {
+    const v = Number(s.harnessDriver?.largeViewTurnCount ?? 0);
+    return Number.isFinite(v) && v > max ? v : max;
+  }, 0);
+  const largeViewTurnCount = Math.max(
+    sampleLargeViewTurnCount,
+    Number.isFinite(finalLargeViewTurnCount) ? finalLargeViewTurnCount : 0
+  );
+  if (
+    maxRequestedViewYawDelta > 0
+    || maxRequestedViewPitchDelta > 0
+    || maxRemainingViewYawError > 0
+    || maxRemainingViewPitchError > 0
+  ) {
+    const hasLargeRequest = largeViewTurnCount > 0
+      || maxRequestedViewYawDelta > 45
+      || maxRequestedViewPitchDelta > 45
+      || maxRemainingViewYawError > 30
+      || maxRemainingViewPitchError > 15;
+    checks.push({
+      id: 'harness_view_slew_request_equivalence',
+      status: hasLargeRequest ? 'warn' : 'pass',
+      value: Math.max(maxRequestedViewYawDelta, maxRequestedViewPitchDelta),
+      message: `Harness requested view delta yaw=${maxRequestedViewYawDelta.toFixed(1)}deg pitch=${maxRequestedViewPitchDelta.toFixed(1)}deg; remaining yaw=${maxRemainingViewYawError.toFixed(1)}deg pitch=${maxRemainingViewPitchError.toFixed(1)}deg; largeRequests=${largeViewTurnCount}`
+    });
+  }
+
+  const shotPresentationStats = summarizeShotPresentationContexts(
+    collectHarnessShotEpochs(runtimeSamples, options?.harnessDriverFinal)
+  );
+  if (shotPresentationStats && shotPresentationStats.shotEpochCount > 0) {
+    const minShotClearance = shotPresentationStats.minEffectiveClearanceMeters
+      ?? shotPresentationStats.minClearanceMeters;
+    const shotContextAnomaly =
+      shotPresentationStats.contextCount === 0
+      || shotPresentationStats.maxCameraYawDeltaDeg > 30
+      || shotPresentationStats.maxCameraPitchDeltaDeg > 15
+      || shotPresentationStats.maxCameraPositionDeltaMeters > 2
+      || (minShotClearance !== null && minShotClearance < 0.75)
+      || shotPresentationStats.terrainHashChurnEvents > 0
+      || shotPresentationStats.terrainNotReadyEvents > 0;
+    checks.push({
+      id: 'harness_shot_presentation_context_equivalence',
+      status: shotContextAnomaly ? 'warn' : 'pass',
+      value: shotPresentationStats.contextCount,
+      message: `Shot presentation contexts=${shotPresentationStats.contextCount}/${shotPresentationStats.shotEpochCount}; cameraDelta yaw=${shotPresentationStats.maxCameraYawDeltaDeg.toFixed(1)}deg pitch=${shotPresentationStats.maxCameraPitchDeltaDeg.toFixed(1)}deg pos=${shotPresentationStats.maxCameraPositionDeltaMeters.toFixed(2)}m; minClearance=${formatNullableMeters(shotPresentationStats.minClearanceMeters)} effective=${formatNullableMeters(shotPresentationStats.minEffectiveClearanceMeters)}; terrainHashChurn=${shotPresentationStats.terrainHashChurnEvents}; terrainNotReady=${shotPresentationStats.terrainNotReadyEvents}`
+    });
   }
 
   return {
@@ -1927,6 +3443,8 @@ async function waitForRendering(
 
   const probeIntervalSeconds = 3;
   const maxSamples = Math.max(1, Math.ceil(maxStartupSeconds / probeIntervalSeconds));
+  const minLiveFrameRateFps = 8;
+  const minLiveProgressWindowSeconds = 9;
   let count = 0;
   let rafTicks = 0;
   let firstEngineSeenSec: number | undefined;
@@ -1934,6 +3452,8 @@ async function waitForRendering(
   let lastStartupMark: string | undefined;
   let lastStartupMarkMs: number | undefined;
   let stalledGameplaySamples = 0;
+  const liveProgressWindow: Array<{ seconds: number; frameCount: number }> = [];
+  let liveProgressWindowHead = 0;
   for (let i = 0; i < maxSamples; i++) {
     await sleep(probeIntervalSeconds * 1000);
     try {
@@ -1966,6 +3486,22 @@ async function waitForRendering(
         + `${startupMsg}${combatMsg}`
       );
       if (probe.gameStarted && probe.frameCount > 0) {
+        const elapsedSeconds = (i + 1) * probeIntervalSeconds;
+        liveProgressWindow.push({ seconds: elapsedSeconds, frameCount: probe.frameCount });
+        while (
+          liveProgressWindow.length - liveProgressWindowHead > 1
+          && elapsedSeconds - liveProgressWindow[liveProgressWindowHead].seconds > minLiveProgressWindowSeconds
+        ) {
+          liveProgressWindowHead++;
+        }
+        if (liveProgressWindowHead > 16 && liveProgressWindowHead * 2 > liveProgressWindow.length) {
+          const retainedLiveProgressSamples = liveProgressWindow.length - liveProgressWindowHead;
+          for (let j = 0; j < retainedLiveProgressSamples; j++) {
+            liveProgressWindow[j] = liveProgressWindow[j + liveProgressWindowHead];
+          }
+          liveProgressWindow.length = retainedLiveProgressSamples;
+          liveProgressWindowHead = 0;
+        }
         stalledGameplaySamples = frameDelta <= 0 && rafDelta <= 0
           ? stalledGameplaySamples + 1
           : 0;
@@ -1980,12 +3516,40 @@ async function waitForRendering(
             lastStartupMarkMs
           };
         }
+        const firstLiveSample = liveProgressWindow[liveProgressWindowHead];
+        const liveElapsedSeconds = elapsedSeconds - firstLiveSample.seconds;
+        const liveFrameDelta = probe.frameCount - firstLiveSample.frameCount;
+        if (probe.frameCount >= frameThreshold) {
+          return {
+            started: true,
+            lastFrameCount: count,
+            firstEngineSeenSec,
+            firstMetricsSeenSec,
+            thresholdReachedSec: elapsedSeconds,
+            lastStartupMark,
+            lastStartupMarkMs
+          };
+        }
+        if (liveElapsedSeconds >= minLiveProgressWindowSeconds) {
+          const liveFrameRate = liveFrameDelta / liveElapsedSeconds;
+          if (liveFrameRate < minLiveFrameRateFps) {
+            return {
+              started: false,
+              lastFrameCount: probe.frameCount,
+              reason: `Gameplay startup is live but frame progress is too slow (${liveFrameRate.toFixed(2)} fps over ${liveElapsedSeconds.toFixed(1)}s, frameCount=${probe.frameCount}, threshold=${frameThreshold}, phase=${probe.startupPhase ?? 'unknown'}, hidden=${probe.hidden}, visibility=${probe.visibilityState})`,
+              firstEngineSeenSec,
+              firstMetricsSeenSec,
+              lastStartupMark,
+              lastStartupMarkMs
+            };
+          }
+        }
       }
     } catch {
       // If early runtime globals are not available yet, keep probing until timeout.
       count = 0;
     }
-    if (count > frameThreshold) {
+    if (count >= frameThreshold) {
       return {
         started: true,
         lastFrameCount: count,
@@ -2141,6 +3705,14 @@ async function startRequestedMode(page: Page, requestedMode: string, startupTime
     3000
   );
 
+  if (finalModeState?.gameStarted || finalModeState?.phase === 'live') {
+    logStep(
+      `⚠ Mode ${requestedMode} reached live state after poll timeouts; continuing ` +
+      `(phase=${finalModeState.phase ?? 'unknown'}, gameStarted=${finalModeState.gameStarted ? 1 : 0})`
+    );
+    return;
+  }
+
   throw new Error(
     `Failed to start requested mode ${requestedMode}: timeout` +
     ` (phase=${finalModeState?.phase ?? 'unknown'}, gameStarted=${finalModeState?.gameStarted ? 1 : 0},` +
@@ -2151,6 +3723,7 @@ async function startRequestedMode(page: Page, requestedMode: string, startupTime
 type ActiveScenarioOptions = {
   enabled: boolean;
   mode: string;
+  driverSeed: number | null;
   compressFrontline: boolean;
   allowWarpRecovery: boolean;
   topUpHealth: boolean;
@@ -2183,7 +3756,7 @@ async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOpti
   );
 
   logStep(
-    `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, mode=${String(setupResult?.mode ?? options.mode)}, compressFrontline=${Boolean(setupResult?.compressFrontline)}, allowWarpRecovery=${Boolean(setupResult?.allowWarpRecovery)}, topUpHealth=${Boolean(setupResult?.topUpHealth)}, autoRespawn=${Boolean(setupResult?.autoRespawn)})`
+    `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, mode=${String(setupResult?.mode ?? options.mode)}, driverSeed=${setupResult?.driverSeed ?? options.driverSeed ?? 'none'}, driverIntervalMs=${Number(setupResult?.movementDecisionIntervalMs ?? options.movementDecisionIntervalMs)}, compressFrontline=${Boolean(setupResult?.compressFrontline)}, allowWarpRecovery=${Boolean(setupResult?.allowWarpRecovery)}, topUpHealth=${Boolean(setupResult?.topUpHealth)}, autoRespawn=${Boolean(setupResult?.autoRespawn)})`
   );
 }
 
@@ -2198,22 +3771,79 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
 
   const runtimeLiveness = normalizeRuntimeLiveness(result.runtimeLiveness);
   logStep(
-    `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, stuckWaypointSkips=${Number(result.stuckWaypointSkips ?? 0)}, routeTargetResets=${Number(result.routeTargetResets ?? 0)}, routeNoProgressResets=${Number(result.routeNoProgressResets ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)}, intent=${Number(result.nonZeroMovementIntentCalls ?? 0)}/${Number(result.movementIntentCalls ?? 0)}, engineFrames=${Number(runtimeLiveness?.engineFrameCount ?? 0)}, raf=${Number(runtimeLiveness?.harnessRafTicks ?? 0)}, playerMoveSamples=${Number(runtimeLiveness?.playerMovementSamples ?? 0)}, kills=${Number(result.kills ?? 0)}, damageDealt=${Number(result.damageDealt ?? 0).toFixed(1)}, damageTaken=${Number(result.damageTaken ?? 0).toFixed(1)}, accuracy=${(Number(result.accuracy ?? 0) * 100).toFixed(1)}%)`
+    `🎮 Active driver stopped (respawns=${result.respawnCount}, driverIntervalMs=${Number(result.movementDecisionIntervalMs ?? 0)}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, losUnknown=${Number(result.losUnknownTargetChecks ?? 0)}/${Number(result.fireUnknownLosRejectedShots ?? 0)}, deadTargetDrops=${Number(result.droppedDeadTargetLocks ?? 0)}, firingRetargets=${Number(result.firingRetargets ?? 0)}, retargetFireStops=${Number(result.firingRetargetFireStops ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, stuckWaypointSkips=${Number(result.stuckWaypointSkips ?? 0)}, routeTargetResets=${Number(result.routeTargetResets ?? 0)}, routeNoProgressResets=${Number(result.routeNoProgressResets ?? 0)}, routeSnap=${Number(result.maxPathStartSnapDistance ?? 0).toFixed(1)}/${Number(result.maxPathEndSnapDistance ?? 0).toFixed(1)}m rejected=${Number(result.untrustedPathSnapCount ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, maxYawStepDeg=${Number(result.maxViewYawStepDeg ?? 0).toFixed(1)}, maxPitchStepDeg=${Number(result.maxViewPitchStepDeg ?? 0).toFixed(1)}, viewSlewClamps=${Number(result.viewSlewClampCount ?? 0)}, viewAnchorResync=${Number(result.viewAnchorResyncCount ?? 0)} max=${Number(result.maxViewAnchorResyncYawDeg ?? 0).toFixed(1)}/${Number(result.maxViewAnchorResyncPitchDeg ?? 0).toFixed(1)}deg, maxAimMoveDivDeg=${Number(result.maxAimMovementDivergenceDeg ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)}, intent=${Number(result.nonZeroMovementIntentCalls ?? 0)}/${Number(result.movementIntentCalls ?? 0)}, engineFrames=${Number(runtimeLiveness?.engineFrameCount ?? 0)}, raf=${Number(runtimeLiveness?.harnessRafTicks ?? 0)}, playerMoveSamples=${Number(runtimeLiveness?.playerMovementSamples ?? 0)}, kills=${Number(result.kills ?? 0)}, damageDealt=${Number(result.damageDealt ?? 0).toFixed(1)}, damageTaken=${Number(result.damageTaken ?? 0).toFixed(1)}, accuracy=${(Number(result.accuracy ?? 0) * 100).toFixed(1)}%)`
   );
 
   return {
     respawnCount: Number(result.respawnCount ?? 0),
+    driverSeed: nullableNumber(result.driverSeed),
+    movementDecisionIntervalMs: nullableNumber(result.movementDecisionIntervalMs),
     ammoRefillCount: Number(result.ammoRefillCount ?? 0),
     healthTopUpCount: Number(result.healthTopUpCount ?? 0),
+    frontlineCompressed: typeof result.frontlineCompressed === 'boolean' ? result.frontlineCompressed : null,
+    frontlineDistance: nullableNumber(result.frontlineDistance),
+    frontlineMoveCount: nullableNumber(result.frontlineMoveCount),
     movementTransitions: Number(result.movementTransitions ?? 0),
     losRejectedShots: Number(result.losRejectedShots ?? 0),
+    losUnknownTargetChecks: Number(result.losUnknownTargetChecks ?? 0),
+    fireUnknownLosRejectedShots: Number(result.fireUnknownLosRejectedShots ?? 0),
+    lastTargetLosStatus: typeof result.lastTargetLosStatus === 'string' ? result.lastTargetLosStatus : null,
+    lastTargetLosReason: typeof result.lastTargetLosReason === 'string' ? result.lastTargetLosReason : null,
+    lastFireLosStatus: typeof result.lastFireLosStatus === 'string' ? result.lastFireLosStatus : null,
+    lastFireLosReason: typeof result.lastFireLosReason === 'string' ? result.lastFireLosReason : null,
+    lastCurrentTargetLive: typeof result.lastCurrentTargetLive === 'boolean' ? result.lastCurrentTargetLive : null,
+    lastCurrentTargetHealth: nullableNumber(result.lastCurrentTargetHealth),
+    lastCurrentTargetState: typeof result.lastCurrentTargetState === 'string' ? result.lastCurrentTargetState : null,
+    shotEpochs: objectArray(result.shotEpochs),
     aimDotGateRejectedShots: Number(result.aimDotGateRejectedShots ?? 0),
+    fireStartRejected: Number(result.fireStartRejected ?? 0),
+    droppedDeadTargetLocks: Number(result.droppedDeadTargetLocks ?? 0),
+    firingRetargets: Number(result.firingRetargets ?? 0),
+    firingRetargetFireStops: Number(result.firingRetargetFireStops ?? 0),
+    firingRetargetEpochs: objectArray(result.firingRetargetEpochs),
     waypointsFollowedCount: Number(result.waypointsFollowedCount ?? 0),
     waypointReplanFailures: Number(result.waypointReplanFailures ?? 0),
     routeTargetResets: Number(result.routeTargetResets ?? 0),
     routeNoProgressResets: Number(result.routeNoProgressResets ?? 0),
     shotsFired: Number(result.shotsFired ?? 0),
     reloadsIssued: Number(result.reloadsIssued ?? 0),
+    maxViewYawStepDeg: Number(result.maxViewYawStepDeg ?? 0),
+    maxViewPitchStepDeg: Number(result.maxViewPitchStepDeg ?? 0),
+    lastViewStepYawDeg: Number(result.lastViewStepYawDeg ?? 0),
+    lastViewStepPitchDeg: Number(result.lastViewStepPitchDeg ?? 0),
+    lastRequestedViewYawDeltaDeg: Number(result.lastRequestedViewYawDeltaDeg ?? 0),
+    lastRequestedViewPitchDeltaDeg: Number(result.lastRequestedViewPitchDeltaDeg ?? 0),
+    lastRemainingViewYawErrorDeg: Number(result.lastRemainingViewYawErrorDeg ?? 0),
+    lastRemainingViewPitchErrorDeg: Number(result.lastRemainingViewPitchErrorDeg ?? 0),
+    lastViewYawClamped: typeof result.lastViewYawClamped === 'boolean' ? result.lastViewYawClamped : null,
+    lastViewPitchClamped: typeof result.lastViewPitchClamped === 'boolean' ? result.lastViewPitchClamped : null,
+    lastViewTargetKind: typeof result.lastViewTargetKind === 'string' ? result.lastViewTargetKind : null,
+    lastViewAnchorResyncChanged: typeof result.lastViewAnchorResyncChanged === 'boolean'
+      ? result.lastViewAnchorResyncChanged
+      : null,
+    lastViewAnchorResyncYawDeg: nullableNumber(result.lastViewAnchorResyncYawDeg),
+    lastViewAnchorResyncPitchDeg: nullableNumber(result.lastViewAnchorResyncPitchDeg),
+    lastViewUpdateAtMs: nullableNumber(result.lastViewUpdateAtMs),
+    lastAimDot: nullableNumber(result.lastAimDot),
+    lastFireIntent: typeof result.lastFireIntent === 'boolean' ? result.lastFireIntent : null,
+    lastAimGatePassed: typeof result.lastAimGatePassed === 'boolean' ? result.lastAimGatePassed : null,
+    lastAimGateReason: typeof result.lastAimGateReason === 'string' ? result.lastAimGateReason : null,
+    lastFireLosGatePassed: typeof result.lastFireLosGatePassed === 'boolean'
+      ? result.lastFireLosGatePassed
+      : null,
+    viewSlewClampCount: Number(result.viewSlewClampCount ?? 0),
+    viewAnchorResyncCount: Number(result.viewAnchorResyncCount ?? 0),
+    maxRequestedViewYawDeltaDeg: Number(result.maxRequestedViewYawDeltaDeg ?? 0),
+    maxRequestedViewPitchDeltaDeg: Number(result.maxRequestedViewPitchDeltaDeg ?? 0),
+    maxRemainingViewYawErrorDeg: Number(result.maxRemainingViewYawErrorDeg ?? 0),
+    maxRemainingViewPitchErrorDeg: Number(result.maxRemainingViewPitchErrorDeg ?? 0),
+    maxViewAnchorResyncYawDeg: Number(result.maxViewAnchorResyncYawDeg ?? 0),
+    maxViewAnchorResyncPitchDeg: Number(result.maxViewAnchorResyncPitchDeg ?? 0),
+    largeViewTurnCount: Number(result.largeViewTurnCount ?? 0),
+    maxAimMovementDivergenceDeg: Number(result.maxAimMovementDivergenceDeg ?? 0),
+    aimMovementDivergenceSamples: Number(result.aimMovementDivergenceSamples ?? 0),
+    aimMovementDivergenceOver45Count: Number(result.aimMovementDivergenceOver45Count ?? 0),
+    weaponHarness: objectOrNull(result.weaponHarness),
     damageDealt: Number(result.damageDealt ?? 0),
     damageTaken: Number(result.damageTaken ?? 0),
     kills: Number(result.kills ?? 0),
@@ -2256,6 +3886,10 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
       : null,
     pathStartSnapDistance: nullableNumber(result.pathStartSnapDistance),
     pathEndSnapDistance: nullableNumber(result.pathEndSnapDistance),
+    maxPathStartSnapDistance: nullableNumber(result.maxPathStartSnapDistance),
+    maxPathEndSnapDistance: nullableNumber(result.maxPathEndSnapDistance),
+    untrustedPathSnapCount: nullableNumber(result.untrustedPathSnapCount),
+    routeSnapEpochs: objectArray(result.routeSnapEpochs),
     routeProgressDistance: nullableNumber(result.routeProgressDistance),
     routeProgressAgeMs: nullableNumber(result.routeProgressAgeMs),
     routeProgressTravelMeters: nullableNumber(result.routeProgressTravelMeters),
@@ -2265,6 +3899,10 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
     playerDistanceMoved: nullableNumber(result.playerDistanceMoved),
     movementIntentCalls: nullableNumber(result.movementIntentCalls),
     nonZeroMovementIntentCalls: nullableNumber(result.nonZeroMovementIntentCalls),
+    worldMovementIntentCalls: nullableNumber(result.worldMovementIntentCalls),
+    cameraMovementIntentCalls: nullableNumber(result.cameraMovementIntentCalls),
+    nonZeroWorldMovementIntentCalls: nullableNumber(result.nonZeroWorldMovementIntentCalls),
+    nonZeroCameraMovementIntentCalls: nullableNumber(result.nonZeroCameraMovementIntentCalls),
     lastMovementIntent: objectOrNull(result.lastMovementIntent),
     lastNonZeroMovementIntent: objectOrNull(result.lastNonZeroMovementIntent),
     runtimeLiveness,
@@ -2342,6 +3980,11 @@ async function runCapture(): Promise<void> {
   const devtools = hasFlag('devtools');
   const playwrightTrace = hasFlag('playwright-trace') || process.env.PERF_PLAYWRIGHT_TRACE === '1';
   const deepCdp = hasFlag('deep-cdp') || process.env.PERF_DEEP_CDP === '1';
+  const deepDiagnostics = parseBooleanFlag('deep-diagnostics', false);
+  const shotVisualCapture = parseBooleanFlag('shot-visual-capture', false);
+  const shotVisualCaptureMax = Math.max(0, Math.floor(parseNumberFlag('shot-visual-capture-max', 6)));
+  const shotVisualCaptureCooldownMs = Math.max(0, Math.floor(parseNumberFlag('shot-visual-capture-cooldown-ms', 750)));
+  const gpuTiming = parseBooleanFlag('gpu-timing', false);
   const cdpProfiler = deepCdp && parseBooleanFlag('cdp-profiler', true);
   const cdpHeapSampling = deepCdp && parseBooleanFlag('cdp-heap-sampling', true);
   const traceWindowStartMsArg = parseNumberFlag('trace-window-start-ms', Number.NaN);
@@ -2397,6 +4040,10 @@ async function runCapture(): Promise<void> {
   const disableVictory = parseBooleanFlag('disable-victory', false);
   const disableNpcCloseModels = parseBooleanFlag('disable-npc-close-models', false);
   const disableTerrainShadows = parseBooleanFlag('disable-terrain-shadows', false);
+  const terrainForceInstanceUpload = parseBooleanFlag('terrain-force-instance-upload', false);
+  const disableTerrainFarCanopyTint = parseBooleanFlag('disable-terrain-far-canopy-tint', false);
+  const disableTerrainLowSunOcclusion = parseBooleanFlag('disable-terrain-low-sun-occlusion', false);
+  const disableWildlife = parseBooleanFlag('disable-wildlife', false);
   const sandboxMode = parseBooleanFlag(
     'sandbox',
     requestedMode === 'ai_sandbox' ? true : DEFAULT_SANDBOX_MODE
@@ -2409,8 +4056,13 @@ async function runCapture(): Promise<void> {
   // curate a fair engagement landscape (not a pathological steep hill).
   const seedArg = parseNumberFlag('seed', Number.NaN);
   const seedPin = Number.isFinite(seedArg) && seedArg >= 0 ? Math.floor(seedArg) : null;
+  const driverSeedArg = parseNumberFlag('driver-seed', Number.NaN);
+  const driverSeed = Number.isFinite(driverSeedArg) && driverSeedArg >= 0
+    ? Math.floor(driverSeedArg)
+    : null;
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
   const rendererMode = parseStringFlag('renderer', '').trim();
+  const gpuTimingQueryEnabled = gpuTiming && rendererMode.toLowerCase() === 'webgl';
   // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-server
   // (or --reuse-dev-server for back-compat) when iterating locally.
   const reuseServer = parseBooleanFlag('reuse-server', parseBooleanFlag('reuse-dev-server', false));
@@ -2433,7 +4085,22 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  const shotVisualCaptureState: ShotVisualCaptureState = {
+    enabled: shotVisualCapture && shotVisualCaptureMax > 0,
+    maxCaptures: shotVisualCaptureMax,
+    cooldownMs: shotVisualCaptureCooldownMs,
+    artifactDir,
+    captures: [],
+    seenKeys: new Set<string>(),
+    lastCaptureElapsedMs: -1
+  };
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainForceInstanceUpload=${terrainForceInstanceUpload} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  if (shotVisualCaptureState.enabled) {
+    logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
+  }
+  if (gpuTiming && !gpuTimingQueryEnabled) {
+    logStep('GPU timing requested, but not injected because the runtime GPU query path only supports explicit --renderer webgl captures.');
+  }
 
   let server: ServerHandle | null = null;
   let context: BrowserContext | null = null;
@@ -2443,6 +4110,7 @@ async function runCapture(): Promise<void> {
   let finalFrameCount = 0;
   const consoleEntries: ConsoleEntry[] = [];
   const runtimeSamples: RuntimeSample[] = [];
+  let finalPresentationEpochs: Record<string, unknown>[] = [];
   let movementArtifacts: MovementArtifactReportForViewer | null = null;
   let movementViewerPayload: MovementViewerPayload | null = null;
   let sceneAttribution: SceneAttributionEntry[] | null = null;
@@ -2451,11 +4119,19 @@ async function runCapture(): Promise<void> {
   const missedSampleErrors: Record<string, number> = {};
   let measurementTrust: MeasurementTrustReport | null = null;
   const startedAt = nowIso();
+  const sourceGitSha = currentGitSha();
+  const sourceGitStatus = gitStatus();
+  const quietMachineAttested = process.env.TIJ_QUIET_MACHINE === '1';
+  const captureEnvironment = {
+    quietMachineAttested,
+    quietMachineAttestationSource: quietMachineAttested ? 'TIJ_QUIET_MACHINE=1' : undefined,
+  };
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
   const uiTransitionsParam = '0';
-  const diagnosticsQuery = 'perf=1';
+  const diagnosticsQuery = deepDiagnostics ? 'perf=1&diagnostics=1' : 'perf=1';
+  const gpuTimingQuery = gpuTimingQueryEnabled ? '&gpuTiming=1' : '';
   const rendererQuery = rendererMode ? `&renderer=${encodeURIComponent(rendererMode)}` : '';
   const seedQuery = seedPin !== null ? `&seed=${seedPin}` : '';
   const matchDurationQuery = perfMatchDurationSeconds !== null
@@ -2464,20 +4140,24 @@ async function runCapture(): Promise<void> {
   const disableVictoryQuery = disableVictory ? '&perfDisableVictory=1' : '';
   const disableNpcCloseModelsQuery = disableNpcCloseModels ? '&perfDisableNpcCloseModels=1' : '';
   const disableTerrainShadowsQuery = disableTerrainShadows ? '&perfDisableTerrainShadows=1' : '';
-  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}`;
+  const terrainForceInstanceUploadQuery = terrainForceInstanceUpload ? '&terrainForceInstanceUpload=1' : '';
+  const disableTerrainFarCanopyTintQuery = disableTerrainFarCanopyTint ? '&perfDisableTerrainFarCanopyTint=1' : '';
+  const disableTerrainLowSunOcclusionQuery = disableTerrainLowSunOcclusion ? '&perfDisableTerrainLowSunOcclusion=1' : '';
+  const disableWildlifeQuery = disableWildlife ? '&perfDisableWildlife=1' : '';
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${terrainForceInstanceUploadQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}`;
   const query = sandboxMode
-    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${perfRuntimeQuery}`
-    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${perfRuntimeQuery}`;
+    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`
+    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`;
   const url = `http://${PERF_SERVER_HOST}:${port}/${query}`;
-  const preflightUrl = `http://${PERF_SERVER_HOST}:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${rendererQuery}`;
+  const preflightUrl = `http://${PERF_SERVER_HOST}:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${rendererQuery}${gpuTimingQuery}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
   const prewarmPaths = sandboxMode
     ? [
-        `/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`,
-        `/?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&autostart=false`,
+        `/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${gpuTimingQuery}`,
+        `/?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${gpuTimingQuery}&autostart=false`,
         primaryPath.replace(`duration=${durationSeconds}`, 'duration=0')
       ]
-    : [`/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`, primaryPath];
+    : [`/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${gpuTimingQuery}`, primaryPath];
   const runHardTimeoutMs = Math.max(
     MIN_RUN_HARD_TIMEOUT_MS,
     (startupTimeoutSeconds + warmupSeconds + durationSeconds + 90) * 1000
@@ -2539,6 +4219,9 @@ async function runCapture(): Promise<void> {
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify({
         startedAt,
         endedAt: nowIso(),
+        sourceGitSha,
+        sourceGitStatus,
+        captureEnvironment,
         durationSeconds,
         npcs: effectiveNpcs,
         requestedNpcs: npcs,
@@ -2677,6 +4360,17 @@ async function runCapture(): Promise<void> {
             const objectOrNull = function(value) {
               return value && typeof value === 'object' ? value : null;
             };
+            const objectArray = function(value, limit = 32) {
+              if (!Array.isArray(value)) return [];
+              const max = Math.max(1, Math.floor(Number(limit) || 32));
+              const start = Math.max(0, value.length - max);
+              const entries = [];
+              for (let index = start; index < value.length; index += 1) {
+                const entry = objectOrNull(value[index]);
+                if (entry) entries.push(entry);
+              }
+              return entries;
+            };
             const normalizeRuntimeLiveness = function(value) {
               const raw = objectOrNull(value);
               if (!raw) return null;
@@ -2712,6 +4406,7 @@ async function runCapture(): Promise<void> {
             window.__perfCaptureHarnessHelpers = {
               nullableNumber,
               objectOrNull,
+              objectArray,
               normalizeRuntimeLiveness,
             };
           })();
@@ -2806,41 +4501,84 @@ async function runCapture(): Promise<void> {
       logStep(`⚠ Startup did not stabilize: ${startupState.reason ?? 'unknown'}`);
       startupDiagnostics = await safeAwait(
         'startup diagnostics',
-        page.evaluate(() => ({
-          ts: new Date().toISOString(),
-          readyState: document.readyState,
-          hasMetrics: Boolean((window as any).__metrics),
-          hasEngine: Boolean((window as any).__engine),
-          hasPerfApi: Boolean((window as any).perf?.report),
-          bodyClassName: document.body?.className ?? '',
-          errorPanelVisible: Boolean(document.querySelector('.error-panel')),
-          gameStarted: Boolean((window as any).__engine?.gameStarted),
-          startupPhase: typeof (window as any).__engine?.startupFlow?.getState === 'function'
-            ? String((window as any).__engine.startupFlow.getState().phase ?? '')
-            : null,
-          rafTicks: Number((window as any).__perfHarnessRaf?.ticks ?? 0),
-          hidden: document.hidden,
-          visibilityState: document.visibilityState,
-          activeViewTransition: Boolean((document as Document & { activeViewTransition?: unknown }).activeViewTransition),
-          uiTransitionEnabled: Boolean(
-            (document as Document & {
-              uiTransitionState?: { enabled?: unknown };
-            }).uiTransitionState?.enabled
-          ),
-          uiTransitionReason: (() => {
-            const reason = (document as Document & {
-              uiTransitionState?: { reason?: unknown };
-            }).uiTransitionState?.reason;
-            return typeof reason === 'string' ? reason : null;
-          })()
-        })),
+        page.evaluate(() => {
+          const rendererBackend = (window as any).__renderer?.getRendererBackendCapabilities?.();
+          return {
+            ts: new Date().toISOString(),
+            readyState: document.readyState,
+            frameCount: Number((window as any).__metrics?.frameCount ?? 0),
+            hasMetrics: Boolean((window as any).__metrics),
+            hasEngine: Boolean((window as any).__engine),
+            hasPerfApi: Boolean((window as any).perf?.report),
+            rendererBackend: rendererBackend ? {
+              requestedMode: String(rendererBackend.requestedMode ?? 'unknown'),
+              resolvedBackend: String(rendererBackend.resolvedBackend ?? 'unknown'),
+              initStatus: String(rendererBackend.initStatus ?? 'unknown'),
+              strictWebGPU: Boolean(rendererBackend.strictWebGPU)
+            } : undefined,
+            bodyClassName: document.body?.className ?? '',
+            errorPanelVisible: Boolean(document.querySelector('.error-panel')),
+            gameStarted: Boolean((window as any).__engine?.gameStarted),
+            startupPhase: typeof (window as any).__engine?.startupFlow?.getState === 'function'
+              ? String((window as any).__engine.startupFlow.getState().phase ?? '')
+              : null,
+            rafTicks: Number((window as any).__perfHarnessRaf?.ticks ?? 0),
+            hidden: document.hidden,
+            visibilityState: document.visibilityState,
+            activeViewTransition: Boolean((document as Document & { activeViewTransition?: unknown }).activeViewTransition),
+            uiTransitionEnabled: Boolean(
+              (document as Document & {
+                uiTransitionState?: { enabled?: unknown };
+              }).uiTransitionState?.enabled
+            ),
+            uiTransitionReason: (() => {
+              const reason = (document as Document & {
+                uiTransitionState?: { reason?: unknown };
+              }).uiTransitionState?.reason;
+              return typeof reason === 'string' ? reason : null;
+            })()
+          };
+        }),
         3_000
       );
+      validation = {
+        overall: 'fail',
+        checks: [
+          {
+            id: 'startup_stabilized',
+            status: 'fail',
+            value: startupState.lastFrameCount,
+            message: startupState.reason ?? 'Startup rendering did not stabilize'
+          }
+        ]
+      };
+      measurementTrust = computeMeasurementTrust({
+        probeRoundTripMs,
+        runtimeSampleCount: runtimeSamples.length,
+        missedSamples,
+        sampleIntervalMs,
+        detailEverySamples
+      });
+      validation.checks.push(measurementTrustValidationCheck(measurementTrust));
+      validation.overall = getOverallStatus(validation.checks);
+      if (startupDiagnostics) {
+        writeFileSync(join(artifactDir, 'startup-diagnostics.json'), JSON.stringify(startupDiagnostics, null, 2), 'utf-8');
+      }
+      if (startupTimeline) {
+        writeFileSync(join(artifactDir, 'startup-timeline.json'), JSON.stringify(startupTimeline, null, 2), 'utf-8');
+      }
+      await safeAwait(
+        'page.screenshot.startup-failed',
+        page.screenshot({ path: join(artifactDir, 'startup-failed-frame.png'), fullPage: false, timeout: 10_000 }),
+        12_000
+      );
+      throw new Error(`Startup did not stabilize: ${startupState.reason ?? 'unknown'}`);
     } else {
       if (enableCombat) {
         await setupActiveScenarioDriver(page, {
           enabled: activePlayerScenario,
           mode: requestedMode,
+          driverSeed,
           compressFrontline,
           allowWarpRecovery,
           topUpHealth: activeTopUpHealth,
@@ -2866,6 +4604,7 @@ async function runCapture(): Promise<void> {
         await setupActiveScenarioDriver(page, {
           enabled: true,
           mode: requestedMode,
+          driverSeed,
           compressFrontline,
           allowWarpRecovery,
           topUpHealth: activeTopUpHealth,
@@ -2884,6 +4623,9 @@ async function runCapture(): Promise<void> {
           (window as any).__metrics?.reset?.();
           (window as any).perf?.reset?.();
           (window as any).__perfHarnessObservers?.reset?.();
+          (window as any).__gameLoopFrameBreakdown?.reset?.();
+          (window as any).__materializationTierEvents?.({ clear: true, limit: 1 });
+          (window as any).__engine?.systemManager?.combatantSystem?.clearRecentTerrainRecoveryEvents?.();
         }),
         3000
       );
@@ -2909,6 +4651,21 @@ async function runCapture(): Promise<void> {
       } catch {
         logStep('⚠ Forced GC baseline measurement failed');
       }
+      // CDP's explicit baseline GC is harness work. Reset rolling frame,
+      // browser-observer, and loop-breakdown metrics again so the first
+      // runtime sample is not polluted by the heap-baseline collection.
+      await safeAwait(
+        'reset post-gc in-page metrics',
+        page.evaluate(() => {
+          (window as any).__metrics?.reset?.();
+          (window as any).perf?.reset?.();
+          (window as any).__perfHarnessObservers?.reset?.();
+          (window as any).__gameLoopFrameBreakdown?.reset?.();
+          (window as any).__materializationTierEvents?.({ clear: true, limit: 1 });
+          (window as any).__engine?.systemManager?.combatantSystem?.clearRecentTerrainRecoveryEvents?.();
+        }),
+        3000
+      );
     }
 
     const startMs = Date.now();
@@ -2962,7 +4719,7 @@ async function runCapture(): Promise<void> {
           shouldIncludeDetails: boolean;
           shouldCaptureSceneAttribution: boolean;
           shouldCaptureRenderSubmissions: boolean;
-          renderSubmissionMode: 'full' | 'summary';
+          renderSubmissionMode: string;
           sceneAttributionEvaluateSource: string;
         }) => {
           const shouldIncludeDetails = options.shouldIncludeDetails;
@@ -2971,34 +4728,125 @@ async function runCapture(): Promise<void> {
           const engine = (window as any).__engine;
           const renderer = (window as any).__renderer;
           const rendererStats = renderer?.getPerformanceStats?.();
+          const rendererBackend = renderer?.getRendererBackendCapabilities?.();
           const browserStalls = (window as any).__perfHarnessObservers?.drain?.() ?? null;
           const basicValidation = perf?.validate?.();
           const report = shouldIncludeDetails ? perf?.report?.() : null;
           const movement = perf?.getMovement?.() ?? report?.movement ?? null;
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
+          let closeModelStats: any = null;
+          if (shouldIncludeDetails) {
+            try {
+              closeModelStats = (window as any).npcMaterializationProfile?.(0)?.closeModelStats ?? null;
+            } catch {
+              closeModelStats = null;
+            }
+          }
           const terrainStreams = shouldIncludeDetails
             ? engine?.systemManager?.terrainSystem?.getStreamingMetrics?.() ?? null
             : null;
+          const terrainRecoveryEvents = shouldIncludeDetails
+            ? engine?.systemManager?.combatantSystem?.getRecentTerrainRecoveryEvents?.() ?? null
+            : null;
+          const materializationTierEvents = shouldIncludeDetails
+            ? (window as any).__materializationTierEvents?.({ clear: true, limit: 128 }) ?? []
+            : [];
           const harnessDriver = shouldIncludeDetails
             ? (window as any).__perfHarnessDriverState?.getDebugSnapshot?.() ?? null
             : null;
           const memory = (performance as any).memory;
           const snapshot = metrics?.getSnapshot?.();
-          const frameEvents = Array.isArray(snapshot?.frameEvents)
-            ? snapshot.frameEvents.slice(-64).map((entry: any) => ({
-                frameCount: Number(entry?.frameCount ?? 0),
-                frameMs: Number(entry?.frameMs ?? 0),
-                atMs: Number(entry?.atMs ?? 0),
-                previousMaxFrameMs: Number(entry?.previousMaxFrameMs ?? 0),
-                newMax: Boolean(entry?.newMax),
-                hitch33: Boolean(entry?.hitch33),
-                hitch50: Boolean(entry?.hitch50),
-                hitch100: Boolean(entry?.hitch100)
-              }))
+          const rawFrameEvents = Array.isArray(snapshot?.frameEvents)
+            ? snapshot.frameEvents
             : [];
+          const frameEvents: RuntimeFrameEventSample[] = [];
+          const frameEventStart = Math.max(0, rawFrameEvents.length - 64);
+          for (let frameEventIndex = frameEventStart; frameEventIndex < rawFrameEvents.length; frameEventIndex++) {
+            const entry = rawFrameEvents[frameEventIndex];
+            frameEvents.push({
+              frameCount: Number(entry?.frameCount ?? 0),
+              frameMs: Number(entry?.frameMs ?? 0),
+              atMs: Number(entry?.atMs ?? 0),
+              previousMaxFrameMs: Number(entry?.previousMaxFrameMs ?? 0),
+              newMax: Boolean(entry?.newMax),
+              hitch33: Boolean(entry?.hitch33),
+              hitch50: Boolean(entry?.hitch50),
+              hitch100: Boolean(entry?.hitch100)
+            });
+          }
+          const rawLoopFrameBreakdown = (window as any).__gameLoopFrameBreakdown?.drain?.() ?? [];
+          const loopFrameBreakdown: LoopFrameBreakdownSample[] = [];
+          if (Array.isArray(rawLoopFrameBreakdown)) {
+            const loopFrameBreakdownStart = Math.max(0, rawLoopFrameBreakdown.length - 64);
+            for (
+              let loopFrameBreakdownIndex = loopFrameBreakdownStart;
+              loopFrameBreakdownIndex < rawLoopFrameBreakdown.length;
+              loopFrameBreakdownIndex++
+            ) {
+              const entry = rawLoopFrameBreakdown[loopFrameBreakdownIndex];
+                const rawSegments = entry?.segments && typeof entry.segments === 'object'
+                  ? entry.segments
+                  : {};
+                const rawSystemTimings = Array.isArray(entry?.systemTimings)
+                  ? entry.systemTimings
+                  : [];
+                const rawTelemetryTimings = Array.isArray(entry?.telemetryTimings)
+                  ? entry.telemetryTimings
+                  : [];
+                const rawCombatTiming = entry?.combatTiming && typeof entry.combatTiming === 'object'
+                  ? entry.combatTiming
+                  : null;
+                loopFrameBreakdown.push({
+                  frameCount: Number.isFinite(Number(entry?.frameCount)) ? Number(entry.frameCount) : null,
+                  startedAtMs: Number(entry?.startedAtMs ?? 0),
+                  endedAtMs: Number(entry?.endedAtMs ?? 0),
+                  timestampDeltaMs: Number(entry?.timestampDeltaMs ?? 0),
+                  callbackDurationMs: Number(entry?.callbackDurationMs ?? 0),
+                  segmentTotalMs: Number(entry?.segmentTotalMs ?? 0),
+                  unmeasuredCallbackMs: Number(entry?.unmeasuredCallbackMs ?? 0),
+                  segments: Object.fromEntries(
+                    Object.entries(rawSegments)
+                      .map(([name, value]: [string, any]) => [String(name), Number(value ?? 0)])
+                      .filter(([, value]) => Number.isFinite(value))
+                  ),
+                  systemTimings: rawSystemTimings
+                    .map((timing: any) => ({
+                      name: String(timing?.name ?? 'unknown'),
+                      lastMs: Number(timing?.lastMs ?? 0),
+                      emaMs: Number(timing?.emaMs ?? timing?.timeMs ?? 0),
+                      budgetMs: Number(timing?.budgetMs ?? 0),
+                      overBudget: Boolean(timing?.overBudget)
+                    }))
+                    .filter((timing: any) =>
+                      Number.isFinite(timing.lastMs) &&
+                      Number.isFinite(timing.emaMs) &&
+                      Number.isFinite(timing.budgetMs)
+                    ),
+                  telemetryTimings: rawTelemetryTimings
+                    .map((timing: any) => ({
+                      name: String(timing?.name ?? 'unknown'),
+                      lastMs: Number(timing?.lastMs ?? 0),
+                      emaMs: Number(timing?.emaMs ?? timing?.timeMs ?? 0),
+                      peakMs: Number(timing?.peakMs ?? timing?.lastMs ?? 0),
+                      budgetMs: Number(timing?.budgetMs ?? 0),
+                      overBudget: Boolean(timing?.overBudget)
+                    }))
+                    .filter((timing: any) =>
+                      Number.isFinite(timing.lastMs) &&
+                      Number.isFinite(timing.emaMs) &&
+                      Number.isFinite(timing.peakMs) &&
+                      Number.isFinite(timing.budgetMs)
+                  ),
+                  combatTiming: rawCombatTiming
+                    ? JSON.parse(JSON.stringify(rawCombatTiming))
+                    : undefined
+                });
+            }
+          }
           const sampleHelpers = (window as any).__perfCaptureHarnessHelpers;
           const nullableNumber = sampleHelpers.nullableNumber;
           const objectOrNull = sampleHelpers.objectOrNull;
+          const objectArray = sampleHelpers.objectArray;
           const normalizeRuntimeLiveness = sampleHelpers.normalizeRuntimeLiveness;
           let sceneAttribution: any[] | null = null;
           let sceneAttributionError: string | null = null;
@@ -3053,6 +4901,8 @@ async function runCapture(): Promise<void> {
             }
           }
           return {
+            pagePerformanceNowMs: Number(performance.now()),
+            pageWallNowMs: Date.now(),
             frameCount: Number(snapshot?.frameCount ?? 0),
             avgFrameMs: Number(snapshot?.avgFrameMs ?? 0),
             p95FrameMs: Number(snapshot?.p95FrameMs ?? 0),
@@ -3062,6 +4912,7 @@ async function runCapture(): Promise<void> {
             hitch50Count: Number(snapshot?.hitch50Count ?? 0),
             hitch100Count: Number(snapshot?.hitch100Count ?? 0),
             frameEvents,
+            loopFrameBreakdown,
             combatantCount: Number(snapshot?.combatantCount ?? 0),
             overBudgetPercent: Number(basicValidation?.frameBudget?.overBudgetPercent ?? report?.overBudgetPercent ?? 0),
             shotsThisSession: Number(basicValidation?.hitDetection?.shotsThisSession ?? report?.hitDetection?.shotsThisSession ?? 0),
@@ -3070,12 +4921,66 @@ async function runCapture(): Promise<void> {
             heapUsedMb: memory?.usedJSHeapSize ? Number(memory.usedJSHeapSize) / (1024 * 1024) : undefined,
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
+            closeModelStats: closeModelStats && typeof closeModelStats === 'object'
+              ? {
+                  closeRadiusMeters: Number(closeModelStats.closeRadiusMeters ?? 0),
+                  closeModelActiveCap: Number(closeModelStats.closeModelActiveCap ?? 0),
+                  candidatesWithinCloseRadius: Number(closeModelStats.candidatesWithinCloseRadius ?? 0),
+                  renderedCloseModels: Number(closeModelStats.renderedCloseModels ?? 0),
+                  activeCloseModels: Number(closeModelStats.activeCloseModels ?? 0),
+                  fallbackCount: Number(closeModelStats.fallbackCount ?? 0),
+                  fallbackCounts: closeModelStats.fallbackCounts && typeof closeModelStats.fallbackCounts === 'object'
+                    ? Object.fromEntries(
+                        Object.entries(closeModelStats.fallbackCounts).map(([key, value]: [string, any]) => [
+                          String(key),
+                          Number(value ?? 0)
+                        ])
+                      )
+                    : {},
+                  nearestFallbackDistanceMeters: nullableNumber(closeModelStats.nearestFallbackDistanceMeters),
+                  farthestFallbackDistanceMeters: nullableNumber(closeModelStats.farthestFallbackDistanceMeters),
+                  poolLoads: Number(closeModelStats.poolLoads ?? 0),
+                  poolTargets: closeModelStats.poolTargets && typeof closeModelStats.poolTargets === 'object'
+                    ? Object.fromEntries(
+                        Object.entries(closeModelStats.poolTargets).map(([key, value]: [string, any]) => [
+                          String(key),
+                          Number(value ?? 0)
+                        ])
+                      )
+                    : {},
+                  poolAvailable: closeModelStats.poolAvailable && typeof closeModelStats.poolAvailable === 'object'
+                    ? Object.fromEntries(
+                        Object.entries(closeModelStats.poolAvailable).map(([key, value]: [string, any]) => [
+                          String(key),
+                          Number(value ?? 0)
+                        ])
+                      )
+                    : {}
+                }
+              : undefined,
+            terrainRecoveryEvents: objectArray(terrainRecoveryEvents, 64),
+            materializationTierEvents: objectArray(materializationTierEvents, 128),
             renderer: rendererStats ? {
               drawCalls: Number(rendererStats.drawCalls ?? 0),
               triangles: Number(rendererStats.triangles ?? 0),
               geometries: Number(rendererStats.geometries ?? 0),
               textures: Number(rendererStats.textures ?? 0),
               programs: Number(rendererStats.programs ?? 0)
+            } : undefined,
+            rendererBackend: rendererBackend ? {
+              requestedMode: String(rendererBackend.requestedMode ?? 'unknown'),
+              resolvedBackend: String(rendererBackend.resolvedBackend ?? 'unknown'),
+              initStatus: String(rendererBackend.initStatus ?? 'unknown'),
+              strictWebGPU: Boolean(rendererBackend.strictWebGPU)
+            } : undefined,
+            gpu: report?.gpu ? {
+              available: Boolean(report.gpu.available),
+              gpuTimeMs: Number(report.gpu.gpuTimeMs ?? 0),
+              drawCalls: Number(report.gpu.drawCalls ?? 0),
+              triangles: Number(report.gpu.triangles ?? 0),
+              geometries: Number(report.gpu.geometries ?? 0),
+              textures: Number(report.gpu.textures ?? 0),
+              programs: Number(report.gpu.programs ?? 0)
             } : undefined,
             ...(options.shouldCaptureSceneAttribution || sceneAttributionError
               ? {
@@ -3094,7 +4999,9 @@ async function runCapture(): Promise<void> {
                 longtask: Boolean(browserStalls.support?.longtask),
                 longAnimationFrame: Boolean(browserStalls.support?.longAnimationFrame),
                 userTiming: Boolean(browserStalls.support?.measure),
-                webglTextureUpload: Boolean(browserStalls.support?.webglTextureUpload)
+                webglTextureUpload: Boolean(browserStalls.support?.webglTextureUpload),
+                rafCadence: Boolean(browserStalls.support?.rafCadence),
+                resourceTiming: Boolean(browserStalls.support?.resourceTiming)
               },
               totals: {
                 longTaskCount: Number(browserStalls.totals?.longTaskCount ?? 0),
@@ -3104,6 +5011,10 @@ async function runCapture(): Promise<void> {
                 longAnimationFrameTotalDurationMs: Number(browserStalls.totals?.longAnimationFrameTotalDurationMs ?? 0),
                 longAnimationFrameMaxDurationMs: Number(browserStalls.totals?.longAnimationFrameMaxDurationMs ?? 0),
                 longAnimationFrameBlockingDurationMs: Number(browserStalls.totals?.longAnimationFrameBlockingDurationMs ?? 0),
+                resourceCount: Number(browserStalls.totals?.resourceCount ?? 0),
+                resourceTotalDurationMs: Number(browserStalls.totals?.resourceTotalDurationMs ?? 0),
+                resourceMaxDurationMs: Number(browserStalls.totals?.resourceMaxDurationMs ?? 0),
+                resourceTransferSizeBytes: Number(browserStalls.totals?.resourceTransferSizeBytes ?? 0),
                 webglTextureUploadCount: Number(browserStalls.totals?.webglTextureUploadCount ?? 0),
                 webglTextureUploadTotalDurationMs: Number(browserStalls.totals?.webglTextureUploadTotalDurationMs ?? 0),
                 webglTextureUploadMaxDurationMs: Number(browserStalls.totals?.webglTextureUploadMaxDurationMs ?? 0),
@@ -3118,6 +5029,21 @@ async function runCapture(): Promise<void> {
                         }
                       ])
                     )
+                  : undefined,
+                rafCadence: browserStalls.totals?.rafCadence && typeof browserStalls.totals.rafCadence === 'object'
+                  ? {
+                      intervalCount: Number(browserStalls.totals.rafCadence.intervalCount ?? 0),
+                      totalGapMs: Number(browserStalls.totals.rafCadence.totalGapMs ?? 0),
+                      maxGapMs: Number(browserStalls.totals.rafCadence.maxGapMs ?? 0),
+                      avgGapMs: Number(browserStalls.totals.rafCadence.avgGapMs ?? 0),
+                      stutter25Count: Number(browserStalls.totals.rafCadence.stutter25Count ?? 0),
+                      hitch33Count: Number(browserStalls.totals.rafCadence.hitch33Count ?? 0),
+                      hitch50Count: Number(browserStalls.totals.rafCadence.hitch50Count ?? 0),
+                      hitch100Count: Number(browserStalls.totals.rafCadence.hitch100Count ?? 0),
+                      overBudget60HzMs: Number(browserStalls.totals.rafCadence.overBudget60HzMs ?? 0),
+                      droppedFrameTime60HzMs: Number(browserStalls.totals.rafCadence.droppedFrameTime60HzMs ?? 0),
+                      estimatedDropped60HzFrames: Number(browserStalls.totals.rafCadence.estimatedDropped60HzFrames ?? 0)
+                    }
                   : undefined,
                 userTimingByName: browserStalls.totals?.userTimingByName && typeof browserStalls.totals.userTimingByName === 'object'
                   ? Object.fromEntries(
@@ -3204,6 +5130,51 @@ async function runCapture(): Promise<void> {
                       }))
                     : []
                 },
+                resources: browserStalls.recent?.resources && typeof browserStalls.recent.resources === 'object'
+                  ? {
+                      count: Number(browserStalls.recent.resources.count ?? 0),
+                      totalDurationMs: Number(browserStalls.recent.resources.totalDurationMs ?? 0),
+                      maxDurationMs: Number(browserStalls.recent.resources.maxDurationMs ?? 0),
+                      transferSizeBytes: Number(browserStalls.recent.resources.transferSizeBytes ?? 0),
+                      entries: Array.isArray(browserStalls.recent.resources.entries)
+                        ? browserStalls.recent.resources.entries.slice(0, 16).map((entry: any) => ({
+                            name: String(entry.name ?? ''),
+                            initiatorType: String(entry.initiatorType ?? ''),
+                            startTime: Number(entry.startTime ?? 0),
+                            responseEnd: Number(entry.responseEnd ?? 0),
+                            duration: Number(entry.duration ?? 0),
+                            transferSize: Number(entry.transferSize ?? 0),
+                            encodedBodySize: Number(entry.encodedBodySize ?? 0),
+                            decodedBodySize: Number(entry.decodedBodySize ?? 0),
+                            renderBlockingStatus: String(entry.renderBlockingStatus ?? '')
+                          }))
+                        : []
+                    }
+                  : undefined,
+                rafCadence: browserStalls.recent?.rafCadence && typeof browserStalls.recent.rafCadence === 'object'
+                  ? {
+                      count: Number(browserStalls.recent.rafCadence.count ?? 0),
+                      estimatedDropped60HzFrames: Number(browserStalls.recent.rafCadence.estimatedDropped60HzFrames ?? 0),
+                      overBudget60HzMs: Number(browserStalls.recent.rafCadence.overBudget60HzMs ?? 0),
+                      droppedFrameTime60HzMs: Number(browserStalls.recent.rafCadence.droppedFrameTime60HzMs ?? 0),
+                      maxGapMs: Number(browserStalls.recent.rafCadence.maxGapMs ?? 0),
+                      entries: Array.isArray(browserStalls.recent.rafCadence.entries)
+                        ? browserStalls.recent.rafCadence.entries.slice(0, 16).map((entry: any) => ({
+                            atMs: Number(entry.atMs ?? 0),
+                            gapMs: Number(entry.gapMs ?? 0),
+                            estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
+                            overBudget60HzMs: Number(entry.overBudget60HzMs ?? 0),
+                            droppedFrameTime60HzMs: Number(entry.droppedFrameTime60HzMs ?? 0),
+                            stutter25: Boolean(entry.stutter25),
+                            hitch33: Boolean(entry.hitch33),
+                            hitch50: Boolean(entry.hitch50),
+                            hitch100: Boolean(entry.hitch100),
+                            presentationContext: objectOrNull(entry.presentationContext),
+                            harnessContext: objectOrNull(entry.harnessContext)
+                          }))
+                        : []
+                    }
+                  : undefined,
                 userTimingByName: browserStalls.recent?.userTimingByName && typeof browserStalls.recent.userTimingByName === 'object'
                   ? Object.fromEntries(
                       Object.entries(browserStalls.recent.userTimingByName).map(([name, value]: [string, any]) => [
@@ -3300,6 +5271,16 @@ async function runCapture(): Promise<void> {
                   aiUpdateMs: Number(combatProfile.timing.aiUpdateMs ?? 0),
                   spatialSyncMs: Number(combatProfile.timing.spatialSyncMs ?? 0),
                   billboardUpdateMs: Number(combatProfile.timing.billboardUpdateMs ?? 0),
+                  billboardProfile: combatProfile.timing.billboardProfile ? {
+                    walkFrameMs: Number(combatProfile.timing.billboardProfile.walkFrameMs ?? 0),
+                    closeModelMs: Number(combatProfile.timing.billboardProfile.closeModelMs ?? 0),
+                    bucketResetMs: Number(combatProfile.timing.billboardProfile.bucketResetMs ?? 0),
+                    impostorWriteMs: Number(combatProfile.timing.billboardProfile.impostorWriteMs ?? 0),
+                    finalizeMs: Number(combatProfile.timing.billboardProfile.finalizeMs ?? 0),
+                    hitboxDebugMs: Number(combatProfile.timing.billboardProfile.hitboxDebugMs ?? 0),
+                    materializationEventsMs: Number(combatProfile.timing.billboardProfile.materializationEventsMs ?? 0),
+                    shaderUniformMs: Number(combatProfile.timing.billboardProfile.shaderUniformMs ?? 0)
+                  } : undefined,
                   effectPoolsMs: Number(combatProfile.timing.effectPoolsMs ?? 0),
                   influenceMapMs: Number(combatProfile.timing.influenceMapMs ?? 0),
                   aiStateMs: typeof combatProfile.timing.aiStateMs === 'object' ? combatProfile.timing.aiStateMs : undefined,
@@ -3396,11 +5377,14 @@ async function runCapture(): Promise<void> {
                     maxPerFrame: Number(combatProfile.timing.combatFireRaycastBudget.maxPerFrame ?? 0),
                     usedThisFrame: Number(combatProfile.timing.combatFireRaycastBudget.usedThisFrame ?? 0),
                     deniedThisFrame: Number(combatProfile.timing.combatFireRaycastBudget.deniedThisFrame ?? 0),
+                    terrainBlockedThisFrame: Number(combatProfile.timing.combatFireRaycastBudget.terrainBlockedThisFrame ?? 0),
                     totalExhaustedFrames: Number(combatProfile.timing.combatFireRaycastBudget.totalExhaustedFrames ?? 0),
                     totalRequested: Number(combatProfile.timing.combatFireRaycastBudget.totalRequested ?? 0),
                     totalDenied: Number(combatProfile.timing.combatFireRaycastBudget.totalDenied ?? 0),
+                    totalTerrainBlocked: Number(combatProfile.timing.combatFireRaycastBudget.totalTerrainBlocked ?? 0),
                     saturationRate: Number(combatProfile.timing.combatFireRaycastBudget.saturationRate ?? 0),
-                    denialRate: Number(combatProfile.timing.combatFireRaycastBudget.denialRate ?? 0)
+                    denialRate: Number(combatProfile.timing.combatFireRaycastBudget.denialRate ?? 0),
+                    terrainBlockRate: Number(combatProfile.timing.combatFireRaycastBudget.terrainBlockRate ?? 0)
                   } : undefined,
                   aiScheduling: combatProfile.timing.aiScheduling ? {
                     frameCounter: Number(combatProfile.timing.aiScheduling.frameCounter ?? 0),
@@ -3409,6 +5393,9 @@ async function runCapture(): Promise<void> {
                     staggeredSkips: Number(combatProfile.timing.aiScheduling.staggeredSkips ?? 0),
                     highFullUpdates: Number(combatProfile.timing.aiScheduling.highFullUpdates ?? 0),
                     mediumFullUpdates: Number(combatProfile.timing.aiScheduling.mediumFullUpdates ?? 0),
+                    projectedHighFullUpdateDeferrals: Number(combatProfile.timing.aiScheduling.projectedHighFullUpdateDeferrals ?? 0),
+                    highFullUpdateCostEmaMs: Number(combatProfile.timing.aiScheduling.highFullUpdateCostEmaMs ?? 0),
+                    highFullUpdateCostPeakMs: Number(combatProfile.timing.aiScheduling.highFullUpdateCostPeakMs ?? 0),
                     maxHighFullUpdatesPerFrame: Number(combatProfile.timing.aiScheduling.maxHighFullUpdatesPerFrame ?? 0),
                     maxMediumFullUpdatesPerFrame: Number(combatProfile.timing.aiScheduling.maxMediumFullUpdatesPerFrame ?? 0),
                     aiBudgetExceededEvents: Number(combatProfile.timing.aiScheduling.aiBudgetExceededEvents ?? 0),
@@ -3418,6 +5405,8 @@ async function runCapture(): Promise<void> {
               : undefined,
             harnessDriver: harnessDriver ? {
               mode: String(harnessDriver.mode ?? ''),
+              driverSeed: nullableNumber(harnessDriver.driverSeed),
+              movementDecisionIntervalMs: nullableNumber(harnessDriver.movementDecisionIntervalMs),
               // Driver exposes the canonical bot state machine label
               // under `botState`; older artifacts may have only had
               // `movementState`. Read both and prefer `botState`.
@@ -3441,8 +5430,86 @@ async function runCapture(): Promise<void> {
                 ? Number(harnessDriver.stuckTimeoutSec)
                 : undefined,
               losRejectedShots: Number(harnessDriver.losRejectedShots ?? 0),
+              losUnknownTargetChecks: Number(harnessDriver.losUnknownTargetChecks ?? 0),
+              fireUnknownLosRejectedShots: Number(harnessDriver.fireUnknownLosRejectedShots ?? 0),
+              lastTargetLosStatus: typeof harnessDriver.lastTargetLosStatus === 'string'
+                ? harnessDriver.lastTargetLosStatus
+                : null,
+              lastTargetLosReason: typeof harnessDriver.lastTargetLosReason === 'string'
+                ? harnessDriver.lastTargetLosReason
+                : null,
+              lastFireLosStatus: typeof harnessDriver.lastFireLosStatus === 'string'
+                ? harnessDriver.lastFireLosStatus
+                : null,
+              lastFireLosReason: typeof harnessDriver.lastFireLosReason === 'string'
+                ? harnessDriver.lastFireLosReason
+                : null,
+              lastCurrentTargetLive: typeof harnessDriver.lastCurrentTargetLive === 'boolean'
+                ? harnessDriver.lastCurrentTargetLive
+                : null,
+              lastCurrentTargetHealth: nullableNumber(harnessDriver.lastCurrentTargetHealth),
+              lastCurrentTargetState: typeof harnessDriver.lastCurrentTargetState === 'string'
+                ? harnessDriver.lastCurrentTargetState
+                : null,
+              shotEpochs: objectArray(harnessDriver.shotEpochs),
+              aimDotGateRejectedShots: Number(harnessDriver.aimDotGateRejectedShots ?? 0),
+              fireStartRejected: Number(harnessDriver.fireStartRejected ?? 0),
+              droppedDeadTargetLocks: Number(harnessDriver.droppedDeadTargetLocks ?? 0),
+              firingRetargets: Number(harnessDriver.firingRetargets ?? 0),
+              firingRetargetFireStops: Number(harnessDriver.firingRetargetFireStops ?? 0),
+              firingRetargetEpochs: objectArray(harnessDriver.firingRetargetEpochs),
+              shotsFired: Number(harnessDriver.shotsFired ?? 0),
+              reloadsIssued: Number(harnessDriver.reloadsIssued ?? 0),
               stuckTeleportCount: Number(harnessDriver.stuckTeleportCount ?? 0),
               maxStuckSeconds: Number(harnessDriver.maxStuckSeconds ?? 0),
+              maxViewYawStepDeg: Number(harnessDriver.maxViewYawStepDeg ?? 0),
+              maxViewPitchStepDeg: Number(harnessDriver.maxViewPitchStepDeg ?? 0),
+              lastViewStepYawDeg: Number(harnessDriver.lastViewStepYawDeg ?? 0),
+              lastViewStepPitchDeg: Number(harnessDriver.lastViewStepPitchDeg ?? 0),
+              lastRequestedViewYawDeltaDeg: Number(harnessDriver.lastRequestedViewYawDeltaDeg ?? 0),
+              lastRequestedViewPitchDeltaDeg: Number(harnessDriver.lastRequestedViewPitchDeltaDeg ?? 0),
+              lastRemainingViewYawErrorDeg: Number(harnessDriver.lastRemainingViewYawErrorDeg ?? 0),
+              lastRemainingViewPitchErrorDeg: Number(harnessDriver.lastRemainingViewPitchErrorDeg ?? 0),
+              lastViewYawClamped: typeof harnessDriver.lastViewYawClamped === 'boolean'
+                ? harnessDriver.lastViewYawClamped
+                : null,
+              lastViewPitchClamped: typeof harnessDriver.lastViewPitchClamped === 'boolean'
+                ? harnessDriver.lastViewPitchClamped
+                : null,
+              lastViewTargetKind: typeof harnessDriver.lastViewTargetKind === 'string'
+                ? harnessDriver.lastViewTargetKind
+                : null,
+              lastViewAnchorResyncChanged: typeof harnessDriver.lastViewAnchorResyncChanged === 'boolean'
+                ? harnessDriver.lastViewAnchorResyncChanged
+                : null,
+              lastViewAnchorResyncYawDeg: nullableNumber(harnessDriver.lastViewAnchorResyncYawDeg),
+              lastViewAnchorResyncPitchDeg: nullableNumber(harnessDriver.lastViewAnchorResyncPitchDeg),
+              lastViewUpdateAtMs: nullableNumber(harnessDriver.lastViewUpdateAtMs),
+              lastAimDot: nullableNumber(harnessDriver.lastAimDot),
+              lastFireIntent: typeof harnessDriver.lastFireIntent === 'boolean'
+                ? harnessDriver.lastFireIntent
+                : null,
+              lastAimGatePassed: typeof harnessDriver.lastAimGatePassed === 'boolean'
+                ? harnessDriver.lastAimGatePassed
+                : null,
+              lastAimGateReason: typeof harnessDriver.lastAimGateReason === 'string'
+                ? harnessDriver.lastAimGateReason
+                : null,
+              lastFireLosGatePassed: typeof harnessDriver.lastFireLosGatePassed === 'boolean'
+                ? harnessDriver.lastFireLosGatePassed
+                : null,
+              viewSlewClampCount: Number(harnessDriver.viewSlewClampCount ?? 0),
+              viewAnchorResyncCount: Number(harnessDriver.viewAnchorResyncCount ?? 0),
+              maxRequestedViewYawDeltaDeg: Number(harnessDriver.maxRequestedViewYawDeltaDeg ?? 0),
+              maxRequestedViewPitchDeltaDeg: Number(harnessDriver.maxRequestedViewPitchDeltaDeg ?? 0),
+              maxRemainingViewYawErrorDeg: Number(harnessDriver.maxRemainingViewYawErrorDeg ?? 0),
+              maxRemainingViewPitchErrorDeg: Number(harnessDriver.maxRemainingViewPitchErrorDeg ?? 0),
+              maxViewAnchorResyncYawDeg: Number(harnessDriver.maxViewAnchorResyncYawDeg ?? 0),
+              maxViewAnchorResyncPitchDeg: Number(harnessDriver.maxViewAnchorResyncPitchDeg ?? 0),
+              largeViewTurnCount: Number(harnessDriver.largeViewTurnCount ?? 0),
+              maxAimMovementDivergenceDeg: Number(harnessDriver.maxAimMovementDivergenceDeg ?? 0),
+              aimMovementDivergenceSamples: Number(harnessDriver.aimMovementDivergenceSamples ?? 0),
+              aimMovementDivergenceOver45Count: Number(harnessDriver.aimMovementDivergenceOver45Count ?? 0),
               gradientProbeDeflections: Number(harnessDriver.gradientProbeDeflections ?? 0),
               waypointsFollowedCount: Number(harnessDriver.waypointsFollowedCount ?? 0),
               waypointReplanFailures: Number(harnessDriver.waypointReplanFailures ?? 0),
@@ -3481,6 +5548,10 @@ async function runCapture(): Promise<void> {
                 : null,
               pathStartSnapDistance: nullableNumber(harnessDriver.pathStartSnapDistance),
               pathEndSnapDistance: nullableNumber(harnessDriver.pathEndSnapDistance),
+              maxPathStartSnapDistance: nullableNumber(harnessDriver.maxPathStartSnapDistance),
+              maxPathEndSnapDistance: nullableNumber(harnessDriver.maxPathEndSnapDistance),
+              untrustedPathSnapCount: nullableNumber(harnessDriver.untrustedPathSnapCount),
+              routeSnapEpochs: objectArray(harnessDriver.routeSnapEpochs),
               routeProgressDistance: nullableNumber(harnessDriver.routeProgressDistance),
               routeProgressAgeMs: nullableNumber(harnessDriver.routeProgressAgeMs),
               routeProgressTravelMeters: nullableNumber(harnessDriver.routeProgressTravelMeters),
@@ -3493,6 +5564,7 @@ async function runCapture(): Promise<void> {
               lastMovementIntent: objectOrNull(harnessDriver.lastMovementIntent),
               lastNonZeroMovementIntent: objectOrNull(harnessDriver.lastNonZeroMovementIntent),
               runtimeLiveness: normalizeRuntimeLiveness(harnessDriver.runtimeLiveness),
+              weaponHarness: objectOrNull(harnessDriver.weaponHarness),
               perceptionRange: nullableNumber(harnessDriver.perceptionRange),
               matchEndedAtMs: nullableNumber(harnessDriver.matchEndedAtMs),
               matchOutcome: typeof harnessDriver.matchOutcome === 'string'
@@ -3514,7 +5586,7 @@ async function runCapture(): Promise<void> {
                 : {}
             } : undefined,
             systemTop: Array.isArray(report?.systemBreakdown)
-              ? report.systemBreakdown.slice(0, 3).map((s: any) => ({
+              ? report.systemBreakdown.slice(0, 8).map((s: any) => ({
                   name: String(s.name ?? 'unknown'),
                   emaMs: Number(s.emaMs ?? 0),
                   peakMs: Number(s.peakMs ?? 0)
@@ -3554,22 +5626,65 @@ async function runCapture(): Promise<void> {
       if (sample) {
         runtimeSamples.push(sample);
         finalFrameCount = sample.frameCount;
+        await maybeCaptureShotVisualFrame(
+          page,
+          sample,
+          runtimeSamples.length - 1,
+          elapsedMs,
+          shotVisualCaptureState
+        );
         const denialRatePct = Number(sample.combatBreakdown?.raycastBudget?.denialRate ?? 0) * 100;
         const aiStarve = Number(sample.combatBreakdown?.aiScheduling?.aiBudgetExceededEvents ?? 0);
         const drawCalls = Number(sample.renderer?.drawCalls ?? 0);
         const triangles = Number(sample.renderer?.triangles ?? 0);
         const recentLongTasks = Number(sample.browserStalls?.recent?.longTasks?.count ?? 0);
         const recentLoafs = Number(sample.browserStalls?.recent?.longAnimationFrames?.count ?? 0);
-        const topTerrainStream = Array.isArray(sample.terrainStreams) && sample.terrainStreams.length > 0
-          ? [...sample.terrainStreams].sort((a, b) => {
-              const pendingDelta = Number(b.pendingUnits ?? 0) - Number(a.pendingUnits ?? 0);
-              if (pendingDelta !== 0) return pendingDelta;
-              return Number(b.timeMs ?? 0) - Number(a.timeMs ?? 0);
-            })[0]
-          : null;
+        const recentResources = sample.browserStalls?.recent?.resources;
+        const recentRafCadence = sample.browserStalls?.recent?.rafCadence;
+        const rafCadence = sample.browserStalls?.totals?.rafCadence;
+        const combatFireBudget = sample.combatBreakdown?.combatFireRaycastBudget;
+        const fireTerrainBlockedFrame = Number(combatFireBudget?.terrainBlockedThisFrame ?? 0);
+        const fireTerrainBlockedTotal = Number(combatFireBudget?.totalTerrainBlocked ?? 0);
+        const fireTerrainBlockRatePct = Number(combatFireBudget?.terrainBlockRate ?? 0) * 100;
+        const rafStutter25Count = Number(rafCadence?.stutter25Count ?? 0);
+        const rafHitch33Count = Number(rafCadence?.hitch33Count ?? 0);
+        const rafDropped60HzFrames = Number(rafCadence?.estimatedDropped60HzFrames ?? 0);
+        const rafDroppedFrameTime60HzMs = Number(rafCadence?.droppedFrameTime60HzMs ?? 0);
+        const rafMaxGapMs = Number(rafCadence?.maxGapMs ?? 0);
+        const recentRafCount = Number(recentRafCadence?.count ?? 0);
+        const recentRafDropped60HzFrames = Number(recentRafCadence?.estimatedDropped60HzFrames ?? 0);
+        const recentRafDroppedFrameTime60HzMs = Number(recentRafCadence?.droppedFrameTime60HzMs ?? 0);
+        const recentRafMaxGapMs = Number(recentRafCadence?.maxGapMs ?? 0);
+        const engineShots = Number(sample.harnessDriver?.engineShotsFired ?? sample.shotsThisSession ?? 0);
+        const engineHits = Number(sample.harnessDriver?.engineShotsHit ?? sample.hitsThisSession ?? 0);
+        const engineHitRate = engineShots > 0
+          ? engineHits / engineShots
+          : Number(sample.hitRate ?? 0);
+        const triggerShots = Number(sample.harnessDriver?.shotsFired ?? 0);
+        const closeStats = sample.closeModelStats;
+        let topTerrainStream: NonNullable<RuntimeSample['terrainStreams']>[number] | null = null;
+        if (Array.isArray(sample.terrainStreams)) {
+          for (const stream of sample.terrainStreams) {
+            if (!topTerrainStream) {
+              topTerrainStream = stream;
+              continue;
+            }
+            const pendingDelta = Number(stream.pendingUnits ?? 0) - Number(topTerrainStream.pendingUnits ?? 0);
+            if (
+              pendingDelta > 0 ||
+              (pendingDelta === 0 && Number(stream.timeMs ?? 0) > Number(topTerrainStream.timeMs ?? 0))
+            ) {
+              topTerrainStream = stream;
+            }
+          }
+        }
         const driverReason = typeof sample.harnessDriver?.lastFireProbe?.reason === 'string'
           ? String(sample.harnessDriver?.lastFireProbe?.reason)
-          : '';
+          : typeof sample.harnessDriver?.lastFireProbe?.losStatus === 'string'
+            ? `los:${String(sample.harnessDriver.lastFireProbe.losStatus)}`
+            : typeof sample.harnessDriver?.lastFireLosStatus === 'string'
+              ? `los:${sample.harnessDriver.lastFireLosStatus}`
+              : '';
         const driverMovement = sample.harnessDriver?.botState
           ? String(sample.harnessDriver.botState)
           : sample.harnessDriver?.movementState
@@ -3611,13 +5726,40 @@ async function runCapture(): Promise<void> {
         const pathSnapSuffix = pathFailureReason && (pathStartSnapDistance !== null || pathEndSnapDistance !== null)
           ? ` snap=${pathStartSnapDistance !== null ? pathStartSnapDistance.toFixed(1) : 'na'}/${pathEndSnapDistance !== null ? pathEndSnapDistance.toFixed(1) : 'na'}m`
           : '';
+        const losUnknownTargetChecks = Number(sample.harnessDriver?.losUnknownTargetChecks ?? 0);
+        const fireUnknownLosRejectedShots = Number(sample.harnessDriver?.fireUnknownLosRejectedShots ?? 0);
+        const losUnknownSuffix = losUnknownTargetChecks > 0 || fireUnknownLosRejectedShots > 0
+          ? ` losUnknown=${losUnknownTargetChecks}/${fireUnknownLosRejectedShots}`
+          : '';
         const driverSuffix = driverReason || driverMovement || objectiveSuffix || opforSuffix || perceivedSuffix || pathSuffix || pathFailureSuffix
-          ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'unknown'}${objectiveSuffix}${opforSuffix}${perceivedSuffix}${pathSuffix}${pathFailureSuffix}${pathSnapSuffix}`
+          ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'none'}${objectiveSuffix}${opforSuffix}${perceivedSuffix}${pathSuffix}${pathFailureSuffix}${pathSnapSuffix}${losUnknownSuffix}`
           : '';
         const terrainSuffix = topTerrainStream
           ? ` terrain=${topTerrainStream.name}:${Number(topTerrainStream.timeMs ?? 0).toFixed(2)}ms/${Number(topTerrainStream.budgetMs ?? 0).toFixed(2)}ms pending=${Number(topTerrainStream.pendingUnits ?? 0)}`
           : '';
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${terrainSuffix}${driverSuffix}`);
+        const closeModelSuffix = closeStats
+          ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
+          : '';
+        const resourceEntries = Array.isArray(recentResources?.entries) ? recentResources.entries : [];
+        const latestResource = resourceEntries.length > 0
+          ? resourceEntries[resourceEntries.length - 1]
+          : null;
+        const latestResourceName = latestResource?.name
+          ? latestResource.name.split('/').pop()?.slice(0, 48) ?? ''
+          : '';
+        const resourceSuffix = Number(recentResources?.count ?? 0) > 0
+          ? ` res=${Number(recentResources?.count ?? 0)} max=${Number(recentResources?.maxDurationMs ?? 0).toFixed(1)}ms${latestResourceName ? ` last=${latestResourceName}` : ''}`
+          : '';
+        const recentRafSuffix = recentRafCount > 0
+          ? ` rafRecent=${recentRafCount}/${recentRafDropped60HzFrames}/${recentRafDroppedFrameTime60HzMs.toFixed(1)}ms@${recentRafMaxGapMs.toFixed(1)}ms`
+          : '';
+        const gpuSuffix = gpuTiming && sample.gpu
+          ? ` gpu=${sample.gpu.available ? `${sample.gpu.gpuTimeMs.toFixed(2)}ms` : 'unavailable'} backend=${sample.rendererBackend?.resolvedBackend ?? 'unknown'}`
+          : '';
+        const fireTerrainBlockSuffix = fireTerrainBlockedFrame > 0 || fireTerrainBlockedTotal > 0
+          ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}%`
+          : '';
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} draw=${drawCalls} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${closeModelSuffix}${driverSuffix}`);
         // harness-lifecycle-halt-on-match-end: latch the first match-end
         // observation, then break the loop after MATCH_END_TAIL_MS so we
         // finalize close to the moment the engine declared a winner instead
@@ -3703,7 +5845,8 @@ async function runCapture(): Promise<void> {
     validation = validateRun(runtimeSamples, consoleEntries, durationSeconds, {
       hitValidation: hitValidationMode,
       sampleIntervalMs,
-      modeThresholds
+      modeThresholds,
+      harnessDriverFinal
     });
     if (!startupState.started) {
       validation.checks.push({
@@ -3793,9 +5936,12 @@ async function runCapture(): Promise<void> {
       writeFileSync(join(artifactDir, 'startup-timeline.json'), JSON.stringify(startupTimeline, null, 2), 'utf-8');
     }
 
-    if (startupState.started) {
-      await safeAwait('page.screenshot', page.screenshot({ path: join(artifactDir, 'final-frame.png'), fullPage: false }), 3_000);
-    }
+    const screenshotPath = join(artifactDir, startupState.started ? 'final-frame.png' : 'startup-failed-frame.png');
+    await safeAwait(
+      startupState.started ? 'page.screenshot' : 'page.screenshot.startup-failed',
+      page.screenshot({ path: screenshotPath, fullPage: false }),
+      3_000
+    );
     stage = 'stop-playwright-trace';
     if (playwrightTracingStarted) {
       await safeAwait('context.tracing.stop', context.tracing.stop({ path: join(artifactDir, 'playwright-trace.zip') }), 10_000);
@@ -3819,6 +5965,21 @@ async function runCapture(): Promise<void> {
         });
       }
       if (page) {
+        finalPresentationEpochs = await safeAwait(
+          'presentation-epochs',
+          page.evaluate(() => {
+            const epochs = (window as any).__perfHarnessObservers?.getPresentationEpochs?.({ limit: 4096 }) ?? [];
+            return Array.isArray(epochs) ? epochs : [];
+          }) as Promise<Record<string, unknown>[]>,
+          3_000
+        ) ?? finalPresentationEpochs;
+        if (finalPresentationEpochs.length > 0) {
+          writeFileSync(
+            join(artifactDir, 'presentation-epochs.json'),
+            JSON.stringify(finalPresentationEpochs, null, 2),
+            'utf-8'
+          );
+        }
         writeFileSync(join(artifactDir, 'console.json'), JSON.stringify(consoleEntries, null, 2), 'utf-8');
         writeFileSync(join(artifactDir, 'runtime-samples.json'), JSON.stringify(runtimeSamples, null, 2), 'utf-8');
         const runtimeSceneAttributionSamples = collectRuntimeSceneAttributionSamples(runtimeSamples);
@@ -3863,9 +6024,21 @@ async function runCapture(): Promise<void> {
         validation.overall = getOverallStatus(validation.checks);
       }
       writeFileSync(join(artifactDir, 'validation.json'), JSON.stringify(validation, null, 2), 'utf-8');
+      writeShotVisualCaptureManifest(shotVisualCaptureState);
+      const latestTerrainRecoveryEvents = objectArray(
+        runtimeSamples[runtimeSamples.length - 1]?.terrainRecoveryEvents,
+        64,
+      );
+      const latestMaterializationTierEvents = objectArray(
+        runtimeSamples[runtimeSamples.length - 1]?.materializationTierEvents,
+        128,
+      );
       const summary: CaptureSummary = {
         startedAt,
         endedAt: nowIso(),
+        sourceGitSha,
+        sourceGitStatus,
+        captureEnvironment,
         durationSeconds,
         npcs: effectiveNpcs,
         requestedNpcs: npcs,
@@ -3905,6 +6078,12 @@ async function runCapture(): Promise<void> {
           missedSampleErrors: Object.keys(missedSampleErrors).length > 0 ? missedSampleErrors : undefined
         },
         measurementTrust,
+        rendererBackend: latestRendererBackend(runtimeSamples),
+        gpuTiming: summarizeGpuTiming(runtimeSamples, gpuTiming, gpuTimingQueryEnabled),
+        droppedFrameMetrics: summarizeDroppedFrames(runtimeSamples, durationSeconds),
+        renderSubmissionMetrics: summarizeRenderSubmissions(runtimeSamples),
+        materializationTierMetrics: summarizeMaterializationTierEvents(runtimeSamples),
+        presentationGapContexts: summarizePresentationGapContexts(runtimeSamples, finalPresentationEpochs),
         sceneAttribution: sceneAttribution ?? undefined,
         startupTiming: {
           firstEngineSeenSec: startupState.firstEngineSeenSec,
@@ -3925,12 +6104,27 @@ async function runCapture(): Promise<void> {
           matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
           victoryConditionsDisabled: disableVictory,
           npcCloseModelsDisabled: disableNpcCloseModels,
-          terrainShadowsDisabled: disableTerrainShadows
+          terrainShadowsDisabled: disableTerrainShadows,
+          terrainForceInstanceUploadEnabled: terrainForceInstanceUpload,
+          terrainFarCanopyTintDisabled: disableTerrainFarCanopyTint,
+          terrainLowSunOcclusionDisabled: disableTerrainLowSunOcclusion,
+          wildlifeDisabled: disableWildlife
         },
         matchEndedAtMs: matchEndedAtRelMs,
         matchOutcome: matchOutcome,
         harnessDriverFinal: harnessDriverFinal ?? undefined,
-        tailAttribution: computeTailAttribution(runtimeSamples)
+        terrainRecoveryEvents: latestTerrainRecoveryEvents.length > 0
+          ? latestTerrainRecoveryEvents
+          : undefined,
+        materializationTierEvents: latestMaterializationTierEvents.length > 0
+          ? latestMaterializationTierEvents
+          : undefined,
+        shotVisualCaptures: shotVisualCaptureState.captures.length > 0
+          ? shotVisualCaptureState.captures
+          : undefined,
+        tailAttribution: computeTailAttribution(runtimeSamples, {
+          presentationEpochs: finalPresentationEpochs
+        })
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
       if (summary.tailAttribution) {

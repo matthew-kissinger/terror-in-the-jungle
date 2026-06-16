@@ -1,6 +1,17 @@
 # Current State
 
-Last verified: 2026-06-12 (war-asset repaint cycle close: 191-GLB generated catalog live across all five consumer classes, `check:live-release` ALL PASS on the close deploy, combat120 steady-state p99 33.40ms vs the 35.39 halt line; NOTE — all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-06-15 (active branch `task/dropped-frame-perf-harness`;
+current focus is dropped-frame time / visible-stutter reduction without
+shrinking Open Frontier or A Shau. Runtime completion is not yet verified: the
+latest known seeded A Shau evidence still failed the dropped-frame goal, and
+the newer static cleanups are unproven until the next quiet-machine capture.
+The 2026-06-12 war-asset repaint close remains the most recent production
+release proof: 191-GLB generated catalog live across all five consumer classes,
+`check:live-release` ALL PASS on the close deploy, combat120 steady-state p99
+33.40ms vs the 35.39 halt line; NOTE — all basin/level-depth water claims
+below are SUPERSEDED: hydrology + all water were stripped to first principles
+on 2026-06-09 and watercraft are dormant pending a future water rework; owner
+visual acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,10 +37,26 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-06-12)
+## Current focus (2026-06-15)
 
 The most recent shipped work, newest first:
 
+- **2026-06-15 — dropped-frame time / visible-stutter finish line** (active
+  branch `task/dropped-frame-perf-harness`): the active goal is to reduce
+  player-visible dropped-frame time and stutter while preserving combat
+  pressure, terrain/vegetation readability, wildlife/animals where enabled,
+  war assets, weather/atmosphere, draw distance, startup/deploy flow, and normal
+  player flow. The repo is aligned around the copyable finish-line statement in
+  `docs/tasks/overnight-dropped-frame-goal-statement.txt` and the working
+  handoff in
+  `docs/tasks/cycle-2026-06-14-dropped-frame-time-perf-research.md`. Static
+  cleanups since the last failed seeded A Shau run are not completion proof.
+  When perf capture resumes, agents should inspect `summary.json`,
+  `presentation-epochs.json`, tail attribution, browser stall entries, and
+  driver trust fields before making further broad optimization changes. Local
+  success still needs release shepherding through `validate:fast`, relevant
+  perf/full evidence, merge to `master`, manual CI/deploy as needed,
+  `check:live-release`, and owner playtest.
 - **2026-06-12 — war-asset repaint integration** (`cycle-2026-06-11-war-asset-repaint`,
   12 PRs #383-#394, deployed `9c64c0bf`): the 108-asset Pixel Forge repaint
   flows through a generalized importer (`npm run assets:import-war-catalog` —

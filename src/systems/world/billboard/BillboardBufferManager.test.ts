@@ -97,6 +97,7 @@ vi.mock('three', () => {
     itemSize: number
     usage?: number
     needsUpdate = false
+    updateRanges: Array<{ start: number; count: number }> = []
 
     constructor(array: Float32Array, itemSize: number) {
       this.array = array
@@ -106,6 +107,14 @@ vi.mock('three', () => {
     setUsage(usage: number) {
       this.usage = usage
       return this
+    }
+
+    addUpdateRange(start: number, count: number) {
+      this.updateRanges.push({ start, count })
+    }
+
+    clearUpdateRanges() {
+      this.updateRanges.length = 0
     }
   }
 
@@ -541,6 +550,40 @@ describe('GPUBillboardVegetation', () => {
     expect(internal.positionAttribute.needsUpdate).toBe(true)
     expect(internal.scaleAttribute.needsUpdate).toBe(true)
     expect(internal.rotationAttribute.needsUpdate).toBe(true)
+  })
+
+  it('scopes instance-buffer uploads to the touched add range', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+
+    manager.addInstances([
+      createInstance(0, 0, 0),
+      createInstance(1, 1, 1),
+      createInstance(2, 2, 2),
+    ])
+    manager.update(new THREE.PerspectiveCamera(), 0)
+
+    expect(internal.positionAttribute.updateRanges).toEqual([{ start: 0, count: 9 }])
+    expect(internal.scaleAttribute.updateRanges).toEqual([{ start: 0, count: 6 }])
+    expect(internal.rotationAttribute.updateRanges).toEqual([{ start: 0, count: 3 }])
+  })
+
+  it('scopes removal uploads to scale data only', () => {
+    const manager = new GPUBillboardVegetation(scene, createConfig())
+    const internal = manager as any
+    const indices = manager.addInstances([
+      createInstance(0, 0, 0),
+      createInstance(1, 1, 1),
+      createInstance(2, 2, 2),
+    ])
+    manager.update(new THREE.PerspectiveCamera(), 0)
+
+    manager.removeInstances([indices[1]])
+    manager.update(new THREE.PerspectiveCamera(), 0)
+
+    expect(internal.positionAttribute.updateRanges).toEqual([{ start: 0, count: 9 }])
+    expect(internal.scaleAttribute.updateRanges).toEqual([{ start: 2, count: 2 }])
+    expect(internal.rotationAttribute.updateRanges).toEqual([{ start: 0, count: 3 }])
   })
 
   it('update does not reapply when no pending updates', () => {

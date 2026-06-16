@@ -50,6 +50,19 @@ const ADVANCE_ARRIVAL_RADIUS = 3;
 const ADVANCE_CLOSE_DISTANCE = 16;
 const ADVANCE_LONG_DISTANCE = 55;
 
+const SQUAD_FOLLOW_DISTANCE_SQ = SQUAD_FOLLOW_DISTANCE * SQUAD_FOLLOW_DISTANCE;
+const DESTINATION_ARRIVAL_RADIUS_SQ = DESTINATION_ARRIVAL_RADIUS * DESTINATION_ARRIVAL_RADIUS;
+const PATROL_CLOSE_DISTANCE_SQ = PATROL_CLOSE_DISTANCE * PATROL_CLOSE_DISTANCE;
+const PATROL_LONG_DISTANCE_SQ = PATROL_LONG_DISTANCE * PATROL_LONG_DISTANCE;
+const COMBAT_APPROACH_DISTANCE_SQ = (ENGAGEMENT_DISTANCE + ENGAGEMENT_TOLERANCE) * (ENGAGEMENT_DISTANCE + ENGAGEMENT_TOLERANCE);
+const CLOSE_QUARTERS_RETREAT_DISTANCE_SQ = CLOSE_QUARTERS_RETREAT_DISTANCE * CLOSE_QUARTERS_RETREAT_DISTANCE;
+const COVER_ARRIVAL_RADIUS_SQ = COVER_ARRIVAL_RADIUS * COVER_ARRIVAL_RADIUS;
+const RETREAT_ARRIVAL_RADIUS_SQ = RETREAT_ARRIVAL_RADIUS * RETREAT_ARRIVAL_RADIUS;
+const DEFEND_ARRIVAL_RADIUS_SQ = DEFEND_ARRIVAL_RADIUS * DEFEND_ARRIVAL_RADIUS;
+const ADVANCE_ARRIVAL_RADIUS_SQ = ADVANCE_ARRIVAL_RADIUS * ADVANCE_ARRIVAL_RADIUS;
+const ADVANCE_CLOSE_DISTANCE_SQ = ADVANCE_CLOSE_DISTANCE * ADVANCE_CLOSE_DISTANCE;
+const ADVANCE_LONG_DISTANCE_SQ = ADVANCE_LONG_DISTANCE * ADVANCE_LONG_DISTANCE;
+
 // ── Zone scoring ──
 const ZONE_EVAL_INTERVAL_MS = 3000;
 const ZONE_EVAL_JITTER_MS = 2000;
@@ -121,15 +134,13 @@ export function updatePatrolMovement(
           combatant.destinationPoint = target.clone();
         }
         _moveVec.subVectors(target, combatant.position);
-        const dist = _moveVec.length();
-        if (dist > SQUAD_FOLLOW_DISTANCE) {
-          _moveVec.normalize();
+        const distSq = _moveVec.lengthSq();
+        if (distSq > SQUAD_FOLLOW_DISTANCE_SQ) {
           // Match leader's pace: run fast when far, slow when close
-          const speed = dist > PATROL_LONG_DISTANCE ? PATROL_LONG_DISTANCE_SPEED
-            : dist > PATROL_CLOSE_DISTANCE ? SQUAD_FOLLOW_SPEED
+          const speed = distSq > PATROL_LONG_DISTANCE_SQ ? PATROL_LONG_DISTANCE_SPEED
+            : distSq > PATROL_CLOSE_DISTANCE_SQ ? SQUAD_FOLLOW_SPEED
             : PATROL_CLOSE_SPEED;
-          combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
-          combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+          setVelocityFromMoveVector(combatant, speed, Math.sqrt(distSq));
           return;
         }
         if (leaderStale) {
@@ -162,7 +173,7 @@ export function updatePatrolMovement(
     const now = performance.now();
     // Throttle re-evaluation: only if we reached destination or enough time passed
     const reachedDestination = !combatant.destinationPoint ||
-      combatant.position.distanceTo(combatant.destinationPoint) < DESTINATION_ARRIVAL_RADIUS;
+      combatant.position.distanceToSquared(combatant.destinationPoint) < DESTINATION_ARRIVAL_RADIUS_SQ;
     const shouldReevaluate = reachedDestination ||
       !combatant.lastZoneEvalTime ||
       (now - combatant.lastZoneEvalTime > ZONE_EVAL_INTERVAL_MS + Math.random() * ZONE_EVAL_JITTER_MS);
@@ -204,7 +215,7 @@ export function updatePatrolMovement(
     combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
   }
   // Update rotation to match movement direction
-  if (combatant.velocity.length() > 0.1) {
+  if (combatant.velocity.lengthSq() > 0.01) {
     combatant.rotation = Math.atan2(combatant.velocity.z, combatant.velocity.x);
   }
 }
@@ -261,31 +272,32 @@ function runZoneTargetingTick(combatant: Combatant, zoneQuery: IZoneQuery): void
 function driveTowardDestination(combatant: Combatant): void {
   if (!combatant.destinationPoint) return;
   _moveVec.subVectors(combatant.destinationPoint, combatant.position);
-  const distance = _moveVec.length();
-  _moveVec.normalize();
+  const distanceSq = _moveVec.lengthSq();
   let speed = PATROL_SPEED;
-  if (distance < PATROL_CLOSE_DISTANCE) speed = PATROL_CLOSE_SPEED;
-  if (distance > PATROL_LONG_DISTANCE) speed = PATROL_LONG_DISTANCE_SPEED;
-  combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
-  if (speed > 0.1) combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+  if (distanceSq < PATROL_CLOSE_DISTANCE_SQ) speed = PATROL_CLOSE_SPEED;
+  if (distanceSq > PATROL_LONG_DISTANCE_SQ) speed = PATROL_LONG_DISTANCE_SPEED;
+  setVelocityFromMoveVector(combatant, speed, Math.sqrt(distanceSq));
 }
 
 export function updateCombatMovement(combatant: Combatant): void {
   if (!combatant.target) return;
   _moveVec.subVectors(combatant.target.position, combatant.position);
-  const distance = _moveVec.length();
-  _moveVec.normalize();
-  if (distance > ENGAGEMENT_DISTANCE + ENGAGEMENT_TOLERANCE) {
+  const distanceSq = _moveVec.lengthSq();
+  const distance = Math.sqrt(distanceSq);
+  const invDistance = distance > 0 ? 1 / distance : 0;
+  const dirX = _moveVec.x * invDistance;
+  const dirZ = _moveVec.z * invDistance;
+  if (distanceSq > COMBAT_APPROACH_DISTANCE_SQ) {
     // Move closer
-    combatant.velocity.copy(_moveVec).multiplyScalar(COMBAT_APPROACH_SPEED);
-  } else if (distance < CLOSE_QUARTERS_RETREAT_DISTANCE) {
+    combatant.velocity.set(dirX * COMBAT_APPROACH_SPEED, 0, dirZ * COMBAT_APPROACH_SPEED);
+  } else if (distanceSq < CLOSE_QUARTERS_RETREAT_DISTANCE_SQ) {
     // Only backpedal when nearly colliding. Broader close-range backing made
     // clustered starts pace instead of resolving the fight.
-    combatant.velocity.copy(_moveVec).multiplyScalar(-COMBAT_RETREAT_SPEED);
+    combatant.velocity.set(dirX * -COMBAT_RETREAT_SPEED, 0, dirZ * -COMBAT_RETREAT_SPEED);
   } else {
     // Strafe
     const strafeAngle = Math.sin(Date.now() * STRAFE_FREQUENCY) * STRAFE_AMPLITUDE;
-    _moveVec2.set(-_moveVec.z, 0, _moveVec.x);
+    _moveVec2.set(-dirZ, 0, dirX);
     combatant.velocity.copy(_moveVec2).multiplyScalar(strafeAngle * COMBAT_STRAFE_SPEED);
   }
 }
@@ -298,22 +310,20 @@ export function updateAdvancingMovement(combatant: Combatant): void {
   }
 
   _moveVec.subVectors(anchor, combatant.position);
-  const distance = _moveVec.length();
-  if (combatant.destinationPoint && distance < ADVANCE_ARRIVAL_RADIUS) {
+  const distanceSq = _moveVec.lengthSq();
+  if (combatant.destinationPoint && distanceSq < ADVANCE_ARRIVAL_RADIUS_SQ) {
     combatant.velocity.set(0, 0, 0);
     return;
   }
 
-  _moveVec.normalize();
   let speed = ADVANCING_TRAVERSE_SPEED;
-  if (distance < ADVANCE_CLOSE_DISTANCE) {
+  if (distanceSq < ADVANCE_CLOSE_DISTANCE_SQ) {
     speed = ADVANCING_CLOSE_SPEED;
-  } else if (distance > ADVANCE_LONG_DISTANCE) {
+  } else if (distanceSq > ADVANCE_LONG_DISTANCE_SQ) {
     speed = TRAVERSAL_RUN_SPEED;
   }
 
-  combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
-  combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+  setVelocityFromMoveVector(combatant, speed, Math.sqrt(distanceSq));
 }
 
 export function updateRetreatingMovement(combatant: Combatant): void {
@@ -323,19 +333,13 @@ export function updateRetreatingMovement(combatant: Combatant): void {
   }
 
   _moveVec.subVectors(combatant.destinationPoint, combatant.position);
-  const distance = _moveVec.length();
-  if (distance < RETREAT_ARRIVAL_RADIUS) {
+  const distanceSq = _moveVec.lengthSq();
+  if (distanceSq < RETREAT_ARRIVAL_RADIUS_SQ) {
     combatant.velocity.set(0, 0, 0);
     return;
   }
 
-  _moveVec.normalize();
-  combatant.velocity.set(
-    _moveVec.x * RETREATING_FALLBACK_SPEED,
-    0,
-    _moveVec.z * RETREATING_FALLBACK_SPEED
-  );
-  combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+  setVelocityFromMoveVector(combatant, RETREATING_FALLBACK_SPEED, Math.sqrt(distanceSq));
 }
 
 export function updateSuppressingMovement(combatant: Combatant): void {
@@ -357,17 +361,12 @@ export function updateCoverSeekingMovement(combatant: Combatant): void {
     return;
   }
   _moveVec.subVectors(combatant.destinationPoint, combatant.position);
-  const distance = _moveVec.length();
-  if (distance < COVER_ARRIVAL_RADIUS) {
+  const distanceSq = _moveVec.lengthSq();
+  if (distanceSq < COVER_ARRIVAL_RADIUS_SQ) {
     combatant.velocity.set(0, 0, 0);
     return;
   }
-  _moveVec.normalize();
-  combatant.velocity.set(
-    _moveVec.x * COVER_SEEKING_SPEED,
-    0,
-    _moveVec.z * COVER_SEEKING_SPEED
-  );
+  setVelocityFromMoveVector(combatant, COVER_SEEKING_SPEED, Math.sqrt(distanceSq), false);
 }
 export function updateDefendingMovement(combatant: Combatant): void {
   if (!combatant.destinationPoint) {
@@ -375,15 +374,23 @@ export function updateDefendingMovement(combatant: Combatant): void {
     return;
   }
   _moveVec.subVectors(combatant.destinationPoint, combatant.position);
-  const distance = _moveVec.length();
-  if (distance < DEFEND_ARRIVAL_RADIUS) {
+  const distanceSq = _moveVec.lengthSq();
+  if (distanceSq < DEFEND_ARRIVAL_RADIUS_SQ) {
     combatant.velocity.set(0, 0, 0);
     return;
   }
-  _moveVec.normalize();
-  combatant.velocity.set(
-    _moveVec.x * DEFEND_SPEED,
-    0,
-    _moveVec.z * DEFEND_SPEED
-  );
+  setVelocityFromMoveVector(combatant, DEFEND_SPEED, Math.sqrt(distanceSq), false);
+}
+
+function setVelocityFromMoveVector(
+  combatant: Combatant,
+  speed: number,
+  distance: number,
+  updateRotation = true,
+): void {
+  const invDistance = distance > 0 ? 1 / distance : 0;
+  const dirX = _moveVec.x * invDistance;
+  const dirZ = _moveVec.z * invDistance;
+  combatant.velocity.set(dirX * speed, 0, dirZ * speed);
+  if (updateRotation && speed > 0.1) combatant.rotation = Math.atan2(dirZ, dirX);
 }

@@ -29,6 +29,12 @@ const {
   computeAdaptiveLookahead,
   pointAlongPath,
   evaluateFireGate,
+  appendBoundedEvent,
+  sanitizePresentationContext,
+  addTopCollisionContributor,
+  shouldRecordRouteSnapEpoch,
+  queryTerrainLineOfSight,
+  hasClearTerrainLineOfSight,
   PLAYER_EYE_HEIGHT,
   TARGET_CHEST_HEIGHT,
   TARGET_ACTOR_AIM_Y_OFFSET,
@@ -38,13 +44,23 @@ const {
   PLAYER_MAX_CLIMB_GRADIENT,
   PATH_TRUST_TTL_MS,
   AIM_PITCH_LIMIT_RAD,
+  NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE,
+  DRIVER_VIEW_MAX_YAW_STEP_RAD,
+  DRIVER_VIEW_MAX_PITCH_STEP_RAD,
   isPathTrusted,
   clampAimYByPitch,
+  signedYawDelta,
+  applyViewSlewLimit,
+  syncViewAnchorToActual,
+  normalizeDriverSeed,
+  createSeededRandom,
   // perf-harness-player-bot exports — JS mirror of src/dev/harness/playerBot/*.ts.
   stepBotState,
   createIdleBotIntent,
   selectDriverViewTarget,
   computeWorldMovementIntent,
+  computeAimMovementDivergence,
+  computeViewMovementDivergence,
   isRouteOverlayMicroTarget,
   isRoutePathExhausted,
   computeRouteContinuationPoint,
@@ -55,13 +71,19 @@ const {
   shouldResetRouteForNoProgress,
   isTargetTemporarilyBlocked,
   markTargetTemporarilyBlocked,
+  addNearestVisibleCheckCandidate,
+  selectVisiblePreferredEnemyCandidate,
   shouldUseTargetForCurrentObjective,
   shouldUseRouteOverlayForIntent,
   shouldUseDirectCombatRouteFallback,
   createDirectCombatFallbackPath,
+  isRouteSnapTrusted,
+  shouldIssueFireStart,
+  shouldReleaseFireForRetarget,
   selectLockedTarget,
   profileForMode,
   botConfigForProfile,
+  resolveDriverDecisionIntervalMs,
   combatObjectiveMaxDistanceForProfile,
   supportsFrontlineCompression,
   usesPlayerAnchoredFrontlineCompression,
@@ -194,6 +216,254 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
     });
     expect(result.shouldFire).toBe(false);
     expect(result.reason).toBe('missing_vectors');
+  });
+});
+
+describe('perf-active-driver fire-start retry', () => {
+  it('issues fireStart on the first fire intent', () => {
+    expect(shouldIssueFireStart(false, null)).toBe(true);
+  });
+
+  it('does not spam fireStart while the live weapon is already firing', () => {
+    expect(shouldIssueFireStart(true, true)).toBe(false);
+  });
+
+  it('retries fireStart when the driver thought fire was held but weapon input rejected it', () => {
+    expect(shouldIssueFireStart(true, false)).toBe(true);
+  });
+
+  it('releases fire when the held trigger crosses a target epoch boundary', () => {
+    expect(shouldReleaseFireForRetarget(true, 'combatant_1', 'combatant_2')).toBe(true);
+    expect(shouldReleaseFireForRetarget(true, 'combatant_1', null)).toBe(true);
+  });
+
+  it('keeps fire state when the target did not change or the trigger was not held', () => {
+    expect(shouldReleaseFireForRetarget(true, 'combatant_1', 'combatant_1')).toBe(false);
+    expect(shouldReleaseFireForRetarget(false, 'combatant_1', 'combatant_2')).toBe(false);
+  });
+});
+
+describe('perf-active-driver seeded randomness', () => {
+  it('normalizes driver seeds for opt-in repeatable harness compression', () => {
+    expect(normalizeDriverSeed(42.9)).toBe(42);
+    expect(normalizeDriverSeed('7')).toBe(7);
+    expect(normalizeDriverSeed(-1)).toBeNull();
+    expect(normalizeDriverSeed(Number.NaN)).toBeNull();
+  });
+
+  it('produces repeatable sequences for the same driver seed', () => {
+    const a = createSeededRandom(123);
+    const b = createSeededRandom(123);
+    const c = createSeededRandom(124);
+    const seqA = [a(), a(), a(), a()];
+    const seqB = [b(), b(), b(), b()];
+    const seqC = [c(), c(), c(), c()];
+
+    expect(seqA).toEqual(seqB);
+    expect(seqA).not.toEqual(seqC);
+    for (const value of seqA) {
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThan(1);
+    }
+  });
+});
+
+describe('perf-active-driver bounded shot epochs', () => {
+  it('keeps only the newest events within the configured limit', () => {
+    const events = [];
+    appendBoundedEvent(events, { id: 'a' }, 2);
+    appendBoundedEvent(events, { id: 'b' }, 2);
+    appendBoundedEvent(events, { id: 'c' }, 2);
+    expect(events.map(event => event.id)).toEqual(['b', 'c']);
+  });
+
+  it('preserves the caller-owned array while rotating a saturated buffer', () => {
+    const events = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const returned = appendBoundedEvent(events, { id: 'd' }, 3);
+    expect(returned).toBe(events);
+    expect(events.map(event => event.id)).toEqual(['b', 'c', 'd']);
+  });
+
+  it('compacts over-capacity event buffers without splicing', () => {
+    const spliceSpy = vi.spyOn(Array.prototype, 'splice');
+    try {
+      const events = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e' }];
+      const returned = appendBoundedEvent(events, { id: 'f' }, 3);
+
+      expect(returned).toBe(events);
+      expect(spliceSpy).not.toHaveBeenCalled();
+      expect(events.map(event => event.id)).toEqual(['d', 'e', 'f']);
+    } finally {
+      spliceSpy.mockRestore();
+    }
+  });
+});
+
+describe('perf-active-driver route snap epochs', () => {
+  it('does not record exact successful nav routes', () => {
+    expect(shouldRecordRouteSnapEpoch({
+      status: 'nav_ok',
+      start: { found: true, snapped: false, distance: 0 },
+      end: { found: true, snapped: false, distance: 0 },
+    })).toBe(false);
+  });
+
+  it('records successful routes with meaningful endpoint snapping', () => {
+    expect(shouldRecordRouteSnapEpoch({
+      status: 'nav_ok',
+      start: { found: true, snapped: true, distance: 7.5 },
+      end: { found: true, snapped: false, distance: 0 },
+    })).toBe(true);
+  });
+
+  it('records snap-rejected and failed paths even when distances are small', () => {
+    expect(shouldRecordRouteSnapEpoch({
+      status: 'snap_rejected',
+      start: { found: true, snapped: false, distance: 0 },
+      end: { found: true, snapped: false, distance: 0 },
+    })).toBe(true);
+
+    expect(shouldRecordRouteSnapEpoch({
+      status: 'nav_failed',
+      start: { found: false, snapped: false, distance: null },
+      end: { found: true, snapped: false, distance: 0 },
+    })).toBe(true);
+  });
+});
+
+describe('perf-active-driver terrain line of sight', () => {
+  it('reports unknown when terrain raycast is unavailable', () => {
+    const result = queryTerrainLineOfSight(
+      null,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    );
+
+    expect(result.status).toBe('unknown');
+    expect(result.clear).toBe(false);
+    expect(result.reason).toBe('missing_terrain_raycast');
+    expect(hasClearTerrainLineOfSight(
+      null,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toBe(false);
+  });
+
+  it('allows fire line of sight when terrain raycast misses', () => {
+    const terrain = {
+      raycastTerrain: () => ({ hit: false }),
+    };
+
+    expect(queryTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toMatchObject({ status: 'clear', clear: true, reason: 'raycast_miss' });
+
+    expect(hasClearTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toBe(true);
+  });
+
+  it('blocks fire line of sight when height profile crosses a raycast miss', () => {
+    const terrain = {
+      raycastTerrain: () => ({ hit: false }),
+      getEffectiveHeightAt: (_x, z) => z < -12 && z > -24 ? 2.4 : -10,
+    };
+
+    expect(queryTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toMatchObject({ status: 'blocked', clear: false, reason: 'height_profile_blocked' });
+  });
+
+  it('blocks fire line of sight when terrain is hit before the aim point', () => {
+    const terrain = {
+      raycastTerrain: () => ({ hit: true, distance: 12 }),
+    };
+
+    expect(queryTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toMatchObject({ status: 'blocked', clear: false, reason: 'terrain_hit_before_target' });
+
+    expect(hasClearTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toBe(false);
+  });
+
+  it('allows a terrain hit at the aim point within target clearance', () => {
+    const terrain = {
+      raycastTerrain: (_from, _dir, distance) => ({ hit: true, distance: distance - 0.2 }),
+    };
+
+    expect(hasClearTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+      0.75,
+    )).toBe(true);
+  });
+});
+
+describe('perf-active-driver aim/movement equivalence telemetry', () => {
+  it('reports divergence when movement target differs from aim target', () => {
+    const result = computeAimMovementDivergence({
+      aimTarget: { x: 0, y: 2, z: -100 },
+      movementTarget: { x: 100, y: 2, z: 0 },
+    }, null, { x: 0, y: 2, z: 0 });
+
+    expect(result).not.toBeNull();
+    expect(result.angleDeg).toBeCloseTo(90, 3);
+    expect(result.aimDistance).toBeCloseTo(100, 3);
+    expect(result.movementDistance).toBeCloseTo(100, 3);
+  });
+
+  it('uses route overlay as movement target when intent has no explicit movement target', () => {
+    const result = computeAimMovementDivergence({
+      aimTarget: { x: 0, y: 2, z: -100 },
+    }, { x: 0, y: 2, z: -50 }, { x: 0, y: 2, z: 0 });
+
+    expect(result).not.toBeNull();
+    expect(result.angleDeg).toBeCloseTo(0, 3);
+    expect(result.movementDistance).toBeCloseTo(50, 3);
+  });
+
+  it('returns null when there is no separate movement target to compare', () => {
+    expect(computeAimMovementDivergence({
+      aimTarget: { x: 0, y: 2, z: -100 },
+    }, null, { x: 0, y: 2, z: 0 })).toBeNull();
+  });
+
+  it('reports no divergence when the selected view target is the route overlay', () => {
+    const playerPos = { x: 0, y: 2, z: 0 };
+    const overlay = { x: 0, y: 2, z: -80 };
+    const result = computeViewMovementDivergence(overlay, {
+      aimTarget: { x: 100, y: 2, z: 0 },
+    }, overlay, playerPos);
+
+    expect(result).not.toBeNull();
+    expect(result.angleDeg).toBeCloseTo(0, 3);
+  });
+
+  it('reports divergence only when camera view and movement target split', () => {
+    const result = computeViewMovementDivergence({
+      x: 100,
+      y: 2,
+      z: 0,
+    }, {
+      aimTarget: { x: 100, y: 2, z: 0 },
+      movementTarget: { x: 0, y: 2, z: -100 },
+    }, null, { x: 0, y: 2, z: 0 });
+
+    expect(result).not.toBeNull();
+    expect(result.angleDeg).toBeCloseTo(90, 3);
   });
 });
 
@@ -670,6 +940,18 @@ describe('PlayerBot driver mirror — PATROL and ALERT', () => {
     expect(step.nextState).toBe('ALERT');
   });
 
+  it('breaks objective travel for a visible Open Frontier target inside weapon range', () => {
+    const config = botConfigForProfile(profileForMode('open_frontier'));
+    const step = stepBotState('PATROL', makeBotCtx({
+      config,
+      findNearestEnemy: () => makeBotTarget({ position: { x: 0, y: 0, z: -220 } }),
+      getObjective: () => ({ position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+      canSeeTarget: () => true,
+    }));
+    expect(config.targetAcquisitionDistance).toBeLessThan(config.maxFireDistance);
+    expect(step.nextState).toBe('ALERT');
+  });
+
   it('ALERT hands off to ENGAGE when target is near and visible', () => {
     const target = makeBotTarget({ position: { x: 0, y: 0, z: -30 } });
     const step = stepBotState('ALERT', makeBotCtx({
@@ -989,6 +1271,16 @@ describe('PlayerBot driver mirror — mode profiles', () => {
     expect(config.coverSuppressionScore).toBeUndefined();
   });
 
+  it('honors the capture-provided movement decision interval', () => {
+    const profile = profileForMode('a_shau_valley');
+    expect(resolveDriverDecisionIntervalMs(profile, 450)).toBe(450);
+  });
+
+  it('falls back to the mode profile decision interval when no capture interval is provided', () => {
+    const profile = profileForMode('open_frontier');
+    expect(resolveDriverDecisionIntervalMs(profile, null)).toBe(profile.decisionIntervalMs);
+  });
+
   it('frontline compression covers long-map perf modes with shot gates', () => {
     expect(supportsFrontlineCompression('open_frontier')).toBe(true);
     expect(supportsFrontlineCompression('a_shau_valley')).toBe(true);
@@ -1053,9 +1345,153 @@ describe('PlayerBot driver mirror — idle intent shape', () => {
     expect(intent.movementTarget).toBeNull();
   });
 
-  it('has an aimLerpRate of 1 (snap) by default', () => {
+  it('requests immediate aim by default; the injected controller applies the slew cap', () => {
     const intent = createIdleBotIntent();
     expect(intent.aimLerpRate).toBe(1);
+  });
+});
+
+describe('PlayerBot driver mirror — camera slew limit', () => {
+  const deg = (value) => value * Math.PI / 180;
+
+  it('uses a humanized default camera slew cap for the synthetic perf driver', () => {
+    expect(DRIVER_VIEW_MAX_YAW_STEP_RAD).toBeCloseTo(deg(12), 6);
+    expect(DRIVER_VIEW_MAX_PITCH_STEP_RAD).toBeCloseTo(deg(4), 6);
+  });
+
+  it('wraps yaw deltas across the +/-pi boundary', () => {
+    expect(signedYawDelta(deg(179), deg(-179))).toBeCloseTo(deg(2), 6);
+    expect(signedYawDelta(deg(-179), deg(179))).toBeCloseTo(deg(-2), 6);
+  });
+
+  it('limits a large target handoff to the default per-tick yaw and pitch caps', () => {
+    const next = applyViewSlewLimit(0, 0, deg(90), deg(25));
+    expect(next.yaw).toBeCloseTo(DRIVER_VIEW_MAX_YAW_STEP_RAD, 6);
+    expect(next.pitch).toBeCloseTo(DRIVER_VIEW_MAX_PITCH_STEP_RAD, 6);
+    expect(next.yawDelta).toBeCloseTo(deg(90), 6);
+    expect(next.pitchDelta).toBeCloseTo(deg(25), 6);
+    expect(next.remainingYawDelta).toBeCloseTo(deg(78), 6);
+    expect(next.remainingPitchDelta).toBeCloseTo(deg(21), 6);
+    expect(next.yawClamped).toBe(true);
+    expect(next.pitchClamped).toBe(true);
+  });
+
+  it('does not alter small camera corrections inside the slew caps', () => {
+    const next = applyViewSlewLimit(deg(10), deg(-2), deg(15), deg(1));
+    expect(next.yaw).toBeCloseTo(deg(15), 6);
+    expect(next.pitch).toBeCloseTo(deg(1), 6);
+    expect(next.yawClamped).toBe(false);
+    expect(next.pitchClamped).toBe(false);
+  });
+
+  it('slews recovery from the actual current view after recoil drift', () => {
+    const synced = syncViewAnchorToActual(0, 0, deg(35), deg(18));
+    const next = applyViewSlewLimit(synced.yaw, synced.pitch, 0, 0);
+
+    expect(synced.changed).toBe(true);
+    expect(synced.yaw).toBeCloseTo(deg(35), 6);
+    expect(synced.pitch).toBeCloseTo(deg(18), 6);
+    expect(next.yaw).toBeCloseTo(deg(35) - DRIVER_VIEW_MAX_YAW_STEP_RAD, 6);
+    expect(next.pitch).toBeCloseTo(deg(18) - DRIVER_VIEW_MAX_PITCH_STEP_RAD, 6);
+    expect(next.yawClamped).toBe(true);
+    expect(next.pitchClamped).toBe(true);
+  });
+});
+
+describe('PlayerBot driver mirror — shot presentation context', () => {
+  it('sanitizes rendered-camera and terrain context for shot epochs', () => {
+    const context = sanitizePresentationContext({
+      frameCount: 42,
+      atMs: 1234.5,
+      cameraEpochs: Array.from({ length: 9 }, (_, index) => ({
+        stage: index === 8 ? 'after-render' : 'before-render',
+        frameCount: 42,
+        atMs: 1200 + index,
+        cameraSource: 'main',
+        position: { x: index, y: 10 + index, z: -index },
+        rotationDeg: { yaw: index * 3, pitch: -index, roll: 0 },
+        quaternion: { x: 0, y: 0, z: 0, w: 1 },
+        deltaFromPrevious: {
+          positionMeters: index,
+          yawDeg: 3,
+          pitchDeg: -1,
+          rollDeg: 0,
+        },
+      })),
+      terrain: {
+        tileCount: 12,
+        tileSelectionSaturated: false,
+        tileHash: 'abcd1234',
+        lodCounts: { 0: 1, 1: 11 },
+        morphingTiles: 2,
+        maxMorphFactor: 0.4,
+        edgeMorphTiles: 1,
+        edgeMorphMaskCounts: { 0: 11, 8: 1 },
+        minTileSize: 64,
+        maxTileSize: 512,
+        cameraSample: {
+          terrainHeightAtCamera: 8,
+          effectiveHeightAtCamera: 8.5,
+          clearanceMeters: 3,
+          effectiveClearanceMeters: 2.5,
+          hasTerrain: true,
+          areaReady: true,
+        },
+      },
+      terrainByStage: {
+        'after-simulation': { tileCount: 10, tileHash: 'simhash' },
+        'before-render': { tileCount: 12, tileHash: 'renderhash' },
+      },
+      terrainSync: {
+        didSync: true,
+        reason: 'stale',
+        selectionRechecked: true,
+        poseWasStale: true,
+        projectionChanged: false,
+        positionDeltaMeters: 0.25,
+        rotationDeltaDeg: 5,
+        tileCount: 12,
+        tileSelectionSaturated: false,
+      },
+      renderer: {
+        drawCalls: 321,
+        triangles: 456789,
+        geometries: 12,
+        textures: 20,
+        programs: 8,
+      },
+      hugeUnexpectedObject: { ignored: true },
+    });
+
+    expect(context.frameCount).toBe(42);
+    expect(context.cameraEpochs).toHaveLength(8);
+    expect(context.cameraEpochs[0].position.x).toBe(1);
+    expect(context.cameraEpochs.at(-1)).toMatchObject({
+      stage: 'after-render',
+      rotationDeg: { yaw: 24, pitch: -8, roll: 0 },
+    });
+    expect(context.terrain).toMatchObject({
+      tileCount: 12,
+      tileHash: 'abcd1234',
+      cameraSample: {
+        effectiveClearanceMeters: 2.5,
+        areaReady: true,
+      },
+    });
+    expect(context.terrainByStage['after-simulation']).toMatchObject({
+      tileCount: 10,
+      tileHash: 'simhash',
+    });
+    expect(context.terrainSync).toMatchObject({
+      didSync: true,
+      reason: 'stale',
+      rotationDeltaDeg: 5,
+    });
+    expect(context.renderer).toMatchObject({
+      drawCalls: 321,
+      triangles: 456789,
+    });
+    expect(context.hugeUnexpectedObject).toBeUndefined();
   });
 });
 
@@ -1118,7 +1554,20 @@ describe('PlayerBot driver mirror — route-overlay eligibility', () => {
       },
       botState: 'ADVANCE',
       currentTarget: makeBotTarget(),
+      currentTargetVisible: false,
     })).toBe(true);
+  });
+
+  it('skips route overlay while advancing toward a visible current target', () => {
+    expect(shouldUseRouteOverlayForIntent({
+      intent: {
+        ...createIdleBotIntent(),
+        moveForward: 1,
+      },
+      botState: 'ADVANCE',
+      currentTarget: makeBotTarget(),
+      currentTargetVisible: true,
+    })).toBe(false);
   });
 
   it('skips route overlay while firing and closing on a visible target', () => {
@@ -1127,6 +1576,18 @@ describe('PlayerBot driver mirror — route-overlay eligibility', () => {
         ...createIdleBotIntent(),
         moveForward: 1,
         firePrimary: true,
+      },
+      botState: 'ENGAGE',
+      currentTarget: makeBotTarget(),
+    })).toBe(false);
+  });
+
+  it('skips route overlay during ENGAGE reload gaps so movement stays aim-aligned', () => {
+    expect(shouldUseRouteOverlayForIntent({
+      intent: {
+        ...createIdleBotIntent(),
+        moveForward: 1,
+        reload: true,
       },
       botState: 'ENGAGE',
       currentTarget: makeBotTarget(),
@@ -1211,6 +1672,17 @@ describe('PlayerBot driver mirror — target lock stability', () => {
     const current = makeBotTarget({ id: 'old_target', lastKnownMs: 1000 });
     const fresh = makeBotTarget({ id: 'new_target', lastKnownMs: 7000 });
     expect(selectLockedTarget(current, fresh, 7000, 4000)).toBe(fresh);
+  });
+
+  it('drops the current target immediately when the engine says it is no longer live', () => {
+    const current = makeBotTarget({ id: 'dead_target', lastKnownMs: 1000 });
+    const fresh = makeBotTarget({ id: 'new_target', lastKnownMs: 2000 });
+    expect(selectLockedTarget(current, fresh, 3000, 4000, false)).toBe(fresh);
+  });
+
+  it('clears the current lock when a dead target has no replacement', () => {
+    const current = makeBotTarget({ id: 'dead_target', lastKnownMs: 1000 });
+    expect(selectLockedTarget(current, null, 3000, 4000, false)).toBeNull();
   });
 
 });
@@ -1578,6 +2050,26 @@ describe('route objective-progress recovery', () => {
     })).toBe(true);
   });
 
+  it('treats oversized navmesh snaps as untrusted route steering', () => {
+    expect(isRouteSnapTrusted({
+      startDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE - 1,
+      endDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE,
+    })).toBe(true);
+    expect(isRouteSnapTrusted({
+      startDistance: 2,
+      endDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE + 1,
+    })).toBe(false);
+  });
+
+  it('uses direct combat fallback when a combat route snap is mechanically untrusted', () => {
+    expect(shouldUseDirectCombatRouteFallback({
+      targetKind: 'current_target',
+      failureReason: 'snap_distance_untrusted',
+      targetDistance: 180,
+      maxDistance: 700,
+    })).toBe(true);
+  });
+
   it('keeps zone routing failures as real route failures', () => {
     expect(shouldUseDirectCombatRouteFallback({
       targetKind: 'zone',
@@ -1637,6 +2129,22 @@ describe('route objective-progress recovery', () => {
     })).toBe(true);
   });
 
+  it('allows a visible target inside fire range to interrupt Open Frontier routing', () => {
+    const config = botConfigForProfile(profileForMode('open_frontier'));
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -220 } });
+    expect(config.targetAcquisitionDistance).toBeLessThan(config.maxFireDistance);
+    expect(shouldUseTargetForCurrentObjective({
+      target,
+      currentTarget: null,
+      objective: { kind: 'zone', position: { x: 100, y: 0, z: 0 }, priority: 1 },
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      botState: 'PATROL',
+      acquisitionDistance: config.targetAcquisitionDistance,
+      maxFireDistance: config.maxFireDistance,
+      canSeeTarget: () => true,
+    })).toBe(true);
+  });
+
   it('keeps an active close target through brief LOS flicker', () => {
     const config = botConfigForProfile(profileForMode('zone_control'));
     const target = makeBotTarget({
@@ -1653,6 +2161,108 @@ describe('route objective-progress recovery', () => {
       maxFireDistance: config.maxFireDistance,
       canSeeTarget: () => false,
     })).toBe(true);
+  });
+});
+
+describe('perf-active-driver visible-check candidate insertion', () => {
+  it('maintains a bounded nearest-first candidate list without splicing', () => {
+    const spliceSpy = vi.spyOn(Array.prototype, 'splice');
+    try {
+      const candidates = [
+        { combatant: { id: 'middle' }, distSq: 400 },
+        { combatant: { id: 'far' }, distSq: 900 },
+      ];
+
+      addNearestVisibleCheckCandidate(candidates, { combatant: { id: 'nearest' }, distSq: 25 }, 3);
+      addNearestVisibleCheckCandidate(candidates, { combatant: { id: 'outside_cap' }, distSq: 1600 }, 3);
+
+      expect(spliceSpy).not.toHaveBeenCalled();
+      expect(candidates.map(candidate => candidate.combatant.id)).toEqual(['nearest', 'middle', 'far']);
+    } finally {
+      spliceSpy.mockRestore();
+    }
+  });
+});
+
+describe('perf-active-driver collision contributor insertion', () => {
+  it('maintains bounded max-height contributor ordering without sorting', () => {
+    const sortSpy = vi.spyOn(Array.prototype, 'sort');
+    try {
+      const contributors = [];
+      const returned = addTopCollisionContributor(contributors, { id: 'a', maxY: 4 }, 5);
+      addTopCollisionContributor(contributors, { id: 'b', maxY: 2 }, 5);
+      addTopCollisionContributor(contributors, { id: 'c', maxY: 5 }, 5);
+      addTopCollisionContributor(contributors, { id: 'd', maxY: 5 }, 5);
+      addTopCollisionContributor(contributors, { id: 'e', maxY: 1 }, 5);
+      addTopCollisionContributor(contributors, { id: 'f', maxY: 3 }, 5);
+      addTopCollisionContributor(contributors, { id: 'g', maxY: 6 }, 5);
+
+      expect(returned).toBe(contributors);
+      expect(sortSpy).not.toHaveBeenCalled();
+      expect(contributors.map(contributor => contributor.id)).toEqual(['g', 'c', 'd', 'a', 'f']);
+    } finally {
+      sortSpy.mockRestore();
+    }
+  });
+});
+
+describe('PlayerBot driver mirror — visible target preference', () => {
+  it('prefers a visible shootable target over a nearer occluded target', () => {
+    const nearOccluded = makeBotTarget({
+      id: 'near_occluded',
+      position: { x: 0, y: 0, z: -120 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+    const visible = makeBotTarget({
+      id: 'visible',
+      position: { x: 0, y: 0, z: -220 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+
+    const selected = selectVisiblePreferredEnemyCandidate({
+      combatants: [nearOccluded, visible],
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      perceptionRange: 300,
+      maxFireDistance: 245,
+      isEnemy: combatant => combatant.faction === 'opfor',
+      canSeeTarget: pos => pos.z === visible.position.z,
+    });
+
+    expect(selected.combatant.id).toBe('visible');
+    expect(selected.visible).toBe(true);
+  });
+
+  it('falls back to the nearest perceived target when none are visible', () => {
+    const nearOccluded = makeBotTarget({
+      id: 'near_occluded',
+      position: { x: 0, y: 0, z: -120 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+    const farOccluded = makeBotTarget({
+      id: 'far_occluded',
+      position: { x: 0, y: 0, z: -220 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+
+    const selected = selectVisiblePreferredEnemyCandidate({
+      combatants: [farOccluded, nearOccluded],
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      perceptionRange: 300,
+      maxFireDistance: 245,
+      isEnemy: combatant => combatant.faction === 'opfor',
+      canSeeTarget: () => false,
+    });
+
+    expect(selected.combatant.id).toBe('near_occluded');
+    expect(selected.visible).toBe(false);
   });
 });
 

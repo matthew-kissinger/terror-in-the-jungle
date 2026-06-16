@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad, isPlayerTarget } from './types';
+import { Combatant, CombatantState, Faction, Squad, isPlayerTarget, isTargetAlive } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
@@ -17,7 +17,11 @@ import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem } from '../../types/SystemInterfaces';
-import { tryConsumeCombatFireRaycast } from './ai/CombatFireRaycastBudget';
+import {
+  recordCombatFireTerrainBlocked,
+  tryConsumeCombatFireRaycast,
+} from './ai/CombatFireRaycastBudget';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 // Extracted modules
 import { CombatantBallistics } from './CombatantBallistics';
 import { CombatantDamage } from './CombatantDamage';
@@ -30,6 +34,14 @@ import {
   copyPlayerCenterMassPosition,
 } from './CombatantBodyMetrics';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
+
+const COMBAT_PLAYER_SHOT_HIT_DETECTION = 'Combat.PlayerShot.HitDetection';
+const COMBAT_PLAYER_SHOT_TERRAIN_RAYCAST = 'Combat.PlayerShot.TerrainRaycast';
+const COMBAT_PLAYER_SHOT_HEIGHT_PROFILE = 'Combat.PlayerShot.HeightProfile';
+const COMBAT_PLAYER_SHOT_DAMAGE = 'Combat.PlayerShot.Damage';
+const COMBAT_PLAYER_SHOT_PREVIEW_HIT_DETECTION = 'Combat.PlayerShot.PreviewHitDetection';
+const COMBAT_PLAYER_SHOT_PREVIEW_TERRAIN_RAYCAST = 'Combat.PlayerShot.PreviewTerrainRaycast';
+const COMBAT_PLAYER_SHOT_PREVIEW_HEIGHT_PROFILE = 'Combat.PlayerShot.PreviewHeightProfile';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -74,6 +86,7 @@ export class CombatantCombat {
   private readonly _muzzlePos = new THREE.Vector3();
   private readonly _targetFirePos = new THREE.Vector3();
   private readonly _fireDirection = new THREE.Vector3();
+  private readonly _fireRay = new THREE.Ray();
 
   // Player-as-attacker proxy. Mirrors the `_playerTarget` pattern in
   // AITargetAcquisition: the player is not a Combatant, but downstream damage
@@ -180,6 +193,12 @@ export class CombatantCombat {
   ): void {
     if (!combatant.gunCore.canFire() || combatant.burstCooldown > 0) return;
 
+    if (!isPlayerTarget(combatant.target) && !isTargetAlive(combatant.target)) {
+      combatant.target = null;
+      combatant.isFullAuto = false;
+      return;
+    }
+
     // Check burst control
     if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
       combatant.currentBurst = 0;
@@ -197,30 +216,13 @@ export class CombatantCombat {
     // Check terrain obstruction before firing - only for high/medium LOD combatants.
     // This gate runs ahead of registerShot() so a blocked or over-budget shot
     // does not consume cooldown or accumulate bloom.
-    if (targetPos && this.terrainSystem && combatant.simLane &&
-        (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
-      const distance = combatant.position.distanceTo(targetPos);
-
-      // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
-      if (!tryConsumeCombatFireRaycast()) {
-        return;
-      }
-
-      // Use module-level scratch vectors instead of pool allocation
-      copyNpcMuzzlePosition(this._muzzlePos, combatant.position);
-
+    if (targetPos) {
       if (isPlayerTarget(combatant.target)) {
         copyPlayerCenterMassPosition(this._targetFirePos, targetPos);
       } else {
         copyNpcCenterMassPosition(this._targetFirePos, targetPos);
       }
-
-      this._fireDirection.subVectors(this._targetFirePos, this._muzzlePos).normalize();
-
-      const terrainHit = this.terrainSystem.raycastTerrain(this._muzzlePos, this._fireDirection, distance);
-
-      if (terrainHit.hit && terrainHit.distance! < distance - 0.5) {
-        // Terrain blocks shot, don't fire — no fire-rate or bloom mutation.
+      if (this.isNpcFireBlockedByTerrain(combatant, this._targetFirePos)) {
         return;
       }
     }
@@ -314,6 +316,16 @@ export class CombatantCombat {
     const targetPos = combatant.suppressionTarget || combatant.lastKnownTargetPos;
     if (!targetPos) return;
 
+    if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
+      combatant.currentBurst = 0;
+      combatant.burstCooldown = combatant.skillProfile.burstPauseMs / 1000;
+      return;
+    }
+
+    if (this.isNpcFireBlockedByTerrain(combatant, targetPos)) {
+      return;
+    }
+
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
 
@@ -351,10 +363,27 @@ export class CombatantCombat {
       }
     }
 
-    const hit = this.hitDetection.raycastCombatants(ray, shooterFaction, allCombatants, { positionMode: 'visual' });
-    const terrainHit = this.terrainSystem
-      ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
-      : { hit: false as const };
+    const telemetryEnabled = performanceTelemetry.isEnabled();
+    let hit: ReturnType<CombatantHitDetection['raycastCombatants']>;
+    this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_HIT_DETECTION);
+    try {
+      hit = this.hitDetection.raycastCombatants(ray, shooterFaction, allCombatants, { positionMode: 'visual' });
+    } finally {
+      this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_HIT_DETECTION);
+    }
+
+    const terrainRayDistance = hit
+      ? Math.min(hit.distance, this.MAX_ENGAGEMENT_RANGE)
+      : this.MAX_ENGAGEMENT_RANGE;
+    let terrainHit: ReturnType<ITerrainRuntime['raycastTerrain']> | { hit: false };
+    this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_TERRAIN_RAYCAST);
+    try {
+      terrainHit = this.terrainSystem
+        ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, terrainRayDistance)
+        : { hit: false as const };
+    } finally {
+      this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_TERRAIN_RAYCAST);
+    }
 
     if (hit && terrainHit.hit && terrainHit.distance !== undefined && terrainHit.distance < hit.distance - 0.5) {
       if (terrainHit.point) {
@@ -366,9 +395,17 @@ export class CombatantCombat {
       return { hit: false, point: this.scratchEndPoint };
     }
 
-    if (hit && this.isBlockedByHeightProfile(ray, hit.distance)) {
-      const blockDistance = this.findHeightProfileBlockDistance(ray, hit.distance);
-      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, blockDistance);
+    let heightProfileBlockDistance: number | null = null;
+    if (hit) {
+      this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_HEIGHT_PROFILE);
+      try {
+        heightProfileBlockDistance = this.findHeightProfileBlockCandidateDistance(ray, hit.distance);
+      } finally {
+        this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_HEIGHT_PROFILE);
+      }
+    }
+    if (hit && heightProfileBlockDistance !== null) {
+      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, heightProfileBlockDistance);
       this.impactEffectsPool.spawn(this.scratchEndPoint, ray.direction);
       return { hit: false, point: this.scratchEndPoint };
     }
@@ -381,8 +418,13 @@ export class CombatantCombat {
       const targetHealth = hit.combatant.health;
       // Keep proxy position current so deathDirection / AI threat bearing are
       // oriented from where the player actually stood when the shot resolved.
-      this._playerAttackerProxy.position.copy(this.playerPosition);
-      this.damage.applyDamage(hit.combatant, damage, this._playerAttackerProxy, undefined, hit.headshot);
+      this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_DAMAGE);
+      try {
+        this._playerAttackerProxy.position.copy(this.playerPosition);
+        this.damage.applyDamage(hit.combatant, damage, this._playerAttackerProxy, undefined, hit.headshot);
+      } finally {
+        this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_DAMAGE);
+      }
 
       const killed = targetHealth > 0 && hit.combatant.health <= 0;
 
@@ -443,10 +485,27 @@ export class CombatantCombat {
       }
     }
 
-    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
-    const terrainHit = this.terrainSystem
-      ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
-      : { hit: false as const };
+    const telemetryEnabled = performanceTelemetry.isEnabled();
+    let hit: ReturnType<CombatantHitDetection['raycastCombatants']>;
+    this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_PREVIEW_HIT_DETECTION);
+    try {
+      hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants, { positionMode: 'visual' });
+    } finally {
+      this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_PREVIEW_HIT_DETECTION);
+    }
+
+    const terrainRayDistance = hit
+      ? Math.min(hit.distance, this.MAX_ENGAGEMENT_RANGE)
+      : this.MAX_ENGAGEMENT_RANGE;
+    let terrainHit: ReturnType<ITerrainRuntime['raycastTerrain']> | { hit: false };
+    this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_PREVIEW_TERRAIN_RAYCAST);
+    try {
+      terrainHit = this.terrainSystem
+        ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, terrainRayDistance)
+        : { hit: false as const };
+    } finally {
+      this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_PREVIEW_TERRAIN_RAYCAST);
+    }
 
     if (hit && terrainHit.hit && terrainHit.distance !== undefined && terrainHit.distance < hit.distance - 0.5) {
       if (terrainHit.point) {
@@ -456,9 +515,17 @@ export class CombatantCombat {
       return { hit: false, point: this.scratchEndPoint };
     }
 
-    if (hit && this.isBlockedByHeightProfile(ray, hit.distance)) {
-      const blockDistance = this.findHeightProfileBlockDistance(ray, hit.distance);
-      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, blockDistance);
+    let heightProfileBlockDistance: number | null = null;
+    if (hit) {
+      this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_PREVIEW_HEIGHT_PROFILE);
+      try {
+        heightProfileBlockDistance = this.findHeightProfileBlockCandidateDistance(ray, hit.distance);
+      } finally {
+        this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_PREVIEW_HEIGHT_PROFILE);
+      }
+    }
+    if (hit && heightProfileBlockDistance !== null) {
+      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, heightProfileBlockDistance);
       return { hit: false, point: this.scratchEndPoint };
     }
 
@@ -478,15 +545,6 @@ export class CombatantCombat {
 
     this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, this.MAX_ENGAGEMENT_RANGE);
     return { hit: false, point: this.scratchEndPoint };
-  }
-
-  private isBlockedByHeightProfile(ray: THREE.Ray, maxDistance: number): boolean {
-    return this.findHeightProfileBlockCandidateDistance(ray, maxDistance) !== null;
-  }
-
-  private findHeightProfileBlockDistance(ray: THREE.Ray, maxDistance: number): number {
-    return this.findHeightProfileBlockCandidateDistance(ray, maxDistance)
-      ?? Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
   }
 
   private findHeightProfileBlockCandidateDistance(ray: THREE.Ray, maxDistance: number): number | null {
@@ -537,6 +595,52 @@ export class CombatantCombat {
     }
 
     return null;
+  }
+
+  private isNpcFireBlockedByTerrain(combatant: Combatant, targetPoint: THREE.Vector3): boolean {
+    if (!this.terrainSystem || !combatant.simLane ||
+        (combatant.simLane !== 'high' && combatant.simLane !== 'medium')) {
+      return false;
+    }
+
+    // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
+    if (!tryConsumeCombatFireRaycast()) {
+      return true;
+    }
+
+    copyNpcMuzzlePosition(this._muzzlePos, combatant.position);
+    this._fireDirection.subVectors(targetPoint, this._muzzlePos);
+    const fireDistance = this._fireDirection.length();
+    if (!Number.isFinite(fireDistance) || fireDistance <= 0.001) {
+      return false;
+    }
+    this._fireDirection.multiplyScalar(1 / fireDistance);
+
+    const terrainHit = this.terrainSystem.raycastTerrain(this._muzzlePos, this._fireDirection, fireDistance);
+    if (terrainHit.hit && terrainHit.distance! < fireDistance - 0.5) {
+      recordCombatFireTerrainBlocked();
+      return true;
+    }
+
+    this._fireRay.set(this._muzzlePos, this._fireDirection);
+    const heightProfileBlockDistance = this.findHeightProfileBlockCandidateDistance(this._fireRay, fireDistance);
+    if (heightProfileBlockDistance !== null) {
+      recordCombatFireTerrainBlocked();
+      return true;
+    }
+    return false;
+  }
+
+  private beginPlayerShotPhase(enabled: boolean, systemName: string): void {
+    if (enabled) {
+      performanceTelemetry.beginSystem(systemName);
+    }
+  }
+
+  private endPlayerShotPhase(enabled: boolean, systemName: string): void {
+    if (enabled) {
+      performanceTelemetry.endSystem(systemName);
+    }
   }
 
   applyDamage(

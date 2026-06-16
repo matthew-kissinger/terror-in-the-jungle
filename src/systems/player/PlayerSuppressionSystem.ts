@@ -32,18 +32,26 @@ export class PlayerSuppressionSystem implements GameSystem {
 
   // Tuning parameters
   private readonly NEAR_MISS_RADIUS = 2.5; // Distance in meters to count as near miss
+  private readonly NEAR_MISS_RADIUS_SQ = this.NEAR_MISS_RADIUS * this.NEAR_MISS_RADIUS;
   private readonly NEAR_MISS_DECAY_TIME = 3.0; // Seconds before near miss count starts decaying
   private readonly LOW_SUPPRESSION = 0.3; // 1-3 near misses
   private readonly MEDIUM_SUPPRESSION = 0.6; // 4-6 near misses
   private readonly HIGH_SUPPRESSION = 0.9; // 7+ near misses
+  private readonly RECENT_NEAR_MISS_EVENT_CAP = 5;
 
   private cameraShakeSystem?: CameraShakeSystem;
   private vignetteElement?: HTMLDivElement;
   private directionalOverlayElement?: HTMLDivElement;
   private directionalCanvas?: HTMLCanvasElement;
+  private directionalContext?: CanvasRenderingContext2D | null;
   private desaturationElement?: HTMLDivElement;
   private playerController?: IPlayerController;
   private boundOnResize: (() => void) | null = null;
+  private directionalOverlayDirty = false;
+  private lastVignetteOpacity = '';
+  private lastDesaturationFilter = '';
+  private lastDesaturationOpacity = '';
+  private readonly nearMissDirectionScratch = new THREE.Vector3();
 
   async init(): Promise<void> {
     Logger.info('Combat', 'Initializing Player Suppression System...');
@@ -54,13 +62,14 @@ export class PlayerSuppressionSystem implements GameSystem {
   }
 
   update(deltaTime: number): void {
+    if (this.isIdle()) {
+      return;
+    }
+
     const now = Date.now();
     const timeSinceLastMiss = (now - this.suppressionState.lastNearMissTime) / 1000;
 
-    // Decay recent near misses (remove events older than 2 seconds)
-    this.suppressionState.recentNearMisses = this.suppressionState.recentNearMisses.filter(
-      event => (now - event.timestamp) < 2000
-    );
+    this.compactRecentNearMisses(now);
 
     if (timeSinceLastMiss > this.NEAR_MISS_DECAY_TIME) {
       // Decay near miss count
@@ -104,12 +113,16 @@ export class PlayerSuppressionSystem implements GameSystem {
    * @param cameraDirection Optional camera direction for directional effects
    */
   registerNearMiss(bulletPosition: THREE.Vector3, playerPosition: THREE.Vector3, _cameraDirection?: THREE.Vector3): void {
-    const distance = bulletPosition.distanceTo(playerPosition);
+    const dx = bulletPosition.x - playerPosition.x;
+    const dy = bulletPosition.y - playerPosition.y;
+    const dz = bulletPosition.z - playerPosition.z;
+    const distanceSq = dx * dx + dy * dy + dz * dz;
 
     // Only count if within suppression radius
-    if (distance > this.NEAR_MISS_RADIUS) return;
+    if (distanceSq > this.NEAR_MISS_RADIUS_SQ) return;
 
     const now = Date.now();
+    const distance = Math.sqrt(distanceSq);
 
     // Increment near miss count
     this.suppressionState.nearMissCount += 1;
@@ -118,22 +131,15 @@ export class PlayerSuppressionSystem implements GameSystem {
     // Calculate proximity factor (closer = more intense)
     const proximityFactor = 1.0 - (distance / this.NEAR_MISS_RADIUS);
 
-    // Calculate direction from player to bullet
-    const direction = new THREE.Vector3().subVectors(bulletPosition, playerPosition);
-    direction.y = 0; // Keep horizontal for screen effects
-    direction.normalize();
-
-    // Add to recent near misses for directional effects
-    this.suppressionState.recentNearMisses.push({
-      direction: direction.clone(),
-      intensity: proximityFactor,
-      timestamp: now
-    });
-
-    // Cap at 5 most recent near misses to prevent accumulation
-    if (this.suppressionState.recentNearMisses.length > 5) {
-      this.suppressionState.recentNearMisses.shift();
+    // Calculate horizontal direction from player to bullet for screen effects.
+    const horizontalDistanceSq = dx * dx + dz * dz;
+    const direction = this.nearMissDirectionScratch.set(0, 0, 0);
+    if (horizontalDistanceSq > 0) {
+      const invHorizontalDistance = 1 / Math.sqrt(horizontalDistanceSq);
+      direction.set(dx * invHorizontalDistance, 0, dz * invHorizontalDistance);
     }
+
+    this.appendRecentNearMiss(direction, proximityFactor, now);
 
     // Increase suppression level based on proximity
     this.suppressionState.level = Math.min(
@@ -200,6 +206,7 @@ export class PlayerSuppressionSystem implements GameSystem {
 
     // Handle window resize
     this.directionalCanvas = canvas;
+    this.directionalContext = canvas.getContext('2d');
     this.boundOnResize = () => {
       if (!this.directionalCanvas) return;
       this.directionalCanvas.width = window.innerWidth;
@@ -247,7 +254,7 @@ export class PlayerSuppressionSystem implements GameSystem {
       vignetteOpacity = 0.2; // Subtle darkening at low suppression
     }
 
-    this.vignetteElement.style.opacity = vignetteOpacity.toString();
+    this.setVignetteOpacity(vignetteOpacity.toString());
 
     // Update directional effects
     this.updateDirectionalEffects();
@@ -260,16 +267,21 @@ export class PlayerSuppressionSystem implements GameSystem {
    * Update directional screen effects based on recent near misses
    */
   private updateDirectionalEffects(): void {
-    if (!this.directionalOverlayElement) return;
-
-    const canvas = this.directionalOverlayElement.querySelector('canvas') as HTMLCanvasElement;
+    const canvas = this.directionalCanvas;
+    const ctx = this.directionalContext;
     if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    if (this.suppressionState.recentNearMisses.length === 0) {
+      if (this.directionalOverlayDirty) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        this.directionalOverlayDirty = false;
+      }
+      return;
+    }
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    this.directionalOverlayDirty = true;
 
     const now = Date.now();
     const centerX = canvas.width / 2;
@@ -321,8 +333,72 @@ export class PlayerSuppressionSystem implements GameSystem {
       desaturation = 10; // Subtle desaturation
     }
 
-    this.desaturationElement.style.filter = `saturate(${100 - desaturation}%)`;
-    this.desaturationElement.style.opacity = this.suppressionState.level > 0 ? '1' : '0';
+    this.setDesaturationStyle(
+      `saturate(${100 - desaturation}%)`,
+      this.suppressionState.level > 0 ? '1' : '0',
+    );
+  }
+
+  private isIdle(): boolean {
+    return this.suppressionState.level === 0
+      && this.suppressionState.nearMissCount === 0
+      && this.suppressionState.recentNearMisses.length === 0
+      && !this.directionalOverlayDirty;
+  }
+
+  private compactRecentNearMisses(now: number): void {
+    const events = this.suppressionState.recentNearMisses;
+    let writeIndex = 0;
+    for (let readIndex = 0; readIndex < events.length; readIndex++) {
+      const event = events[readIndex];
+      if ((now - event.timestamp) < 2000) {
+        events[writeIndex++] = event;
+      }
+    }
+    events.length = writeIndex;
+  }
+
+  private appendRecentNearMiss(direction: THREE.Vector3, intensity: number, timestamp: number): void {
+    const events = this.suppressionState.recentNearMisses;
+    if (events.length < this.RECENT_NEAR_MISS_EVENT_CAP) {
+      events.push({
+        direction: direction.clone(),
+        intensity,
+        timestamp
+      });
+      return;
+    }
+
+    for (let index = 1; index < events.length; index++) {
+      const source = events[index];
+      const target = events[index - 1];
+      target.direction.copy(source.direction);
+      target.intensity = source.intensity;
+      target.timestamp = source.timestamp;
+    }
+
+    const target = events[events.length - 1];
+    target.direction.copy(direction);
+    target.intensity = intensity;
+    target.timestamp = timestamp;
+  }
+
+  private setVignetteOpacity(opacity: string): void {
+    if (!this.vignetteElement || this.lastVignetteOpacity === opacity) return;
+    this.vignetteElement.style.opacity = opacity;
+    this.lastVignetteOpacity = opacity;
+  }
+
+  private setDesaturationStyle(filter: string, opacity: string): void {
+    if (!this.desaturationElement) return;
+    if (this.lastDesaturationFilter !== filter) {
+      this.desaturationElement.style.filter = filter;
+      this.lastDesaturationFilter = filter;
+    }
+    if (this.lastDesaturationOpacity !== opacity) {
+      this.desaturationElement.style.opacity = opacity;
+      this.lastDesaturationOpacity = opacity;
+    }
   }
 
   /**

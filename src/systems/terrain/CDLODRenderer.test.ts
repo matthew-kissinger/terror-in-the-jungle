@@ -22,7 +22,12 @@ vi.mock('three', () => {
     array: any;
     itemSize: number;
     needsUpdate = false;
+    usage: unknown = undefined;
+    updateRanges: Array<{ start: number; count: number }> = [];
     constructor(arr: any, size: number) { this.array = arr; this.itemSize = size; }
+    addUpdateRange(start: number, count: number) { this.updateRanges.push({ start, count }); }
+    clearUpdateRanges() { this.updateRanges.length = 0; }
+    setUsage(usage: unknown) { this.usage = usage; return this; }
   }
 
   class MockInstancedMesh {
@@ -32,9 +37,24 @@ vi.mock('three', () => {
     castShadow = false;
     receiveShadow = false;
     visible = true;
+    userData: Record<string, unknown> = {};
     geometry: MockBufferGeometry;
     material: any;
-    instanceMatrix = { needsUpdate: false };
+    layers = {
+      mask: 1,
+      set: vi.fn((layer: number) => {
+        this.layers.mask = 1 << layer;
+      }),
+    };
+    instanceMatrix = {
+      needsUpdate: false,
+      usage: undefined as unknown,
+      updateRanges: [] as Array<{ start: number; count: number }>,
+      addUpdateRange(start: number, count: number) { this.updateRanges.push({ start, count }); },
+      clearUpdateRanges() { this.updateRanges.length = 0; },
+      setUsage(usage: unknown) { this.usage = usage; return this; },
+    };
+    matrixWriteCount = 0;
     private matrices: Float32Array;
     constructor(geo: MockBufferGeometry, mat: any, maxCount: number) {
       this.geometry = geo;
@@ -42,6 +62,7 @@ vi.mock('three', () => {
       this.matrices = new Float32Array(maxCount * 16);
     }
     setMatrixAt(i: number, matrix: any) {
+      this.matrixWriteCount++;
       const arr = matrix.elements || new Float32Array(16);
       this.matrices.set(arr, i * 16);
     }
@@ -74,13 +95,19 @@ vi.mock('three', () => {
       array: Float32Array;
       itemSize: number;
       needsUpdate = false;
+      usage: unknown = undefined;
+      updateRanges: Array<{ start: number; count: number }> = [];
       constructor(arr: Float32Array, size: number) {
         this.array = arr;
         this.itemSize = size;
       }
+      addUpdateRange(start: number, count: number) { this.updateRanges.push({ start, count }); }
+      clearUpdateRanges() { this.updateRanges.length = 0; }
+      setUsage(usage: unknown) { this.usage = usage; return this; }
     },
     Matrix4: MockMatrix4,
     Material: class {},
+    DynamicDrawUsage: 'DynamicDrawUsage',
   };
 });
 
@@ -176,6 +203,126 @@ describe('CDLODRenderer', () => {
     expect(params1[11]).toBe(0);
     expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
+    expect(mesh.matrixWriteCount).toBe(3);
+    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+  });
+
+  it('keeps terrain instance buffers coherent when only morph params change', () => {
+    const tiles: CDLODTile[] = [
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0.1, edgeMorphMask: 5 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.2, edgeMorphMask: 10 },
+    ];
+    renderer.updateInstances(tiles);
+
+    const mesh: any = renderer.getMesh();
+    expect(mesh.matrixWriteCount).toBe(2);
+
+    mesh.instanceMatrix.needsUpdate = false;
+    mesh.geometry.attributes.tileParams0.needsUpdate = false;
+    mesh.geometry.attributes.tileParams1.needsUpdate = false;
+    mesh.instanceMatrix.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams0.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams1.clearUpdateRanges();
+
+    renderer.updateInstances([
+      { ...tiles[0], morphFactor: 0.6, edgeMorphMask: 7 },
+      { ...tiles[1], morphFactor: 0.9, edgeMorphMask: 12 },
+    ]);
+
+    const params0 = mesh.geometry.attributes.tileParams0.array as Float32Array;
+    const params1 = mesh.geometry.attributes.tileParams1.array as Float32Array;
+    expect(mesh.matrixWriteCount).toBe(4);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
+    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expect(Array.from(params0.slice(0, 8))).toEqual([
+      0, 0, 64, 0,
+      64, 0, 64, 1,
+    ]);
+    expect(params1[0]).toBeCloseTo(0.6);
+    expect(params1[1]).toBe(7);
+    expect(params1[4]).toBeCloseTo(0.9);
+    expect(params1[5]).toBe(12);
+  });
+
+  it('rewrites the active terrain prefix when any tile identity changes', () => {
+    const tiles: CDLODTile[] = [
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0.1, edgeMorphMask: 5 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.2, edgeMorphMask: 10 },
+      { x: 128, z: 0, size: 64, lodLevel: 1, morphFactor: 0.3, edgeMorphMask: 12 },
+    ];
+    renderer.updateInstances(tiles);
+
+    const mesh: any = renderer.getMesh();
+    expect(mesh.matrixWriteCount).toBe(3);
+    mesh.instanceMatrix.needsUpdate = false;
+    mesh.geometry.attributes.tileParams0.needsUpdate = false;
+    mesh.geometry.attributes.tileParams1.needsUpdate = false;
+    mesh.instanceMatrix.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams0.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams1.clearUpdateRanges();
+
+    renderer.updateInstances([
+      tiles[0],
+      { ...tiles[1], x: 96 },
+      tiles[2],
+    ]);
+
+    const params0 = mesh.geometry.attributes.tileParams0.array as Float32Array;
+    const params1 = mesh.geometry.attributes.tileParams1.array as Float32Array;
+    expect(mesh.matrixWriteCount).toBe(6);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
+    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expect(Array.from(params0.slice(0, 12))).toEqual([
+      0, 0, 64, 0,
+      96, 0, 64, 1,
+      128, 0, 64, 1,
+    ]);
+    expect(params1[0]).toBeCloseTo(0.1);
+    expect(params1[1]).toBe(5);
+    expect(params1[4]).toBeCloseTo(0.2);
+    expect(params1[5]).toBe(10);
+    expect(params1[8]).toBeCloseTo(0.3);
+    expect(params1[9]).toBe(12);
+  });
+
+  it('keeps the active terrain prefix coherent when visible instance count shrinks', () => {
+    const tiles: CDLODTile[] = [
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0.1, edgeMorphMask: 5 },
+      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.2, edgeMorphMask: 10 },
+      { x: 128, z: 0, size: 64, lodLevel: 1, morphFactor: 0.3, edgeMorphMask: 12 },
+    ];
+    renderer.updateInstances(tiles);
+
+    const mesh: any = renderer.getMesh();
+    mesh.instanceMatrix.needsUpdate = false;
+    mesh.geometry.attributes.tileParams0.needsUpdate = false;
+    mesh.geometry.attributes.tileParams1.needsUpdate = false;
+    mesh.instanceMatrix.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams0.clearUpdateRanges();
+    mesh.geometry.attributes.tileParams1.clearUpdateRanges();
+
+    renderer.updateInstances(tiles.slice(0, 2));
+
+    expect(mesh.count).toBe(2);
+    expect(mesh.visible).toBe(true);
+    expect(mesh.matrixWriteCount).toBe(5);
+    expect(mesh.instanceMatrix.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
+    expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
+    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
+    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
   });
 
   it('keeps terrain shadow casting enabled by default', () => {

@@ -35,7 +35,9 @@ const SUPPRESSED_REPORT_INTERVAL_MS = 2000;
 const BUFFER_CAPACITY = 200;
 
 export class Logger {
-  private static buffer: LogEntry[] = [];
+  private static buffer: Array<LogEntry | undefined> = new Array(BUFFER_CAPACITY);
+  private static bufferWriteIndex = 0;
+  private static bufferCount = 0;
   private static perCategory: Map<string, { timestamps: number[]; stats: CategoryStats }> = new Map();
   private static suppressedTotal = 0;
   private static minLevel: LogLevel = Logger.resolveInitialLevel();
@@ -75,17 +77,19 @@ export class Logger {
     return {
       suppressedTotal: this.suppressedTotal,
       categories,
-      recent: [...this.buffer]
+      recent: this.snapshotBuffer()
     };
   }
 
   static clearBuffer(): void {
-    this.buffer = [];
+    this.buffer.fill(undefined);
+    this.bufferWriteIndex = 0;
+    this.bufferCount = 0;
   }
 
   static getRecent(limit = 50): LogEntry[] {
     if (limit <= 0) return [];
-    return this.buffer.slice(-limit);
+    return this.snapshotBuffer(limit);
   }
 
   private static log(level: LogLevel, category: string, message: string, ...args: unknown[]): void {
@@ -125,16 +129,34 @@ export class Logger {
   }
 
   private static pruneOldTimestamps(timestamps: number[], now: number): void {
-    while (timestamps.length > 0 && now - timestamps[0] > RATE_LIMIT_WINDOW_MS) {
-      timestamps.shift();
+    let expired = 0;
+    while (expired < timestamps.length && now - timestamps[expired] > RATE_LIMIT_WINDOW_MS) {
+      expired++;
+    }
+    if (expired > 0) {
+      timestamps.splice(0, expired);
     }
   }
 
   private static pushToBuffer(entry: LogEntry): void {
-    this.buffer.push(entry);
-    if (this.buffer.length > BUFFER_CAPACITY) {
-      this.buffer.shift();
+    this.buffer[this.bufferWriteIndex] = entry;
+    this.bufferWriteIndex = (this.bufferWriteIndex + 1) % BUFFER_CAPACITY;
+    if (this.bufferCount < BUFFER_CAPACITY) {
+      this.bufferCount++;
     }
+  }
+
+  private static snapshotBuffer(limit = this.bufferCount): LogEntry[] {
+    if (!(limit > 0) || this.bufferCount === 0) {
+      return [];
+    }
+    const outputCount = Math.min(this.bufferCount, Math.floor(limit));
+    const output = new Array<LogEntry>(outputCount);
+    const start = (this.bufferWriteIndex - outputCount + BUFFER_CAPACITY) % BUFFER_CAPACITY;
+    for (let index = 0; index < outputCount; index++) {
+      output[index] = this.buffer[(start + index) % BUFFER_CAPACITY] as LogEntry;
+    }
+    return output;
   }
 
   private static forwardToConsole(entry: LogEntry): void {

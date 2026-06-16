@@ -73,6 +73,62 @@ describe('AILineOfSight heightfield prefilter', () => {
     expect(stats.fullEvaluationClear).toBe(1);
   });
 
+  it('rejects targets outside FOV before terrain work', () => {
+    const los = new AILineOfSight();
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => -2),
+      raycastTerrain: vi.fn(() => ({ hit: false }))
+    } as any;
+    los.setTerrainSystem(terrainSystem);
+
+    const source = makeCombatant('a', 0, 0);
+    source.skillProfile.fieldOfView = 90;
+    const target = makeCombatant('b', 0, 80);
+    const visible = los.canSeeTarget(source, target, new THREE.Vector3());
+
+    expect(visible).toBe(false);
+    expect(terrainSystem.getEffectiveHeightAt).not.toHaveBeenCalled();
+    expect(terrainSystem.raycastTerrain).not.toHaveBeenCalled();
+  });
+
+  it('keeps targets on the FOV edge eligible for normal LOS evaluation', () => {
+    const los = new AILineOfSight();
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => -2),
+      raycastTerrain: vi.fn(() => ({ hit: false }))
+    } as any;
+    los.setTerrainSystem(terrainSystem);
+
+    const source = makeCombatant('a', 0, 0);
+    source.skillProfile.fieldOfView = 90;
+    const target = makeCombatant('b', 80, 80);
+    const visible = los.canSeeTarget(source, target, new THREE.Vector3());
+
+    expect(visible).toBe(true);
+    expect(terrainSystem.raycastTerrain).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks LOS with the heightfield fallback when terrain raycast misses a ridge', () => {
+    (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
+    const los = new AILineOfSight();
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn((x: number) => (x >= 35 && x <= 65 ? NPC_Y_OFFSET + 2 : 0)),
+      raycastTerrain: vi.fn(() => ({ hit: false }))
+    } as any;
+    los.setTerrainSystem(terrainSystem);
+
+    const source = makeCombatant('a', 0, 0);
+    const target = makeCombatant('b', 80, 0);
+    const visible = los.canSeeTarget(source, target, new THREE.Vector3());
+
+    expect(visible).toBe(false);
+    expect(terrainSystem.raycastTerrain).toHaveBeenCalledTimes(1);
+    const stats = AILineOfSight.getCacheStats();
+    expect(stats.prefilterRejects).toBe(0);
+    expect(stats.fullEvaluations).toBe(1);
+    expect(stats.fullEvaluationBlocked).toBe(1);
+  });
+
   it('serves a repeated check from cache without re-running the full evaluation', () => {
     (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
     const los = new AILineOfSight();
@@ -122,6 +178,29 @@ describe('AILineOfSight heightfield prefilter', () => {
     const stats = AILineOfSight.getCacheStats();
     expect(stats.hits).toBe(2);
     expect(stats.misses).toBe(2);
+  });
+
+  it('prunes stale large-cache entries incrementally', () => {
+    (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(0);
+    const los = new AILineOfSight();
+    const debugLos = los as unknown as { losCacheSize: number };
+    const source = makeCombatant('a', 0, 0);
+    const playerPosition = new THREE.Vector3();
+
+    for (let i = 0; i < 300; i++) {
+      los.canSeeTarget(source, makeCombatant(`target-${i}`, 80, 0), playerPosition);
+    }
+    expect(debugLos.losCacheSize).toBe(300);
+
+    nowSpy.mockReturnValue(1000);
+    los.clearCache();
+    expect(debugLos.losCacheSize).toBe(236);
+
+    los.clearCache();
+    expect(debugLos.losCacheSize).toBe(200);
+
+    nowSpy.mockRestore();
   });
 
   it('does not double-raise player eye position for full LOS terrain raycasts', () => {

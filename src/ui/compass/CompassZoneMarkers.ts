@@ -81,14 +81,14 @@ export function updateZoneMarkers({
     }
 
     if (isVisible) {
-      marker.style.display = 'flex';
-      marker.style.left = `${markerX}px`;
+      setDisplay(marker, 'flex');
+      setLeft(marker, `${markerX}px`);
     } else {
-      marker.style.display = 'none';
+      setDisplay(marker, 'none');
     }
 
-    marker.className = markerClass;
-    marker.textContent = displayText;
+    setClassName(marker, markerClass);
+    setTextContent(marker, displayText);
   });
 
   state.zoneMarkers.forEach((marker, zoneId) => {
@@ -99,6 +99,22 @@ export function updateZoneMarkers({
       state.zoneMarkers.delete(zoneId);
     }
   });
+}
+
+function setDisplay(marker: HTMLDivElement, display: string): void {
+  if (marker.style.display !== display) marker.style.display = display;
+}
+
+function setLeft(marker: HTMLDivElement, left: string): void {
+  if (marker.style.left !== left) marker.style.left = left;
+}
+
+function setClassName(marker: HTMLDivElement, className: string): void {
+  if (marker.className !== className) marker.className = className;
+}
+
+function setTextContent(marker: HTMLDivElement, text: string): void {
+  if (marker.textContent !== text) marker.textContent = text;
 }
 
 export type { ZoneMarkerState };

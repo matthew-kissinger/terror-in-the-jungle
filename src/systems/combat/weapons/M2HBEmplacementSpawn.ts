@@ -2,11 +2,14 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Faction } from '../types';
 import { Emplacement } from '../../vehicle/Emplacement';
 import type { VehicleManager } from '../../vehicle/VehicleManager';
 import { M2HBEmplacementSystem } from './M2HBEmplacement';
 import { M2HBWeapon } from './M2HBWeapon';
+
+const M2HB_PERF_CATEGORY = 'emplacements';
 
 /**
  * Procedural tripod rig + scenario-spawn glue for the M2HB emplacement.
@@ -34,34 +37,23 @@ export function buildM2HBTripod(): {
 } {
   const root = new THREE.Group();
   root.name = 'm2hb_tripod_root';
+  root.userData.perfCategory = M2HB_PERF_CATEGORY;
 
   // Tripod base — three legs in a tetrahedral spread, dark olive.
-  const legGeom = new THREE.CylinderGeometry(0.025, 0.025, 1.1, 5);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x3a4030, flatShading: true });
-  for (let i = 0; i < 3; i++) {
-    const leg = new THREE.Mesh(legGeom, legMat);
-    const angle = (i / 3) * Math.PI * 2;
-    leg.position.set(Math.cos(angle) * 0.25, 0.55, Math.sin(angle) * 0.25);
-    leg.rotation.z = Math.cos(angle) * 0.35;
-    leg.rotation.x = Math.sin(angle) * 0.35;
-    root.add(leg);
-  }
-
-  // Yoke at the top of the tripod (where the gun pintle sits).
-  const yokeGeom = new THREE.CylinderGeometry(0.12, 0.18, 0.18, 8);
-  const yoke = new THREE.Mesh(yokeGeom, legMat);
-  yoke.position.y = 1.05;
-  root.add(yoke);
+  root.add(buildM2HBTripodBase(legMat));
 
   // Yaw node: rotates around world Y at the yoke height.
   const yawNode = new THREE.Object3D();
   yawNode.position.y = 1.18;
   yawNode.name = 'm2hb_yaw';
+  yawNode.userData.perfCategory = M2HB_PERF_CATEGORY;
   root.add(yawNode);
 
   // Pitch node: rotates around local X; this is where recoil-z writes.
   const pitchNode = new THREE.Object3D();
   pitchNode.name = 'm2hb_pitch';
+  pitchNode.userData.perfCategory = M2HB_PERF_CATEGORY;
   yawNode.add(pitchNode);
 
   // Receiver block (the M2HB's box body). Re-proportioned to the real-scale
@@ -72,6 +64,7 @@ export function buildM2HBTripod(): {
   const receiverGeom = new THREE.BoxGeometry(0.26, 0.3, 0.7);
   const receiverMat = new THREE.MeshStandardMaterial({ color: 0x2a2a26, flatShading: true });
   const receiver = new THREE.Mesh(receiverGeom, receiverMat);
+  receiver.userData.perfCategory = M2HB_PERF_CATEGORY;
   receiver.position.z = 0;
   pitchNode.add(receiver);
 
@@ -86,6 +79,7 @@ export function buildM2HBTripod(): {
   const barrelGeom = new THREE.CylinderGeometry(0.045, 0.055, 1.5, 10);
   const barrelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a18, flatShading: true });
   const barrel = new THREE.Mesh(barrelGeom, barrelMat);
+  barrel.userData.perfCategory = M2HB_PERF_CATEGORY;
   barrel.rotation.x = Math.PI * 0.5;
   barrel.position.z = -1.0;
   pitchNode.add(barrel);
@@ -95,10 +89,47 @@ export function buildM2HBTripod(): {
   const gripGeom = new THREE.BoxGeometry(0.26, 0.3, 0.05);
   const gripMat = new THREE.MeshStandardMaterial({ color: 0x141414, flatShading: true });
   const grip = new THREE.Mesh(gripGeom, gripMat);
+  grip.userData.perfCategory = M2HB_PERF_CATEGORY;
   grip.position.z = 0.4;
   pitchNode.add(grip);
 
   return { root, yawNode, pitchNode };
+}
+
+function buildM2HBTripodBase(material: THREE.Material): THREE.Mesh {
+  const legGeom = new THREE.CylinderGeometry(0.025, 0.025, 1.1, 5);
+  const yokeGeom = new THREE.CylinderGeometry(0.12, 0.18, 0.18, 8);
+  const geometries: THREE.BufferGeometry[] = [];
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2;
+    const position = new THREE.Vector3(Math.cos(angle) * 0.25, 0.55, Math.sin(angle) * 0.25);
+    const rotation = new THREE.Euler(Math.sin(angle) * 0.35, 0, Math.cos(angle) * 0.35);
+    const geometry = legGeom.clone();
+    matrix.compose(position, quaternion.setFromEuler(rotation), scale);
+    geometry.applyMatrix4(matrix);
+    geometries.push(geometry);
+  }
+
+  const yokeGeometry = yokeGeom.clone();
+  matrix.compose(new THREE.Vector3(0, 1.05, 0), quaternion.identity(), scale);
+  yokeGeometry.applyMatrix4(matrix);
+  geometries.push(yokeGeometry);
+
+  const merged = BufferGeometryUtils.mergeGeometries(geometries, false) ?? yokeGeom.clone();
+  for (const geometry of geometries) {
+    geometry.dispose();
+  }
+  legGeom.dispose();
+  yokeGeom.dispose();
+
+  const base = new THREE.Mesh(merged, material);
+  base.name = 'm2hb_tripod_base';
+  base.userData.perfCategory = M2HB_PERF_CATEGORY;
+  return base;
 }
 
 export interface CreateM2HBEmplacementOptions {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { RuntimeMetrics } from './RuntimeMetrics';
 
 describe('RuntimeMetrics frame events', () => {
@@ -30,12 +30,14 @@ describe('RuntimeMetrics frame events', () => {
     const metrics = new RuntimeMetrics();
 
     metrics.updateFrame(0.08);
+    expect(metrics.getFrameCount()).toBe(1);
     expect(metrics.getSnapshot().frameEvents).toHaveLength(1);
 
     metrics.reset();
 
     const snapshot = metrics.getSnapshot();
     expect(snapshot.frameCount).toBe(0);
+    expect(metrics.getFrameCount()).toBe(0);
     expect(snapshot.frameEvents).toEqual([]);
   });
 
@@ -50,5 +52,25 @@ describe('RuntimeMetrics frame events', () => {
     expect(events).toHaveLength(64);
     expect(events[0]?.frameCount).toBe(17);
     expect(events[events.length - 1]?.frameCount).toBe(80);
+  });
+
+  it('computes percentile snapshots without sorting the full active sample window', () => {
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    const sortSpy = vi.spyOn(Float64Array.prototype, 'sort');
+    try {
+      const metrics = new RuntimeMetrics();
+
+      for (let i = 1; i <= 300; i++) {
+        metrics.updateFrame(i / 1000);
+      }
+
+      const snapshot = metrics.getSnapshot();
+      expect(snapshot.p95FrameMs).toBe(285);
+      expect(snapshot.p99FrameMs).toBe(297);
+      expect(sortSpy).not.toHaveBeenCalled();
+    } finally {
+      sortSpy.mockRestore();
+      nowSpy.mockRestore();
+    }
   });
 });

@@ -10,7 +10,9 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantDamage } from './CombatantDamage';
 import { CombatantSuppression } from './CombatantSuppression';
-import { objectPool } from '../../utils/ObjectPoolManager';
+
+const LOCAL_COMBAT_EFFECT_DISTANCE = 200;
+const LOCAL_COMBAT_EFFECT_DISTANCE_SQ = LOCAL_COMBAT_EFFECT_DISTANCE * LOCAL_COMBAT_EFFECT_DISTANCE;
 
 /**
  * CombatantCombatEffects - Handles all visual and audio effect spawning for combat actions
@@ -35,6 +37,10 @@ export class CombatantCombatEffects {
   private readonly scratchMuzzlePos = new THREE.Vector3();
   private readonly scratchMuzzleFlashPos = new THREE.Vector3();
   private readonly scratchSplatterDir = new THREE.Vector3();
+  private readonly scratchHitPoint = new THREE.Vector3();
+  private readonly scratchTracerStart = new THREE.Vector3();
+  private readonly scratchMuzzleOffset = new THREE.Vector3();
+  private readonly scratchNegatedDirection = new THREE.Vector3();
 
   constructor(
     tracerPool: TracerPool,
@@ -65,38 +71,29 @@ export class CombatantCombatEffects {
     allCombatants: Map<string, Combatant>,
     squads: Map<string, Squad>
   ): void {
-    const distance = combatant.position.distanceTo(playerPosition);
-    if (distance < 200) {
-      const hitPoint = objectPool.getVector3();
+    const distanceSq = combatant.position.distanceToSquared(playerPosition);
+    if (distanceSq < LOCAL_COMBAT_EFFECT_DISTANCE_SQ) {
       if (hit) {
-        hitPoint.copy(hit.point);
+        this.scratchHitPoint.copy(hit.point);
       } else {
-        hitPoint.copy(shotRay.origin).addScaledVector(shotRay.direction, 80 + Math.random() * 40);
+        this.scratchHitPoint.copy(shotRay.origin).addScaledVector(shotRay.direction, 80 + Math.random() * 40);
       }
 
-      const tracerStart = objectPool.getVector3();
-      tracerStart.copy(shotRay.origin);
-      this.tracerPool.spawn(tracerStart, hitPoint, 300);
-      objectPool.releaseVector3(tracerStart);
+      this.scratchTracerStart.copy(shotRay.origin);
+      this.tracerPool.spawn(this.scratchTracerStart, this.scratchHitPoint, 300);
 
-      const muzzlePos = objectPool.getVector3();
-      muzzlePos.copy(shotRay.origin);
-      const muzzleOffset = objectPool.getVector3();
-      muzzleOffset.copy(shotRay.direction).multiplyScalar(2);
-      muzzlePos.add(muzzleOffset);
-      this.muzzleFlashSystem.spawnNPC(muzzlePos, shotRay.direction);
-      objectPool.releaseVector3(muzzleOffset);
-      objectPool.releaseVector3(muzzlePos);
+      this.scratchMuzzlePos.copy(shotRay.origin);
+      this.scratchMuzzleOffset.copy(shotRay.direction).multiplyScalar(2);
+      this.scratchMuzzlePos.add(this.scratchMuzzleOffset);
+      this.muzzleFlashSystem.spawnNPC(this.scratchMuzzlePos, shotRay.direction);
 
       if (this.audioManager) {
         this.audioManager.playGunshotAt(combatant.position);
       }
 
       if (hit) {
-        const negatedDirection = objectPool.getVector3();
-        negatedDirection.copy(shotRay.direction).negate();
-        this.impactEffectsPool.spawn(hit.point, negatedDirection);
-        objectPool.releaseVector3(negatedDirection);
+        this.scratchNegatedDirection.copy(shotRay.direction).negate();
+        this.impactEffectsPool.spawn(hit.point, this.scratchNegatedDirection);
 
         // Only apply damage if hit has a combatant (not a player hit)
         if ('combatant' in hit) {
@@ -109,10 +106,8 @@ export class CombatantCombatEffects {
         }
       } else {
         // Track near misses for suppression
-        this.suppression.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants, playerPosition);
+        this.suppression.trackNearMisses(shotRay, this.scratchHitPoint, combatant.faction, allCombatants, playerPosition);
       }
-
-      objectPool.releaseVector3(hitPoint);
     } else if (hit && 'combatant' in hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
       this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
@@ -127,8 +122,8 @@ export class CombatantCombatEffects {
     shotRay: THREE.Ray,
     playerPosition: THREE.Vector3
   ): void {
-    const distance = combatant.position.distanceTo(playerPosition);
-    if (distance < 200) {
+    const distanceSq = combatant.position.distanceToSquared(playerPosition);
+    if (distanceSq < LOCAL_COMBAT_EFFECT_DISTANCE_SQ) {
       // Use scratch vectors to avoid allocations
       this.scratchEndPoint.copy(shotRay.origin)
         .addScaledVector(shotRay.direction, 60 + Math.random() * 40);

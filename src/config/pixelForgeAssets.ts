@@ -188,6 +188,11 @@ export const PIXEL_FORGE_NPC_CLIP_IDS = [
 
 export type PixelForgeNpcClipId = typeof PIXEL_FORGE_NPC_CLIP_IDS[number];
 
+export const PIXEL_FORGE_NPC_STARTUP_CLIP_IDS: readonly PixelForgeNpcClipId[] = [
+  'idle',
+  'patrol_walk',
+];
+
 export const PIXEL_FORGE_NPC_CLIPS: readonly PixelForgeNpcClipAsset[] = [
   { id: 'idle', framesPerClip: 8, viewGridX: 7, viewGridY: 7, framesX: 4, framesY: 2, tileSize: 96, durationSec: 4.03 },
   { id: 'patrol_walk', framesPerClip: 8, viewGridX: 7, viewGridY: 7, framesX: 4, framesY: 2, tileSize: 96, durationSec: 1.00 },
@@ -201,6 +206,20 @@ export const PIXEL_FORGE_NPC_CLIPS: readonly PixelForgeNpcClipAsset[] = [
 export function pixelForgeNpcTextureName(runtimeFaction: string, clipId: string): string {
   return `PixelForge.NPC.${runtimeFaction}.${clipId}.color`;
 }
+
+export function pixelForgeNpcTextureNamesForClips(
+  clipIds: readonly PixelForgeNpcClipId[],
+): string[] {
+  return PIXEL_FORGE_NPC_FACTIONS.flatMap((faction) =>
+    clipIds.map((clipId) => pixelForgeNpcTextureName(faction.runtimeFaction, clipId)),
+  );
+}
+
+export const PIXEL_FORGE_NPC_STARTUP_TEXTURE_NAMES: readonly string[] =
+  pixelForgeNpcTextureNamesForClips(PIXEL_FORGE_NPC_STARTUP_CLIP_IDS);
+
+export const PIXEL_FORGE_NPC_TEXTURE_NAMES: readonly string[] =
+  pixelForgeNpcTextureNamesForClips(PIXEL_FORGE_NPC_CLIP_IDS);
 
 export const PIXEL_FORGE_TEXTURE_ASSETS: PixelForgeTextureAsset[] = [
   ...PIXEL_FORGE_VEGETATION_ASSETS.flatMap((asset) => {

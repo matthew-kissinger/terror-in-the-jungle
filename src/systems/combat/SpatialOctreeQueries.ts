@@ -137,14 +137,15 @@ export class SpatialOctreeQueries {
    * Query k nearest entities to a point
    */
   queryNearestK(root: OctreeNode, center: THREE.Vector3, k: number, maxDistance: number = Infinity): string[] {
-    const candidates: Array<{ id: string; distanceSq: number }> = []
+    if (k <= 0) return []
+
+    const nearestIds: string[] = []
+    const nearestDistancesSq: number[] = []
     const maxDistanceSq = maxDistance * maxDistance
 
-    this.queryNearestKRecursive(root, center, candidates, maxDistanceSq)
+    this.queryNearestKRecursive(root, center, nearestIds, nearestDistancesSq, k, maxDistanceSq)
 
-    // Sort by distance and return top k
-    candidates.sort((a, b) => a.distanceSq - b.distanceSq)
-    return candidates.slice(0, k).map(c => c.id)
+    return nearestIds.slice(0, k)
   }
 
   /**
@@ -153,12 +154,17 @@ export class SpatialOctreeQueries {
   private queryNearestKRecursive(
     node: OctreeNode,
     center: THREE.Vector3,
-    candidates: Array<{ id: string; distanceSq: number }>,
+    nearestIds: string[],
+    nearestDistancesSq: number[],
+    k: number,
     maxDistanceSq: number
   ): void {
     // Check distance to node bounds
     const distanceSq = node.bounds.distanceToPoint(center)
-    if (distanceSq > maxDistanceSq) {
+    const effectiveMaxDistanceSq = nearestDistancesSq.length >= k
+      ? Math.min(maxDistanceSq, nearestDistancesSq[k - 1])
+      : maxDistanceSq
+    if (distanceSq > effectiveMaxDistanceSq) {
       return
     }
 
@@ -168,7 +174,7 @@ export class SpatialOctreeQueries {
       if (pos) {
         const distSq = pos.distanceToSquared(center)
         if (distSq <= maxDistanceSq) {
-          candidates.push({ id, distanceSq: distSq })
+          this.insertNearestCandidate(nearestIds, nearestDistancesSq, k, id, distSq)
         }
       }
     }
@@ -177,8 +183,39 @@ export class SpatialOctreeQueries {
     // allocations and compare work without changing correctness here.
     if (!node.isLeaf() && node.children) {
       for (const child of node.children) {
-        this.queryNearestKRecursive(child, center, candidates, maxDistanceSq)
+        this.queryNearestKRecursive(child, center, nearestIds, nearestDistancesSq, k, maxDistanceSq)
       }
     }
+  }
+
+  private insertNearestCandidate(
+    nearestIds: string[],
+    nearestDistancesSq: number[],
+    k: number,
+    id: string,
+    distanceSq: number
+  ): void {
+    if (nearestIds.length >= k && distanceSq >= nearestDistancesSq[k - 1]) {
+      return
+    }
+
+    const insertLimit = Math.min(nearestIds.length, k - 1)
+    let insertIndex = insertLimit
+    while (insertIndex > 0 && nearestDistancesSq[insertIndex - 1] > distanceSq) {
+      insertIndex--
+    }
+
+    if (nearestIds.length < k) {
+      nearestIds.push(id)
+      nearestDistancesSq.push(distanceSq)
+    }
+
+    for (let index = Math.min(nearestIds.length - 1, k - 1); index > insertIndex; index--) {
+      nearestIds[index] = nearestIds[index - 1]
+      nearestDistancesSq[index] = nearestDistancesSq[index - 1]
+    }
+
+    nearestIds[insertIndex] = id
+    nearestDistancesSq[insertIndex] = distanceSq
   }
 }

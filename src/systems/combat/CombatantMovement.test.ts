@@ -210,18 +210,50 @@ describe('CombatantMovement', () => {
     expect(c.movementIntent).toBe('backtrack');
   });
 
-  it('backs up toward last-good navmesh progress instead of the current-position snap', () => {
+  it('uses goal-compatible last-good navmesh progress instead of the current-position snap', () => {
     const adapter = mockNavmeshAdapter();
     const navSystem = mockNavmeshSystem(adapter);
     navSystem.findNearestPoint.mockImplementation((point: THREE.Vector3) => (
-      point.x < -4
-        ? new THREE.Vector3(-8, 0, 0)
+      point.x > 4
+        ? new THREE.Vector3(8, 0, 0)
         : new THREE.Vector3(0, 0, 0)
     ));
     movement.setNavmeshSystem(navSystem as any);
 
     const c = createTestCombatant({
       id: 'npc-navmesh-recovery',
+      state: CombatantState.ADVANCING,
+      position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
+      destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
+      movementLastGoodPosition: new THREE.Vector3(8, NPC_Y_OFFSET, 0),
+      simLane: 'high',
+      renderLane: 'culled',
+    });
+
+    const activated = (movement as unknown as {
+      activateBacktrack: (combatant: typeof c) => boolean;
+    }).activateBacktrack(c);
+
+    expect(activated).toBe(true);
+    expect(navSystem.findNearestPoint).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 8, z: 0 }),
+      10,
+    );
+    expect(c.movementBacktrackPoint?.x).toBeCloseTo(8);
+    expect(c.movementBacktrackPoint?.y).toBeCloseTo(NPC_Y_OFFSET);
+    expect(c.movementIntent).toBe('backtrack');
+  });
+
+  it('tries a scored recovery point before a goal-regressive last-good point', () => {
+    const adapter = mockNavmeshAdapter();
+    const navSystem = mockNavmeshSystem(adapter);
+    navSystem.findNearestPoint.mockImplementation((point: THREE.Vector3) => (
+      new THREE.Vector3(point.x, 0, point.z)
+    ));
+    movement.setNavmeshSystem(navSystem as any);
+
+    const c = createTestCombatant({
+      id: 'npc-navmesh-recovery-regressive',
       state: CombatantState.ADVANCING,
       position: new THREE.Vector3(0, NPC_Y_OFFSET, 0),
       destinationPoint: new THREE.Vector3(120, NPC_Y_OFFSET, 0),
@@ -235,12 +267,10 @@ describe('CombatantMovement', () => {
     }).activateBacktrack(c);
 
     expect(activated).toBe(true);
-    expect(navSystem.findNearestPoint).toHaveBeenCalledWith(
-      expect.objectContaining({ x: -8, z: 0 }),
-      10,
-    );
-    expect(c.movementBacktrackPoint?.x).toBeCloseTo(-8);
-    expect(c.movementBacktrackPoint?.y).toBeCloseTo(NPC_Y_OFFSET);
+    expect(navSystem.findNearestPoint).toHaveBeenCalled();
+    const firstCandidate = navSystem.findNearestPoint.mock.calls[0][0] as THREE.Vector3;
+    expect(firstCandidate.x).toBeGreaterThan(0);
+    expect(c.movementBacktrackPoint?.x).toBeGreaterThan(0);
     expect(c.movementIntent).toBe('backtrack');
   });
 
@@ -504,6 +534,25 @@ describe('CombatantMovement', () => {
       expect(warn.mock.calls[0][1]).toContain('NPC npc-a stalled on terrain');
       expect(warn.mock.calls[1][1]).toContain('NPC npc-d stalled on terrain');
       expect(warn.mock.calls[1][1]).toContain('2 additional terrain-stall recoveries suppressed');
+
+      const recoveryEvents = movement.getRecentTerrainRecoveryEvents();
+      expect(recoveryEvents.map(event => event.combatantId)).toEqual(['npc-a', 'npc-b', 'npc-c', 'npc-d']);
+      expect(recoveryEvents[0]).toMatchObject({
+        action: 'backtrack',
+        logged: true,
+        suppressedSinceLastLog: 0,
+        simLane: 'high',
+        renderLane: 'culled',
+      });
+      expect(recoveryEvents[1]).toMatchObject({
+        logged: false,
+        suppressedSinceLastLog: null,
+      });
+      expect(recoveryEvents[3]).toMatchObject({
+        logged: true,
+        suppressedSinceLastLog: 2,
+      });
+      expect(recoveryEvents[3].destinationDistance).toBeGreaterThan(0);
     });
 
     it('clears terrain-stall warning suppression on stuck-detector reset', () => {
@@ -517,6 +566,37 @@ describe('CombatantMovement', () => {
       expect(warn).toHaveBeenCalledTimes(2);
       expect(warn.mock.calls[1][1]).toContain('NPC npc-c stalled on terrain');
       expect(warn.mock.calls[1][1]).not.toContain('suppressed');
+      expect(movement.getRecentTerrainRecoveryEvents().map(event => event.combatantId)).toEqual(['npc-c']);
+
+      movement.clearRecentTerrainRecoveryEvents();
+      expect(movement.getRecentTerrainRecoveryEvents()).toEqual([]);
+    });
+
+    it('keeps recent terrain recovery events bounded and chronological', () => {
+      vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+      const warnStuckRecovery = (movement as unknown as {
+        warnStuckRecovery: (combatant: ReturnType<typeof createTestCombatant>, action: 'backtrack' | 'hold', now: number) => void;
+      }).warnStuckRecovery.bind(movement);
+
+      for (let index = 0; index < 70; index++) {
+        const combatant = createTestCombatant({
+          id: `npc-${index}`,
+          state: CombatantState.ADVANCING,
+          position: new THREE.Vector3(index, NPC_Y_OFFSET, 0),
+          destinationPoint: new THREE.Vector3(index + 10, NPC_Y_OFFSET, 0),
+          simLane: 'high',
+          renderLane: 'culled',
+        });
+        warnStuckRecovery(combatant, 'backtrack', 1000 + index * 100);
+      }
+
+      const recoveryEvents = movement.getRecentTerrainRecoveryEvents();
+      expect(recoveryEvents).toHaveLength(64);
+      expect(recoveryEvents[0].combatantId).toBe('npc-6');
+      expect(recoveryEvents.at(-1)?.combatantId).toBe('npc-69');
+      expect(recoveryEvents.map(event => event.combatantId)).toEqual(
+        Array.from({ length: 64 }, (_, index) => `npc-${index + 6}`)
+      );
     });
   });
 

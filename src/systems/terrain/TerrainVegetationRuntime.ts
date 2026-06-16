@@ -47,9 +47,14 @@ export class TerrainVegetationRuntime {
     biomePalettes: Map<string, BiomeVegetationEntry[]>,
     biomeRules: BiomeClassificationRule[],
   ): void {
-    this.jungleGroundRing.configure(activeTypes, defaultBiomeId, biomePalettes, biomeRules);
+    // Owner visual review rejected the camera-following dense ground-cover
+    // circle. Keep JungleGroundRing dormant as an experiment/reference, while
+    // normal gameplay uses the prior scatterer ownership for accepted ferns
+    // and plants.
+    this.jungleGroundRing.clear();
+    this.jungleGroundRing.configure([], defaultBiomeId, biomePalettes, biomeRules);
     this.vegetationScatterer.configure(
-      activeTypes.filter((type) => type.tier !== 'groundCover'),
+      activeTypes,
       defaultBiomeId,
       biomePalettes,
       biomeRules,
@@ -66,23 +71,14 @@ export class TerrainVegetationRuntime {
     budgetMs: number,
     frameBudget: TerrainVegetationFrameBudget,
   ): TerrainVegetationUpdateResult {
-    const ringDidWork = this.jungleGroundRing.updateBudgeted(playerPosition, {
-      maxAddsPerFrame: Math.min(
-        Math.max(1, Math.floor(budgetMs * 3)),
-        frameBudget.maxAddsPerFrame,
-      ),
-      maxRemovalsPerFrame: Math.max(
-        frameBudget.maxRemovalsPerFrame,
-        Math.max(4, Math.floor(budgetMs * 8)),
-      ),
-    });
-    const didWork = this.vegetationScatterer.updateBudgeted(playerPosition, {
+    const scattererDidWork = this.vegetationScatterer.updateBudgeted(playerPosition, {
       maxAddsPerFrame: frameBudget.maxAddsPerFrame,
       maxRemovalsPerFrame: Math.max(
         frameBudget.maxRemovalsPerFrame,
         Math.max(2, Math.floor(budgetMs * 6)),
       ),
-    }) || ringDidWork;
+    });
+    const didWork = scattererDidWork;
     const pending = this.vegetationScatterer.getPendingCounts();
     const ringPending = this.jungleGroundRing.getPendingCounts();
 
@@ -101,12 +97,12 @@ export class TerrainVegetationRuntime {
 
   regenerateAll(): void {
     this.vegetationScatterer.regenerateAll();
-    this.jungleGroundRing.regenerateAll();
+    this.jungleGroundRing.clear();
   }
 
   async regenerateAllAsync(onProgress?: (done: number, total: number) => void): Promise<void> {
     await this.vegetationScatterer.regenerateAllAsync(onProgress);
-    this.jungleGroundRing.regenerateAll();
+    this.jungleGroundRing.clear();
   }
 
   dispose(): void {

@@ -60,6 +60,7 @@ export class PlayerHealthSystem implements GameSystem {
   private hudSystem?: HUDSystem;
   private playerController?: PlayerController;
   private playerFaction: Faction = Faction.US;
+  private lowHealthEffectActive = false;
 
   constructor() {
     this.ui = new PlayerHealthUI();
@@ -117,13 +118,15 @@ export class PlayerHealthSystem implements GameSystem {
     }
 
     // Health regeneration
-    const timeSinceLastDamage = (Date.now() - this.lastDamageTime) / 1000;
-    if (timeSinceLastDamage > this.healthRegenDelay && this.playerState.health < this.playerState.maxHealth) {
-      this.playerState.health = Math.min(
-        this.playerState.maxHealth,
-        this.playerState.health + this.healthRegenRate * deltaTime
-      );
-      this.updateHealthDisplay();
+    if (this.playerState.health < this.playerState.maxHealth) {
+      const timeSinceLastDamage = (Date.now() - this.lastDamageTime) / 1000;
+      if (timeSinceLastDamage > this.healthRegenDelay) {
+        this.playerState.health = Math.min(
+          this.playerState.maxHealth,
+          this.playerState.health + this.healthRegenRate * deltaTime
+        );
+        this.updateHealthDisplay();
+      }
     }
 
     // Update effects
@@ -138,6 +141,11 @@ export class PlayerHealthSystem implements GameSystem {
 
   private updateLowHealthEffects(): void {
     const isLowHealth = this.playerState.health < LOW_HEALTH_THRESHOLD;
+    if (isLowHealth === this.lowHealthEffectActive) {
+      return;
+    }
+
+    this.lowHealthEffectActive = isLowHealth;
     this.ui.setLowHealthEffect(isLowHealth);
 
     if (isLowHealth) {
@@ -323,6 +331,7 @@ export class PlayerHealthSystem implements GameSystem {
 
     this.effects.clearDamageIndicators();
     this.effects.stopHeartbeat();
+    this.lowHealthEffectActive = false;
     this.ui.setLowHealthEffect(false);
     this.ui.setSpawnProtection(false);
     this.updateHealthDisplay();

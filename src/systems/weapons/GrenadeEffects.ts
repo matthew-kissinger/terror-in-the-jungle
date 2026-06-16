@@ -257,6 +257,8 @@ export class GrenadeEffects {
 
     const FULL_DISORIENT_DISTANCE = 15;
     const PARTIAL_DISORIENT_DISTANCE = 25;
+    const FULL_DISORIENT_DISTANCE_SQ = FULL_DISORIENT_DISTANCE * FULL_DISORIENT_DISTANCE;
+    const PARTIAL_DISORIENT_DISTANCE_SQ = PARTIAL_DISORIENT_DISTANCE * PARTIAL_DISORIENT_DISTANCE;
     const FULL_DISORIENT_DURATION_MS = 3000; // 3 seconds
     const PARTIAL_DISORIENT_DURATION_MS = 1500; // 1.5 seconds
 
@@ -279,13 +281,13 @@ export class GrenadeEffects {
         if (combatant.state === CombatantState.DEAD) continue;
 
         _toCombatant.subVectors(combatant.position, flashPosition);
-        const distance = _toCombatant.length();
+        const distanceSq = _toCombatant.lengthSq();
 
-        if (distance > PARTIAL_DISORIENT_DISTANCE) continue;
+        if (distanceSq > PARTIAL_DISORIENT_DISTANCE_SQ) continue;
 
         // Determine duration based on distance
         let durationMs = 0;
-        if (distance <= FULL_DISORIENT_DISTANCE) {
+        if (distanceSq <= FULL_DISORIENT_DISTANCE_SQ) {
           durationMs = FULL_DISORIENT_DURATION_MS;
         } else {
           durationMs = PARTIAL_DISORIENT_DURATION_MS;
@@ -302,13 +304,13 @@ export class GrenadeEffects {
         if (combatant.state === CombatantState.DEAD) return;
 
         _toCombatant.subVectors(combatant.position, flashPosition);
-        const distance = _toCombatant.length();
+        const distanceSq = _toCombatant.lengthSq();
 
-        if (distance > PARTIAL_DISORIENT_DISTANCE) return;
+        if (distanceSq > PARTIAL_DISORIENT_DISTANCE_SQ) return;
 
         // Determine duration based on distance
         let durationMs = 0;
-        if (distance <= FULL_DISORIENT_DISTANCE) {
+        if (distanceSq <= FULL_DISORIENT_DISTANCE_SQ) {
           durationMs = FULL_DISORIENT_DURATION_MS;
         } else {
           durationMs = PARTIAL_DISORIENT_DURATION_MS;

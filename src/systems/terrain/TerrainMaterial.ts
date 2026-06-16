@@ -864,19 +864,29 @@ export function updateTerrainMaterialAtmosphereLighting(
 ): void {
   const terrainUniforms = material.userData.terrainUniforms as TerrainUniforms | undefined;
   if (!terrainUniforms) return;
-  const normalized = normalizeTerrainAtmosphereLighting(lighting);
-  (terrainUniforms.atmosphereNightFillColor.value as THREE.Color).copy(normalized.nightFillColor);
-  terrainUniforms.atmosphereNightFillStrength.value = normalized.nightFillStrength;
-  (terrainUniforms.atmosphereDirectLightDirection.value as THREE.Vector3).copy(normalized.directLightDirection);
-  terrainUniforms.atmosphereDaylightFactor.value = normalized.daylightFactor;
-  terrainUniforms.atmosphereLowSunOcclusionStrength.value = normalized.lowSunOcclusionStrength;
-  material.userData.terrainAtmosphereLighting = {
-    nightFillColor: normalized.nightFillColor.clone(),
-    nightFillStrength: normalized.nightFillStrength,
-    directLightDirection: normalized.directLightDirection.clone(),
-    daylightFactor: normalized.daylightFactor,
-    lowSunOcclusionStrength: normalized.lowSunOcclusionStrength,
-  };
+  const nightFillColor = terrainUniforms.atmosphereNightFillColor.value as THREE.Color;
+  const directLightDirection = terrainUniforms.atmosphereDirectLightDirection.value as THREE.Vector3;
+  nightFillColor.copy(lighting.nightFillColor);
+  directLightDirection.copy(lighting.directLightDirection);
+  if (directLightDirection.lengthSq() < 1e-8) {
+    directLightDirection.set(0, 1, 0);
+  } else {
+    directLightDirection.normalize();
+  }
+  terrainUniforms.atmosphereNightFillStrength.value = THREE.MathUtils.clamp(lighting.nightFillStrength, 0, 0.5);
+  terrainUniforms.atmosphereDaylightFactor.value = THREE.MathUtils.clamp(lighting.daylightFactor, 0, 1);
+  terrainUniforms.atmosphereLowSunOcclusionStrength.value = THREE.MathUtils.clamp(
+    lighting.lowSunOcclusionStrength,
+    0,
+    1,
+  );
+
+  const stashed = getMutableTerrainAtmosphereLighting(material);
+  stashed.nightFillColor.copy(nightFillColor);
+  stashed.nightFillStrength = terrainUniforms.atmosphereNightFillStrength.value as number;
+  stashed.directLightDirection.copy(directLightDirection);
+  stashed.daylightFactor = terrainUniforms.atmosphereDaylightFactor.value as number;
+  stashed.lowSunOcclusionStrength = terrainUniforms.atmosphereLowSunOcclusionStrength.value as number;
 }
 
 function applyTerrainMaterialOptions(
@@ -1119,6 +1129,23 @@ function normalizeFarCanopyTint(farCanopyTint?: TerrainFarCanopyTintConfig): Req
 function readCurrentSurfaceWetness(material: TerrainMaterial): number {
   const currentWetness = material.userData.terrainSurfaceWetness;
   return typeof currentWetness === 'number' ? currentWetness : 0;
+}
+
+function getMutableTerrainAtmosphereLighting(material: TerrainMaterial): TerrainAtmosphereLightingMaterialConfig {
+  const stashed = material.userData.terrainAtmosphereLighting as TerrainAtmosphereLightingMaterialConfig | undefined;
+  if (stashed?.nightFillColor instanceof THREE.Color && stashed.directLightDirection instanceof THREE.Vector3) {
+    return stashed;
+  }
+
+  const created = {
+    nightFillColor: new THREE.Color(0, 0, 0),
+    nightFillStrength: 0,
+    directLightDirection: new THREE.Vector3(0, 1, 0),
+    daylightFactor: 1,
+    lowSunOcclusionStrength: 0,
+  };
+  material.userData.terrainAtmosphereLighting = created;
+  return created;
 }
 
 function normalizeTerrainAtmosphereLighting(

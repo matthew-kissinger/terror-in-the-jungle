@@ -108,6 +108,44 @@ describe('AAEmplacementSystem', () => {
     // (since target is in range and flying)
   });
 
+  it('fires burst shots with a normalized ray and buffered tracer endpoints', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const heli = { id: 'heli_1', position: new THREE.Vector3(100, 80, 0), model: 'UH1_HUEY' };
+    const mockHM = createMockHelicopterModel({ helis: [heli] });
+    mockHM.getFlightData.mockReturnValue(null);
+    mockHM.checkRayHit.mockReturnValue({ heliId: 'heli_1' });
+    system.setHelicopterModel(mockHM);
+    system.setTerrainSystem(createMockTerrain());
+    system.addEmplacement(new THREE.Vector3(0, 0, 0));
+
+    const emp = (system as any).emplacements[0];
+    emp.targetHeliId = 'heli_1';
+    emp.burstRemaining = 1;
+    emp.fireAccum = 1 / emp.config.fireRate;
+
+    system.update(0);
+
+    const tracerPool = (system as any).tracerPool;
+    expect(tracerPool.spawn).toHaveBeenCalledTimes(1);
+    const [start, end, lifetimeMs] = tracerPool.spawn.mock.calls[0] as [THREE.Vector3, THREE.Vector3, number];
+    expect(start.x).toBeCloseTo(0);
+    expect(start.y).toBeCloseTo(1.5);
+    expect(start.z).toBeCloseTo(0);
+    expect(end.distanceTo(start)).toBeCloseTo(178.062, 3);
+    expect(lifetimeMs).toBe(250);
+
+    expect(mockHM.checkRayHit).toHaveBeenCalledTimes(1);
+    const [ray, range] = mockHM.checkRayHit.mock.calls[0] as [THREE.Ray, number];
+    expect(ray.origin.x).toBeCloseTo(start.x);
+    expect(ray.origin.y).toBeCloseTo(start.y);
+    expect(ray.origin.z).toBeCloseTo(start.z);
+    expect(ray.direction.length()).toBeCloseTo(1);
+    expect(range).toBe(emp.config.range);
+    expect(mockHM.applyDamage).toHaveBeenCalledWith('heli_1', emp.config.damage);
+
+    randomSpy.mockRestore();
+  });
+
   it('does not target helicopters out of range', () => {
     const heli = { id: 'heli_1', position: new THREE.Vector3(5000, 100, 5000), model: 'UH1_HUEY' };
     const mockHM = createMockHelicopterModel({ helis: [heli] });

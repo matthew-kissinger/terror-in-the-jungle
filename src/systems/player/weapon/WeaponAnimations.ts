@@ -46,6 +46,7 @@ export class WeaponAnimations {
   private isPumpAnimating = false
   private readonly PUMP_ANIMATION_TIME = 0.35 // Quick pump action
   private pumpGripRef?: THREE.Object3D
+  private readonly SWAY_SPEED_FACTOR_CAP_SQ = 100
 
   constructor(camera: THREE.Camera) {
     this.camera = camera
@@ -81,7 +82,8 @@ export class WeaponAnimations {
     }
 
     // Mouse-look sway (small)
-    const speedFactor = Math.min(1, lookVelocity.length() / 10)
+    const lookVelocitySq = lookVelocity.lengthSq()
+    const speedFactor = lookVelocitySq >= this.SWAY_SPEED_FACTOR_CAP_SQ ? 1 : Math.sqrt(lookVelocitySq) / 10
     this.swayOffset.x = THREE.MathUtils.lerp(this.swayOffset.x, speedFactor * 0.02, 8 * deltaTime)
     this.swayOffset.y = THREE.MathUtils.lerp(this.swayOffset.y, speedFactor * 0.02, 8 * deltaTime)
 
@@ -93,8 +95,10 @@ export class WeaponAnimations {
     // Apply FOV zoom when ADS (reduced zoom for less disorientation)
     if (this.camera instanceof THREE.PerspectiveCamera) {
       const targetFOV = THREE.MathUtils.lerp(this.baseFOV, this.baseFOV / 1.3, this.adsProgress)
-      this.camera.fov = targetFOV
-      this.camera.updateProjectionMatrix()
+      if (this.camera.fov !== targetFOV) {
+        this.camera.fov = targetFOV
+        this.camera.updateProjectionMatrix()
+      }
     }
 
     // Apply recoil recovery spring physics

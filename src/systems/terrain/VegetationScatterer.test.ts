@@ -150,6 +150,28 @@ describe('VegetationScatterer', () => {
     }));
   });
 
+  it('sizes residency from active vegetation draw distance instead of the fallback ring', () => {
+    const compactScatterer = new VegetationScatterer(billboard, 64, 6);
+    compactScatterer.configure(
+      [
+        {
+          ...testTypes[0],
+          tier: 'midLevel',
+          maxDistance: 130,
+        },
+      ],
+      'denseJungle',
+      new Map([['denseJungle', testPalette]]),
+    );
+
+    compactScatterer.updateBudgeted(new THREE.Vector3(10, 0, 10), { maxAddsPerFrame: 1, maxRemovalsPerFrame: 0 });
+
+    expect(compactScatterer.getDebugInfo()).toEqual(expect.objectContaining({
+      maxCellDistance: 3,
+      targetCells: 49,
+    }));
+  });
+
   it('prioritizes critical cells over stale far pending additions when throttled', () => {
     const internals = scatterer as unknown as {
       pendingAdditions: string[];
@@ -166,6 +188,84 @@ describe('VegetationScatterer', () => {
     expect(billboard.addChunkInstances).toHaveBeenCalledTimes(1);
     expect(billboard.addChunkInstances.mock.calls[0][0]).toBe('0,0');
     expect(internals.pendingAdditions).toEqual(['8,8']);
+  });
+
+  it('compacts processed residency queues without splice allocation', () => {
+    const internals = scatterer as unknown as {
+      activeCells: Set<string>;
+      pendingAdditions: string[];
+      pendingRemovals: string[];
+      lastPlayerCellX: number;
+      lastPlayerCellZ: number;
+      processPendingWork(maxAddsPerFrame: number, maxRemovalsPerFrame: number): boolean;
+    };
+    internals.activeCells = new Set(['8,8', '9,9']);
+    internals.pendingRemovals = ['8,8', '9,9'];
+    internals.pendingAdditions = ['8,8', '0,0'];
+    internals.lastPlayerCellX = 0;
+    internals.lastPlayerCellZ = 0;
+
+    const spliceSpy = vi.spyOn(Array.prototype, 'splice');
+    const didWork = internals.processPendingWork(0, 1);
+    const spliceCalls = spliceSpy.mock.calls.length;
+    spliceSpy.mockRestore();
+
+    expect(didWork).toBe(true);
+    expect(spliceCalls).toBe(0);
+    expect(billboard.removeChunkInstances).toHaveBeenCalledWith('8,8');
+    expect(billboard.addChunkInstances).toHaveBeenCalledWith('0,0', expect.any(Map));
+    expect(internals.pendingRemovals).toEqual(['9,9']);
+    expect(internals.pendingAdditions).toEqual(['8,8']);
+  });
+
+  it('deduplicates pending residency work when rebuilding the target ring', () => {
+    const internals = scatterer as unknown as {
+      activeCells: Set<string>;
+      targetCells: Set<string>;
+      pendingAdditions: string[];
+      pendingRemovals: string[];
+      rebuildResidencyTargets(cellX: number, cellZ: number): void;
+    };
+    internals.activeCells = new Set(['0,0', '9,9']);
+    internals.pendingAdditions = ['0,1', '9,9'];
+    internals.pendingRemovals = ['8,8', '9,9'];
+    const targetCells = internals.targetCells;
+
+    internals.rebuildResidencyTargets(0, 0);
+
+    expect(internals.targetCells).toBe(targetCells);
+    expect(internals.targetCells.size).toBe(25);
+    expect(internals.pendingRemovals).toEqual(['9,9']);
+    expect(internals.pendingAdditions.filter((key) => key === '0,1')).toHaveLength(1);
+    expect(internals.pendingAdditions).not.toContain('9,9');
+    expect(new Set(internals.pendingAdditions).size).toBe(internals.pendingAdditions.length);
+  });
+
+  it('orders residency additions by distance without sorting cell keys', () => {
+    const internals = scatterer as unknown as {
+      activeCells: Set<string>;
+      pendingAdditions: string[];
+      pendingRemovals: string[];
+      rebuildResidencyTargets(cellX: number, cellZ: number): void;
+    };
+    internals.activeCells = new Set();
+    internals.pendingAdditions = [];
+    internals.pendingRemovals = [];
+
+    const sortSpy = vi.spyOn(Array.prototype, 'sort');
+    internals.rebuildResidencyTargets(0, 0);
+    const sortCalls = sortSpy.mock.calls.length;
+    sortSpy.mockRestore();
+
+    expect(sortCalls).toBe(0);
+    expect(internals.pendingAdditions[0]).toBe('0,0');
+    let previousDistance = 0;
+    for (const key of internals.pendingAdditions) {
+      const [x, z] = key.split(',').map(Number);
+      const distance = Math.abs(x) + Math.abs(z);
+      expect(distance).toBeGreaterThanOrEqual(previousDistance);
+      previousDistance = distance;
+    }
   });
 
   it('removes distant cells when player moves', () => {
@@ -203,5 +303,47 @@ describe('VegetationScatterer', () => {
     const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
     const classifiedPalette = calls[calls.length - 1][5];
     expect(classifiedPalette).toEqual(highlandPalette);
+  });
+
+  it('preserves generated vegetation arrays when exclusion zones do not remove instances', () => {
+    const generatedFern = [
+      { position: new THREE.Vector3(0, 5, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(5, 5, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+    ];
+    vi.mocked(ChunkVegetationGenerator.generateVegetation).mockReturnValueOnce(new Map([
+      ['fern', generatedFern],
+    ]));
+    scatterer.setExclusionZones([{ x: 1000, z: 1000, radius: 8 }]);
+
+    scatterer.updateBudgeted(new THREE.Vector3(0, 0, 0), { maxAddsPerFrame: 1, maxRemovalsPerFrame: 0 });
+
+    const [, instancesByType] = vi.mocked(billboard.addChunkInstances).mock.calls[0];
+    expect(instancesByType.get('fern')).toBe(generatedFern);
+    expect(scatterer.getDebugInfo().lastUpdate.lastGeneratedCell).toEqual(expect.objectContaining({
+      skippedReason: null,
+      instanceCount: 2,
+    }));
+  });
+
+  it('filters only vegetation instances inside exclusion zones', () => {
+    const kept = { position: new THREE.Vector3(20, 5, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 };
+    const generatedFern = [
+      { position: new THREE.Vector3(0, 5, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      kept,
+    ];
+    vi.mocked(ChunkVegetationGenerator.generateVegetation).mockReturnValueOnce(new Map([
+      ['fern', generatedFern],
+    ]));
+    scatterer.setExclusionZones([{ x: 0, z: 0, radius: 8 }]);
+
+    scatterer.updateBudgeted(new THREE.Vector3(0, 0, 0), { maxAddsPerFrame: 1, maxRemovalsPerFrame: 0 });
+
+    const [, instancesByType] = vi.mocked(billboard.addChunkInstances).mock.calls[0];
+    expect(instancesByType.get('fern')).toEqual([kept]);
+    expect(instancesByType.get('fern')).not.toBe(generatedFern);
+    expect(scatterer.getDebugInfo().lastUpdate.lastGeneratedCell).toEqual(expect.objectContaining({
+      skippedReason: null,
+      instanceCount: 1,
+    }));
   });
 });

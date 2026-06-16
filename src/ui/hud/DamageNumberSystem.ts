@@ -17,11 +17,16 @@ interface DamageNumber {
   damage: number;
   isHeadshot: boolean;
   isKill: boolean;
+  lastLeft: string;
+  lastTop: string;
+  lastOpacity: string;
 }
 
 export class DamageNumberSystem {
   private camera: THREE.Camera;
   private pool: DamageNumber[] = [];
+  private activeNumbers: DamageNumber[] = [];
+  private availableNumbers: DamageNumber[] = [];
   private container: HTMLDivElement;
   private readonly POOL_SIZE = 30;
   private readonly ANIMATION_DURATION = 800; // ms
@@ -46,15 +51,20 @@ export class DamageNumberSystem {
     // Initialize pool
     for (let i = 0; i < this.POOL_SIZE; i++) {
       const element = this.createDamageElement();
-      this.pool.push({
+      const damageNumber: DamageNumber = {
         element,
         active: false,
         worldPos: new THREE.Vector3(),
         startTime: 0,
         damage: 0,
         isHeadshot: false,
-        isKill: false
-      });
+        isKill: false,
+        lastLeft: '',
+        lastTop: '',
+        lastOpacity: ''
+      };
+      this.pool.push(damageNumber);
+      this.availableNumbers.push(damageNumber);
       this.container.appendChild(element);
     }
 
@@ -128,8 +138,7 @@ export class DamageNumberSystem {
   }
 
   spawn(worldPos: THREE.Vector3, damage: number, isHeadshot: boolean = false, isKill: boolean = false): void {
-    // Find inactive damage number from pool
-    let damageNumber = this.pool.find(dn => !dn.active);
+    const damageNumber = this.availableNumbers.pop();
 
     if (!damageNumber) {
       Logger.warn('ui', 'Damage number pool exhausted');
@@ -143,11 +152,13 @@ export class DamageNumberSystem {
     damageNumber.damage = Math.round(damage);
     damageNumber.isHeadshot = isHeadshot;
     damageNumber.isKill = isKill;
+    this.activeNumbers.push(damageNumber);
 
     // Set text and style
     const element = damageNumber.element;
     element.textContent = `-${damageNumber.damage}`;
     element.className = 'damage-number';
+    this.resetDamageNumberStyleCache(damageNumber);
 
     if (isKill) {
       element.classList.add('kill');
@@ -177,17 +188,17 @@ export class DamageNumberSystem {
   }
 
   update(): void {
+    if (this.activeNumbers.length === 0) return;
+
     const now = performance.now();
 
-    for (const damageNumber of this.pool) {
-      if (!damageNumber.active) continue;
-
+    for (let i = this.activeNumbers.length - 1; i >= 0; i--) {
+      const damageNumber = this.activeNumbers[i];
       const elapsed = now - damageNumber.startTime;
 
       // Deactivate after animation completes
       if (elapsed >= this.ANIMATION_DURATION) {
-        damageNumber.active = false;
-        damageNumber.element.style.display = 'none';
+        this.deactivateAt(i, damageNumber);
         continue;
       }
 
@@ -203,13 +214,50 @@ export class DamageNumberSystem {
     // If behind camera or off-screen, hide
     if (screenPos.z > 1 || screenPos.x < 0 || screenPos.x > window.innerWidth ||
         screenPos.y < 0 || screenPos.y > window.innerHeight) {
-      damageNumber.element.style.opacity = '0';
+      this.setDamageNumberOpacity(damageNumber, '0');
       return;
     }
 
     // Update position
-    damageNumber.element.style.left = `${screenPos.x}px`;
-    damageNumber.element.style.top = `${screenPos.y}px`;
+    this.setDamageNumberOpacity(damageNumber, '');
+    this.setDamageNumberLeft(damageNumber, `${screenPos.x}px`);
+    this.setDamageNumberTop(damageNumber, `${screenPos.y}px`);
+  }
+
+  private deactivateAt(index: number, damageNumber: DamageNumber): void {
+    damageNumber.active = false;
+    damageNumber.element.style.display = 'none';
+    const last = this.activeNumbers[this.activeNumbers.length - 1];
+    if (last !== undefined) {
+      this.activeNumbers[index] = last;
+    }
+    this.activeNumbers.pop();
+    this.availableNumbers.push(damageNumber);
+  }
+
+  private resetDamageNumberStyleCache(damageNumber: DamageNumber): void {
+    damageNumber.lastLeft = '';
+    damageNumber.lastTop = '';
+    damageNumber.lastOpacity = '';
+    damageNumber.element.style.opacity = '';
+  }
+
+  private setDamageNumberLeft(damageNumber: DamageNumber, left: string): void {
+    if (damageNumber.lastLeft === left) return;
+    damageNumber.element.style.left = left;
+    damageNumber.lastLeft = left;
+  }
+
+  private setDamageNumberTop(damageNumber: DamageNumber, top: string): void {
+    if (damageNumber.lastTop === top) return;
+    damageNumber.element.style.top = top;
+    damageNumber.lastTop = top;
+  }
+
+  private setDamageNumberOpacity(damageNumber: DamageNumber, opacity: string): void {
+    if (damageNumber.lastOpacity === opacity) return;
+    damageNumber.element.style.opacity = opacity;
+    damageNumber.lastOpacity = opacity;
   }
 
   private worldToScreen(worldPos: THREE.Vector3): { x: number; y: number; z: number } {

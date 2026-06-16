@@ -71,7 +71,7 @@ export interface PlayerBotIntent {
   // firing, the controller may face this point so camera-relative movement can
   // follow a nav/path corner instead of the far combat/objective aim point.
   movementTarget: BotVec3 | null;
-  aimLerpRate: number;   // 0..1; 1 = snap
+  aimLerpRate: number;   // 0..1; 1 = request target angle before slew caps
 
   // Fire — bot writes intent; controller debounces and aim-dot-gates.
   firePrimary: boolean;
@@ -129,7 +129,7 @@ export interface PlayerBotConfig {
   readonly approachDistance: number;
   /** Distance (m) below which ENGAGE stops pushing forward (0 — never −1). */
   readonly pushInDistance: number;
-  /** Aim slew rate per tick (0..1). 1 = instant snap. */
+  /** Aim blend rate per tick (0..1). 1 requests target angle before slew caps. */
   readonly aimLerpRate: number;
   /** Strafe amplitude in ENGAGE (0..1). 0 disables player-dodge. */
   readonly engageStrafeAmplitude: number;

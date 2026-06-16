@@ -7,11 +7,12 @@ import { injectSharedStyles } from '../ui/design/styles';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
-import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
+import { isPerfHarnessEnabled, isDiagEnabled } from './PerfDiagnostics';
 import { collectNodeMaterialShaders } from './RendererBackend';
 import { Logger } from '../utils/Logger';
 import { preloadIcons } from '../ui/icons/IconRegistry';
 import { isFlightTestMode } from '../dev/flightTestMode';
+import { BoundedRingBuffer } from './BoundedRingBuffer';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -20,6 +21,86 @@ const ashauSessionTelemetry = {
   lastNearbyTactical250: 0,
   peakNearbyTactical250: 0
 };
+
+interface AShauZoneOccupancyCounts {
+  us: number;
+  opfor: number;
+}
+
+interface AShauZoneSummarySource {
+  id: string;
+  name?: string;
+  owner?: unknown;
+  state?: unknown;
+}
+
+interface AShauTopZoneCandidate {
+  zoneId: string;
+  counts: AShauZoneOccupancyCounts;
+  total: number;
+}
+
+export interface AShauTopZoneOccupancy {
+  zoneId: string;
+  zoneName: string;
+  owner: unknown;
+  state: unknown;
+  us: number;
+  opfor: number;
+  total: number;
+}
+
+function insertTopZoneCandidate(
+  target: AShauTopZoneCandidate[],
+  candidate: AShauTopZoneCandidate,
+  limit: number,
+): void {
+  let insertAt = 0;
+  while (insertAt < target.length && target[insertAt].total >= candidate.total) {
+    insertAt++;
+  }
+  if (insertAt >= limit) return;
+
+  const nextLength = Math.min(target.length + 1, limit);
+  for (let index = nextLength - 1; index > insertAt; index--) {
+    target[index] = target[index - 1];
+  }
+  target[insertAt] = candidate;
+  target.length = nextLength;
+}
+
+export function buildTopZoneOccupancy(
+  zoneDistribution: ReadonlyMap<string, AShauZoneOccupancyCounts>,
+  zones: readonly AShauZoneSummarySource[],
+  limit = 10,
+): AShauTopZoneOccupancy[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  const boundedLimit = Math.floor(limit);
+  const topCandidates: AShauTopZoneCandidate[] = [];
+  for (const [zoneId, counts] of zoneDistribution) {
+    insertTopZoneCandidate(topCandidates, {
+      zoneId,
+      counts,
+      total: counts.us + counts.opfor,
+    }, boundedLimit);
+  }
+
+  const topZones: AShauTopZoneOccupancy[] = new Array(topCandidates.length);
+  for (let index = 0; index < topCandidates.length; index++) {
+    const candidate = topCandidates[index];
+    const zone = zones.find(z => z.id === candidate.zoneId);
+    topZones[index] = {
+      zoneId: candidate.zoneId,
+      zoneName: zone?.name ?? candidate.zoneId,
+      owner: zone?.owner ?? null,
+      state: zone?.state ?? null,
+      us: candidate.counts.us,
+      opfor: candidate.counts.opfor,
+      total: candidate.total
+    };
+  }
+  return topZones;
+}
 
 function showFatalError(message: string) {
   const overlay = document.createElement('div');
@@ -149,15 +230,18 @@ export async function bootstrapGame(): Promise<void> {
     // Warm browser cache for critical HUD icons
     preloadIcons([
       'icon-rifle', 'icon-shotgun', 'icon-smg', 'icon-pistol',
-      'icon-lmg', 'icon-launcher', 'icon-grenade',
+      'icon-lmg', 'icon-launcher', 'icon-grenade', 'icon-mortar',
+      'icon-melee', 'icon-kill-arrow', 'icon-headshot',
       'icon-minigun', 'icon-rocket-pod', 'icon-door-gun',
+      'map-player', 'map-squad-member', 'map-zone-flag',
+      'map-firebase', 'map-helipad',
     ]);
 
     // Perf-harness gate: true in `vite dev` AND in the perf-harness build
     // (VITE_PERF_HARNESS=1, see docs/PERFORMANCE.md "Build targets"). Retail
     // builds evaluate both constants to false at compile time, so Vite DCE
     // eliminates these diagnostic exposures from the shipping bundle.
-    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfHarnessEnabled()) {
       // Expose engine root for perf harness scenario control.
       (window as any).__engine = engine;
       // Expose renderer for performance measurement scripts.
@@ -176,7 +260,7 @@ export async function bootstrapGame(): Promise<void> {
       (window as any).__ashauDiagnostics = () => buildAShauDiagnostics(engine);
     }
 
-    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && (isPerfDiagnosticsEnabled() || isDiagEnabled())) {
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && (isPerfHarnessEnabled() || isDiagEnabled())) {
       (window as any).advanceTime = async (ms: number) => {
         engine.advanceTime(ms);
       };
@@ -272,19 +356,16 @@ export async function bootstrapGame(): Promise<void> {
       // a bounded ring so probe scripts can inspect the actual flow of tier
       // transitions during a session. The buffer is cleared on read by
       // default so consecutive probe steps observe distinct windows.
-      const tierEventBuffer: Array<{
+      const TIER_EVENT_BUFFER_LIMIT = 4096;
+      const tierEventBuffer = new BoundedRingBuffer<{
         capturedAtMs: number;
         combatantId: string;
         fromRender: 'close-glb' | 'impostor' | 'culled' | null;
         toRender: 'close-glb' | 'impostor' | 'culled';
         reason: string;
         distanceMeters: number;
-      }> = [];
-      const TIER_EVENT_BUFFER_LIMIT = 4096;
+      }>(TIER_EVENT_BUFFER_LIMIT);
       GameEventBus.subscribe('materialization_tier_changed', (event) => {
-        if (tierEventBuffer.length >= TIER_EVENT_BUFFER_LIMIT) {
-          tierEventBuffer.shift();
-        }
         tierEventBuffer.push({
           capturedAtMs: performance.now(),
           ...event,
@@ -296,9 +377,9 @@ export async function bootstrapGame(): Promise<void> {
         const clear = options.clear !== false;
         const limit = Number.isFinite(options.limit ?? NaN)
           ? Math.max(0, Math.min(TIER_EVENT_BUFFER_LIMIT, Math.floor(options.limit as number)))
-          : tierEventBuffer.length;
-        const out = tierEventBuffer.slice(-limit);
-        if (clear) tierEventBuffer.length = 0;
+          : tierEventBuffer.size;
+        const out = tierEventBuffer.snapshotLatest(limit);
+        if (clear) tierEventBuffer.clear();
         return out;
       };
     }
@@ -470,21 +551,7 @@ function buildAShauDiagnostics(engine: GameEngine) {
     }
   }
 
-  const topZones = Array.from(zoneDistribution.entries())
-    .map(([zoneId, counts]) => {
-      const zone = zones.find(z => z.id === zoneId);
-      return {
-        zoneId,
-        zoneName: zone?.name ?? zoneId,
-        owner: zone?.owner ?? null,
-        state: zone?.state ?? null,
-        us: counts.us,
-        opfor: counts.opfor,
-        total: counts.us + counts.opfor
-      };
-    })
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+  const topZones = buildTopZoneOccupancy(zoneDistribution, zones);
 
   return {
     mode,

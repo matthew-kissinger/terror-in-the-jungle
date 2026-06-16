@@ -26,6 +26,9 @@ interface LOSCacheEntry {
 
 /** Cache TTL in milliseconds - combatants don't teleport */
 const LOS_CACHE_TTL_MS = 150;
+const LOS_CACHE_PRUNE_THRESHOLD = 200;
+const LOS_CACHE_PRUNE_ENTRIES_PER_FRAME = 64;
+const FOV_DOT_EPSILON = 1e-12;
 
 /**
  * Handles line-of-sight and visibility checks
@@ -43,6 +46,9 @@ export class AILineOfSight {
   // set/delete so clearCache() can make its "is the cache large?" decision
   // without iterating every bucket.
   private losCacheSize = 0;
+  private cachePruneAttackerIterator: IterableIterator<[string, Map<string, LOSCacheEntry>]> | null = null;
+  private cachePruneTargetIterator: IterableIterator<[string, LOSCacheEntry]> | null = null;
+  private cachePruneAttackerId: string | null = null;
 
   // Profiling counters
   static cacheHits = 0;
@@ -73,20 +79,63 @@ export class AILineOfSight {
    */
   clearCache(): void {
     const now = performance.now();
-    // Only do full sweep if cache is getting large
-    if (this.losCacheSize > 200) {
-      this.losCache.forEach((targets, attackerId) => {
-        targets.forEach((entry, targetId) => {
-          if (now - entry.timestamp > LOS_CACHE_TTL_MS) {
-            targets.delete(targetId);
-            this.losCacheSize--;
-          }
-        });
-        if (targets.size === 0) {
-          this.losCache.delete(attackerId);
-        }
-      });
+    if (this.losCacheSize <= LOS_CACHE_PRUNE_THRESHOLD) {
+      this.resetCachePruneCursor();
+      return;
     }
+
+    let inspected = 0;
+    while (
+      inspected < LOS_CACHE_PRUNE_ENTRIES_PER_FRAME
+      && this.losCacheSize > LOS_CACHE_PRUNE_THRESHOLD
+    ) {
+      if (!this.cachePruneTargetIterator) {
+        if (!this.cachePruneAttackerIterator) {
+          this.cachePruneAttackerIterator = this.losCache.entries();
+        }
+        const nextAttacker = this.cachePruneAttackerIterator.next();
+        if (nextAttacker.done) {
+          this.resetCachePruneCursor();
+          return;
+        }
+        this.cachePruneAttackerId = nextAttacker.value[0];
+        this.cachePruneTargetIterator = nextAttacker.value[1].entries();
+      }
+
+      const targetIterator = this.cachePruneTargetIterator;
+      const target = targetIterator.next();
+      if (target.done) {
+        this.finishCurrentCachePruneBucket();
+        continue;
+      }
+
+      inspected++;
+      if (now - target.value[1].timestamp > LOS_CACHE_TTL_MS) {
+        const targets = this.cachePruneAttackerId
+          ? this.losCache.get(this.cachePruneAttackerId)
+          : undefined;
+        if (targets?.delete(target.value[0])) {
+          this.losCacheSize--;
+        }
+      }
+    }
+  }
+
+  private finishCurrentCachePruneBucket(): void {
+    if (this.cachePruneAttackerId) {
+      const targets = this.losCache.get(this.cachePruneAttackerId);
+      if (targets?.size === 0) {
+        this.losCache.delete(this.cachePruneAttackerId);
+      }
+    }
+    this.cachePruneAttackerId = null;
+    this.cachePruneTargetIterator = null;
+  }
+
+  private resetCachePruneCursor(): void {
+    this.cachePruneAttackerIterator = null;
+    this.cachePruneTargetIterator = null;
+    this.cachePruneAttackerId = null;
   }
 
   /**
@@ -175,20 +224,20 @@ export class AILineOfSight {
 
     const distance = Math.sqrt(distanceSq);
 
-    // FOV check (cheap - always do this before cache lookup)
-    _toTarget.subVectors(targetPos, combatant.position).divideScalar(distance || 1);
-
     _forward.set(
       Math.cos(combatant.rotation),
       0,
       Math.sin(combatant.rotation)
     );
 
-    const dot = _forward.dot(_toTarget);
-    const angle = Math.acos(THREE.MathUtils.clamp(dot, -1, 1));
+    // FOV check (cheap - always do this before cache lookup)
+    _toTarget.subVectors(targetPos, combatant.position);
+    const invDistance = distance > 0 ? 1 / distance : 1;
+    const dot = THREE.MathUtils.clamp(_forward.dot(_toTarget) * invDistance, -1, 1);
     const halfFov = THREE.MathUtils.degToRad(combatant.skillProfile.fieldOfView / 2);
+    const minForwardDot = Math.cos(halfFov);
 
-    if (angle > halfFov) {
+    if (dot + FOV_DOT_EPSILON < minForwardDot) {
       return false;
     }
 
@@ -209,7 +258,9 @@ export class AILineOfSight {
 
     // Cheap substitution for many expensive LOS raycasts:
     // sample terrain heightfield along the sight segment and reject clearly occluded pairs.
+    let heightfieldPrefilterChecked = false;
     if (this.isHeightfieldPrefilterEnabled() && this.terrainSystem) {
+      heightfieldPrefilterChecked = true;
       const blocked = this.isBlockedByHeightfield(combatant, targetPos, distance);
       if (blocked) {
         AILineOfSight.prefilterRejects++;
@@ -238,7 +289,7 @@ export class AILineOfSight {
 
     // --- Full LOS evaluation ---
     AILineOfSight.fullEvaluations++;
-    const result = this.evaluateFullLOS(combatant, targetPos, distance);
+    const result = this.evaluateFullLOS(combatant, targetPos, distance, heightfieldPrefilterChecked);
     if (result) {
       AILineOfSight.fullEvaluationClear++;
     } else {
@@ -257,7 +308,8 @@ export class AILineOfSight {
   private evaluateFullLOS(
     combatant: Combatant,
     targetPos: THREE.Vector3,
-    distance: number
+    distance: number,
+    heightfieldAlreadyChecked = false,
   ): boolean {
     copyActorEyePosition(_eyePos, combatant.position);
     copyActorEyePosition(_targetEyePos, targetPos);
@@ -271,6 +323,9 @@ export class AILineOfSight {
       const terrainHit = this.terrainSystem.raycastTerrain(_eyePos, _direction, distance);
 
       if (terrainHit.hit && terrainHit.distance! < distance - 1) {
+        return false;
+      }
+      if (!heightfieldAlreadyChecked && this.isBlockedByHeightfield(combatant, targetPos, distance)) {
         return false;
       }
     }

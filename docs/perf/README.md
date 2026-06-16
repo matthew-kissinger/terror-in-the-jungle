@@ -103,7 +103,7 @@ npm run perf:quick                      # Smoke; not a baseline
 # Analysis and comparison:
 npm run perf:analyze:latest             # Print latest artifact summary
 npm run perf:compare                    # Compare latest vs baseline; prints raw metrics when no baseline is tracked
-npm run perf:compare:strict             # Same compare, fail on warnings too (no-op gating without a baseline)
+npm run perf:compare:strict             # Same compare, fail on warnings too; failed captures still fail without a baseline
 npm run perf:update-baseline            # (Re)create perf-baselines.json from latest capture (use sparingly)
 ```
 

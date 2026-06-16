@@ -479,6 +479,28 @@ describe("GunplayCore", () => {
       expect(anySpreadApplied).toBe(true); // At least one pellet should have some spread
     });
 
+    it("computePelletRays can fill a caller-owned result container", () => {
+      const gun = new GunplayCore(shotgunSpec);
+      const result: THREE.Ray[] = [new THREE.Ray(), new THREE.Ray()];
+
+      const rays = gun.computePelletRays(mockCamera, result);
+
+      expect(rays).toBe(result);
+      expect(rays.length).toBe(shotgunSpec.pelletCount);
+      for (const ray of rays) {
+        expect(ray).toBeInstanceOf(THREE.Ray);
+        expect(ray.origin.x).toBeCloseTo(mockCamera.position.x);
+        expect(ray.origin.y).toBeCloseTo(mockCamera.position.y);
+        expect(ray.origin.z).toBeCloseTo(mockCamera.position.z);
+      }
+
+      const singleRayGun = new GunplayCore(testSpec);
+      const singleRays = singleRayGun.computePelletRays(mockCamera, result);
+      expect(singleRays).toBe(result);
+      expect(singleRays).toHaveLength(1);
+      expect(singleRays[0]).toBeInstanceOf(THREE.Ray);
+    });
+
     it("isShotgun should return true for shotguns and false otherwise", () => {
       const rifleGun = new GunplayCore(testSpec);
       expect(rifleGun.isShotgun()).toBe(false);

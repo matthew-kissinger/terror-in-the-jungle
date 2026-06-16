@@ -4,7 +4,14 @@
 import * as THREE from 'three';
 import { ExplosionEffect } from './ExplosionEffectFactory';
 
-const GRAVITY = new THREE.Vector3(0, -3, 0);
+const GRAVITY_Y = -3;
+
+function markAttributeRangeDirty(attribute: THREE.BufferAttribute, start = 0, count = attribute.count * attribute.itemSize): void {
+  if (typeof attribute.addUpdateRange === 'function') {
+    attribute.addUpdateRange(start, count);
+  }
+  attribute.needsUpdate = true;
+}
 
 /**
  * Updates flash effect (first 200ms)
@@ -30,19 +37,20 @@ export function updateFireParticles(
   deltaTime: number
 ): void {
   if (elapsed < 800) {
-    const firePositions = effect.fireParticles.geometry.attributes.position as THREE.BufferAttribute;
+    const firePositions = effect.firePositionAttribute;
+    const fireArray = effect.firePositionArray;
     for (let j = 0; j < firePositions.count; j++) {
       // Apply gravity
-      effect.fireVelocities[j].addScaledVector(GRAVITY, deltaTime * 2);
+      const velocity = effect.fireVelocities[j];
+      velocity.y += GRAVITY_Y * deltaTime * 2;
 
       // Update position
-      const x = firePositions.getX(j) + effect.fireVelocities[j].x * deltaTime;
-      const y = firePositions.getY(j) + effect.fireVelocities[j].y * deltaTime;
-      const z = firePositions.getZ(j) + effect.fireVelocities[j].z * deltaTime;
-
-      firePositions.setXYZ(j, x, y, z);
+      const offset = j * 3;
+      fireArray[offset] += velocity.x * deltaTime;
+      fireArray[offset + 1] += velocity.y * deltaTime;
+      fireArray[offset + 2] += velocity.z * deltaTime;
     }
-    firePositions.needsUpdate = true;
+    markAttributeRangeDirty(firePositions);
 
     // Fade fire
     const fireProgress = elapsed / 800;
@@ -61,19 +69,20 @@ export function updateDebrisParticles(
   deltaTime: number
 ): void {
   if (elapsed < 1500) {
-    const debrisPositions = effect.debrisParticles.geometry.attributes.position as THREE.BufferAttribute;
+    const debrisPositions = effect.debrisPositionAttribute;
+    const debrisArray = effect.debrisPositionArray;
     for (let j = 0; j < debrisPositions.count; j++) {
       // Apply strong gravity to debris
-      effect.debrisVelocities[j].addScaledVector(GRAVITY, deltaTime * 3);
+      const velocity = effect.debrisVelocities[j];
+      velocity.y += GRAVITY_Y * deltaTime * 3;
 
       // Update position
-      const x = debrisPositions.getX(j) + effect.debrisVelocities[j].x * deltaTime;
-      const y = debrisPositions.getY(j) + effect.debrisVelocities[j].y * deltaTime;
-      const z = debrisPositions.getZ(j) + effect.debrisVelocities[j].z * deltaTime;
-
-      debrisPositions.setXYZ(j, x, y, z);
+      const offset = j * 3;
+      debrisArray[offset] += velocity.x * deltaTime;
+      debrisArray[offset + 1] += velocity.y * deltaTime;
+      debrisArray[offset + 2] += velocity.z * deltaTime;
     }
-    debrisPositions.needsUpdate = true;
+    markAttributeRangeDirty(debrisPositions);
 
     // Fade debris in last 500ms
     if (elapsed > 1000) {
@@ -94,22 +103,25 @@ export function updateSmokeParticles(
   deltaTime: number,
   progress: number
 ): void {
-  const smokePositions = effect.smokeParticles.geometry.attributes.position as THREE.BufferAttribute;
+  const smokePositions = effect.smokePositionAttribute;
+  const smokeArray = effect.smokePositionArray;
   for (let j = 0; j < smokePositions.count; j++) {
     // Smoke slows down over time
-    effect.smokeVelocities[j].multiplyScalar(0.98);
+    const velocity = effect.smokeVelocities[j];
+    velocity.x *= 0.98;
+    velocity.y *= 0.98;
+    velocity.z *= 0.98;
 
     // Add slight upward drift
-    effect.smokeVelocities[j].y += 0.5 * deltaTime;
+    velocity.y += 0.5 * deltaTime;
 
     // Update position
-    const x = smokePositions.getX(j) + effect.smokeVelocities[j].x * deltaTime;
-    const y = smokePositions.getY(j) + effect.smokeVelocities[j].y * deltaTime;
-    const z = smokePositions.getZ(j) + effect.smokeVelocities[j].z * deltaTime;
-
-    smokePositions.setXYZ(j, x, y, z);
+    const offset = j * 3;
+    smokeArray[offset] += velocity.x * deltaTime;
+    smokeArray[offset + 1] += velocity.y * deltaTime;
+    smokeArray[offset + 2] += velocity.z * deltaTime;
   }
-  smokePositions.needsUpdate = true;
+  markAttributeRangeDirty(smokePositions);
 
   // Smoke expands and fades - larger growth
   const smokeSize = 4 + progress * 8; // Grow to 12 units

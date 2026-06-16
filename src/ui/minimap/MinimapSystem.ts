@@ -8,12 +8,12 @@ import type { IZoneQuery } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { createMinimapDOM } from './MinimapDOMBuilder';
 import { DEFAULT_WORLD_SIZE, MINIMAP_SIZE } from './MinimapStyles';
-import { renderMinimap, HelipadMarker, VehicleMarker } from './MinimapRenderer';
-import type { IVehicle } from '../../systems/vehicle/IVehicle';
+import { renderMinimap, type HelipadMarker, type VehicleMarker } from './MinimapRenderer';
 import { isMobileViewport } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
+import { refreshVehicleMarkersFromSource, type VehicleMarkerSource } from '../map/VehicleMarkers';
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -23,18 +23,7 @@ const _v1 = new THREE.Vector3();
  * structural so the minimap can be tested without standing up the full
  * vehicle subsystem, and so the composer wire stays a single line.
  */
-export interface MinimapVehicleSource {
-  getVehiclesByCategory(category: 'ground' | 'watercraft' | 'emplacement'): readonly IVehicle[];
-}
-
-// Categories of drivable / boardable vehicles surfaced on the minimap.
-// Helicopters and fixed-wing are intentionally excluded -- the existing
-// helipad markers already provide aircraft signposting.
-const VEHICLE_MARKER_CATEGORIES: ReadonlyArray<'ground' | 'watercraft' | 'emplacement'> = [
-  'ground',
-  'watercraft',
-  'emplacement',
-];
+export type MinimapVehicleSource = VehicleMarkerSource;
 
 export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
@@ -165,19 +154,7 @@ export class MinimapSystem implements GameSystem {
   }
 
   private refreshVehicleMarkers(source: MinimapVehicleSource): void {
-    this.vehicleMarkers.length = 0;
-    for (const category of VEHICLE_MARKER_CATEGORIES) {
-      const vehicles = source.getVehiclesByCategory(category);
-      for (const vehicle of vehicles) {
-        if (vehicle.isDestroyed()) continue;
-        this.vehicleMarkers.push({
-          worldPos: vehicle.getPosition().clone(),
-          category,
-          faction: vehicle.faction,
-          vehicleType: vehicle.vehicleId,
-        });
-      }
-    }
+    refreshVehicleMarkersFromSource(this.vehicleMarkers, source);
   }
 
   /** Re-parent minimap into a grid slot (called after init). */

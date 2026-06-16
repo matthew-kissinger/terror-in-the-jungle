@@ -116,9 +116,12 @@ exception note in `docs/CARRY_OVERS.md`.
 ## perf:compare details
 
 **With no `perf-baselines.json` present (current state), `perf:compare` prints
-the latest capture's raw metrics and exits 0** — there is nothing to gate
-against, so it never emits PASS/WARN/FAIL rows or a non-zero exit. The behavior
-below applies once a baseline file exists.
+the latest capture's raw metrics.** If that capture's own validation passed, it
+exits 0 because there is no baseline to compare against. If the latest capture
+failed validation, `perf:compare` still prints the raw metrics and failed-check
+summary, then exits non-zero so failed dropped-frame evidence is not silently
+bypassed by an older artifact. The behavior below applies once a baseline file
+exists.
 
 When a baseline exists, `perf:compare` prints PASS/WARN/FAIL rows per metric.
 `FAIL` is locally blocking when invoked through `validate:full`; hosted CI keeps
@@ -133,5 +136,6 @@ fail `>= 300`.
 
 `perf:compare` auto-selects the latest capture for the scenario and skips
 non-capture artifact directories (audits, decision packets, etc.). Failed
-diagnostic captures are excluded from auto-selection. Pass `--dir <timestamp>`
-to compare a specific capture.
+captures are included in auto-selection and fail the command after printing raw
+metrics, because a failed dropped-frame capture is often the evidence that needs
+attention. Pass `--dir <timestamp>` to inspect a specific capture.

@@ -46,6 +46,12 @@ export class StatsPanel extends UIComponent {
 
   // Streak overlay element (fixed-position, mounted separately)
   private streakOverlay: HTMLDivElement | null = null;
+  private desktopKillsEl: HTMLElement | null = null;
+  private desktopDeathsEl: HTMLElement | null = null;
+  private desktopKdEl: HTMLElement | null = null;
+  private mobileKillsEl: HTMLElement | null = null;
+  private mobileDeathsEl: HTMLElement | null = null;
+  private mobileKdEl: HTMLElement | null = null;
 
   constructor(private statsTracker: PlayerStatsTracker) {
     super();
@@ -92,26 +98,32 @@ export class StatsPanel extends UIComponent {
     if (this.streakOverlay && this.root.parentElement) {
       this.root.parentElement.appendChild(this.streakOverlay);
     }
+    this.desktopKillsEl = this.$('[data-ref="dk"]');
+    this.desktopDeathsEl = this.$('[data-ref="dd"]');
+    this.desktopKdEl = this.$('[data-ref="dkd"]');
+    this.mobileKillsEl = this.$('[data-ref="mk"]');
+    this.mobileDeathsEl = this.$('[data-ref="md"]');
+    this.mobileKdEl = this.$('[data-ref="mkd"]');
 
     // Effect: update kills display (desktop + mobile)
     this.effect(() => {
       const k = this.kills.value.toString();
-      this.text('[data-ref="dk"]', k);
-      this.text('[data-ref="mk"]', k);
+      this.setText(this.desktopKillsEl, k);
+      this.setText(this.mobileKillsEl, k);
     });
 
     // Effect: update deaths display
     this.effect(() => {
       const d = this.deaths.value.toString();
-      this.text('[data-ref="dd"]', d);
-      this.text('[data-ref="md"]', d);
+      this.setText(this.desktopDeathsEl, d);
+      this.setText(this.mobileDeathsEl, d);
     });
 
     // Effect: update KD ratio display
     this.effect(() => {
       const kd = this.kdRatio.value;
-      this.text('[data-ref="dkd"]', kd);
-      this.text('[data-ref="mkd"]', kd);
+      this.setText(this.desktopKdEl, kd);
+      this.setText(this.mobileKdEl, kd);
     });
   }
 
@@ -120,15 +132,22 @@ export class StatsPanel extends UIComponent {
     if (this.streakOverlay?.parentNode) {
       this.streakOverlay.parentNode.removeChild(this.streakOverlay);
     }
+    this.desktopKillsEl = null;
+    this.desktopDeathsEl = null;
+    this.desktopKdEl = null;
+    this.mobileKillsEl = null;
+    this.mobileDeathsEl = null;
+    this.mobileKdEl = null;
   }
 
   // --- Public API ---
 
   /** Sync stats from tracker (called each frame) */
   update(): void {
-    const stats = this.statsTracker.getStats();
-    this.kills.value = stats.kills;
-    this.deaths.value = stats.deaths;
+    const kills = this.statsTracker.getKills();
+    const deaths = this.statsTracker.getDeaths();
+    if (this.kills.value !== kills) this.kills.value = kills;
+    if (this.deaths.value !== deaths) this.deaths.value = deaths;
 
     // Check streak timeout
     if (this.currentStreak > 0 && Date.now() - this.lastKillTime > this.STREAK_TIMEOUT) {
@@ -157,6 +176,12 @@ export class StatsPanel extends UIComponent {
     const milestone = STREAKS[this.currentStreak];
     if (!milestone) return;
     this.showStreak(milestone.message, milestone.color);
+  }
+
+  private setText(element: HTMLElement | null, value: string): void {
+    if (element && element.textContent !== value) {
+      element.textContent = value;
+    }
   }
 
   private showStreak(message: string, color: string): void {

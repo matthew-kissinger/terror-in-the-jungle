@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
+import { isPerfHarnessEnabled, isDiagEnabled } from './PerfDiagnostics';
 
 export interface RuntimeFrameEvent {
   frameCount: number;
@@ -43,7 +43,7 @@ export class RuntimeMetrics {
   private percentileCacheDirty = true;
   private cachedP95 = 0;
   private cachedP99 = 0;
-  private sortScratch: Float64Array | null = null;
+  private percentileTailScratch: Float64Array | null = null;
   private lastPercentileComputeTime = 0;
   private readonly PERCENTILE_RECOMPUTE_INTERVAL_MS = 500;
   private frameCount = 0;
@@ -57,7 +57,7 @@ export class RuntimeMetrics {
 
   constructor() {
     if (typeof window !== 'undefined' && (
-      ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
+      ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfHarnessEnabled())
       || isDiagEnabled()
     )) {
       // Use arrow functions to capture 'this' lexically instead of aliasing
@@ -126,6 +126,10 @@ export class RuntimeMetrics {
     this.combatantCount = stats.combatantCount;
     this.firingCount = stats.firingCount;
     this.engagingCount = stats.engagingCount;
+  }
+
+  getFrameCount(): number {
+    return this.frameCount;
   }
 
   getSnapshot(): RuntimeMetricsSnapshot {
@@ -226,20 +230,28 @@ export class RuntimeMetrics {
       return;
     }
 
-    // Reuse a single scratch buffer to avoid per-frame allocation + GC pressure.
-    // Only reallocate if the ring grew (happens once during warmup, then never).
-    if (!this.sortScratch || this.sortScratch.length < this.ringCount) {
-      this.sortScratch = new Float64Array(this.maxSamples);
+    const p95Index = Math.floor((this.ringCount - 1) * 0.95);
+    const p99Index = Math.floor((this.ringCount - 1) * 0.99);
+    const tailCount = this.ringCount - p95Index;
+    if (!this.percentileTailScratch || this.percentileTailScratch.length < tailCount) {
+      this.percentileTailScratch = new Float64Array(this.maxSamples);
     }
-    for (let i = 0; i < this.ringCount; i++) {
-      this.sortScratch[i] = this.ringBuffer[i];
-    }
-    // Sort only the active portion via a subarray view (no allocation)
-    const active = this.sortScratch.subarray(0, this.ringCount);
-    active.sort();
 
-    this.cachedP95 = active[Math.floor((this.ringCount - 1) * 0.95)];
-    this.cachedP99 = active[Math.floor((this.ringCount - 1) * 0.99)];
+    let tailLength = 0;
+    const tail = this.percentileTailScratch;
+    for (let i = 0; i < this.ringCount; i++) {
+      const value = this.ringBuffer[i];
+      if (tailLength < tailCount) {
+        RuntimeMetrics.insertAscending(tail, tailLength, value);
+        tailLength += 1;
+      } else if (value > tail[0]) {
+        tail[0] = value;
+        RuntimeMetrics.bubbleAscendingFromStart(tail, tailCount);
+      }
+    }
+
+    this.cachedP95 = tail[0];
+    this.cachedP99 = tail[p99Index - p95Index];
   }
 
   private getP95FrameMs(): number {
@@ -250,5 +262,24 @@ export class RuntimeMetrics {
   private getP99FrameMs(): number {
     this.computePercentiles();
     return this.cachedP99;
+  }
+
+  private static insertAscending(values: Float64Array, length: number, value: number): void {
+    let insertAt = length;
+    while (insertAt > 0 && value < values[insertAt - 1]) {
+      values[insertAt] = values[insertAt - 1];
+      insertAt -= 1;
+    }
+    values[insertAt] = value;
+  }
+
+  private static bubbleAscendingFromStart(values: Float64Array, length: number): void {
+    let index = 0;
+    while (index + 1 < length && values[index] > values[index + 1]) {
+      const next = values[index + 1];
+      values[index + 1] = values[index];
+      values[index] = next;
+      index += 1;
+    }
   }
 }

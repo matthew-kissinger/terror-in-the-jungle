@@ -7,6 +7,7 @@ import type { CloseEngagementTelemetry } from './ai/AIStateEngage';
 import type { TargetAcquisitionTelemetry } from './ai/AITargetAcquisition';
 import type { TargetDistributionTelemetry } from './ClusterManager';
 import type { AiUpdateBreakdown, LosCallsiteTelemetry } from './CombatantAI';
+import type { BillboardUpdateProfile } from './CombatantRenderer';
 
 interface CombatLineOfSightTelemetry {
   hits: number;
@@ -103,6 +104,17 @@ const emptyCloseEngagementProfile = (): CloseEngagementProfile => ({
   }
 });
 
+const emptyBillboardUpdateProfile = (): BillboardUpdateProfile => ({
+  walkFrameMs: 0,
+  closeModelMs: 0,
+  bucketResetMs: 0,
+  impostorWriteMs: 0,
+  finalizeMs: 0,
+  hitboxDebugMs: 0,
+  materializationEventsMs: 0,
+  shaderUniformMs: 0
+});
+
 /**
  * Manages profiling and telemetry for the combat system
  */
@@ -126,6 +138,7 @@ export class CombatantProfiler {
     aiSlowestUpdate: null as AiUpdateBreakdown | null,
     spatialSyncMs: 0,
     billboardUpdateMs: 0,
+    billboardProfile: emptyBillboardUpdateProfile(),
     effectPoolsMs: 0,
     influenceMapMs: 0,
     totalMs: 0,
@@ -157,11 +170,14 @@ export class CombatantProfiler {
       maxPerFrame: 0,
       usedThisFrame: 0,
       deniedThisFrame: 0,
+      terrainBlockedThisFrame: 0,
       totalExhaustedFrames: 0,
       totalRequested: 0,
       totalDenied: 0,
+      totalTerrainBlocked: 0,
       saturationRate: 0,
-      denialRate: 0
+      denialRate: 0,
+      terrainBlockRate: 0
     },
     aiScheduling: {
       frameCounter: 0,
@@ -170,6 +186,9 @@ export class CombatantProfiler {
       staggeredSkips: 0,
       highFullUpdates: 0,
       mediumFullUpdates: 0,
+      projectedHighFullUpdateDeferrals: 0,
+      highFullUpdateCostEmaMs: 0,
+      highFullUpdateCostPeakMs: 0,
       maxHighFullUpdatesPerFrame: 0,
       maxMediumFullUpdatesPerFrame: 0,
       aiBudgetExceededEvents: 0,
@@ -228,6 +247,7 @@ export class CombatantProfiler {
       aiSlowestUpdate: AiUpdateBreakdown | null;
       spatialSyncMs: number;
       billboardUpdateMs: number;
+      billboardProfile: BillboardUpdateProfile;
       effectPoolsMs: number;
       influenceMapMs: number;
       totalMs: number;
@@ -259,11 +279,14 @@ export class CombatantProfiler {
         maxPerFrame: number;
         usedThisFrame: number;
         deniedThisFrame: number;
+        terrainBlockedThisFrame: number;
         totalExhaustedFrames: number;
         totalRequested: number;
         totalDenied: number;
+        totalTerrainBlocked: number;
         saturationRate: number;
         denialRate: number;
+        terrainBlockRate: number;
       };
       aiScheduling: {
         frameCounter: number;
@@ -272,6 +295,9 @@ export class CombatantProfiler {
         staggeredSkips: number;
         highFullUpdates: number;
         mediumFullUpdates: number;
+        projectedHighFullUpdateDeferrals: number;
+        highFullUpdateCostEmaMs: number;
+        highFullUpdateCostPeakMs: number;
         maxHighFullUpdatesPerFrame: number;
         maxMediumFullUpdatesPerFrame: number;
         aiBudgetExceededEvents: number;

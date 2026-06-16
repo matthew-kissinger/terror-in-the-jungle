@@ -9,6 +9,7 @@ import { createSmokeTexture } from './ExplosionTextures';
 interface SmokeCloud {
   group: THREE.Group;
   sprites: THREE.Sprite[];
+  materials: THREE.SpriteMaterial[];
   offsets: Float32Array;
   radii: Float32Array;
   baseScales: Float32Array;
@@ -20,7 +21,6 @@ interface SmokeCloud {
 }
 
 // Module-level scratch vectors for LOS calculations
-const _closestPoint = new THREE.Vector3();
 const _lineDir = new THREE.Vector3();
 const _toPoint = new THREE.Vector3();
 
@@ -48,6 +48,7 @@ export class SmokeCloudSystem implements GameSystem {
   private readonly BASE_OPACITY = 0.85;
   private readonly OVERLAY_MAX_OPACITY = 0.7;
   private overlayOpacity = 0;
+  private overlayStyleOpacity = '0';
 
   constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.scene = scene;
@@ -70,6 +71,9 @@ export class SmokeCloudSystem implements GameSystem {
 
   update(deltaTime: number): void {
     if (this.clouds.length === 0) {
+      if (this.overlayOpacity === 0) {
+        return;
+      }
       this.updateOverlayOpacity(deltaTime, 0);
       return;
     }
@@ -117,7 +121,7 @@ export class SmokeCloudSystem implements GameSystem {
 
         sprite.position.set(x, y, z);
         sprite.scale.set(scale, scale, 1);
-        (sprite.material as THREE.SpriteMaterial).opacity = opacity;
+        cloud.materials[s].opacity = opacity;
       }
 
       const dx = cameraPos.x - cloud.group.position.x;
@@ -188,13 +192,13 @@ export class SmokeCloudSystem implements GameSystem {
       cloud.offsets[idx] = nx;
       cloud.offsets[idx + 1] = ny;
       cloud.offsets[idx + 2] = nz;
-      cloud.radii[i] = Math.min(1, Math.sqrt(nx * nx + ny * ny + nz * nz));
+      cloud.radii[i] = spread;
       cloud.baseScales[i] = 2.2 + Math.random() * 2.2;
 
       const sprite = cloud.sprites[i];
       sprite.position.set(0, 0, 0);
       sprite.scale.set(1, 1, 1);
-      (sprite.material as THREE.SpriteMaterial).opacity = 0;
+      cloud.materials[i].opacity = 0;
     }
 
     this.clouds.push(cloud);
@@ -208,10 +212,8 @@ export class SmokeCloudSystem implements GameSystem {
     if (this.clouds.length === 0) return false;
 
     _lineDir.subVectors(to, from);
-    const lineLength = _lineDir.length();
-    if (lineLength === 0) return false;
-
-    _lineDir.divideScalar(lineLength);
+    const lineLengthSq = _lineDir.lengthSq();
+    if (lineLengthSq === 0) return false;
 
     for (const cloud of this.clouds) {
       // Calculate effective radius based on cloud lifecycle
@@ -235,13 +237,16 @@ export class SmokeCloudSystem implements GameSystem {
 
       // Find closest point on line segment to cloud center
       _toPoint.subVectors(cloud.group.position, from);
-      const dot = _toPoint.dot(_lineDir);
-      const clampedT = Math.max(0, Math.min(lineLength, dot));
-
-      _closestPoint.copy(from).addScaledVector(_lineDir, clampedT);
+      const clampedT = Math.max(0, Math.min(1, _toPoint.dot(_lineDir) / lineLengthSq));
 
       // Check if closest point is within cloud radius
-      const distSq = _closestPoint.distanceToSquared(cloud.group.position);
+      const closestX = from.x + _lineDir.x * clampedT;
+      const closestY = from.y + _lineDir.y * clampedT;
+      const closestZ = from.z + _lineDir.z * clampedT;
+      const dx = closestX - cloud.group.position.x;
+      const dy = closestY - cloud.group.position.y;
+      const dz = closestZ - cloud.group.position.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
       const radiusSq = effectiveRadius * effectiveRadius;
 
       if (distSq < radiusSq) {
@@ -258,6 +263,7 @@ export class SmokeCloudSystem implements GameSystem {
     group.matrixAutoUpdate = true;
 
     const sprites: THREE.Sprite[] = [];
+    const materials: THREE.SpriteMaterial[] = [];
     const offsets = new Float32Array(this.SPRITES_PER_CLOUD * 3);
     const radii = new Float32Array(this.SPRITES_PER_CLOUD);
     const baseScales = new Float32Array(this.SPRITES_PER_CLOUD);
@@ -274,11 +280,13 @@ export class SmokeCloudSystem implements GameSystem {
       sprite.renderOrder = 2;
       group.add(sprite);
       sprites.push(sprite);
+      materials.push(material);
     }
 
     return {
       group,
       sprites,
+      materials,
       offsets,
       radii,
       baseScales,
@@ -296,7 +304,7 @@ export class SmokeCloudSystem implements GameSystem {
 
     const spriteCount = cloud.sprites.length;
     for (let i = 0; i < spriteCount; i++) {
-      (cloud.sprites[i].material as THREE.SpriteMaterial).opacity = 0;
+      cloud.materials[i].opacity = 0;
     }
 
     const last = this.clouds.length - 1;
@@ -309,8 +317,8 @@ export class SmokeCloudSystem implements GameSystem {
 
   private disposeCloud(cloud: SmokeCloud): void {
     this.scene.remove(cloud.group);
-    for (const sprite of cloud.sprites) {
-      sprite.material.dispose();
+    for (const material of cloud.materials) {
+      material.dispose();
     }
   }
 
@@ -331,6 +339,7 @@ export class SmokeCloudSystem implements GameSystem {
       backdrop-filter: blur(2px);
     `;
     document.body.appendChild(this.overlay);
+    this.overlayStyleOpacity = '0';
   }
 
   private updateOverlayOpacity(deltaTime: number, targetOpacity: number): void {
@@ -343,6 +352,10 @@ export class SmokeCloudSystem implements GameSystem {
       this.overlayOpacity = 0;
     }
 
-    this.overlay.style.opacity = this.overlayOpacity.toString();
+    const opacityText = this.overlayOpacity === 0 ? '0' : this.overlayOpacity.toString();
+    if (opacityText !== this.overlayStyleOpacity) {
+      this.overlay.style.opacity = opacityText;
+      this.overlayStyleOpacity = opacityText;
+    }
   }
 }

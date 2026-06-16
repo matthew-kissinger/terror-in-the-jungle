@@ -2,7 +2,6 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { GrenadeType } from '../combat/types';
 
 export interface Grenade {
@@ -27,6 +26,9 @@ export class GrenadePhysics {
   private bounceDamping: number;
   private frictionMud: number;
   private frictionWater: number;
+  private readonly nextPosition = new THREE.Vector3();
+  private readonly velocityDelta = new THREE.Vector3();
+  private readonly rotationDelta = new THREE.Vector3();
 
   constructor(
     gravity: number,
@@ -49,8 +51,8 @@ export class GrenadePhysics {
     // Apply air resistance to all components
     grenade.velocity.multiplyScalar(this.airResistance);
 
-    const nextPosition = objectPool.getVector3().copy(grenade.position);
-    const velocityDelta = objectPool.getVector3().copy(grenade.velocity).multiplyScalar(deltaTime);
+    const nextPosition = this.nextPosition.copy(grenade.position);
+    const velocityDelta = this.velocityDelta.copy(grenade.velocity).multiplyScalar(deltaTime);
     nextPosition.add(velocityDelta);
 
     const groundHeight = getGroundHeight(nextPosition.x, nextPosition.z) + 0.3;
@@ -81,12 +83,9 @@ export class GrenadePhysics {
     }
 
     grenade.position.copy(nextPosition);
-    objectPool.releaseVector3(nextPosition);
-    objectPool.releaseVector3(velocityDelta);
 
-    const rotDelta = objectPool.getVector3().copy(grenade.rotationVelocity).multiplyScalar(deltaTime);
+    const rotDelta = this.rotationDelta.copy(grenade.rotationVelocity).multiplyScalar(deltaTime);
     grenade.rotation.add(rotDelta);
-    objectPool.releaseVector3(rotDelta);
 
     grenade.mesh.position.copy(grenade.position);
     grenade.mesh.rotation.set(grenade.rotation.x, grenade.rotation.y, grenade.rotation.z);

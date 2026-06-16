@@ -736,6 +736,27 @@ describe('PlayerCamera', () => {
   });
 
   describe('applyRecoil', () => {
+    it('updates the infantry camera pose immediately without waiting for updateCamera', () => {
+      playerCamera.updateCamera(mockInput);
+
+      playerCamera.applyRecoil(0.1, 0.2);
+
+      expect(camera.rotation.x).toBeCloseTo(0.1, 5);
+      expect(camera.rotation.y).toBeCloseTo(Math.PI + 0.2, 5);
+      expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+
+    it('includes an already-active shake offset in the immediate recoil pose', () => {
+      mockShakeSystem.getCurrentShakeOffset = vi.fn(() => ({ pitch: 0.02, yaw: 0.03 }));
+      playerCamera.setCameraShakeSystem(mockShakeSystem);
+
+      playerCamera.applyRecoil(0.1, 0.2);
+
+      expect(camera.rotation.x).toBeCloseTo(0.12, 5);
+      expect(camera.rotation.y).toBeCloseTo(Math.PI + 0.23, 5);
+      expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+
     it('should add pitch delta (clamped to maxPitch)', () => {
       playerCamera.applyRecoil(0.1, 0);
       playerCamera.updateCamera(mockInput);
@@ -782,6 +803,21 @@ describe('PlayerCamera', () => {
 
       expect(camera.rotation.x).toBeCloseTo(0.02, 5);
       expect(camera.rotation.y).toBeCloseTo(Math.PI + 0.04, 5);
+    });
+
+    it('does not overwrite a helicopter-owned camera pose when recoil is applied', () => {
+      playerState.isInHelicopter = true;
+      playerState.helicopterId = 'heli-1';
+      playerCamera.setHelicopterModel(mockHelicopterModel);
+      playerCamera.updateCamera(mockInput);
+      const positionBefore = camera.position.clone();
+      const rotationBefore = camera.rotation.clone();
+
+      playerCamera.applyRecoil(0.1, 0.2);
+
+      expect(camera.position.equals(positionBefore)).toBe(true);
+      expect(camera.rotation.x).toBeCloseTo(rotationBefore.x, 5);
+      expect(camera.rotation.y).toBeCloseTo(rotationBefore.y, 5);
     });
   });
 

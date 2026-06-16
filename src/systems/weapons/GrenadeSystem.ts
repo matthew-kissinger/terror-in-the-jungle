@@ -18,6 +18,11 @@ import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeAr
 import { GrenadeEffects } from './GrenadeEffects';
 import type { IFlashbangScreenEffect, IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 
+const _throwStartPos = new THREE.Vector3();
+const _throwDirection = new THREE.Vector3();
+const _throwForwardDir = new THREE.Vector3();
+const _throwVelocity = new THREE.Vector3();
+
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -242,15 +247,13 @@ export class GrenadeSystem implements GameSystem {
 
     this.arcRenderer.showArc(false);
 
-    const startPos = this.camera.position.clone();
+    _throwStartPos.copy(this.camera.position);
     // Offset slightly forward and down from camera
-    const forward = new THREE.Vector3();
-    this.camera.getWorldDirection(forward);
-    startPos.add(forward.clone().multiplyScalar(0.5));
-    startPos.y -= 0.3;
+    this.camera.getWorldDirection(_throwDirection);
+    _throwStartPos.addScaledVector(_throwDirection, 0.5);
+    _throwStartPos.y -= 0.3;
 
-    const direction = new THREE.Vector3();
-    this.camera.getWorldDirection(direction);
+    const direction = _throwDirection;
 
     // Variable throw force based on power buildup
     const throwForce = this.MIN_THROW_FORCE + (this.MAX_THROW_FORCE - this.MIN_THROW_FORCE) * this.throwPower;
@@ -260,23 +263,24 @@ export class GrenadeSystem implements GameSystem {
     const baseThrowAngle = 0.25 + (0.15 * this.throwPower); // 0.25 to 0.4 radians (14 to 23 degrees)
 
     // Maintain more forward momentum regardless of vertical look angle
-    const forwardDir = direction.clone();
-    forwardDir.y = 0; // Remove vertical component
-    forwardDir.normalize();
+    _throwForwardDir.copy(direction);
+    _throwForwardDir.y = 0; // Remove vertical component
+    _throwForwardDir.normalize();
 
     // Combine forward direction with upward angle
-    const finalDirection = new THREE.Vector3();
-    finalDirection.x = forwardDir.x * Math.cos(baseThrowAngle);
-    finalDirection.z = forwardDir.z * Math.cos(baseThrowAngle);
-    finalDirection.y = Math.sin(baseThrowAngle);
+    _throwVelocity.set(
+      _throwForwardDir.x * Math.cos(baseThrowAngle),
+      Math.sin(baseThrowAngle),
+      _throwForwardDir.z * Math.cos(baseThrowAngle)
+    );
 
-    const throwVelocity = finalDirection.multiplyScalar(throwForce);
+    _throwVelocity.multiplyScalar(throwForce);
 
     // Add moderate upward boost based on look angle (but not too much)
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
-    throwVelocity.y += lookUpBoost * this.throwPower;
+    _throwVelocity.y += lookUpBoost * this.throwPower;
 
-    const grenade = this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++, this.currentGrenadeType);
+    const grenade = this.spawner.spawnGrenade(_throwStartPos, _throwVelocity, remainingFuseTime, this.nextGrenadeId++, this.currentGrenadeType);
     this.grenades.push(grenade);
 
     if (this.audioManager) {
@@ -379,6 +383,10 @@ export class GrenadeSystem implements GameSystem {
 
   showGrenadeInHand(show: boolean): void {
     this.handView.showGrenadeInHand(show);
+  }
+
+  canRenderOverlay(): boolean {
+    return this.handView.hasVisibleContent();
   }
 
   getGrenadeOverlayScene(): THREE.Scene {

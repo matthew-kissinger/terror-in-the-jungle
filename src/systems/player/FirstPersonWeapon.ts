@@ -25,6 +25,7 @@ import { WeaponSwitching } from './weapon/WeaponSwitching'
 
 import { WeaponShotCommandBuilder } from './weapon/WeaponShotCommandBuilder'
 import { Logger } from '../../utils/Logger'
+import { performanceTelemetry } from '../debug/PerformanceTelemetry'
 import type { HUDSystem } from '../../ui/hud/HUDSystem'
 import { AmmoState } from '../weapons/AmmoManager'
 import type { LoadoutWeapon } from '../../ui/loadout/LoadoutTypes'
@@ -32,6 +33,17 @@ import type { GrenadeSystem } from '../weapons/GrenadeSystem'
 import { Faction } from '../combat/types'
 
 const _zeroVelocity = new THREE.Vector3()
+
+const WEAPON_PHASE_SUPPRESSION = 'Player.Weapon.Suppression'
+const WEAPON_PHASE_PRESENTATION = 'Player.Weapon.Presentation'
+const WEAPON_PHASE_AMMO = 'Player.Weapon.Ammo'
+const WEAPON_PHASE_ANIMATIONS = 'Player.Weapon.Animations'
+const WEAPON_PHASE_RELOAD = 'Player.Weapon.Reload'
+const WEAPON_PHASE_SWITCH = 'Player.Weapon.Switch'
+const WEAPON_PHASE_TRANSFORM = 'Player.Weapon.Transform'
+const WEAPON_PHASE_COOLDOWN = 'Player.Weapon.Cooldown'
+const WEAPON_PHASE_FIRING = 'Player.Weapon.Firing'
+const WEAPON_PHASE_EFFECTS = 'Player.Weapon.Effects'
 
 /**
  * Thin orchestrator for first-person weapon system
@@ -82,7 +94,7 @@ export class FirstPersonWeapon implements GameSystem {
     // Initialize animations and reload first
     this.animations = new WeaponAnimations(camera)
     this.reload = new WeaponReload()
-    
+
     // Create model (which creates weapon scene/camera)
     this.model = new WeaponModel(this.animations, this.reload)
 
@@ -92,8 +104,9 @@ export class FirstPersonWeapon implements GameSystem {
     // Initialize effects pools
     this.tracerPool = new TracerPool(this.scene, 96)
     this.muzzleFlashSystem = new MuzzleFlashSystem(this.scene)
+    this.muzzleFlashSystem.preparePlayerOverlayScene(this.model.getWeaponScene())
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 32)
-    
+
     // Initialize firing module
     this.firing = new WeaponFiring(
       camera,
@@ -141,53 +154,106 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   update(deltaTime: number): void {
+    const telemetryEnabled = performanceTelemetry.isEnabled()
     const weaponRig = this.rigManager.getCurrentRig()
-    const vehicleSuppressed = this.syncVehicleSuppressionSideEffects()
+    let vehicleSuppressed: boolean
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_SUPPRESSION)
+    try {
+      vehicleSuppressed = this.syncVehicleSuppressionSideEffects()
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_SUPPRESSION)
+    }
+
     if (!weaponRig || !this.isEnabled || vehicleSuppressed) {
-      this.applyWeaponPresentationState()
+      this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_PRESENTATION)
+      try {
+        this.applyWeaponPresentationState()
+      } finally {
+        this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_PRESENTATION)
+      }
       return
     }
 
     // Update ammo manager with player position for zone resupply
-    const playerPos = this.playerController?.getPosition()
-    this.ammo.getCurrentAmmoManager().update(deltaTime, playerPos)
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_AMMO)
+    try {
+      const playerPos = this.playerController?.getPosition()
+      this.ammo.getCurrentAmmoManager().update(deltaTime, playerPos)
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_AMMO)
+    }
 
     // Get player movement state
     const isMoving = this.playerController?.isMoving() || false
     const lookVelocity = this.playerController ? this.playerController.getVelocity() : _zeroVelocity
 
     // Update animations (ADS, recoil, idle bob, sway, pump)
-    this.animations.update(deltaTime, isMoving, lookVelocity)
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_ANIMATIONS)
+    try {
+      this.animations.update(deltaTime, isMoving, lookVelocity)
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_ANIMATIONS)
+    }
 
     // Update reload animation
-    this.reload.update(deltaTime)
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_RELOAD)
+    try {
+      this.reload.update(deltaTime)
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_RELOAD)
+    }
 
     // Update weapon switch animation
     if (this.rigManager.isSwitching()) {
-      this.rigManager.updateSwitchAnimation(deltaTime, this.hudSystem, this.audioManager, this.ammo.getCurrentAmmoManager())
-      // Update references after switch completes
-      if (!this.rigManager.isSwitching()) {
-        this.updateWeaponReferences()
+      this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_SWITCH)
+      try {
+        this.rigManager.updateSwitchAnimation(deltaTime, this.hudSystem, this.audioManager, this.ammo.getCurrentAmmoManager())
+        // Update references after switch completes
+        if (!this.rigManager.isSwitching()) {
+          this.updateWeaponReferences()
+        }
+        this.applyWeaponPresentationState()
+      } finally {
+        this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_SWITCH)
       }
-      this.applyWeaponPresentationState()
     }
 
     // Apply weapon transform
-    this.model.updateTransform(this.rigManager)
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_TRANSFORM)
+    try {
+      this.model.updateTransform(this.rigManager)
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_TRANSFORM)
+    }
 
     // Gunplay cooldown
-    const gunCore = this.rigManager.getCurrentCore()
-    gunCore.cooldown(deltaTime)
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_COOLDOWN)
+    try {
+      const gunCore = this.rigManager.getCurrentCore()
+      gunCore.cooldown(deltaTime)
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_COOLDOWN)
+    }
 
     // Auto-fire while mouse is held
     if (this.input.isFiringActive()) {
-      this.tryFire()
+      this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_FIRING)
+      try {
+        this.tryFire()
+      } finally {
+        this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_FIRING)
+      }
     }
 
     // Update all effects
-    this.tracerPool.update()
-    this.muzzleFlashSystem.update(deltaTime)
-    this.impactEffectsPool.update(deltaTime)
+    this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_EFFECTS)
+    try {
+      this.tracerPool.update()
+      this.muzzleFlashSystem.update(deltaTime)
+      this.impactEffectsPool.update(deltaTime)
+    } finally {
+      this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_EFFECTS)
+    }
   }
 
   dispose(): void {
@@ -250,7 +316,7 @@ export class FirstPersonWeapon implements GameSystem {
     ) return
 
     const currentAmmo = this.ammo.getCurrentAmmoManager()
-    
+
     // Check ammo
     if (!currentAmmo.canFire()) {
       if (currentAmmo.isEmpty()) {
@@ -299,8 +365,8 @@ export class FirstPersonWeapon implements GameSystem {
     // Visual recoil: kick weapon and camera slightly, and persist kick via controller
     const kick = gunCore.getRecoilOffsetDeg()
     if (this.playerController) {
-      this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw))
       this.playerController.applyRecoilShake()
+      this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw))
     }
 
     // Apply recoil impulse to weapon spring system
@@ -544,5 +610,17 @@ export class FirstPersonWeapon implements GameSystem {
 
     this.effectiveVehicleEquipmentSuppressed = suppressed
     return this.effectiveVehicleEquipmentSuppressed
+  }
+
+  private beginWeaponPhase(enabled: boolean, systemName: string): void {
+    if (enabled) {
+      performanceTelemetry.beginSystem(systemName)
+    }
+  }
+
+  private endWeaponPhase(enabled: boolean, systemName: string): void {
+    if (enabled) {
+      performanceTelemetry.endSystem(systemName)
+    }
   }
 }

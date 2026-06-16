@@ -63,6 +63,8 @@ describe('TerrainRaycastRuntime', () => {
     expect(runtime.getPendingRowCount()).toBe(0);
     expect(runtime.isReadyForPosition(center, 50)).toBe(true);
     expect(losAccelerator.registerChunk).toHaveBeenCalledWith('bvh_nearfield', expect.any(THREE.Mesh));
+    const registeredMesh = losAccelerator.registerChunk.mock.calls.at(-1)?.[1] as THREE.Mesh;
+    expect(registeredMesh.geometry.boundsTree).toBeDefined();
   });
 
   it('serves a consistent snapshot to LOS queries while a rebuild is mid-flight, then the new geometry after it completes', () => {

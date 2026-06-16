@@ -6,6 +6,8 @@ import * as THREE from 'three';
 // Module-level scratch vectors to avoid per-call allocations
 const _velStep = new THREE.Vector3();
 const _roundVelStep = new THREE.Vector3();
+const _trajectoryPos = new THREE.Vector3();
+const _trajectoryVel = new THREE.Vector3();
 
 export interface MortarRound {
   id: string;
@@ -20,6 +22,7 @@ export interface BallisticTrajectory {
   points: THREE.Vector3[];
   landingPoint: THREE.Vector3;
   timeToImpact: number;
+  pointCount?: number;
 }
 
 export class MortarBallistics {
@@ -32,7 +35,7 @@ export class MortarBallistics {
   /**
    * Compute initial velocity vector from pitch and yaw angles
    */
-  computeVelocityVector(pitch: number, yaw: number, power: number): THREE.Vector3 {
+  computeVelocityVector(pitch: number, yaw: number, power: number, target = new THREE.Vector3()): THREE.Vector3 {
     // Clamp pitch to valid range
     const clampedPitch = THREE.MathUtils.clamp(pitch, this.MIN_PITCH, this.MAX_PITCH);
     const pitchRad = THREE.MathUtils.degToRad(clampedPitch);
@@ -46,7 +49,7 @@ export class MortarBallistics {
     const vy = velocity * Math.sin(pitchRad);
     const vz = velocity * Math.cos(pitchRad) * Math.cos(yawRad);
 
-    return new THREE.Vector3(vx, vy, vz);
+    return target.set(vx, vy, vz);
   }
 
   /**
@@ -59,37 +62,57 @@ export class MortarBallistics {
     maxSteps: number = 100,
     timeStep: number = 0.1
   ): BallisticTrajectory {
-    const points: THREE.Vector3[] = [];
-    let pos = startPos.clone();
-    let vel = velocity.clone();
-    let landingPoint = pos.clone();
-    let timeToImpact = 0;
+    const trajectory: BallisticTrajectory = {
+      points: [],
+      landingPoint: new THREE.Vector3(),
+      timeToImpact: 0,
+    };
+    this.computeTrajectoryInto(trajectory, startPos, velocity, getGroundHeight, maxSteps, timeStep);
+    trajectory.points.length = trajectory.pointCount ?? trajectory.points.length;
+    return trajectory;
+  }
+
+  computeTrajectoryInto(
+    target: BallisticTrajectory,
+    startPos: THREE.Vector3,
+    velocity: THREE.Vector3,
+    getGroundHeight: (x: number, z: number) => number,
+    maxSteps: number = 100,
+    timeStep: number = 0.1
+  ): BallisticTrajectory {
+    _trajectoryPos.copy(startPos);
+    _trajectoryVel.copy(velocity);
+    target.landingPoint.copy(_trajectoryPos);
+    target.timeToImpact = 0;
+    target.pointCount = 0;
 
     for (let i = 0; i < maxSteps; i++) {
-      points.push(pos.clone());
+      let point = target.points[i];
+      if (!point) {
+        point = new THREE.Vector3();
+        target.points[i] = point;
+      }
+      point.copy(_trajectoryPos);
+      target.pointCount++;
 
       // Update velocity (gravity only)
-      vel.y += this.GRAVITY * timeStep;
+      _trajectoryVel.y += this.GRAVITY * timeStep;
 
       // Update position using scratch vector instead of clone
-      _velStep.copy(vel).multiplyScalar(timeStep);
-      pos.add(_velStep);
-      timeToImpact += timeStep;
+      _velStep.copy(_trajectoryVel).multiplyScalar(timeStep);
+      _trajectoryPos.add(_velStep);
+      target.timeToImpact += timeStep;
 
       // Check ground collision
-      const groundHeight = getGroundHeight(pos.x, pos.z);
-      if (pos.y <= groundHeight) {
-        pos.y = groundHeight;
-        landingPoint = pos.clone();
+      const groundHeight = getGroundHeight(_trajectoryPos.x, _trajectoryPos.z);
+      if (_trajectoryPos.y <= groundHeight) {
+        _trajectoryPos.y = groundHeight;
+        target.landingPoint.copy(_trajectoryPos);
         break;
       }
     }
 
-    return {
-      points,
-      landingPoint,
-      timeToImpact
-    };
+    return target;
   }
 
   /**

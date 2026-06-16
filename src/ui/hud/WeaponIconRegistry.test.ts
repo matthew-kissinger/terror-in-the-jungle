@@ -5,8 +5,8 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 
-import { describe, it, expect } from 'vitest';
-import { getWeaponIconElement, getWeaponIconData } from '../icons/IconRegistry';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { getWeaponIconElement, getWeaponIconData, preloadIcons } from '../icons/IconRegistry';
 
 /**
  * Behavior-focused tests for the weapon icon registry.
@@ -18,6 +18,10 @@ import { getWeaponIconElement, getWeaponIconData } from '../icons/IconRegistry';
  * different types don't collide.
  */
 describe('weapon icon registry', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('returns a label and icon identifier for known weapon types', () => {
     const rifle = getWeaponIconData('rifle');
     expect(rifle.label.length).toBeGreaterThan(0);
@@ -52,5 +56,23 @@ describe('weapon icon registry', () => {
     const el1 = getWeaponIconElement('rifle');
     const el2 = getWeaponIconElement('rifle');
     expect(el1).not.toBe(el2);
+  });
+
+  it('retains preloaded icon images and skips duplicate preload requests', () => {
+    const createdImages: Array<{ src: string }> = [];
+    vi.stubGlobal('Image', class {
+      private _src = '';
+      constructor() {
+        createdImages.push(this);
+      }
+      get src() { return this._src; }
+      set src(value: string) { this._src = value; }
+    });
+
+    preloadIcons(['icon-kill-arrow', 'icon-kill-arrow', 'map-zone-flag']);
+
+    expect(createdImages).toHaveLength(2);
+    expect(createdImages[0].src).toContain('icon-kill-arrow.png');
+    expect(createdImages[1].src).toContain('map-zone-flag.png');
   });
 });

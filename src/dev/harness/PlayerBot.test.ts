@@ -315,6 +315,23 @@ describe('PlayerBot — transition log and histogram', () => {
     expect(log[0].to).toBe('ALERT');
   });
 
+  it('keeps only the latest transition-log entries in chronological order', () => {
+    const bot = new PlayerBot();
+    for (let index = 0; index < 80; index++) {
+      const atMs = 1000 + index * 2;
+      bot.update(1, makeObservation({ now: atMs, health: 0 }));
+      bot.update(1, makeObservation({ now: atMs + 1, health: 100 }));
+    }
+
+    const log = bot.getTransitionLog();
+    expect(log).toHaveLength(128);
+    expect(log[0].atMs).toBeGreaterThan(1000);
+    for (let index = 1; index < log.length; index++) {
+      expect(log[index].atMs).toBeGreaterThanOrEqual(log[index - 1].atMs);
+    }
+    expect(log[log.length - 1].to).toBe('PATROL');
+  });
+
   it('accumulates per-state time in the histogram', () => {
     const bot = new PlayerBot();
     bot.update(500, makeObservation()); // PATROL for 500ms

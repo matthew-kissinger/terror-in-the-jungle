@@ -15,6 +15,7 @@ export class FlashbangScreenEffect implements GameSystem {
   private flashIntensity: number = 0;
   private flashDecayRate: number = 0; // Set per flash
   private playerController?: IPlayerController;
+  private readonly directionToFlash = new THREE.Vector3();
 
   // Tuning parameters
   private readonly FULL_BLIND_DISTANCE = 15; // Within 15m = full whiteout
@@ -55,12 +56,17 @@ export class FlashbangScreenEffect implements GameSystem {
     playerPosition: THREE.Vector3,
     playerLookDirection: THREE.Vector3
   ): void {
-    const distance = flashPosition.distanceTo(playerPosition);
+    const dx = flashPosition.x - playerPosition.x;
+    const dy = flashPosition.y - playerPosition.y;
+    const dz = flashPosition.z - playerPosition.z;
+    const distanceSq = dx * dx + dy * dy + dz * dz;
 
     // No effect beyond partial blind distance
-    if (distance > this.PARTIAL_BLIND_DISTANCE) {
+    if (distanceSq > this.PARTIAL_BLIND_DISTANCE * this.PARTIAL_BLIND_DISTANCE) {
       return;
     }
+
+    const distance = Math.sqrt(distanceSq);
 
     // Calculate base intensity from distance
     let baseIntensity = 0;
@@ -79,9 +85,11 @@ export class FlashbangScreenEffect implements GameSystem {
     }
 
     // Calculate angle factor - looking at flash increases intensity
-    const directionToFlash = new THREE.Vector3()
-      .subVectors(flashPosition, playerPosition)
-      .normalize();
+    const directionToFlash = this.directionToFlash.set(0, 0, 0);
+    if (distance > 0) {
+      const invDistance = 1 / distance;
+      directionToFlash.set(dx * invDistance, dy * invDistance, dz * invDistance);
+    }
 
     const dotProduct = playerLookDirection.dot(directionToFlash);
     // dotProduct: 1 = looking directly at flash, -1 = looking away, 0 = perpendicular

@@ -308,6 +308,9 @@ describe('TerrainMaterial', () => {
       splatmap: testSplatmap,
       biomeConfig: testBiomeConfig,
     });
+    const stashedLighting = mat.userData.terrainAtmosphereLighting;
+    const stashedNightFillColor = stashedLighting.nightFillColor;
+    const stashedDirectLightDirection = stashedLighting.directLightDirection;
 
     updateTerrainMaterialAtmosphereLighting(mat, {
       nightFillColor: new THREE.Color(0.08, 0.10, 0.16),
@@ -324,6 +327,9 @@ describe('TerrainMaterial', () => {
     expect(uniforms.atmosphereDirectLightDirection.value.y).toBeCloseTo(0.8);
     expect(uniforms.atmosphereDaylightFactor.value).toBeCloseTo(0.42);
     expect(uniforms.atmosphereLowSunOcclusionStrength.value).toBe(1);
+    expect(mat.userData.terrainAtmosphereLighting).toBe(stashedLighting);
+    expect(mat.userData.terrainAtmosphereLighting.nightFillColor).toBe(stashedNightFillColor);
+    expect(mat.userData.terrainAtmosphereLighting.directLightDirection).toBe(stashedDirectLightDirection);
     expect(mat.userData.terrainAtmosphereLighting.nightFillStrength).toBe(0.5);
     expect(mat.userData.terrainAtmosphereLighting.lowSunOcclusionStrength).toBe(1);
   });

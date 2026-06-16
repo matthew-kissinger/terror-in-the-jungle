@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { WarSimulator } from './WarSimulator';
 import { Faction } from '../combat/types';
 import { AgentTier, StrategicAgent, StrategicSquad } from './types';
@@ -306,8 +306,192 @@ describe('WarSimulator strategic routing', () => {
       }],
     };
 
-    const destination = (simulator as any).getAgentTravelDestination(agent, squad);
+    (simulator as any).updateAgentTravelDestination(agent, squad);
 
-    expect(Math.hypot(destination.x, destination.z)).toBeLessThanOrEqual(34.6);
+    expect(Math.hypot(agent.destX, agent.destZ)).toBeLessThanOrEqual(34.6);
+  });
+
+  it('rotates squad centroid maintenance when the movement budget is spent', () => {
+    const simulator = createConfiguredSimulator(1, 1);
+    const squads: StrategicSquad[] = [];
+
+    for (let i = 0; i < 40; i++) {
+      const agentId = `ws_agent_${i}`;
+      const squadId = `ws_squad_${i}`;
+      const agent: StrategicAgent = {
+        id: agentId,
+        faction: Faction.US,
+        x: 100 + i,
+        z: 200 + i,
+        y: 0,
+        health: 100,
+        alive: true,
+        tier: AgentTier.SIMULATED,
+        squadId,
+        isLeader: true,
+        destX: 100 + i,
+        destZ: 200 + i,
+        speed: 0,
+        combatState: 'fighting',
+      };
+      const squad: StrategicSquad = {
+        id: squadId,
+        faction: Faction.US,
+        members: [agentId],
+        leaderId: agentId,
+        x: 0,
+        z: 0,
+        objectiveX: 100 + i,
+        objectiveZ: 200 + i,
+        stance: 'attack',
+        strength: 1,
+        combatActive: false,
+        lastCombatTime: 0,
+      };
+      simulator.getAllAgents().set(agentId, agent);
+      simulator.getAllSquads().set(squadId, squad);
+      squads.push(squad);
+    }
+
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(10);
+    try {
+      (simulator as any).updateSimulatedMovement(0.016, 0);
+
+      const updatedAfterFirstTick = squads.filter(squad => squad.x !== 0).length;
+      expect(updatedAfterFirstTick).toBeGreaterThan(0);
+      expect(updatedAfterFirstTick).toBeLessThan(squads.length);
+
+      const firstDeferredIndex = squads.findIndex(squad => squad.x === 0);
+      expect(firstDeferredIndex).toBeGreaterThanOrEqual(0);
+
+      (simulator as any).updateSimulatedMovement(0.016, 0);
+
+      expect(squads[firstDeferredIndex].x).toBe(100 + firstDeferredIndex);
+      expect(squads[firstDeferredIndex].z).toBe(200 + firstDeferredIndex);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('spreads squad route planning across budgeted ticks', () => {
+    const simulator = createConfiguredSimulator(1, 1);
+    const squads: StrategicSquad[] = [];
+
+    for (let i = 0; i < 80; i++) {
+      const agentId = `ws_agent_${i}`;
+      const squadId = `ws_squad_${i}`;
+      const agent: StrategicAgent = {
+        id: agentId,
+        faction: Faction.US,
+        x: 0,
+        z: 0,
+        y: 0,
+        health: 100,
+        alive: true,
+        tier: AgentTier.SIMULATED,
+        squadId,
+        isLeader: true,
+        destX: 0,
+        destZ: 0,
+        speed: 0,
+        combatState: 'fighting',
+      };
+      const squad: StrategicSquad = {
+        id: squadId,
+        faction: Faction.US,
+        members: [agentId],
+        leaderId: agentId,
+        x: i,
+        z: 0,
+        objectiveX: 200 + i,
+        objectiveZ: 0,
+        stance: 'attack',
+        strength: 1,
+        combatActive: false,
+        lastCombatTime: 0,
+      };
+      simulator.getAllAgents().set(agentId, agent);
+      simulator.getAllSquads().set(squadId, squad);
+      squads.push(squad);
+    }
+
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(10);
+    try {
+      (simulator as any).updateSimulatedMovement(0.016, 0);
+
+      const plannedAfterFirstTick = squads.filter(squad => squad.routeWaypoints?.length).length;
+      expect(plannedAfterFirstTick).toBeGreaterThan(0);
+      expect(plannedAfterFirstTick).toBeLessThan(squads.length);
+
+      const firstDeferredIndex = squads.findIndex(squad => !squad.routeWaypoints?.length);
+      expect(firstDeferredIndex).toBeGreaterThanOrEqual(0);
+
+      (simulator as any).updateSimulatedMovement(0.016, 0);
+
+      expect(squads[firstDeferredIndex].routeWaypoints?.length).toBeGreaterThan(0);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('continues simulated agent movement from the previous budget cursor', () => {
+    const simulator = createConfiguredSimulator(1, 1);
+    const agents: StrategicAgent[] = [];
+    const squad: StrategicSquad = {
+      id: 'ws_squad_0',
+      faction: Faction.US,
+      members: [],
+      leaderId: 'ws_agent_0',
+      x: 0,
+      z: 0,
+      objectiveX: 100,
+      objectiveZ: 0,
+      stance: 'attack',
+      strength: 1,
+      combatActive: false,
+      lastCombatTime: 0,
+    };
+
+    for (let i = 0; i < 96; i++) {
+      const agent: StrategicAgent = {
+        id: `ws_agent_${i}`,
+        faction: Faction.US,
+        x: 0,
+        z: 0,
+        y: 0,
+        health: 100,
+        alive: true,
+        tier: AgentTier.SIMULATED,
+        squadId: squad.id,
+        isLeader: i === 0,
+        destX: 0,
+        destZ: 0,
+        speed: 10,
+        combatState: 'idle',
+        formationSlot: 0,
+      };
+      squad.members.push(agent.id);
+      simulator.getAllAgents().set(agent.id, agent);
+      agents.push(agent);
+    }
+    simulator.getAllSquads().set(squad.id, squad);
+
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(10);
+    try {
+      (simulator as any).updateSimulatedMovement(1, 0);
+
+      const movedAfterFirstTick = agents.filter(agent => agent.x > 0).length;
+      expect(movedAfterFirstTick).toBeGreaterThan(0);
+      expect(movedAfterFirstTick).toBeLessThan(agents.length);
+
+      const firstDeferredIndex = agents.findIndex(agent => agent.x === 0);
+      expect(firstDeferredIndex).toBeGreaterThanOrEqual(0);
+
+      (simulator as any).updateSimulatedMovement(1, 0);
+
+      expect(agents[firstDeferredIndex].x).toBeGreaterThan(0);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 });

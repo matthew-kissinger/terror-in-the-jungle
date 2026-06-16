@@ -190,6 +190,39 @@ describe('GroundVehicleProximityChecker', () => {
     expect(hud.showInteractionPrompt).toHaveBeenCalledWith('Press F to board M151 Jeep');
   });
 
+  it('uses the radius iterator source when it is available', () => {
+    const jeep = new FakeVehicle('motor_pool_small_m151', 'ground', new THREE.Vector3(2, 0, 0));
+    const manager = {
+      getVehiclesInRadius: vi.fn(() => {
+        throw new Error('fallback radius array should not be materialized');
+      }),
+      forEachVehicleInRadius: vi.fn((
+        center: THREE.Vector3,
+        radius: number,
+        visitor: (vehicle: IVehicle) => void,
+      ) => {
+        const dx = jeep.getPosition().x - center.x;
+        const dz = jeep.getPosition().z - center.z;
+        if (dx * dx + dz * dz <= radius * radius) {
+          visitor(jeep as unknown as IVehicle);
+        }
+      }),
+    };
+    const hud = makeHud();
+    const checker = new GroundVehicleProximityChecker(
+      manager,
+      () => new THREE.Vector3(0, 0, 0),
+      () => false,
+    );
+    checker.setHUDSystem(hud);
+
+    checker.checkPlayerProximity();
+
+    expect(manager.forEachVehicleInRadius).toHaveBeenCalledTimes(1);
+    expect(manager.getVehiclesInRadius).not.toHaveBeenCalled();
+    expect(hud.showInteractionPrompt).toHaveBeenCalledWith('Press F to board M151 Jeep');
+  });
+
   it('runs the proximity check on the 10 Hz cadence from update(dt)', () => {
     const jeep = new FakeVehicle('motor_pool_small_m151', 'ground', new THREE.Vector3(3, 0, 0));
     const manager = makeVehicleManager([jeep]);

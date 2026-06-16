@@ -44,6 +44,45 @@ describe('CrosshairSystem', () => {
   });
 
   describe('setMode()', () => {
+    it('uses mounted element refs for reticle, spread, and cue updates', () => {
+      const root = crosshair.element;
+      const fixedWing = root.querySelector('[data-ref="fixedWing"]') as HTMLElement;
+      const spreadRing = root.querySelector('[data-ref="spreadRing"]') as HTMLElement;
+      const mgRight = root.querySelector('[data-ref="mgStopRight"]') as HTMLElement;
+      const dgRight = root.querySelector('[data-ref="dgStopRight"]') as HTMLElement;
+      const gun = root.querySelector('[data-ref="pipperGun"]') as HTMLElement;
+      const rocket = root.querySelector('[data-ref="pipperRocket"]') as HTMLElement;
+      const cue = root.querySelector('[data-ref="rocketCue"]') as HTMLElement;
+
+      const querySelector = vi.spyOn(root, 'querySelector');
+      querySelector.mockImplementation(() => {
+        throw new Error('CrosshairSystem should use cached mounted refs for updates');
+      });
+      const querySelectorAll = vi.spyOn(root, 'querySelectorAll');
+      querySelectorAll.mockImplementation(() => {
+        throw new Error('CrosshairSystem should use cached pipper icon refs for updates');
+      });
+
+      expect(() => {
+        crosshair.setMode('fixed_wing');
+        crosshair.setSpread(20);
+        crosshair.setTraverseStop('right');
+        crosshair.setMode('helicopter_attack');
+        crosshair.setHelicopterWeapon('rockets');
+        crosshair.setRocketCueOffset(12);
+      }).not.toThrow();
+
+      expect(fixedWing.style.display).toBe('none');
+      expect(spreadRing.style.width).toBe('40px');
+      expect(spreadRing.style.height).toBe('40px');
+      expect(mgRight.classList.contains('mgStopActive')).toBe(true);
+      expect(dgRight.classList.contains('dgStopActive')).toBe(true);
+      expect(gun.style.display).toBe('none');
+      expect(rocket.style.display).toBe('');
+      expect(cue.style.display).toBe('');
+      expect(cue.style.transform).toContain('12px');
+    });
+
     it('should switch to helicopter_attack and show pipper', () => {
       crosshair.setMode('helicopter_attack');
       expect(crosshair.getMode()).toBe('helicopter_attack');
@@ -294,6 +333,24 @@ describe('CrosshairSystem', () => {
       expect(crosshair.getRocketCueOffset()).toBe(24);
     });
 
+    it('updates rocket cue offset without rewriting stable pipper display styles', () => {
+      crosshair.setMode('helicopter_attack');
+      crosshair.setHelicopterWeapon('rockets');
+      crosshair.setRocketCueOffset(12);
+      const { gun, rocket, cue } = pipperEls();
+      const gunDisplayWrites = trackStyleWrites(gun.style, 'display');
+      const rocketDisplayWrites = trackStyleWrites(rocket.style, 'display');
+      const cueDisplayWrites = trackStyleWrites(cue.style, 'display');
+      const cueTransformWrites = trackStyleWrites(cue.style, 'transform');
+
+      crosshair.setRocketCueOffset(24);
+
+      expect(gunDisplayWrites).toEqual([]);
+      expect(rocketDisplayWrites).toEqual([]);
+      expect(cueDisplayWrites).toEqual([]);
+      expect(cueTransformWrites).toEqual(['translate(-50%, calc(-50% + 24px))']);
+    });
+
     it('clamps a negative cue offset to zero', () => {
       crosshair.setMode('helicopter_attack');
       crosshair.setHelicopterWeapon('rockets');
@@ -356,3 +413,17 @@ describe('CrosshairSystem', () => {
     });
   });
 });
+
+function trackStyleWrites(style: CSSStyleDeclaration, property: 'display' | 'transform'): string[] {
+  let current = style[property];
+  const writes: string[] = [];
+  Object.defineProperty(style, property, {
+    configurable: true,
+    get: () => current,
+    set: (value: string) => {
+      current = value;
+      writes.push(value);
+    },
+  });
+  return writes;
+}

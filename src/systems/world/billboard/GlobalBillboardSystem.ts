@@ -11,6 +11,13 @@ import { VegetationTypeConfig, VEGETATION_TYPES } from '../../../config/vegetati
 import { BiomeConfig, getBiome } from '../../../config/biomes';
 import type { TerrainExclusionZone } from '../../terrain/TerrainFeatureTypes';
 
+type BillboardExclusionZone = {
+  x: number;
+  z: number;
+  radius: number;
+  radiusSq: number;
+};
+
 export class GlobalBillboardSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -19,7 +26,7 @@ export class GlobalBillboardSystem implements GameSystem {
   private gpuSystem: GPUBillboardSystem;
   private initialized = false;
 
-  private exclusionZones: Array<{ x: number; z: number; radius: number }> = [];
+  private exclusionZones: BillboardExclusionZone[] = [];
 
   /** The active vegetation types for the current biome/mode. */
   private activeTypes: VegetationTypeConfig[] = VEGETATION_TYPES;
@@ -130,13 +137,18 @@ export class GlobalBillboardSystem implements GameSystem {
   }
 
   addExclusionZone(x: number, z: number, radius: number): void {
-    this.exclusionZones.push({ x, z, radius });
+    this.exclusionZones.push({ x, z, radius, radiusSq: radius * radius });
     Logger.info('World', `Added vegetation exclusion zone at (${x}, ${z}) with radius ${radius}`);
     this.clearVegetationInArea(x, z, radius);
   }
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
-    this.exclusionZones = zones.map((zone) => ({ x: zone.x, z: zone.z, radius: zone.radius }));
+    this.exclusionZones = zones.map((zone) => ({
+      x: zone.x,
+      z: zone.z,
+      radius: zone.radius,
+      radiusSq: zone.radius * zone.radius,
+    }));
     this.gpuSystem.clearInstancesInZones(this.exclusionZones);
   }
 
@@ -147,15 +159,27 @@ export class GlobalBillboardSystem implements GameSystem {
 
   private isInExclusionZone(x: number, z: number): boolean {
     for (const zone of this.exclusionZones) {
-      const distance = Math.sqrt((x - zone.x) ** 2 + (z - zone.z) ** 2);
-      if (distance <= zone.radius) return true;
+      const dx = x - zone.x;
+      const dz = z - zone.z;
+      if (dx * dx + dz * dz <= zone.radiusSq) return true;
     }
     return false;
   }
 
   private filterVegetationInstances(instances: BillboardInstance[]): BillboardInstance[] {
     if (this.exclusionZones.length === 0) return instances;
-    return instances.filter(inst => !this.isInExclusionZone(inst.position.x, inst.position.z));
+    let filtered: BillboardInstance[] | null = null;
+    for (let i = 0; i < instances.length; i++) {
+      const instance = instances[i];
+      if (this.isInExclusionZone(instance.position.x, instance.position.z)) {
+        if (filtered === null) {
+          filtered = instances.slice(0, i);
+        }
+        continue;
+      }
+      filtered?.push(instance);
+    }
+    return filtered ?? instances;
   }
 
   getDebugInfo(): { [key: string]: number } {

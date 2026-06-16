@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { isHelicopterAnimatedRotorMesh } from './HelicopterGeometry';
+import { isHelicopterAnimatedRotorMesh, optimizeRotorJointDrawCalls } from './HelicopterGeometry';
 import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
 
 function makeMesh(name: string): THREE.Mesh {
@@ -56,6 +56,30 @@ describe('HelicopterGeometry rotor exclusion', () => {
     fuselage.add(tailBoom);
 
     expect(isHelicopterAnimatedRotorMesh(tailBoom)).toBe(false);
+  });
+
+  it('batches compatible rotor child meshes without losing the rotor pivot contract', () => {
+    const root = new THREE.Group();
+    const joint = new THREE.Group();
+    joint.name = 'Joint_MainRotor';
+    joint.userData.type = 'mainBlades';
+    joint.userData.spinAxis = 'y';
+    joint.add(makeMesh('Blade_A'));
+    joint.add(makeMesh('Blade_B'));
+    root.add(joint);
+
+    optimizeRotorJointDrawCalls(root, 'UH1_HUEY');
+
+    const meshes: THREE.Mesh[] = [];
+    joint.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshes.push(child);
+      }
+    });
+    expect(meshes).toHaveLength(1);
+    expect(meshes[0].userData.generatedOptimizedMesh).toBe(true);
+    expect(joint.userData.type).toBe('mainBlades');
+    expect(isHelicopterAnimatedRotorMesh(meshes[0])).toBe(true);
   });
 });
 

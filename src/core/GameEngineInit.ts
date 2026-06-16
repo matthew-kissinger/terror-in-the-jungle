@@ -309,11 +309,11 @@ function wireWorldOverlays(engine: GameEngine): void {
     getCameraPosition: cameraPos,
   }));
   overlays.register(createTerrainChunkOverlay({
-    getActiveTiles: () => terrainSystem.getActiveTilesForDebug?.() ?? [],
+    getActiveTiles: () => terrainSystem.selectTilesForDebugOverlay?.() ?? terrainSystem.getActiveTilesForDebug?.() ?? [],
     getHeightAt: (x, z) => (typeof terrainSystem.getHeightAt === 'function' ? terrainSystem.getHeightAt(x, z) : 0),
   }));
   overlays.register(createTerrainSeamOverlay({
-    getActiveTiles: () => terrainSystem.getActiveTilesForDebug?.() ?? [],
+    getActiveTiles: () => terrainSystem.selectTilesForDebugOverlay?.() ?? terrainSystem.getActiveTilesForDebug?.() ?? [],
     getHeightAt: (x, z) => (typeof terrainSystem.getHeightAt === 'function' ? terrainSystem.getHeightAt(x, z) : 0),
   }));
 

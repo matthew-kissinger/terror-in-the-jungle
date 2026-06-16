@@ -30,6 +30,15 @@ describe('CDLODQuadtree', () => {
     expect(qt.getSelectedTileCount()).toBe(tiles.length);
   });
 
+  it('reuses the selected tile array between frames', () => {
+    const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+    const first = qt.selectTiles(0, 50, 0, null);
+    const second = qt.selectTiles(120, 50, -80, null);
+
+    expect(second).toBe(first);
+    expect(second.length).toBe(qt.getSelectedTileCount());
+  });
+
   it('produces tiles with valid LOD levels', () => {
     const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
     const tiles = qt.selectTiles(0, 50, 0, null);
@@ -82,7 +91,7 @@ describe('CDLODQuadtree', () => {
     const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
 
     // All visible
-    const allTiles = qt.selectTiles(0, 50, 0, null);
+    const allTileCount = qt.selectTiles(0, 50, 0, null).length;
 
     // Only +X half visible (looking right)
     const restrictedFrustum: FrustumPlane[] = [
@@ -95,7 +104,7 @@ describe('CDLODQuadtree', () => {
     ];
     const culledTiles = qt.selectTiles(0, 50, 0, restrictedFrustum);
 
-    expect(culledTiles.length).toBeLessThan(allTiles.length);
+    expect(culledTiles.length).toBeLessThan(allTileCount);
   });
 
   it('handles very large world sizes', () => {
@@ -107,6 +116,24 @@ describe('CDLODQuadtree', () => {
     const tiles = qt.selectTiles(0, 100, 0, null);
     expect(tiles.length).toBeGreaterThan(0);
     expect(tiles.length).toBeLessThanOrEqual(2048);
+  });
+
+  it('surfaces when selection hits the hard tile cap and resets on the next selection', () => {
+    const saturatingRanges = new Array(8).fill(Number.POSITIVE_INFINITY);
+    const qt = new CDLODQuadtree(worldSize, 8, saturatingRanges);
+
+    const saturatedTiles = qt.selectTiles(0, 0, 0, null);
+
+    expect(saturatedTiles.length).toBe(2048);
+    expect(qt.getSelectedTileCount()).toBe(2048);
+    expect(qt.wasLastSelectionSaturated()).toBe(true);
+
+    const culledTiles = qt.selectTiles(0, 0, 0, [
+      { nx: 1, ny: 0, nz: 0, d: -100000 },
+    ]);
+
+    expect(culledTiles.length).toBe(0);
+    expect(qt.wasLastSelectionSaturated()).toBe(false);
   });
 
   it('all tiles cover world without gaps (center camera)', () => {

@@ -69,6 +69,13 @@ function makeAssetLoader(): AssetLoader {
   ]);
 
   return {
+    ensureTexturesLoaded: vi.fn(async (names: readonly string[]) => {
+      for (const name of names) {
+        if (!textures.has(name)) {
+          textures.set(name, new THREE.Texture());
+        }
+      }
+    }),
     getTexture: vi.fn((name: string) => textures.get(name)),
   } as unknown as AssetLoader;
 }
@@ -76,6 +83,15 @@ function makeAssetLoader(): AssetLoader {
 function latestVegetationConfig() {
   const mocked = vi.mocked(GPUBillboardVegetation);
   return mocked.mock.calls.at(-1)?.[1];
+}
+
+function latestVegetationInstance() {
+  const mocked = vi.mocked(GPUBillboardVegetation);
+  return mocked.mock.instances.at(-1) as unknown as {
+    addInstances: ReturnType<typeof vi.fn>;
+    removeInstances: ReturnType<typeof vi.fn>;
+    getInstancePositions: ReturnType<typeof vi.fn>;
+  };
 }
 
 describe('GPUBillboardSystem KB-LOAD proof hooks', () => {
@@ -89,11 +105,16 @@ describe('GPUBillboardSystem KB-LOAD proof hooks', () => {
   });
 
   it('uses normal-lit vegetation by default', async () => {
-    const system = new GPUBillboardSystem(new THREE.Scene(), makeAssetLoader());
+    const assetLoader = makeAssetLoader();
+    const system = new GPUBillboardSystem(new THREE.Scene(), assetLoader);
 
     await system.initializeFromConfig([vegetationType]);
 
     const config = latestVegetationConfig();
+    expect(assetLoader.ensureTexturesLoaded).toHaveBeenCalledWith([
+      vegetationType.textureName,
+      vegetationType.normalTextureName,
+    ]);
     expect(config?.normalTexture).toBeDefined();
     expect(config?.shaderProfile).toBe('normal-lit');
   });
@@ -105,6 +126,7 @@ describe('GPUBillboardSystem KB-LOAD proof hooks', () => {
     await system.initializeFromConfig([hemisphereVegetationType]);
 
     const config = latestVegetationConfig();
+    expect(assetLoader.ensureTexturesLoaded).toHaveBeenCalledWith([hemisphereVegetationType.textureName]);
     expect(config?.normalTexture).toBeUndefined();
     expect(config?.shaderProfile).toBe('hemisphere');
     expect(assetLoader.getTexture).toHaveBeenCalledWith(hemisphereVegetationType.textureName);
@@ -113,12 +135,129 @@ describe('GPUBillboardSystem KB-LOAD proof hooks', () => {
 
   it('can disable vegetation normals for KB-LOAD candidate proof runs', async () => {
     (globalThis as { __KB_LOAD_DISABLE_VEGETATION_NORMALS__?: boolean }).__KB_LOAD_DISABLE_VEGETATION_NORMALS__ = true;
-    const system = new GPUBillboardSystem(new THREE.Scene(), makeAssetLoader());
+    const assetLoader = makeAssetLoader();
+    const system = new GPUBillboardSystem(new THREE.Scene(), assetLoader);
 
     await system.initializeFromConfig([vegetationType]);
 
     const config = latestVegetationConfig();
+    expect(assetLoader.ensureTexturesLoaded).toHaveBeenCalledWith([vegetationType.textureName]);
     expect(config?.normalTexture).toBeUndefined();
     expect(config?.shaderProfile).toBe('hemisphere');
+  });
+
+  it('clears only vegetation instances inside any exclusion zone', async () => {
+    const system = new GPUBillboardSystem(new THREE.Scene(), makeAssetLoader());
+    await system.initializeFromConfig([vegetationType]);
+    const vegetation = latestVegetationInstance();
+    vegetation.addInstances.mockReturnValueOnce([0, 1, 2, 3]);
+    vegetation.getInstancePositions.mockReturnValue(new Float32Array([
+      0, 0, 0,
+      10, 0, 0,
+      50, 0, 0,
+      0, 0, 50,
+    ]));
+
+    system.addChunkInstances('chunk-a', vegetationType.id, [
+      { position: new THREE.Vector3(0, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(10, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(50, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(0, 0, 50), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+    ]);
+
+    const sliceSpy = vi.spyOn(Array.prototype, 'slice');
+    system.clearInstancesInZones([
+      { x: 9, z: 0, radius: 3 },
+      { x: 0, z: 49, radius: 3 },
+    ]);
+    const sliceCalls = sliceSpy.mock.calls.length;
+    sliceSpy.mockRestore();
+
+    expect(sliceCalls).toBe(0);
+    expect(vegetation.removeInstances).toHaveBeenCalledTimes(1);
+    expect(vegetation.removeInstances).toHaveBeenCalledWith([1, 3]);
+
+    system.removeChunkInstances('chunk-a');
+    expect(vegetation.removeInstances).toHaveBeenCalledTimes(2);
+    expect(vegetation.removeInstances).toHaveBeenLastCalledWith([0, 2]);
+  });
+
+  it('keeps tracked chunk indices unchanged when exclusion zones clear nothing', async () => {
+    const system = new GPUBillboardSystem(new THREE.Scene(), makeAssetLoader());
+    await system.initializeFromConfig([vegetationType]);
+    const vegetation = latestVegetationInstance();
+    const allocatedIndices = [0, 1];
+    vegetation.addInstances.mockReturnValueOnce(allocatedIndices);
+    vegetation.getInstancePositions.mockReturnValue(new Float32Array([
+      0, 0, 0,
+      10, 0, 0,
+    ]));
+
+    system.addChunkInstances('chunk-a', vegetationType.id, [
+      { position: new THREE.Vector3(0, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(10, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+    ]);
+
+    system.clearInstancesInZones([{ x: 100, z: 100, radius: 3, radiusSq: 9 }]);
+
+    expect(vegetation.removeInstances).not.toHaveBeenCalled();
+
+    system.removeChunkInstances('chunk-a');
+    expect(vegetation.removeInstances).toHaveBeenCalledWith(allocatedIndices);
+  });
+
+  it('clears only vegetation instances inside a single exclusion radius', async () => {
+    const system = new GPUBillboardSystem(new THREE.Scene(), makeAssetLoader());
+    await system.initializeFromConfig([vegetationType]);
+    const vegetation = latestVegetationInstance();
+    vegetation.addInstances.mockReturnValueOnce([0, 1, 2]);
+    vegetation.getInstancePositions.mockReturnValue(new Float32Array([
+      0, 0, 0,
+      5, 0, 0,
+      20, 0, 0,
+    ]));
+
+    system.addChunkInstances('chunk-a', vegetationType.id, [
+      { position: new THREE.Vector3(0, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(5, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(20, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+    ]);
+
+    const sliceSpy = vi.spyOn(Array.prototype, 'slice');
+    system.clearInstancesInArea(0, 0, 6);
+    const sliceCalls = sliceSpy.mock.calls.length;
+    sliceSpy.mockRestore();
+
+    expect(sliceCalls).toBe(0);
+    expect(vegetation.removeInstances).toHaveBeenCalledTimes(1);
+    expect(vegetation.removeInstances).toHaveBeenCalledWith([0, 1]);
+
+    system.removeChunkInstances('chunk-a');
+    expect(vegetation.removeInstances).toHaveBeenCalledTimes(2);
+    expect(vegetation.removeInstances).toHaveBeenLastCalledWith([2]);
+  });
+
+  it('keeps tracked chunk indices unchanged when a radius clear removes nothing', async () => {
+    const system = new GPUBillboardSystem(new THREE.Scene(), makeAssetLoader());
+    await system.initializeFromConfig([vegetationType]);
+    const vegetation = latestVegetationInstance();
+    const allocatedIndices = [0, 1];
+    vegetation.addInstances.mockReturnValueOnce(allocatedIndices);
+    vegetation.getInstancePositions.mockReturnValue(new Float32Array([
+      20, 0, 0,
+      30, 0, 0,
+    ]));
+
+    system.addChunkInstances('chunk-a', vegetationType.id, [
+      { position: new THREE.Vector3(20, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+      { position: new THREE.Vector3(30, 0, 0), scale: new THREE.Vector3(1, 1, 1), rotation: 0 },
+    ]);
+
+    system.clearInstancesInArea(0, 0, 5);
+
+    expect(vegetation.removeInstances).not.toHaveBeenCalled();
+
+    system.removeChunkInstances('chunk-a');
+    expect(vegetation.removeInstances).toHaveBeenCalledWith(allocatedIndices);
   });
 });

@@ -64,16 +64,37 @@ export function worldToPlayerCenteredMap(
   size: number,
   scale: number,
 ): MapPoint {
+  return worldToPlayerCenteredMapInto(
+    { x: 0, y: 0 },
+    worldX,
+    worldZ,
+    playerX,
+    playerZ,
+    playerRotation,
+    size,
+    scale,
+  );
+}
+
+export function worldToPlayerCenteredMapInto(
+  out: MapPoint,
+  worldX: number,
+  worldZ: number,
+  playerX: number,
+  playerZ: number,
+  playerRotation: number,
+  size: number,
+  scale: number,
+): MapPoint {
   const dx = worldX - playerX;
   const dz = worldZ - playerZ;
   const cos = Math.cos(playerRotation);
   const sin = Math.sin(playerRotation);
   const rotatedX = dx * cos + dz * sin;
   const rotatedZ = -dx * sin + dz * cos;
-  return {
-    x: size / 2 + rotatedX * scale,
-    y: size / 2 + rotatedZ * scale,
-  };
+  out.x = size / 2 + rotatedX * scale;
+  out.y = size / 2 + rotatedZ * scale;
+  return out;
 }
 
 /**

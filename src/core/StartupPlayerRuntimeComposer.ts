@@ -328,6 +328,7 @@ function wirePlayerRuntime(
   firstPersonWeapon.setCombatantSystem(combatantSystem);
   firstPersonWeapon.setTicketSystem(ticketSystem);
   firstPersonWeapon.setHUDSystem(hudSystem);
+  firstPersonWeapon.setStatsTracker(hudSystem.getStatsTracker());
   firstPersonWeapon.setZoneManager(zoneManager);
   firstPersonWeapon.setInventoryManager(inventoryManager);
   firstPersonWeapon.setAudioManager(audioManager);
@@ -464,13 +465,16 @@ function wireDeployRuntime(runtime: StartupPlayerRuntimeGroups['deployRuntime'])
  * import path through the type-check seam.
  */
 interface CompassVehicleSource {
-  getAllVehicles(): ReadonlyArray<{
-    vehicleId: string;
-    category: string;
-    faction: import('../systems/combat/types').Faction;
-    getPosition(): THREE.Vector3;
-    isDestroyed(): boolean;
-  }>;
+  getAllVehicles(): ReadonlyArray<CompassVehicleRecord>;
+  forEachVehicle?(visitor: (vehicle: CompassVehicleRecord) => void): void;
+}
+
+interface CompassVehicleRecord {
+  vehicleId: string;
+  category: string;
+  faction: import('../systems/combat/types').Faction;
+  getPosition(): THREE.Vector3;
+  isDestroyed(): boolean;
 }
 
 const COMPASS_DRIVABLE_CATEGORIES = new Set<string>(['ground', 'watercraft', 'emplacement']);
@@ -482,20 +486,53 @@ const COMPASS_DRIVABLE_CATEGORIES = new Set<string>(['ground', 'watercraft', 'em
  * and non-drivable categories (aircraft have their own HUD).
  */
 function createCompassVehicleQuery(source: CompassVehicleSource): IVehicleMarkerQuery {
+  const markers: VehicleMarkerEntry[] = [];
+  const markerByVehicleId = new Map<string, VehicleMarkerEntry>();
+  const seenVehicleIds = new Set<string>();
+
+  const visitVehicle = (vehicle: CompassVehicleRecord): void => {
+    if (!COMPASS_DRIVABLE_CATEGORIES.has(vehicle.category)) return;
+    if (vehicle.isDestroyed()) return;
+
+    let marker = markerByVehicleId.get(vehicle.vehicleId);
+    if (!marker) {
+      marker = {
+        vehicleId: vehicle.vehicleId,
+        category: vehicle.category as VehicleMarkerCategory,
+        faction: vehicle.faction,
+        position: vehicle.getPosition(),
+      };
+      markerByVehicleId.set(vehicle.vehicleId, marker);
+    } else {
+      marker.category = vehicle.category as VehicleMarkerCategory;
+      marker.faction = vehicle.faction;
+      marker.position = vehicle.getPosition();
+    }
+
+    markers.push(marker);
+    seenVehicleIds.add(vehicle.vehicleId);
+  };
+
   return {
     getVehicleMarkers(): readonly VehicleMarkerEntry[] {
-      const out: VehicleMarkerEntry[] = [];
-      for (const vehicle of source.getAllVehicles()) {
-        if (!COMPASS_DRIVABLE_CATEGORIES.has(vehicle.category)) continue;
-        if (vehicle.isDestroyed()) continue;
-        out.push({
-          vehicleId: vehicle.vehicleId,
-          category: vehicle.category as VehicleMarkerCategory,
-          faction: vehicle.faction,
-          position: vehicle.getPosition(),
-        });
+      markers.length = 0;
+      seenVehicleIds.clear();
+
+      if (source.forEachVehicle) {
+        source.forEachVehicle(visitVehicle);
+      } else {
+        for (const vehicle of source.getAllVehicles()) {
+          visitVehicle(vehicle);
+        }
       }
-      return out;
+
+      markerByVehicleId.forEach((_marker, vehicleId) => {
+        if (!seenVehicleIds.has(vehicleId)) {
+          markerByVehicleId.delete(vehicleId);
+        }
+      });
+
+      return markers;
     },
   };
 }

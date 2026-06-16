@@ -9,7 +9,7 @@ import { MuzzleFlashSystem, MuzzleFlashVariant } from '../../effects/MuzzleFlash
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
-import { ShotCommand, ShotCommandFactory, ShotResult } from './ShotCommand'
+import { ShotCommand, ShotResult } from './ShotCommand'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 import { WeaponShotExecutor } from './WeaponShotExecutor'
 import type { HUDSystem } from '../../../ui/hud/HUDSystem'
@@ -28,8 +28,10 @@ const _barrelOrigin = new THREE.Vector3()
 const _aimPoint = new THREE.Vector3()
 const _barrelDirection = new THREE.Vector3()
 const _tracerEnd = new THREE.Vector3()
-const _pelletDirection = new THREE.Vector3()
 const _barrelRotation = new THREE.Quaternion()
+const _barrelAlignedPelletDirection = new THREE.Vector3()
+const _launcherStartPos = new THREE.Vector3()
+const _launcherVelocity = new THREE.Vector3()
 
 const PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE = 1.35
 const PLAYER_BARREL_FALLBACK_RIGHT = 0.18
@@ -139,8 +141,6 @@ export class WeaponFiring {
       this.audioManager.playPlayerWeaponSound(command.weaponType)
     }
 
-    const visualCommand = this.resolveBarrelAlignedCommand(command, _barrelOrigin, _aimPoint)
-
     // Execute based on weapon type
     let result: ShotResult
     if (command.weaponType === 'shotgun' && command.pelletRays) {
@@ -157,7 +157,7 @@ export class WeaponFiring {
     this.spawnMuzzleFlash()
 
     // Spawn tracer
-    this.spawnTracer(visualCommand, result, _barrelOrigin, _aimPoint)
+    this.spawnBarrelAlignedTracer(command, result)
 
     // Record in telemetry
     performanceTelemetry.recordShot(result.hit)
@@ -184,14 +184,14 @@ export class WeaponFiring {
       this.camera.getWorldDirection(_forward)
 
       // Start grenade slightly ahead of camera
-      const startPos = _cameraPos.clone().addScaledVector(_forward, 1.5)
+      _launcherStartPos.copy(_cameraPos).addScaledVector(_forward, 1.5)
 
       // M79 muzzle velocity ~40 m/s, slight upward arc
-      const velocity = _forward.clone().multiplyScalar(40)
-      velocity.y += 3.0 // Slight upward boost for natural arc
+      _launcherVelocity.copy(_forward).multiplyScalar(40)
+      _launcherVelocity.y += 3.0 // Slight upward boost for natural arc
 
       // Shorter fuse than hand grenades (2.0s vs 3.5s)
-      this.grenadeSystem.spawnProjectile(startPos, velocity, 2.0)
+      this.grenadeSystem.spawnProjectile(_launcherStartPos, _launcherVelocity, 2.0)
     }
 
     // Record in telemetry (no hit - damage comes from explosion)
@@ -226,39 +226,11 @@ export class WeaponFiring {
     this.muzzleFlashSystem.spawnPlayer(this.overlayScene, _muzzlePos, _forward, variant)
   }
 
-  private spawnTracer(
-    command: ShotCommand,
-    result: ShotResult,
-    tracerStart: THREE.Vector3,
-    fallbackEnd: THREE.Vector3,
-  ): void {
-    if (command.weaponType === 'shotgun' && command.pelletRays) {
-      // Spawn 1 tracer per 3 pellets
-      for (let i = 0; i < command.pelletRays.length; i += 3) {
-        const pelletRay = command.pelletRays[i]
-        const range = result.distance ?? 25
-        _tracerEnd.copy(pelletRay.origin).addScaledVector(pelletRay.direction, range)
-        this.tracerPool.spawn(tracerStart, _tracerEnd, 100)
-      }
-    } else {
-      if (result.hitPoint) {
-        _tracerEnd.copy(result.hitPoint)
-      } else {
-        _tracerEnd.copy(fallbackEnd)
-      }
-      this.tracerPool.spawn(tracerStart, _tracerEnd, 120)
-    }
-  }
+  private spawnBarrelAlignedTracer(command: ShotCommand, result: ShotResult): void {
+    this.resolveTracerStart(_barrelOrigin, command.isADS)
+    this.resolveAimPoint(command, _aimPoint, result.hitPoint)
 
-  private resolveBarrelAlignedCommand(
-    command: ShotCommand,
-    barrelOriginTarget: THREE.Vector3,
-    aimPointTarget: THREE.Vector3,
-  ): ShotCommand {
-    this.resolveTracerStart(barrelOriginTarget, command.isADS)
-    this.resolveAimPoint(command, aimPointTarget)
-
-    _barrelDirection.subVectors(aimPointTarget, barrelOriginTarget)
+    _barrelDirection.subVectors(_aimPoint, _barrelOrigin)
     if (_barrelDirection.lengthSq() <= 0.0001) {
       _barrelDirection.copy(command.ray.direction)
     } else {
@@ -267,31 +239,34 @@ export class WeaponFiring {
 
     if (command.weaponType === 'shotgun' && command.pelletRays) {
       _barrelRotation.setFromUnitVectors(command.ray.direction, _barrelDirection)
-      const pelletDirections = command.pelletRays.map((pelletRay) =>
-        _pelletDirection.copy(pelletRay.direction).applyQuaternion(_barrelRotation).normalize().clone()
-      )
-      return ShotCommandFactory.createShotgunShot(
-        barrelOriginTarget,
-        _barrelDirection,
-        pelletDirections,
-        command.damage,
-        command.isADS,
-      )
+      // Spawn 1 tracer per 3 pellets
+      for (let i = 0; i < command.pelletRays.length; i += 3) {
+        const pelletRay = command.pelletRays[i]
+        const range = result.distance ?? 25
+        _barrelAlignedPelletDirection
+          .copy(pelletRay.direction)
+          .applyQuaternion(_barrelRotation)
+          .normalize()
+        _tracerEnd.copy(_barrelOrigin).addScaledVector(_barrelAlignedPelletDirection, range)
+        this.tracerPool.spawn(_barrelOrigin, _tracerEnd, 100)
+      }
+    } else {
+      if (result.hitPoint) {
+        _tracerEnd.copy(result.hitPoint)
+      } else {
+        _tracerEnd.copy(_aimPoint)
+      }
+      this.tracerPool.spawn(_barrelOrigin, _tracerEnd, 120)
     }
-
-    return ShotCommandFactory.createSingleShot(
-      barrelOriginTarget,
-      _barrelDirection,
-      command.weaponType === 'shotgun' ? 'rifle' : command.weaponType,
-      command.damage,
-      command.isADS,
-    )
   }
 
-  private resolveAimPoint(command: ShotCommand, target: THREE.Vector3): THREE.Vector3 {
-    if (this.combatantSystem) {
-      const preview = this.combatantSystem.resolvePlayerAimPoint(command.ray)
-      return target.copy(preview.point)
+  private resolveAimPoint(
+    command: ShotCommand,
+    target: THREE.Vector3,
+    actualAimPoint?: THREE.Vector3,
+  ): THREE.Vector3 {
+    if (actualAimPoint) {
+      return target.copy(actualAimPoint)
     }
 
     return target.copy(command.ray.origin).addScaledVector(command.ray.direction, 200)
@@ -329,8 +304,8 @@ export class WeaponFiring {
     // Hip-fire: camera-relative offset to approximate barrel position.
     // Avoids NDC projection which can clamp to screen edges during recoil,
     // creating a visible second ray from the wrong origin.
-    _cameraRight.set(1, 0, 0).applyQuaternion(_cameraQuat).normalize()
-    _cameraUp.set(0, 1, 0).applyQuaternion(_cameraQuat).normalize()
+    _cameraRight.set(1, 0, 0).applyQuaternion(_cameraQuat)
+    _cameraUp.set(0, 1, 0).applyQuaternion(_cameraQuat)
     return target.copy(_cameraPos)
       .addScaledVector(_cameraRight, PLAYER_BARREL_FALLBACK_RIGHT)
       .addScaledVector(_cameraUp, PLAYER_BARREL_FALLBACK_UP)

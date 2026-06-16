@@ -21,6 +21,11 @@ const _deathDir = new THREE.Vector3();
 
 export interface VehicleExplosionDamageQuery {
   getVehiclesInRadius(center: THREE.Vector3, radius: number): readonly IVehicle[];
+  forEachVehicleInRadius?(
+    center: THREE.Vector3,
+    radius: number,
+    visitor: (vehicle: IVehicle) => void,
+  ): void;
 }
 
 interface GenericVehicleDamageTarget extends IVehicle {
@@ -88,6 +93,7 @@ export class CombatantSystemDamage {
     // set of in-radius ids; the exact `distance <= radius` test below keeps the
     // damage falloff identical to the old full scan. (combat-death-unification)
     const candidateIds = spatialGridManager.queryRadius(center, radius);
+    const radiusSq = radius * radius;
     candidateIds.forEach(id => {
       const combatant = this.combatants.get(id);
       if (!combatant) return;
@@ -96,9 +102,10 @@ export class CombatantSystemDamage {
       // Same-alliance combatants are immune to the radial wave.
       if (shooterFaction !== undefined && isAlly(combatant.faction, shooterFaction)) return;
 
-      const distance = combatant.position.distanceTo(center);
+      const distanceSq = combatant.position.distanceToSquared(center);
 
-      if (distance <= radius) {
+      if (distanceSq <= radiusSq) {
+        const distance = Math.sqrt(distanceSq);
         const damagePercent = 1.0 - (distance / radius);
         const baseDamage = maxDamage * damagePercent;
         const damage = playerOneShotActive && baseDamage > 0
@@ -245,23 +252,34 @@ export class CombatantSystemDamage {
 
     const damageType = tankDamageTypeForWeapon(weaponType);
     let hitCount = 0;
-    for (const vehicle of this.vehicleDamageQuery.getVehiclesInRadius(center, radius)) {
-      if (vehicle.isDestroyed()) continue;
-      if (shooterFaction !== undefined && isAlly(vehicle.faction, shooterFaction)) continue;
+    const radiusSq = radius * radius;
+    const applyDamageToVehicle = (vehicle: IVehicle): void => {
+      if (vehicle.isDestroyed()) return;
+      if (shooterFaction !== undefined && isAlly(vehicle.faction, shooterFaction)) return;
 
-      const distance = vehicle.getPosition().distanceTo(center);
-      if (distance > radius) continue;
+      const vehiclePosition = vehicle.getPosition();
+      const distanceSq = vehiclePosition.distanceToSquared(center);
+      if (distanceSq > radiusSq) return;
+      const distance = Math.sqrt(distanceSq);
       const damage = maxDamage * (1.0 - distance / radius);
-      if (damage <= 0) continue;
+      if (damage <= 0) return;
 
       if (vehicle instanceof Tank) {
         vehicle.applyDamage(damage, center, damageType);
       } else if (isGenericVehicleDamageTarget(vehicle)) {
         vehicle.applyDamage(damage, center);
       } else {
-        continue;
+        return;
       }
       hitCount++;
+    };
+
+    if (this.vehicleDamageQuery.forEachVehicleInRadius) {
+      this.vehicleDamageQuery.forEachVehicleInRadius(center, radius, applyDamageToVehicle);
+    } else {
+      for (const vehicle of this.vehicleDamageQuery.getVehiclesInRadius(center, radius)) {
+        applyDamageToVehicle(vehicle);
+      }
     }
 
     if (hitCount > 0) {

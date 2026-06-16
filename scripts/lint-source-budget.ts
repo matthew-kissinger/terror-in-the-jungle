@@ -65,14 +65,24 @@ export interface GrandfatherEntry {
 // limit as their effective ceiling.)
 // Format: posix-style relative path (forward slashes).
 const GRANDFATHER: Record<string, GrandfatherEntry> = {
-  'src/systems/combat/CombatantRenderer.ts': { round: 'P3R1', reason: 'split into 5 files', loc: 2191, methods: 78 },
-  'src/systems/combat/CombatantMovement.ts': { round: 'P3R2', reason: 'split into 4 files', loc: 1701, methods: 63 },
+  // Snapshot raised 2191 → 2459 LOC / 78 → 85 methods
+  // (dropped-frame-perf-harness, 2026-06-15/16): materialization-tier,
+  // close-model, and render-attribution telemetry for the stabilization branch.
+  // Orchestrator re-base only; split target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/combat/CombatantRenderer.ts': { round: 'P3R1', reason: 'split into 5 files; +268 LOC/+7 methods for dropped-frame materialization/render telemetry', loc: 2459, methods: 85 },
+  // Snapshot raised 1701 → 1825 LOC / 63 → 68 methods
+  // (dropped-frame-perf-harness, 2026-06-15/16): terrain recovery and route
+  // telemetry needed to correlate player-visible terrain glitches with combat
+  // movement. Orchestrator re-base only; split target unchanged.
+  'src/systems/combat/CombatantMovement.ts': { round: 'P3R2', reason: 'split into 4 files; +124 LOC/+5 methods for terrain recovery and route telemetry', loc: 1825, methods: 68 },
   // Snapshot raised 1217 → 1222 (door-gun-seat, cycle-2026-06-09-helicopter-craft):
   // +5 LOC for the `onHelicopterDoorGunToggle` input-callback wiring that routes
   // the in-flight F key to the door-gun seat swap. Within-cycle ratchet re-base;
   // R3 split target unchanged. See docs/CARRY_OVERS.md.
   'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1222, methods: 111 },
-  'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files', loc: 995, methods: 41 },
+  // Snapshot raised 995 → 1073 LOC (dropped-frame-perf-harness,
+  // 2026-06-15/16): frame/presentation/dropped-frame telemetry export surfaces.
+  'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files; +78 LOC for frame/presentation dropped-frame telemetry', loc: 1073, methods: 41 },
   // Snapshot raised 1155→1163 LOC / 48→51 methods (per-aircraft-ordnance,
   // cycle-2026-06-09-fixed-wing-craft): per-airframe armament wiring + the new
   // getWeaponName getter. The bulk weapon table was EXTRACTED to the sibling
@@ -80,17 +90,17 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // is the per-airframe config plumbing and the +3 method-regex matches are the
   // getWeaponName getter plus two multi-line call-expression false positives.
   // Within-cycle ratchet re-base; R4 split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files', loc: 1163, methods: 51 },
+  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files; +3 LOC from dropped-frame stabilization branch wiring', loc: 1166, methods: 51 },
   'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
-  'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence)', loc: 933, methods: 32 },
-  'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files', loc: 860, methods: 34 },
+  'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence); +102 LOC dropped-frame materialization telemetry', loc: 1035, methods: 32 },
+  'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files; +204 LOC dropped-frame world-static attribution and optimization hooks', loc: 1064, methods: 34 },
   // Snapshot raised 808 → 833 (ashau-load-freeze, 2026-06-10): pre-baked loads
   // now route through the time-sliced PrebakedTiledNavmeshImporter (fetch +
   // import live there) with per-phase startup marks and an onTileProgress
   // loading-bar hook threaded through generateNavmesh. Within-cycle ratchet
   // re-base; split target unchanged. See docs/CARRY_OVERS.md.
   'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau); +25 LOC: time-sliced prebaked import wiring + load telemetry (ashau-load-freeze, 2026-06-10)', loc: 833, methods: 24 },
-  'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files', loc: 788, methods: 36 },
+  'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files; +181 LOC dropped-frame war-state telemetry and stabilization probes', loc: 969, methods: 36 },
   'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
   'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +12 LOC: per-frame stepper hook for the shared NPC tank cannon, scaled-dt signature per combat-review (npc-tank-cannon-wiring, 2026-06-09)', loc: 1004, methods: 44 },
   // Admitted 2026-06-09 (npc-tank-cannon-wiring review fix): the prod
@@ -99,15 +109,23 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // single-owner stepping gate in one cycle window. Orchestrator note in
   // docs/CARRY_OVERS.md (Parked). Factor into a composition split when it
   // next grows.
-  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); split queued when it next grows', loc: 748, methods: 50 },
+  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); +35 LOC dropped-frame startup/materialization wiring; split queued when it next grows', loc: 783, methods: 50 },
   // Snapshot raised 757 → 761 / 83 → 84 (fixedwing-gunsight, 2026-06-10): the
   // fixed-wing reflector-gunsight task adds one HUD delegation method
   // (`updateFixedWingAmmo`) so the nose-gun ammo count reaches FixedWingHUD —
   // the mirror of the existing `setHelicopterWeaponStatus` delegation. Growth
   // is intentional and minimal; the R3 split target is unchanged. In-cycle
   // ratchet re-base, not a new carry-over (see docs/CARRY_OVERS.md).
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files', loc: 761, methods: 84 },
-  'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence)', loc: 762, methods: 43 },
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring', loc: 774, methods: 85 },
+  'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence); +28 LOC dropped-frame combat telemetry wiring', loc: 790, methods: 43 },
+  // Admitted 2026-06-15/16 (dropped-frame-perf-harness): the main loop grew
+  // with frame/presentation epoch recording and render-context attribution.
+  // Orchestrator note in docs/CARRY_OVERS.md; split loop diagnostics out next.
+  'src/core/GameEngineLoop.ts': { round: 'P3R5', reason: 'split frame diagnostics and presentation epoch recording out of the main loop', loc: 856, methods: 50 },
+  // Admitted 2026-06-15/16 (dropped-frame-perf-harness): combat firing and
+  // terrain LOS telemetry crossed the base LOC limit during stabilization.
+  // Orchestrator note in docs/CARRY_OVERS.md; split firing diagnostics next.
+  'src/systems/combat/CombatantCombat.ts': { round: 'P3R2', reason: 'split firing diagnostics and terrain LOS probes out of combat core', loc: 718, methods: 50 },
   // ZoneManager removed from grandfather list 2026-05-09 (Phase 2): fan-in
   // dropped from 52 → ≤20 via IZoneQuery seam (Batches A+B+C of
   // cycle-2026-05-10-zone-manager-decoupling). File is well under both LOC and
@@ -135,14 +153,14 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
-  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate)', loc: 1155, methods: 0 },
+  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles', loc: 1182, methods: 0 },
   // Snapshot raised 898 → 904 / 69 → 75 (ashau-load-freeze, 2026-06-10): six
   // markStartup statements bracketing propagateTerrainSourceChanges phases —
   // the instrumentation that attributed the 47s A Shau load freeze to the
   // stamped-provider gameplay-grid bake. The methods delta is those statement
   // lines tripping the first-class-method heuristic, not new methods.
   // Within-cycle ratchet re-base; split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale); +6 LOC: propagate-phase startup marks (ashau-load-freeze, 2026-06-10)', loc: 904, methods: 75 },
+  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale); +6 LOC: propagate-phase startup marks (ashau-load-freeze, 2026-06-10); +71 LOC dropped-frame vegetation/shadow isolation and terrain lighting controls', loc: 975, methods: 80 },
   'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 861, methods: 24 },
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 882, methods: 42 },
   'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '0 tests → split into terrain config + biome config + spawn data; +5 LOC: prebaked navmesh asset wiring (navmesh-coverage-ashau)', loc: 761, methods: 0 },
@@ -151,7 +169,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // faction-availability chips + the selectable-ammo 4th loadout slot).
   // Not relicense-related; queued for a presentation/loadout-panel split.
   'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade', loc: 1038, methods: 68 },
-  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers', loc: 355, methods: 61 },
+  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff', loc: 355, methods: 62 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as
   // split-debt in docs/CARRY_OVERS.md (konveyer-large-file-splits). The

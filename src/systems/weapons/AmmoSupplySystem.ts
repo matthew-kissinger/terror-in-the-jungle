@@ -30,6 +30,7 @@ export class AmmoSupplySystem implements GameSystem {
 
   private readonly CRATE_SIZE = 1.5;
   private readonly PROXIMITY_RANGE = 5.0;
+  private readonly PROXIMITY_RANGE_SQ = this.PROXIMITY_RANGE * this.PROXIMITY_RANGE;
   private readonly RESUPPLY_COOLDOWN = 30; // seconds
   private readonly GLOW_PULSE_SPEED = 2.0;
   private readonly GRENADE_REFILL_AMOUNT = 3;
@@ -221,8 +222,7 @@ export class AmmoSupplySystem implements GameSystem {
     for (const crate of this.crates.values()) {
       if (!crate.isActive) continue;
 
-      const distance = this.playerPosition.distanceTo(crate.position);
-      const isInRange = distance <= this.PROXIMITY_RANGE;
+      const isInRange = this.playerPosition.distanceToSquared(crate.position) <= this.PROXIMITY_RANGE_SQ;
 
       // Check if player is on cooldown
       const cooldownEnd = crate.playerCooldowns.get(playerId);
