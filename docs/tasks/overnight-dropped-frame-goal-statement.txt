@@ -4236,3 +4236,39 @@ Latest 2026-06-16 16:27 UTC / 12:27 EDT update:
   triangle/shader cost and world-static detail submission/shadow pressure as
   the leading suspects. Do not chase the rejected shadow-proxy branch; it added
   a main-scene proxy draw and was discarded.
+
+Latest 2026-06-16 16:49 UTC / 12:49 EDT update:
+
+- Promoted conservative terrain height-aware CDLOD frustum culling from an
+  opt-in proof flag to the default runtime path when a terrain height sampler
+  is available. The old conservative slab behavior remains available for
+  controlled A/B captures with `--disable-terrain-height-aware-frustum`.
+- This is a same-experience optimization: it only rejects terrain tiles whose
+  sampled padded height bounds are outside the camera frustum. It does not
+  reduce A Shau/Open Frontier size, draw distance, terrain LOD ranges,
+  vegetation, wildlife, weather, war assets, combat pressure, or player flow.
+- Harness metadata now records requested, disabled, and actual runtime
+  `terrainHeightAwareFrustumEnabled` state instead of treating the old CLI
+  opt-in as truth. This matters because the goal depends on distrustable
+  measurements when harness and runtime state diverge.
+- Verification passed for this slice: focused `TerrainRenderRuntime` and
+  `CDLODQuadtree` tests, `npm run typecheck`, targeted ESLint, and
+  `npm run build:perf`.
+- Current default-on headed A Shau active-combat evidence:
+  `artifacts/perf/2026-06-16T16-42-16-310Z`. The capture correctly reports
+  `terrainHeightAwareFrustumEnabled=true` without the old enable flag, but it
+  still failed validation and measurement trust (`probeAvg=159.3ms`,
+  `probeP95=247ms`). Browser rAF dropped-frame time remains unacceptable:
+  about `34.07` estimated dropped frames/s and `532.44ms/s` dropped-frame time.
+- Directional render movement: corrected no-height-aware evidence
+  `artifacts/perf/2026-06-16T16-23-13-537Z` sampled terrain at about
+  `948,890` tris/frame; default height-aware evidence sampled about
+  `882,563` terrain tris/frame. This is useful pressure reduction, not goal
+  completion.
+- Next aligned target remains render cost without content cuts. Terrain is
+  still the largest sampled triangle owner, vegetation imposters remain about
+  `100,574` tris/frame, and world-static detail remains the largest
+  small-submission owner at roughly `81.5` submissions/frame. Prioritize
+  terrain shadow/geometry strategy, terrain shader cost, vegetation imposter
+  cost, or world-static batching/shadow pressure before lower-value
+  simulation micro-optimizations.

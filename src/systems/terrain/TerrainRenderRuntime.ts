@@ -108,8 +108,7 @@ export function isTerrainForceInstanceUploadEnabled(): boolean {
 }
 
 export function isTerrainHeightAwareFrustumEnabled(): boolean {
-  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
-    && readBooleanQueryFlag('perfTerrainHeightAwareFrustum');
+  return !readBooleanQueryFlag('perfDisableTerrainHeightAwareFrustum');
 }
 
 function nowMs(): number {
