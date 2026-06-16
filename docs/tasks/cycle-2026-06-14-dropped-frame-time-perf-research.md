@@ -1116,3 +1116,22 @@ Update 2026-06-16 19:33 UTC / 15:33 EDT:
   only). This is not runtime proof; the next quiet-machine A Shau/Open
   Frontier artifacts must show the movement-mode warning gone and must still
   pass real combat, dropped-frame, trust, and visual gates.
+
+Update 2026-06-16 19:55 UTC / 15:55 EDT:
+
+- Aligned active perf capture defaults with the EARS completion lane:
+  frontline compression is now explicit opt-in instead of default-on.
+  `--compress-frontline true` remains available as a diagnostic shortcut, but
+  same-experience captures should leave it false so combat pressure is reached
+  through route/objective behavior rather than relocating actors near the
+  player.
+- `summary.json` now records `perfRuntime.frontlineCompressionRequested`, and
+  `npm run check:dropped-frame-ears` rejects requested frontline compression
+  even if no actors happened to move. This closes the loophole where a
+  compressed setup could pass artifact review on metrics alone.
+- Added EARS-shaped capture commands:
+  `npm run perf:capture:ashau:ears` and
+  `npm run perf:capture:openfrontier:ears`. They force headed strict WebGPU,
+  summary render-submission attribution, and `--compress-frontline false`.
+  Goal status is still open until quiet-machine artifacts from both commands
+  pass the EARS checker and owner visual/game-feel acceptance.

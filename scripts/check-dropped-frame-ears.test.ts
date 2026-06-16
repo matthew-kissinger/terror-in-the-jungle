@@ -59,6 +59,7 @@ function tempArtifact(options: ArtifactOptions): string {
     },
     rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
     perfRuntime: {
+      frontlineCompressionRequested: false,
       victoryConditionsDisabled: false,
       npcCloseModelsDisabled: false,
       terrainShadowsDisabled: false,
@@ -113,6 +114,15 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     }));
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_wildlife_disabled' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects frontline-compressed artifacts even when movement warnings are absent', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      runtimeOverrides: { frontlineCompressionRequested: true },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_frontline_compression_requested' && check.status === 'fail')).toBe(true);
   });
 });
 

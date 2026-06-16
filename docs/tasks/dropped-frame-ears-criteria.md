@@ -21,8 +21,8 @@ Unless the owner explicitly changes this, a completion candidate means all of:
   representative content, active combat.
 - No content-reduction flags: no disabled wildlife, no disabled terrain
   shadows, no disabled terrain skirts, no reduced vegetation density, no
-  reduced draw distance, no weakened combat, no shortened terrain, and no
-  diagnostic-only bypasses.
+  reduced draw distance, no weakened combat, no shortened terrain, no
+  frontline compression, and no diagnostic-only bypasses.
 - Required artifacts: `summary.json`, `validation.json`,
   `presentation-epochs.json`, browser stall entries when present,
   render-submission samples when present, final frame, and driver final state.
@@ -34,6 +34,10 @@ Executable scaffold:
 
 - Run `npm run check:dropped-frame-ears -- --dir artifacts/perf/<a-shau-capture> --dir artifacts/perf/<open-frontier-capture> --strict`
   before calling a dropped-frame candidate complete.
+- Preferred local capture commands for the completion lane are
+  `npm run perf:capture:ashau:ears` and
+  `npm run perf:capture:openfrontier:ears`. They force headed strict WebGPU,
+  render-submission attribution, and `--compress-frontline false`.
 - Without `--dir`, the checker evaluates the latest `artifacts/perf/*`
   capture only. That is useful for triage but cannot pass the completion lane
   unless the required Open Frontier + A Shau artifact pair is supplied.

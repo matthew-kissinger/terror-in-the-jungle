@@ -841,6 +841,7 @@ type CaptureSummary = {
   };
   perfRuntime?: {
     matchDurationSeconds?: number;
+    frontlineCompressionRequested: boolean;
     victoryConditionsDisabled: boolean;
     npcCloseModelsDisabled: boolean;
     terrainShadowsDisabled: boolean;
@@ -1140,7 +1141,7 @@ const DEFAULT_STARTUP_TIMEOUT_SECONDS = 120;
 const DEFAULT_STARTUP_FRAME_THRESHOLD = 30;
 const DEFAULT_ACTIVE_PLAYER = true;
 const DEFAULT_GAME_MODE = 'ai_sandbox';
-const DEFAULT_COMPRESS_FRONTLINE = true;
+const DEFAULT_COMPRESS_FRONTLINE = false;
 const DEFAULT_ALLOW_WARP_RECOVERY = false;
 const DEFAULT_ACTIVE_TOP_UP_HEALTH = true;
 const DEFAULT_ACTIVE_AUTO_RESPAWN = true;
@@ -1718,6 +1719,7 @@ Common options:
   --runtime-render-submission-mode <full|summary>
   --runtime-preflight <true|false>
   --renderer <webgpu-strict|webgpu|webgl>
+  --compress-frontline <true|false> Diagnostic shortcut that repositions combatants near the player; default false
   --gpu-timing
   --disable-npc-close-models
   --disable-terrain-shadows
@@ -6278,6 +6280,7 @@ async function runCapture(): Promise<void> {
         },
         perfRuntime: {
           matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
+          frontlineCompressionRequested: compressFrontline,
           victoryConditionsDisabled: disableVictory,
           npcCloseModelsDisabled: disableNpcCloseModels,
           terrainShadowsDisabled: disableTerrainShadows,
