@@ -103,7 +103,7 @@ export class SystemInitializer {
       renderDistance: adaptiveRenderDistance,
       loadDistance: adaptiveRenderDistance + 1,
       lodLevels: 4
-    });
+    }, _renderer?.moonLight ?? null);
     Logger.info('init', `Chunk render distance: ${adaptiveRenderDistance} (multiplier: ${renderDistanceMultiplier.toFixed(2)})`);
     // GPUTerrain disabled - going with web workers approach instead
     onProgress('core', 1);

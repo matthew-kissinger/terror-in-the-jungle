@@ -372,17 +372,46 @@ describe('CDLODRenderer', () => {
     expect(isolatedRenderer.getMesh().receiveShadow).toBe(true);
   });
 
-  it('keeps the full visible terrain instance count in shadow passes by default', () => {
+  it('bounds terrain shadow caster instances by default without changing main-pass count', () => {
     renderer.updateInstances([
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
-      { x: 512, z: 0, size: 256, lodLevel: 3, morphFactor: 0.5, edgeMorphMask: 0 },
+      { x: 1400, z: 0, size: 128, lodLevel: 3, morphFactor: 0.5, edgeMorphMask: 0 },
     ]);
 
     const mesh: any = renderer.getMesh();
+    expect(mesh.count).toBe(2);
+
+    mesh.onBeforeShadow();
+
+    expect(mesh.count).toBe(1);
+    expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
+      boundedShadowPassEnabled: true,
+      shadowPrefixInstances: 1,
+      lastMainPassInstances: 2,
+      lastShadowPassInstances: 1,
+      shadowPassReductions: 1,
+    });
+
+    mesh.onAfterShadow();
+
+    expect(mesh.count).toBe(2);
+  });
+
+  it('keeps full terrain shadow casting under the diagnostic full-shadow query flag', () => {
+    setRuntimeSearch('?terrainFullShadowPass=1');
+    const fullShadowRenderer = new CDLODRenderer({} as any, 33, 256);
+    fullShadowRenderer.configureBoundedShadowPass(0, 0, 96);
+
+    fullShadowRenderer.updateInstances([
+      { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
+      { x: 1400, z: 0, size: 128, lodLevel: 3, morphFactor: 0.5, edgeMorphMask: 0 },
+    ]);
+
+    const mesh: any = fullShadowRenderer.getMesh();
     mesh.onBeforeShadow();
 
     expect(mesh.count).toBe(2);
-    expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
+    expect(fullShadowRenderer.getShadowPassStatsForDebug()).toMatchObject({
       boundedShadowPassEnabled: false,
       shadowPrefixInstances: 2,
       lastMainPassInstances: 2,
@@ -391,7 +420,7 @@ describe('CDLODRenderer', () => {
     });
   });
 
-  it('bounds only the shadow-pass instance count when the perf candidate flag is enabled', () => {
+  it('bounds only the shadow-pass instance count when configured with a narrow radius', () => {
     mockIsPerfHarnessEnabled.mockReturnValue(true);
     setRuntimeSearch('?perf=1&perfBoundedTerrainShadowPass=1');
     const boundedRenderer = new CDLODRenderer({} as any, 33, 256);

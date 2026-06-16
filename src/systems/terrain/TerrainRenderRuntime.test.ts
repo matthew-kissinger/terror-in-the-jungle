@@ -7,14 +7,16 @@ import * as THREE from 'three';
 const {
   mockQuadtreeCtor,
   mockSelectTiles,
+  mockConfigureBoundedShadowPass,
   mockUpdateInstances,
   mockResubmitCurrentInstances,
   mockWasLastSelectionSaturated,
   mockGetLastSelectionStats,
 } = vi.hoisted(() => ({
-  mockQuadtreeCtor: vi.fn(),
-  mockSelectTiles: vi.fn().mockReturnValue([]),
-  mockUpdateInstances: vi.fn(),
+    mockQuadtreeCtor: vi.fn(),
+    mockSelectTiles: vi.fn().mockReturnValue([]),
+    mockConfigureBoundedShadowPass: vi.fn(),
+    mockUpdateInstances: vi.fn(),
   mockResubmitCurrentInstances: vi.fn(),
   mockWasLastSelectionSaturated: vi.fn().mockReturnValue(false),
   mockGetLastSelectionStats: vi.fn().mockReturnValue({
@@ -49,13 +51,17 @@ vi.mock('./CDLODQuadtree', () => ({
 }));
 
 vi.mock('./CDLODRenderer', () => ({
+  TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS: 640,
   CDLODRenderer: class {
     getMesh = vi.fn().mockReturnValue({});
-    configureBoundedShadowPass = vi.fn();
+    configureBoundedShadowPass = mockConfigureBoundedShadowPass;
     updateInstances = mockUpdateInstances;
     resubmitCurrentInstances = mockResubmitCurrentInstances;
     getShadowPassStatsForDebug = vi.fn().mockReturnValue({
       boundedShadowPassEnabled: false,
+      shadowCenterX: 0,
+      shadowCenterZ: 0,
+      shadowRadiusMeters: 0,
       shadowPrefixInstances: 0,
       lastMainPassInstances: 0,
       lastShadowPassInstances: 0,
@@ -82,6 +88,7 @@ describe('TerrainRenderRuntime', () => {
     mockQuadtreeCtor.mockClear();
     mockSelectTiles.mockClear();
     mockSelectTiles.mockReturnValue([]);
+    mockConfigureBoundedShadowPass.mockClear();
     mockUpdateInstances.mockClear();
     mockResubmitCurrentInstances.mockClear();
     mockWasLastSelectionSaturated.mockClear();
@@ -126,6 +133,43 @@ describe('TerrainRenderRuntime', () => {
     const lastCallArgs = mockQuadtreeCtor.mock.calls[mockQuadtreeCtor.mock.calls.length - 1];
     const [renderedExtent] = lastCallArgs;
     expect(renderedExtent).toBeGreaterThan(playableSize);
+  });
+
+  it('configures the terrain shadow caster bound from the directional shadow camera', () => {
+    const tile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0, edgeMorphMask: 0 };
+    mockSelectTiles.mockReturnValue([tile]);
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(1000, 40, 2000);
+    const shadowLight = new THREE.DirectionalLight();
+    shadowLight.target.position.set(25, 12, -75);
+    shadowLight.position.set(325, 412, -75);
+    shadowLight.shadow.camera.left = -100;
+    shadowLight.shadow.camera.right = 100;
+    shadowLight.shadow.camera.top = 100;
+    shadowLight.shadow.camera.bottom = -100;
+    shadowLight.shadow.camera.far = 1000;
+
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      camera,
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 1000,
+        visualMargin: 0,
+        maxLODLevels: 4,
+        lodRanges: [100, 250, 500, 1000],
+        tileResolution: 33,
+      },
+      undefined,
+      shadowLight,
+    );
+
+    runtime.update();
+
+    const [centerX, centerZ, radiusMeters] = mockConfigureBoundedShadowPass.mock.calls.at(-1) ?? [];
+    expect(centerX).toBe(25);
+    expect(centerZ).toBe(-75);
+    expect(radiusMeters).toBeCloseTo(805.421, 3);
   });
 
   it('selects terrain tiles from an explicit render camera override for review captures', () => {

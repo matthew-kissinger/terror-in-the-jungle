@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import type { CDLODTile } from './CDLODQuadtree';
+import { TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS } from './TerrainShadowBounds';
 
 /**
  * CDLOD tile base geometry: NxN XZ grid (`isSkirt=0`) plus a perimeter
@@ -108,13 +109,14 @@ export function isTerrainShadowPerfIsolationEnabled(): boolean {
 }
 
 export function isTerrainBoundedShadowPassEnabled(): boolean {
-  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
-    && isPerfHarnessEnabled()
-    && readBooleanQueryFlag('perfBoundedTerrainShadowPass');
+  return !readBooleanQueryFlag('terrainFullShadowPass');
 }
 
 export interface CDLODRendererShadowPassStats {
   boundedShadowPassEnabled: boolean;
+  shadowCenterX: number;
+  shadowCenterZ: number;
+  shadowRadiusMeters: number;
   shadowPrefixInstances: number;
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
@@ -135,10 +137,10 @@ export class CDLODRenderer {
   private tileParams0Attr: THREE.InstancedBufferAttribute;
   private tileParams1Attr: THREE.InstancedBufferAttribute;
   private readonly maxInstances: number;
-  private boundedShadowPassEnabled = false;
+  private boundedShadowPassEnabled = isTerrainBoundedShadowPassEnabled();
   private shadowCenterX = 0;
   private shadowCenterZ = 0;
-  private shadowRadiusMeters = 180;
+  private shadowRadiusMeters = TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS;
   private shadowRadiusSq = this.shadowRadiusMeters * this.shadowRadiusMeters;
   private shadowPrefixInstances = 0;
   private lastMainPassInstances = 0;
@@ -184,9 +186,8 @@ export class CDLODRenderer {
     geo.setAttribute('tileParams0', this.tileParams0Attr);
     geo.setAttribute('tileParams1', this.tileParams1Attr);
 
-    // Diagnostic-only terrain shadow isolation. Terrain still receives shadows
-    // so this isolates CDLOD shadow-caster submissions without changing the
-    // rest of the scene's shadow contract.
+    // Terrain still receives shadows, but only terrain within the useful
+    // camera-following shadow-map footprint is submitted as a caster.
     this.mesh.castShadow = !isTerrainShadowPerfIsolationEnabled();
     this.mesh.receiveShadow = true;
     this.mesh.onBeforeShadow = () => {
@@ -212,7 +213,11 @@ export class CDLODRenderer {
     return this.mesh;
   }
 
-  configureBoundedShadowPass(centerX: number, centerZ: number, radiusMeters = 180): void {
+  configureBoundedShadowPass(
+    centerX: number,
+    centerZ: number,
+    radiusMeters = TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS,
+  ): void {
     this.boundedShadowPassEnabled = isTerrainBoundedShadowPassEnabled();
     this.shadowCenterX = centerX;
     this.shadowCenterZ = centerZ;
@@ -346,6 +351,9 @@ export class CDLODRenderer {
   getShadowPassStatsForDebug(): CDLODRendererShadowPassStats {
     return {
       boundedShadowPassEnabled: this.boundedShadowPassEnabled,
+      shadowCenterX: this.shadowCenterX,
+      shadowCenterZ: this.shadowCenterZ,
+      shadowRadiusMeters: this.shadowRadiusMeters,
       shadowPrefixInstances: this.shadowPrefixInstances,
       lastMainPassInstances: this.lastMainPassInstances,
       lastShadowPassInstances: this.lastShadowPassInstances,

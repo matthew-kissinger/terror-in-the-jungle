@@ -148,6 +148,7 @@ export class TerrainSystem implements GameSystem {
     assetLoader: AssetLoader,
     globalBillboardSystem: GlobalBillboardSystem,
     runtimeConfig: TerrainRuntimeBootstrapConfig = { size: 64, renderDistance: 6, loadDistance: 7, lodLevels: 4 },
+    private readonly shadowLight: THREE.DirectionalLight | null = null,
   ) {
     this.scene = scene;
     this.camera = camera;
@@ -203,8 +204,7 @@ export class TerrainSystem implements GameSystem {
         maxLODLevels: this.config.maxLODLevels,
         lodRanges: this.config.lodRanges,
         tileResolution: this.config.tileResolution,
-      },
-      (x, z) => this.getHeightAt(x, z),
+      }, (x, z) => this.getHeightAt(x, z), this.shadowLight,
     );
     this.renderRuntime.init();
 

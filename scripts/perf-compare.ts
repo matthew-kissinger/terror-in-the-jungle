@@ -82,7 +82,10 @@ type CaptureSummary = {
   perfRuntime?: {
     npcCloseModelsDisabled?: boolean;
     terrainShadowsDisabled?: boolean;
+    terrainShadowPassMode?: 'bounded-default' | 'bounded-requested' | 'full-diagnostic';
+    terrainFullShadowPassEnabled?: boolean;
     boundedTerrainShadowPassEnabled?: boolean;
+    boundedTerrainShadowPassRequested?: boolean;
   };
   droppedFrameMetrics?: {
     browserRaf?: {
@@ -169,9 +172,16 @@ function avg(values: number[]): number {
 }
 
 function isDiagnosticRuntimeVariant(summary: Partial<CaptureSummary>): boolean {
-  return summary.perfRuntime?.npcCloseModelsDisabled === true
-    || summary.perfRuntime?.terrainShadowsDisabled === true
-    || summary.perfRuntime?.boundedTerrainShadowPassEnabled === true;
+  const runtime = summary.perfRuntime;
+  const legacyBoundedShadowCapture = runtime?.terrainShadowPassMode === undefined
+    && runtime?.boundedTerrainShadowPassEnabled === true;
+  return runtime?.npcCloseModelsDisabled === true
+    || runtime?.terrainShadowsDisabled === true
+    || runtime?.terrainFullShadowPassEnabled === true
+    || runtime?.terrainShadowPassMode === 'bounded-requested'
+    || runtime?.terrainShadowPassMode === 'full-diagnostic'
+    || runtime?.boundedTerrainShadowPassRequested === true
+    || legacyBoundedShadowCapture;
 }
 
 function listCaptureDirs(options: { includeDiagnosticRuntimeVariants?: boolean } = {}): string[] {

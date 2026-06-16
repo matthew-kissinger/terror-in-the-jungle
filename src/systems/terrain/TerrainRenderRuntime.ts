@@ -10,6 +10,7 @@ import {
   type TerrainTileHeightBounds,
 } from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
+import { computeTerrainShadowBoundRadius } from './TerrainShadowBounds';
 
 export interface TerrainDebugTile {
   x: number;
@@ -75,6 +76,9 @@ export interface TerrainRenderSubmissionStats {
   selectionHeightBoundsFallbacks: number;
   selectionHeightBoundsRejectedNodes: number;
   boundedShadowPassEnabled: boolean;
+  shadowCenterX: number;
+  shadowCenterZ: number;
+  shadowRadiusMeters: number;
   shadowPrefixInstances: number;
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
@@ -118,7 +122,6 @@ const HEIGHT_BOUNDS_MIN_PAD_METERS = 96;
 const HEIGHT_BOUNDS_SKIRT_PAD_METERS = 48;
 const HEIGHT_BOUNDS_TILE_PAD_FRACTION = 0.06;
 const HEIGHT_BOUNDS_MAX_PAD_METERS = 640;
-
 /**
  * Owns camera frustum extraction, quadtree tile selection, and instanced terrain draw submission.
  */
@@ -140,6 +143,7 @@ export class TerrainRenderRuntime {
   private quadtree: CDLODQuadtree;
   private renderer: CDLODRenderer;
   private readonly terrainHeightAt?: (x: number, z: number) => number;
+  private readonly shadowLight: THREE.DirectionalLight | null;
   private cameraOverride: THREE.PerspectiveCamera | null = null;
   private readonly lastSelectedTiles: TerrainDebugTile[] = [];
   private readonly debugTilePool: TerrainDebugTile[] = [];
@@ -173,11 +177,13 @@ export class TerrainRenderRuntime {
     material: THREE.Material,
     config: TerrainRenderRuntimeConfig,
     terrainHeightAt?: (x: number, z: number) => number,
+    shadowLight?: THREE.DirectionalLight | null,
   ) {
     this.scene = scene;
     this.camera = camera;
     this.config = { ...config, lodRanges: [...config.lodRanges] };
     this.terrainHeightAt = terrainHeightAt;
+    this.shadowLight = shadowLight ?? null;
     this.quadtree = this.buildQuadtree();
     this.renderer = new CDLODRenderer(material, this.config.tileResolution);
   }
@@ -313,7 +319,7 @@ export class TerrainRenderRuntime {
     },
   ): void {
     this.copySelectedTilesForDebug(tiles);
-    this.renderer.configureBoundedShadowPass(camera.position.x, camera.position.z);
+    this.configureTerrainShadowPass(camera);
     const updateStartedAt = nowMs();
     this.renderer.updateInstances(tiles);
     this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
@@ -329,7 +335,7 @@ export class TerrainRenderRuntime {
       classification: TerrainRenderSubmissionClassification;
     },
   ): void {
-    this.renderer.configureBoundedShadowPass(camera.position.x, camera.position.z);
+    this.configureTerrainShadowPass(camera);
     const updateStartedAt = nowMs();
     this.renderer.resubmitCurrentInstances();
     this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
@@ -479,6 +485,9 @@ export class TerrainRenderRuntime {
       selectionHeightBoundsFallbacks: selectionStats?.heightBoundsFallbacks ?? 0,
       selectionHeightBoundsRejectedNodes: selectionStats?.heightBoundsRejectedNodes ?? 0,
       boundedShadowPassEnabled: shadowStats.boundedShadowPassEnabled,
+      shadowCenterX: shadowStats.shadowCenterX,
+      shadowCenterZ: shadowStats.shadowCenterZ,
+      shadowRadiusMeters: shadowStats.shadowRadiusMeters,
       shadowPrefixInstances: shadowStats.shadowPrefixInstances,
       lastMainPassInstances: shadowStats.lastMainPassInstances,
       lastShadowPassInstances: shadowStats.lastShadowPassInstances,
@@ -500,6 +509,15 @@ export class TerrainRenderRuntime {
     const terrainY = this.terrainHeightAt(camera.position.x, camera.position.z);
     const relativeY = camera.position.y - terrainY;
     return Number.isFinite(relativeY) ? relativeY : camera.position.y;
+  }
+
+  private configureTerrainShadowPass(camera: THREE.Camera): void {
+    const center = this.shadowLight?.target.position ?? camera.position;
+    this.renderer.configureBoundedShadowPass(
+      center.x,
+      center.z,
+      computeTerrainShadowBoundRadius(this.shadowLight),
+    );
   }
 
   private shouldUseHeightAwareFrustum(): boolean {
