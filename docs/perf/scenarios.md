@@ -12,13 +12,16 @@ how to re-establish one live in [baselines.md](baselines.md).
 | `combat120` | AI Sandbox | 90s | 120 | Combat stress, primary regression target |
 | `openfrontier:short` | Open Frontier | 180s | 120 | Terrain + draw call pressure |
 | `ashau:short` | A Shau Valley | 180s | 60 | Strategy stack + heap peaks |
+| `openfrontier:ears` | Open Frontier | 180s | 120 | Dropped-frame completion-lane capture: strict WebGPU, render attribution, no frontline compression |
+| `ashau:ears` | A Shau Valley | 180s | 60 | Dropped-frame completion-lane capture: strict WebGPU, render attribution, no frontline compression |
 | `frontier30m` | Open Frontier | 30 min | 120 | Long-tail stability soak |
 | `zonecontrol` | Zone Control | 120s | 60 | Small-map gameplay |
 | `teamdeathmatch` | TDM | 120s | 80 | Kill-race scenario |
 
 Gated scenarios (when a baseline is tracked): `combat120`,
-`openfrontier:short`, `ashau:short`, `frontier30m`. Other scenarios are
-diagnostic only.
+`openfrontier:short`, `ashau:short`, `frontier30m`. For STABILIZAT-4
+dropped-frame completion, use the paired `openfrontier:ears` and `ashau:ears`
+artifacts with `check:dropped-frame-ears`; other scenarios are diagnostic only.
 
 ## Scenario-specific overrides
 

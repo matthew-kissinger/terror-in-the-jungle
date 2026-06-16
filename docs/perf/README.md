@@ -90,6 +90,8 @@ npm run perf:capture                    # Default scenario
 npm run perf:capture:combat120          # Primary regression target
 npm run perf:capture:openfrontier:short # Open Frontier 180s
 npm run perf:capture:ashau:short        # A Shau 180s
+npm run perf:capture:openfrontier:ears  # Dropped-frame EARS lane
+npm run perf:capture:ashau:ears         # Dropped-frame EARS lane
 npm run perf:capture:zonecontrol        # Zone Control 120s
 npm run perf:capture:teamdeathmatch     # TDM 120s
 npm run perf:capture:frontier30m        # 30-minute soak
@@ -106,6 +108,11 @@ npm run perf:compare                    # Compare latest vs baseline; prints raw
 npm run perf:compare:strict             # Same compare, fail on warnings too; failed captures still fail without a baseline
 npm run perf:update-baseline            # (Re)create perf-baselines.json from latest capture (use sparingly)
 ```
+
+The `*:ears` captures are the preferred local inputs for
+`npm run check:dropped-frame-ears -- --dir <ashau> --dir <open-frontier> --strict`.
+They force headed strict WebGPU, summary render-submission attribution, and no
+frontline compression.
 
 `perf:capture` accepts `--scenario`, `--server-mode`, `--headless`,
 `--cdp-profiler`, `--cdp-heap-sampling`, `--trace-window-start-ms`, and

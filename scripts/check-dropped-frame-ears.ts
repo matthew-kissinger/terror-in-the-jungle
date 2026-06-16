@@ -104,6 +104,11 @@ const HARNESS_EQUIVALENCE_IDS = [
 
 const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
   {
+    id: 'frontline_compression_requested',
+    path: ['perfRuntime', 'frontlineCompressionRequested'],
+    message: 'frontline compression was requested',
+  },
+  {
     id: 'npc_close_models_disabled',
     path: ['perfRuntime', 'npcCloseModelsDisabled'],
     message: 'close NPC models are disabled',

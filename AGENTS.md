@@ -58,6 +58,8 @@ npm run playtest:mobile          # Mobile playtest driver
 npm run perf:capture:combat120      # Primary regression target, 120 NPC AI stress
 npm run perf:capture:openfrontier:short
 npm run perf:capture:ashau:short
+npm run perf:capture:openfrontier:ears # Dropped-frame EARS lane: strict WebGPU + render attribution + no frontline compression
+npm run perf:capture:ashau:ears        # Dropped-frame EARS lane: strict WebGPU + render attribution + no frontline compression
 npm run perf:capture:frontier30m    # 30min soak
 npm run perf:startup:openfrontier   # Retail startup benchmark (mode select -> deploy -> playable)
 npm run perf:quick                  # Smoke capture (not a baseline)
