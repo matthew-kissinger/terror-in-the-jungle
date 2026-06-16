@@ -27,8 +27,5 @@ export function computeTerrainShadowBoundRadius(light: THREE.DirectionalLight | 
   const length = Math.hypot(dx, dy, dz);
   const horizontalFraction = length > 1e-5 ? Math.hypot(dx, dz) / length : 1;
 
-  return Math.max(
-    TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS,
-    far * horizontalFraction + halfDiagonal + TERRAIN_SHADOW_BOUND_MOTION_MARGIN_METERS,
-  );
+  return Math.max(1, far * horizontalFraction + halfDiagonal + TERRAIN_SHADOW_BOUND_MOTION_MARGIN_METERS);
 }
