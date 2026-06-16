@@ -4,100 +4,39 @@
 import * as THREE from 'three';
 import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import type { CDLODTile } from './CDLODQuadtree';
+import {
+  computeTileGeometryStats,
+  createEdgeSkirtGeometry,
+  createTileGeometry,
+  type CDLODTileGeometryStats,
+  type TerrainEdgeSkirtBit,
+} from './CDLODGeometry';
 import { TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS } from './TerrainShadowBounds';
 
-/**
- * CDLOD tile base geometry: NxN XZ grid (`isSkirt=0`) plus a perimeter
- * skirt ring (`isSkirt=1`). The vertex shader drops skirt verts by a
- * per-LOD amount to hide sub-pixel cracks at chunk borders. Skirt walls
- * are indexed with both windings so FrontSide terrain material cannot
- * cull the seam cover from oblique helicopter/far-horizon views. Stage
- * D2/D3 of `terrain-cdlod-seam`. Total verts = N*N + 4*N - 4.
- */
-export function createTileGeometry(
-  tileResolution: number,
-  options: { includeSkirts?: boolean } = {},
-): THREE.BufferGeometry {
-  const N = tileResolution;
-  const includeSkirts = options.includeSkirts ?? true;
-  const geometryStats = computeTileGeometryStats(N, includeSkirts);
-  const interiorCount = N * N;
-  const totalVerts = interiorCount + geometryStats.tileSkirtVertices;
-  const positions = new Float32Array(totalVerts * 3);
-  const isSkirtArr = new Float32Array(totalVerts);
+type TerrainSkirtMode = 'full' | 'sparse-edge' | 'none';
 
-  // Interior grid mirrors PlaneGeometry(1,1,N-1,N-1) post-rotateX(-π/2):
-  // rotateX(-π/2) maps (x, y_orig, 0) -> (x, 0, -y_orig). PlaneGeometry's
-  // y_orig at row j is 0.5 - j/(N-1), so post-rotation z = j/(N-1) - 0.5.
-  // Z must increase with j to preserve PlaneGeometry's CCW triangle winding;
-  // otherwise interior face normals flip to -Y and FrontSide culling hides
-  // the entire terrain when viewed from above.
-  for (let j = 0; j < N; j++) {
-    for (let i = 0; i < N; i++) {
-      const base = (j * N + i) * 3;
-      positions[base] = i / (N - 1) - 0.5;
-      positions[base + 2] = j / (N - 1) - 0.5;
-    }
-  }
-
-  // Skirt ring duplicates each perimeter vertex (corners shared between
-  // sides), tagged isSkirt=1. Walk the perimeter once.
-  const skirtIndexOf = new Int32Array(interiorCount).fill(-1);
-  if (includeSkirts) {
-    let cursor = interiorCount;
-    const dup = (interiorIdx: number): void => {
-      if (skirtIndexOf[interiorIdx] !== -1) return;
-      const ib = interiorIdx * 3;
-      const sb = cursor * 3;
-      positions[sb] = positions[ib];
-      positions[sb + 2] = positions[ib + 2];
-      isSkirtArr[cursor] = 1;
-      skirtIndexOf[interiorIdx] = cursor;
-      cursor++;
-    };
-    for (let i = 0; i < N; i++) dup(i);                            // top
-    for (let j = 1; j < N; j++) dup(j * N + (N - 1));              // right
-    for (let i = N - 2; i >= 0; i--) dup((N - 1) * N + i);          // bottom
-    for (let j = N - 2; j >= 1; j--) dup(j * N + 0);                // left
-  }
-
-  // Indices: interior triangles (PlaneGeometry winding) + two-sided
-  // skirt strips. Only skirt walls duplicate winding; the terrain top
-  // remains FrontSide so we do not pay a full-material DoubleSide cost.
-  const indexCount = geometryStats.tileTotalTriangles * 3;
-  const indices = totalVerts > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
-  let k = 0;
-  for (let j = 0; j < N - 1; j++) {
-    for (let i = 0; i < N - 1; i++) {
-      const a = j * N + i, b = a + 1, c = a + N, d = c + 1;
-      indices[k++] = a; indices[k++] = c; indices[k++] = b;
-      indices[k++] = b; indices[k++] = c; indices[k++] = d;
-    }
-  }
-  // Skirt strips: connect each perimeter edge's two interior endpoints
-  // with their skirt duplicates so the skirt drops vertically. Emit both
-  // windings because the seam may be viewed from either adjacent tile at
-  // helicopter/far-camera angles while the material remains FrontSide.
-  const addQuad = (ia: number, ib: number): void => {
-    const sa = skirtIndexOf[ia], sb = skirtIndexOf[ib];
-    indices[k++] = ia; indices[k++] = sa; indices[k++] = ib;
-    indices[k++] = ib; indices[k++] = sa; indices[k++] = sb;
-    indices[k++] = ia; indices[k++] = ib; indices[k++] = sa;
-    indices[k++] = ib; indices[k++] = sb; indices[k++] = sa;
-  };
-  if (includeSkirts) {
-    for (let i = 0; i < N - 1; i++) addQuad(i, i + 1);
-    for (let j = 0; j < N - 1; j++) addQuad(j * N + (N - 1), (j + 1) * N + (N - 1));
-    for (let i = 0; i < N - 1; i++) addQuad((N - 1) * N + (i + 1), (N - 1) * N + i);
-    for (let j = 0; j < N - 1; j++) addQuad((j + 1) * N + 0, j * N + 0);
-  }
-
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geo.setAttribute('isSkirt', new THREE.BufferAttribute(isSkirtArr, 1));
-  geo.setIndex(new THREE.BufferAttribute(indices, 1));
-  return geo;
+interface TerrainEdgeSkirtSpec {
+  bit: TerrainEdgeSkirtBit;
+  name: string;
 }
+
+interface TerrainEdgeSkirtInstanceState {
+  bit: TerrainEdgeSkirtBit;
+  mesh: THREE.InstancedMesh;
+  tileParams0Attr: THREE.InstancedBufferAttribute;
+  tileParams1Attr: THREE.InstancedBufferAttribute;
+  shadowPrefixInstances: number;
+  lastMainPassInstances: number;
+  lastShadowPassInstances: number;
+  restoreShadowCount: number | null;
+}
+
+const TERRAIN_EDGE_SKIRT_SPECS: readonly TerrainEdgeSkirtSpec[] = [
+  { bit: 1, name: 'North' },
+  { bit: 2, name: 'East' },
+  { bit: 4, name: 'South' },
+  { bit: 8, name: 'West' },
+];
 
 function readBooleanQueryFlag(name: string): boolean {
   if (typeof window === 'undefined') return false;
@@ -123,6 +62,12 @@ export function isTerrainSkirtPerfIsolationEnabled(): boolean {
     && readBooleanQueryFlag('perfDisableTerrainSkirts');
 }
 
+function getTerrainSkirtMode(): TerrainSkirtMode {
+  if (isTerrainSkirtPerfIsolationEnabled()) return 'none';
+  if (readBooleanQueryFlag('terrainFullTerrainSkirts')) return 'full';
+  return 'sparse-edge';
+}
+
 export function isTerrainBoundedShadowPassEnabled(): boolean {
   return !readBooleanQueryFlag('terrainFullShadowPass');
 }
@@ -135,38 +80,18 @@ export interface CDLODRendererShadowPassStats {
   shadowPrefixInstances: number;
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
+  lastMainPassEdgeSkirtInstances: number;
+  lastShadowPassEdgeSkirtInstances: number;
   shadowPassReductions: number;
+  edgeShadowPassReductions: number;
+  sparseEdgeSkirtsEnabled: boolean;
   tileInteriorTriangles: number;
   tileSkirtTriangles: number;
   tileSkirtTrianglesPerEdge: number;
   tileTotalTriangles: number;
-}
-
-export interface CDLODTileGeometryStats {
-  tileResolution: number;
-  tileInteriorVertices: number;
-  tileSkirtVertices: number;
-  tileInteriorTriangles: number;
-  tileSkirtTriangles: number;
-  tileSkirtTrianglesPerEdge: number;
-  tileTotalTriangles: number;
-}
-
-export function computeTileGeometryStats(tileResolution: number, includeSkirts = true): CDLODTileGeometryStats {
-  const N = Math.max(2, Math.floor(tileResolution));
-  const edgeSegments = N - 1;
-  const tileInteriorTriangles = edgeSegments * edgeSegments * 2;
-  const tileSkirtTrianglesPerEdge = includeSkirts ? edgeSegments * 4 : 0;
-  const tileSkirtTriangles = tileSkirtTrianglesPerEdge * 4;
-  return {
-    tileResolution: N,
-    tileInteriorVertices: N * N,
-    tileSkirtVertices: includeSkirts ? 4 * N - 4 : 0,
-    tileInteriorTriangles,
-    tileSkirtTriangles,
-    tileSkirtTrianglesPerEdge,
-    tileTotalTriangles: tileInteriorTriangles + tileSkirtTriangles,
-  };
+  tileFullSkirtTriangles: number;
+  lastMainPassTriangleEstimate: number;
+  lastShadowPassTriangleEstimate: number;
 }
 
 /**
@@ -182,6 +107,7 @@ export class CDLODRenderer {
   private mesh: THREE.InstancedMesh;
   private tileParams0Attr: THREE.InstancedBufferAttribute;
   private tileParams1Attr: THREE.InstancedBufferAttribute;
+  private readonly edgeSkirts: TerrainEdgeSkirtInstanceState[] = [];
   private readonly maxInstances: number;
   private boundedShadowPassEnabled = isTerrainBoundedShadowPassEnabled();
   private shadowCenterX = 0;
@@ -192,8 +118,11 @@ export class CDLODRenderer {
   private lastMainPassInstances = 0;
   private lastShadowPassInstances = 0;
   private shadowPassReductions = 0;
+  private edgeShadowPassReductions = 0;
   private restoreShadowCount: number | null = null;
   private readonly geometryStats: CDLODTileGeometryStats;
+  private readonly fullSkirtGeometryStats: CDLODTileGeometryStats;
+  private readonly sparseEdgeSkirtsEnabled: boolean;
 
   // Scratch matrix for setting instance transforms
   private readonly _matrix = new THREE.Matrix4();
@@ -205,14 +134,15 @@ export class CDLODRenderer {
   ) {
     this.maxInstances = maxInstances;
 
-    // Shared base geometry: a flat XZ plane with 1x1 dimensions plus a
-    // perimeter skirt ring tagged with `isSkirt = 1`. Each instance scales
-    // this to the tile's world size. The vertex shader drops skirt verts
-    // by a per-LOD amount to hide sub-pixel cracks at chunk borders. See
-    // `createTileGeometry` and `terrain-cdlod-seam` Stage D2.
-    const includeSkirts = !isTerrainSkirtPerfIsolationEnabled();
+    // Shared base geometry: a flat XZ plane with 1x1 dimensions. The default
+    // path moves seam skirts into separate edge-only instanced meshes so tiles
+    // pay skirt triangles only where `edgeMorphMask` marks a LOD transition.
+    const skirtMode = getTerrainSkirtMode();
+    const includeSkirts = skirtMode === 'full';
+    this.sparseEdgeSkirtsEnabled = skirtMode === 'sparse-edge';
     const geo = createTileGeometry(tileResolution, { includeSkirts });
     this.geometryStats = computeTileGeometryStats(tileResolution, includeSkirts);
+    this.fullSkirtGeometryStats = computeTileGeometryStats(tileResolution, true);
 
     this.mesh = new THREE.InstancedMesh(geo, material, maxInstances);
     this.mesh.frustumCulled = false; // Quadtree already culls
@@ -235,6 +165,12 @@ export class CDLODRenderer {
     geo.setAttribute('tileParams0', this.tileParams0Attr);
     geo.setAttribute('tileParams1', this.tileParams1Attr);
 
+    if (this.sparseEdgeSkirtsEnabled) {
+      for (const spec of TERRAIN_EDGE_SKIRT_SPECS) {
+        this.edgeSkirts.push(this.createEdgeSkirtState(spec, material, tileResolution, maxInstances));
+      }
+    }
+
     // Terrain still receives shadows, but only terrain within the useful
     // camera-following shadow-map footprint is submitted as a caster.
     this.mesh.castShadow = !isTerrainShadowPerfIsolationEnabled();
@@ -253,6 +189,10 @@ export class CDLODRenderer {
         this.restoreShadowCount = null;
       }
     };
+
+    for (const edgeSkirt of this.edgeSkirts) {
+      this.mesh.add(edgeSkirt.mesh);
+    }
   }
 
   /**
@@ -286,6 +226,7 @@ export class CDLODRenderer {
     this.clearAttributeUpdateRanges(this.mesh.instanceMatrix);
     this.clearAttributeUpdateRanges(this.tileParams0Attr);
     this.clearAttributeUpdateRanges(this.tileParams1Attr);
+    this.resetEdgeSkirtInstances();
 
     let writeIndex = 0;
     if (this.boundedShadowPassEnabled) {
@@ -293,30 +234,42 @@ export class CDLODRenderer {
         const tile = tiles[i];
         if (this.tileIntersectsShadowRadius(tile)) {
           this.writeTileInstance(writeIndex++, tile);
+          this.writeEdgeSkirtInstances(tile);
         }
       }
       this.shadowPrefixInstances = writeIndex;
+      this.rememberEdgeSkirtShadowPrefixes();
       for (let i = 0; i < count; i++) {
         const tile = tiles[i];
         if (!this.tileIntersectsShadowRadius(tile)) {
           this.writeTileInstance(writeIndex++, tile);
+          this.writeEdgeSkirtInstances(tile);
         }
       }
     } else {
       this.shadowPrefixInstances = count;
       for (let i = 0; i < count; i++) {
         this.writeTileInstance(i, tiles[i]);
+        this.writeEdgeSkirtInstances(tiles[i]);
       }
+      this.rememberEdgeSkirtShadowPrefixes();
     }
 
     this.markActivePrefixNeedsUpdate(count);
+    this.markEdgeSkirtActivePrefixesNeedsUpdate();
   }
 
   resubmitCurrentInstances(): void {
     this.clearAttributeUpdateRanges(this.mesh.instanceMatrix);
     this.clearAttributeUpdateRanges(this.tileParams0Attr);
     this.clearAttributeUpdateRanges(this.tileParams1Attr);
+    for (const edgeSkirt of this.edgeSkirts) {
+      this.clearAttributeUpdateRanges(edgeSkirt.mesh.instanceMatrix);
+      this.clearAttributeUpdateRanges(edgeSkirt.tileParams0Attr);
+      this.clearAttributeUpdateRanges(edgeSkirt.tileParams1Attr);
+    }
     this.markActivePrefixNeedsUpdate(this.mesh.count);
+    this.markEdgeSkirtActivePrefixesNeedsUpdate();
   }
 
   private writeTileInstance(index: number, tile: CDLODTile): void {
@@ -348,6 +301,134 @@ export class CDLODRenderer {
       morphFactor,
       edgeMorphMask,
     );
+  }
+
+  private writeEdgeSkirtInstances(tile: CDLODTile): void {
+    if (!this.sparseEdgeSkirtsEnabled) return;
+    const edgeMorphMask = Number(tile.edgeMorphMask ?? 0);
+    if (edgeMorphMask === 0) return;
+
+    for (const edgeSkirt of this.edgeSkirts) {
+      if ((edgeMorphMask & edgeSkirt.bit) === 0) continue;
+      const index = edgeSkirt.mesh.count;
+      if (index >= this.maxInstances) continue;
+      edgeSkirt.mesh.count = index + 1;
+      edgeSkirt.mesh.visible = true;
+      edgeSkirt.lastMainPassInstances = edgeSkirt.mesh.count;
+      this.writeTileInstanceToMesh(
+        edgeSkirt.mesh,
+        edgeSkirt.tileParams0Attr,
+        edgeSkirt.tileParams1Attr,
+        index,
+        tile,
+      );
+    }
+  }
+
+  private writeTileInstanceToMesh(
+    mesh: THREE.InstancedMesh,
+    tileParams0Attr: THREE.InstancedBufferAttribute,
+    tileParams1Attr: THREE.InstancedBufferAttribute,
+    index: number,
+    tile: CDLODTile,
+  ): void {
+    const base = index * 4;
+    const tileX = Math.fround(tile.x);
+    const tileZ = Math.fround(tile.z);
+    const tileSize = Math.fround(tile.size);
+    const lodLevel = Math.fround(tile.lodLevel);
+    const morphFactor = Math.fround(tile.morphFactor);
+    const edgeMorphMask = Math.fround(Number(tile.edgeMorphMask ?? 0));
+
+    this._matrix.makeScale(tileSize, 1, tileSize);
+    this._matrix.setPosition(tileX, 0, tileZ);
+    mesh.setMatrixAt(index, this._matrix);
+
+    this.writeTileParams(
+      tileParams0Attr,
+      tileParams1Attr,
+      base,
+      tileX,
+      tileZ,
+      tileSize,
+      lodLevel,
+      morphFactor,
+      edgeMorphMask,
+    );
+  }
+
+  private createEdgeSkirtState(
+    spec: TerrainEdgeSkirtSpec,
+    material: THREE.Material,
+    tileResolution: number,
+    maxInstances: number,
+  ): TerrainEdgeSkirtInstanceState {
+    const geometry = createEdgeSkirtGeometry(tileResolution, spec.bit);
+    const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
+    mesh.frustumCulled = false;
+    mesh.count = 0;
+    mesh.visible = false;
+    mesh.name = `CDLODTerrainEdgeSkirt${spec.name}`;
+    mesh.matrixAutoUpdate = false;
+    mesh.matrixWorldAutoUpdate = false;
+    mesh.castShadow = !isTerrainShadowPerfIsolationEnabled();
+    mesh.receiveShadow = true;
+
+    const tileParams0Attr = new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4);
+    const tileParams1Attr = new THREE.InstancedBufferAttribute(new Float32Array(maxInstances * 4), 4);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    tileParams0Attr.setUsage(THREE.DynamicDrawUsage);
+    tileParams1Attr.setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('tileParams0', tileParams0Attr);
+    geometry.setAttribute('tileParams1', tileParams1Attr);
+
+    const state: TerrainEdgeSkirtInstanceState = {
+      bit: spec.bit,
+      mesh,
+      tileParams0Attr,
+      tileParams1Attr,
+      shadowPrefixInstances: 0,
+      lastMainPassInstances: 0,
+      lastShadowPassInstances: 0,
+      restoreShadowCount: null,
+    };
+
+    mesh.onBeforeShadow = () => {
+      state.restoreShadowCount = mesh.count;
+      if (this.boundedShadowPassEnabled && state.shadowPrefixInstances < mesh.count) {
+        mesh.count = state.shadowPrefixInstances;
+        this.edgeShadowPassReductions += 1;
+      }
+      state.lastShadowPassInstances = mesh.count;
+    };
+    mesh.onAfterShadow = () => {
+      if (state.restoreShadowCount !== null) {
+        mesh.count = state.restoreShadowCount;
+        state.restoreShadowCount = null;
+      }
+    };
+
+    return state;
+  }
+
+  private resetEdgeSkirtInstances(): void {
+    for (const edgeSkirt of this.edgeSkirts) {
+      edgeSkirt.mesh.count = 0;
+      edgeSkirt.mesh.visible = false;
+      edgeSkirt.shadowPrefixInstances = 0;
+      edgeSkirt.lastMainPassInstances = 0;
+      edgeSkirt.lastShadowPassInstances = 0;
+      edgeSkirt.restoreShadowCount = null;
+      this.clearAttributeUpdateRanges(edgeSkirt.mesh.instanceMatrix);
+      this.clearAttributeUpdateRanges(edgeSkirt.tileParams0Attr);
+      this.clearAttributeUpdateRanges(edgeSkirt.tileParams1Attr);
+    }
+  }
+
+  private rememberEdgeSkirtShadowPrefixes(): void {
+    for (const edgeSkirt of this.edgeSkirts) {
+      edgeSkirt.shadowPrefixInstances = edgeSkirt.mesh.count;
+    }
   }
 
   private tileIntersectsShadowRadius(tile: CDLODTile): boolean {
@@ -393,6 +474,16 @@ export class CDLODRenderer {
     this.markAttributePrefixNeedsUpdate(this.tileParams1Attr, count * 4);
   }
 
+  private markEdgeSkirtActivePrefixesNeedsUpdate(): void {
+    for (const edgeSkirt of this.edgeSkirts) {
+      const count = edgeSkirt.mesh.count;
+      if (count <= 0) continue;
+      this.markAttributePrefixNeedsUpdate(edgeSkirt.mesh.instanceMatrix, count * 16);
+      this.markAttributePrefixNeedsUpdate(edgeSkirt.tileParams0Attr, count * 4);
+      this.markAttributePrefixNeedsUpdate(edgeSkirt.tileParams1Attr, count * 4);
+    }
+  }
+
   private markAttributePrefixNeedsUpdate(
     attribute: THREE.BufferAttribute | THREE.InstancedBufferAttribute,
     componentCount: number,
@@ -408,9 +499,24 @@ export class CDLODRenderer {
    */
   setMaterial(material: THREE.Material): void {
     this.mesh.material = material;
+    for (const edgeSkirt of this.edgeSkirts) {
+      edgeSkirt.mesh.material = material;
+    }
   }
 
   getShadowPassStatsForDebug(): CDLODRendererShadowPassStats {
+    const lastMainPassEdgeSkirtInstances = this.sumEdgeSkirtMainInstances();
+    const lastShadowPassEdgeSkirtInstances = this.sumEdgeSkirtShadowInstances();
+    const activeSkirtTrianglesPerEdge =
+      (this.sparseEdgeSkirtsEnabled || this.geometryStats.tileSkirtTriangles > 0)
+        ? this.fullSkirtGeometryStats.tileSkirtTrianglesPerEdge
+        : 0;
+    const mainPassTriangleEstimate =
+      this.lastMainPassInstances * this.geometryStats.tileTotalTriangles
+      + lastMainPassEdgeSkirtInstances * activeSkirtTrianglesPerEdge;
+    const shadowPassTriangleEstimate =
+      this.lastShadowPassInstances * this.geometryStats.tileTotalTriangles
+      + lastShadowPassEdgeSkirtInstances * activeSkirtTrianglesPerEdge;
     return {
       boundedShadowPassEnabled: this.boundedShadowPassEnabled,
       shadowCenterX: this.shadowCenterX,
@@ -419,18 +525,40 @@ export class CDLODRenderer {
       shadowPrefixInstances: this.shadowPrefixInstances,
       lastMainPassInstances: this.lastMainPassInstances,
       lastShadowPassInstances: this.lastShadowPassInstances,
+      lastMainPassEdgeSkirtInstances,
+      lastShadowPassEdgeSkirtInstances,
       shadowPassReductions: this.shadowPassReductions,
+      edgeShadowPassReductions: this.edgeShadowPassReductions,
+      sparseEdgeSkirtsEnabled: this.sparseEdgeSkirtsEnabled,
       tileInteriorTriangles: this.geometryStats.tileInteriorTriangles,
       tileSkirtTriangles: this.geometryStats.tileSkirtTriangles,
-      tileSkirtTrianglesPerEdge: this.geometryStats.tileSkirtTrianglesPerEdge,
+      tileSkirtTrianglesPerEdge: activeSkirtTrianglesPerEdge,
       tileTotalTriangles: this.geometryStats.tileTotalTriangles,
+      tileFullSkirtTriangles: this.fullSkirtGeometryStats.tileSkirtTriangles,
+      lastMainPassTriangleEstimate: mainPassTriangleEstimate,
+      lastShadowPassTriangleEstimate: shadowPassTriangleEstimate,
     };
   }
 
   dispose(): void {
     this.mesh.geometry.dispose();
+    for (const edgeSkirt of this.edgeSkirts) {
+      edgeSkirt.mesh.geometry.dispose();
+    }
     if (this.mesh.material instanceof THREE.Material) {
       this.mesh.material.dispose();
     }
+  }
+
+  private sumEdgeSkirtMainInstances(): number {
+    let total = 0;
+    for (const edgeSkirt of this.edgeSkirts) total += edgeSkirt.lastMainPassInstances;
+    return total;
+  }
+
+  private sumEdgeSkirtShadowInstances(): number {
+    let total = 0;
+    for (const edgeSkirt of this.edgeSkirts) total += edgeSkirt.lastShadowPassInstances;
+    return total;
   }
 }

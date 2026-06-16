@@ -8,6 +8,11 @@ enabled, war-asset visuals, weather/atmosphere, draw distance, player flow, and
 mode startup/deploy behavior must remain materially equivalent or better.
 
 Completion evidence required:
+0. The quantitative scaffold in
+   `docs/tasks/dropped-frame-ears-criteria.md` is the current pass/fail shape
+   for STABILIZAT-4. Future agents should treat those EARS criteria as the
+   default loop contract unless the owner explicitly changes thresholds or
+   scope.
 1. The perf harness measures the player-visible symptom directly: dropped-frame
    time, rAF gaps, long tasks / LoAFs, frame-time tails, and presentation epochs.
    It must also expose enough context to distrust itself when data looks wrong:
@@ -39,6 +44,30 @@ Completion evidence required:
    and shooting-path work in the suspect set until artifacts narrow it.
 
 Latest static checkpoint:
+- Sparse CDLOD edge-skirt checkpoint:
+  `CDLODRenderer` now renders default terrain as an interior tile instanced
+  mesh plus edge-only skirt instanced meshes only where `edgeMorphMask` marks a
+  LOD transition. Legacy full perimeter skirts remain available via
+  `?terrainFullTerrainSkirts=1` and `perf-capture --terrain-full-skirts`;
+  the no-skirt diagnostic remains `--disable-terrain-skirts` and is not a
+  gameplay candidate. This is an exact-preserving render-cost candidate:
+  A Shau / Open Frontier size, draw distance, heightmap sampling, CDLOD morph
+  rules, seam coverage on LOD transitions, vegetation, wildlife, weather, war
+  assets, combat pressure, and player flow are preserved. Focused terrain,
+  recorder, perf-summary, and perf-driver tests passed, along with
+  `npm run typecheck`, targeted ESLint, and `npm run build:perf`.
+- First sparse-skirt A Shau runtime artifact:
+  `artifacts/perf/2026-06-16T18-37-52-915Z` ran headed 60-NPC A Shau active
+  combat with `TIJ_QUIET_MACHINE=1` and WebGPU, but measurement trust failed
+  (`probeAvg=151.6ms`, `probeP95=211ms`), so it is diagnostic-only. It
+  confirmed lower terrain geometry pressure: average main terrain triangles
+  were about `543.7k/frame`, versus the previous full-skirt diagnostic
+  neighborhood around `681.9k/frame`; edge-transition skirts averaged about
+  `9.0k/frame` while full skirts would have averaged about `133.7k/frame`.
+  The dropped-frame goal still failed hard and the tail remained render-bound
+  (`RenderMain.renderer.render` about `38ms` in the selected slow callback).
+  Final-frame review did not show the earlier sky-ribbon terrain artifact, but
+  dense bamboo occlusion means this is not complete visual acceptance.
 - CDLOD terrain integrity checkpoint:
   Reference CDLOD codebases point to one invariant that matters for the owner
   symptom: selected tile bounds, transform, LOD/morph params, and heightmap

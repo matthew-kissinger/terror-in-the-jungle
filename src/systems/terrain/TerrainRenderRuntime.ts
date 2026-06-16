@@ -83,11 +83,18 @@ export interface TerrainRenderSubmissionStats {
   shadowPrefixInstances: number;
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
+  lastMainPassEdgeSkirtInstances: number;
+  lastShadowPassEdgeSkirtInstances: number;
   shadowPassReductions: number;
+  edgeShadowPassReductions: number;
+  sparseEdgeSkirtsEnabled: boolean;
   tileInteriorTriangles: number;
   tileSkirtTriangles: number;
   tileSkirtTrianglesPerEdge: number;
   tileTotalTriangles: number;
+  tileFullSkirtTriangles: number;
+  lastMainPassTriangleEstimate: number;
+  lastShadowPassTriangleEstimate: number;
 }
 
 const CAMERA_RENDER_SYNC_POSITION_EPSILON_METERS = 0;
@@ -478,11 +485,18 @@ export class TerrainRenderRuntime {
       shadowPrefixInstances: shadowStats.shadowPrefixInstances,
       lastMainPassInstances: shadowStats.lastMainPassInstances,
       lastShadowPassInstances: shadowStats.lastShadowPassInstances,
+      lastMainPassEdgeSkirtInstances: shadowStats.lastMainPassEdgeSkirtInstances,
+      lastShadowPassEdgeSkirtInstances: shadowStats.lastShadowPassEdgeSkirtInstances,
       shadowPassReductions: shadowStats.shadowPassReductions,
+      edgeShadowPassReductions: shadowStats.edgeShadowPassReductions,
+      sparseEdgeSkirtsEnabled: shadowStats.sparseEdgeSkirtsEnabled,
       tileInteriorTriangles: shadowStats.tileInteriorTriangles,
       tileSkirtTriangles: shadowStats.tileSkirtTriangles,
       tileSkirtTrianglesPerEdge: shadowStats.tileSkirtTrianglesPerEdge,
       tileTotalTriangles: shadowStats.tileTotalTriangles,
+      tileFullSkirtTriangles: shadowStats.tileFullSkirtTriangles,
+      lastMainPassTriangleEstimate: shadowStats.lastMainPassTriangleEstimate,
+      lastShadowPassTriangleEstimate: shadowStats.lastShadowPassTriangleEstimate,
     };
   }
 

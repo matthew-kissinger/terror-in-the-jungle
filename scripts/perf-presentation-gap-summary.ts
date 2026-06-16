@@ -508,31 +508,43 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     const tileSkirtTriangles = finiteNumber(terrainRender?.tileSkirtTriangles);
     const tileSkirtTrianglesPerEdge = finiteNumber(terrainRender?.tileSkirtTrianglesPerEdge);
     const tileTotalTriangles = finiteNumber(terrainRender?.tileTotalTriangles);
+    const tileFullSkirtTriangles = finiteNumber(terrainRender?.tileFullSkirtTriangles)
+      ?? tileSkirtTriangles;
+    const lastMainPassEdgeSkirtInstances = finiteNumber(terrainRender?.lastMainPassEdgeSkirtInstances);
+    const lastMainPassTriangleEstimate = finiteNumber(terrainRender?.lastMainPassTriangleEstimate);
+    const lastShadowPassTriangleEstimate = finiteNumber(terrainRender?.lastShadowPassTriangleEstimate);
     if (
       tileCount !== null
       && tileInteriorTriangles !== null
       && tileSkirtTriangles !== null
       && tileSkirtTrianglesPerEdge !== null
       && tileTotalTriangles !== null
+      && tileFullSkirtTriangles !== null
     ) {
       const interiorTriangles = tileCount * tileInteriorTriangles;
-      const fullSkirtTriangles = tileCount * tileSkirtTriangles;
-      const fullTriangles = tileCount * tileTotalTriangles;
-      const edgeTransitionSkirtTriangles = countEdgeMorphEdges(edgeMorphMaskCounts)
-        * tileSkirtTrianglesPerEdge;
+      const fullSkirtTriangles = tileCount * tileFullSkirtTriangles;
+      const fallbackFullTriangles = tileCount * tileTotalTriangles;
+      const edgeTransitionSkirtTriangles = (
+        lastMainPassEdgeSkirtInstances !== null
+          ? lastMainPassEdgeSkirtInstances
+          : countEdgeMorphEdges(edgeMorphMaskCounts)
+      ) * tileSkirtTrianglesPerEdge;
+      const mainTriangles = lastMainPassTriangleEstimate ?? fallbackFullTriangles;
       const potentialSkirtSavings = Math.max(0, fullSkirtTriangles - edgeTransitionSkirtTriangles);
       mainTerrainInteriorTriangleEstimates.push(interiorTriangles);
       mainTerrainFullSkirtTriangleEstimates.push(fullSkirtTriangles);
-      mainTerrainTriangleEstimates.push(fullTriangles);
+      mainTerrainTriangleEstimates.push(mainTriangles);
       edgeTransitionSkirtTriangleEstimates.push(edgeTransitionSkirtTriangles);
       potentialSkirtTriangleSavingsEstimates.push(potentialSkirtSavings);
-      if (fullTriangles > 0) {
-        potentialSkirtTriangleSavingsRatios.push(potentialSkirtSavings / fullTriangles);
+      if (mainTriangles > 0) {
+        potentialSkirtTriangleSavingsRatios.push(potentialSkirtSavings / mainTriangles);
       }
     }
 
     const shadowInstances = finiteNumber(terrainRender?.lastShadowPassInstances);
-    if (shadowInstances !== null && tileTotalTriangles !== null) {
+    if (lastShadowPassTriangleEstimate !== null) {
+      shadowTerrainTriangleEstimates.push(lastShadowPassTriangleEstimate);
+    } else if (shadowInstances !== null && tileTotalTriangles !== null) {
       shadowTerrainTriangleEstimates.push(shadowInstances * tileTotalTriangles);
     }
 

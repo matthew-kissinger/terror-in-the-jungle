@@ -964,12 +964,21 @@
       shadowPrefixInstances: finiteOrNull(value.shadowPrefixInstances),
       lastMainPassInstances: finiteOrNull(value.lastMainPassInstances),
       lastShadowPassInstances: finiteOrNull(value.lastShadowPassInstances),
+      lastMainPassEdgeSkirtInstances: finiteOrNull(value.lastMainPassEdgeSkirtInstances),
+      lastShadowPassEdgeSkirtInstances: finiteOrNull(value.lastShadowPassEdgeSkirtInstances),
       shadowPrefixRatio: finiteOrNull(value.shadowPrefixRatio),
       shadowPassReductions: finiteOrNull(value.shadowPassReductions),
+      edgeShadowPassReductions: finiteOrNull(value.edgeShadowPassReductions),
+      sparseEdgeSkirtsEnabled: typeof value.sparseEdgeSkirtsEnabled === 'boolean'
+        ? value.sparseEdgeSkirtsEnabled
+        : null,
       tileInteriorTriangles: finiteOrNull(value.tileInteriorTriangles),
       tileSkirtTriangles: finiteOrNull(value.tileSkirtTriangles),
       tileSkirtTrianglesPerEdge: finiteOrNull(value.tileSkirtTrianglesPerEdge),
       tileTotalTriangles: finiteOrNull(value.tileTotalTriangles),
+      tileFullSkirtTriangles: finiteOrNull(value.tileFullSkirtTriangles),
+      lastMainPassTriangleEstimate: finiteOrNull(value.lastMainPassTriangleEstimate),
+      lastShadowPassTriangleEstimate: finiteOrNull(value.lastShadowPassTriangleEstimate),
     };
   }
 

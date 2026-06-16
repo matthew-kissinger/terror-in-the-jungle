@@ -34,11 +34,18 @@ type TerrainRenderDebugStatsLike = {
   shadowPrefixInstances?: unknown;
   lastMainPassInstances?: unknown;
   lastShadowPassInstances?: unknown;
+  lastMainPassEdgeSkirtInstances?: unknown;
+  lastShadowPassEdgeSkirtInstances?: unknown;
   shadowPassReductions?: unknown;
+  edgeShadowPassReductions?: unknown;
+  sparseEdgeSkirtsEnabled?: unknown;
   tileInteriorTriangles?: unknown;
   tileSkirtTriangles?: unknown;
   tileSkirtTrianglesPerEdge?: unknown;
   tileTotalTriangles?: unknown;
+  tileFullSkirtTriangles?: unknown;
+  lastMainPassTriangleEstimate?: unknown;
+  lastShadowPassTriangleEstimate?: unknown;
 };
 
 type TerrainDebugSource = {
@@ -129,12 +136,19 @@ export interface PresentationTerrainRenderEpoch {
   shadowPrefixInstances: number;
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
+  lastMainPassEdgeSkirtInstances: number;
+  lastShadowPassEdgeSkirtInstances: number;
   shadowPrefixRatio: number | null;
   shadowPassReductions: number;
+  edgeShadowPassReductions: number;
+  sparseEdgeSkirtsEnabled: boolean;
   tileInteriorTriangles: number;
   tileSkirtTriangles: number;
   tileSkirtTrianglesPerEdge: number;
   tileTotalTriangles: number;
+  tileFullSkirtTriangles: number;
+  lastMainPassTriangleEstimate: number;
+  lastShadowPassTriangleEstimate: number;
 }
 
 export interface PresentationEpochContext {
@@ -452,10 +466,17 @@ function summarizeTerrainRender(source: TerrainDebugSource): PresentationTerrain
     lastShadowPassInstances: finiteNumber(stats.lastShadowPassInstances),
     shadowPrefixRatio,
     shadowPassReductions: finiteNumber(stats.shadowPassReductions),
+    lastMainPassEdgeSkirtInstances: finiteNumber(stats.lastMainPassEdgeSkirtInstances),
+    lastShadowPassEdgeSkirtInstances: finiteNumber(stats.lastShadowPassEdgeSkirtInstances),
+    edgeShadowPassReductions: finiteNumber(stats.edgeShadowPassReductions),
+    sparseEdgeSkirtsEnabled: Boolean(stats.sparseEdgeSkirtsEnabled),
     tileInteriorTriangles: finiteNumber(stats.tileInteriorTriangles),
     tileSkirtTriangles: finiteNumber(stats.tileSkirtTriangles),
     tileSkirtTrianglesPerEdge: finiteNumber(stats.tileSkirtTrianglesPerEdge),
     tileTotalTriangles: finiteNumber(stats.tileTotalTriangles),
+    tileFullSkirtTriangles: finiteNumber(stats.tileFullSkirtTriangles),
+    lastMainPassTriangleEstimate: finiteNumber(stats.lastMainPassTriangleEstimate),
+    lastShadowPassTriangleEstimate: finiteNumber(stats.lastShadowPassTriangleEstimate),
   };
 }
 
