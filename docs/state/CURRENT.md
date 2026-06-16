@@ -1,6 +1,6 @@
 # Current State
 
-Last aligned: 2026-06-15 (stabilization branch `task/dropped-frame-perf-harness` is being merged for release after the terrain coherency fix, dense vegetation-ring rollback, and dropped-frame harness alignment. The active goal remains dropped-frame time / visible-stutter reduction without shrinking Open Frontier or A Shau; runtime completion is not claimed until fresh quiet-machine capture and live release proof pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-06-16 UTC (2026-06-15 local): dropped-frame stabilization shipped at `5684df747f2092c9095ad1bd5e868abacfd5ab77` after the terrain coherency fix, dense vegetation-ring rollback, and dropped-frame harness alignment. Exact-head CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke passed in `npm run check:live-release` at `artifacts/perf/2026-06-16T01-17-17-966Z/projekt-143-live-release-proof/release-proof.json`. The active goal remains dropped-frame time / visible-stutter reduction without shrinking Open Frontier or A Shau; runtime completion is not claimed until fresh quiet-machine capture and owner playtest pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,22 +30,26 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
-- **2026-06-15 — dropped-frame time / visible-stutter finish line** (active
-  branch `task/dropped-frame-perf-harness`): the active goal is to reduce
+- **2026-06-15 local / 2026-06-16 UTC — dropped-frame stabilization release**
+  (`5684df747f2092c9095ad1bd5e868abacfd5ab77`, branch
+  `task/dropped-frame-perf-harness`): the active goal is to reduce
   player-visible dropped-frame time and stutter while preserving combat
   pressure, terrain/vegetation readability, wildlife/animals where enabled,
   war assets, weather/atmosphere, draw distance, startup/deploy flow, and normal
   player flow. The repo is aligned around the copyable finish-line statement in
   `docs/tasks/overnight-dropped-frame-goal-statement.txt` and the working
   handoff in
-  `docs/tasks/cycle-2026-06-14-dropped-frame-time-perf-research.md`. Static
-  cleanups since the last failed seeded A Shau run are not completion proof.
+  `docs/tasks/cycle-2026-06-14-dropped-frame-time-perf-research.md`.
+  Stabilization proof is green: focused tests, `validate:fast`, `build`,
+  exact-head CI run `27587079042`, deploy run `27587371780`, and
+  `check:live-release` all passed, with live manifest SHA matching the release
+  head. Static cleanups since the last failed seeded A Shau run are still not
+  completion proof.
   When perf capture resumes, agents should inspect `summary.json`,
   `presentation-epochs.json`, tail attribution, browser stall entries, and
-  driver trust fields before making further broad optimization changes. Local
-  success still needs release shepherding through `validate:fast`, relevant
-  perf/full evidence, merge to `master`, manual CI/deploy as needed,
-  `check:live-release`, and owner playtest.
+  driver trust fields before making further broad optimization changes. Runtime
+  success still needs relevant quiet-machine perf/full evidence and owner
+  playtest.
 - **2026-06-14 — Fable gated-systems readout**
   (`cycle-2026-06-14-fable-gated-systems-readout`): docs/proof-only readout
   is recorded. Renderer policy is promoted as one WebGPU-primary project with

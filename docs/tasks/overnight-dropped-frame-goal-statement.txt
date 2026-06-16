@@ -86,7 +86,12 @@ Execution order for agents:
    success from local proof alone.
 
 Current alignment:
-- Active branch: `task/dropped-frame-perf-harness`.
+- Stabilized release baseline:
+  `5684df747f2092c9095ad1bd5e868abacfd5ab77` is live on production after
+  focused tests, `validate:fast`, `build`, exact-head CI run `27587079042`,
+  deploy run `27587371780`, and `check:live-release` passed. Live proof:
+  `artifacts/perf/2026-06-16T01-17-17-966Z/projekt-143-live-release-proof/release-proof.json`.
+- Working branch identity: `task/dropped-frame-perf-harness`.
 - AC-47 collision is historical context, not the active branch identity.
 - Current status: not complete. The latest known runtime evidence still failed
   the dropped-frame goal, and newer static cleanups are unproven until the next
