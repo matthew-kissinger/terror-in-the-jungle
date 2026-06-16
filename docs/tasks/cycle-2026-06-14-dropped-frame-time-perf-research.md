@@ -10,12 +10,14 @@ copyable finish-line statement lives in
 `docs/tasks/overnight-dropped-frame-goal-statement.txt`.
 
 Release alignment: the 2026-06-15 local stabilization pass shipped at
-`5684df747f2092c9095ad1bd5e868abacfd5ab77`. The follow-up owner hotfix for
+`5684df747f2092c9095ad1bd5e868abacfd5ab77`. The owner hotfix for
 land-vehicle steering direction and the detached Huey rotor/stabilizer mesh
-shipped at `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`. Focused proof passed
-for the hotfix, exact-head CI run `27594724546`, deploy run `27594906745`, and
-`npm run check:live-release` passed. Live proof is
-`artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`.
+shipped at `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`, then the terrain
+presentation-gap summarizer and rejected CDLOD morph-only spike note shipped at
+`7cad7963e9e767e2d4ae14bcf9e0d27d93ef01e6`. Exact-head CI run
+`27596557373`, deploy run `27596698857`, and `npm run check:live-release`
+passed for `7cad7963`. Live proof is
+`artifacts/perf/2026-06-16T05-41-22-808Z/projekt-143-live-release-proof/release-proof.json`.
 Local proof and production proof are separate; future optimization slices still
 need the same release shepherding before they are called shipped.
 
