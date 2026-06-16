@@ -46,18 +46,23 @@ Completion evidence required:
    and shooting-path work in the suspect set until artifacts narrow it.
 
 Latest static checkpoint:
-- Sparse CDLOD edge-skirt checkpoint:
-  `CDLODRenderer` now renders default terrain as an interior tile instanced
-  mesh plus edge-only skirt instanced meshes only where `edgeMorphMask` marks a
-  LOD transition. Legacy full perimeter skirts remain available via
-  `?terrainFullTerrainSkirts=1` and `perf-capture --terrain-full-skirts`;
-  the no-skirt diagnostic remains `--disable-terrain-skirts` and is not a
-  gameplay candidate. This is an exact-preserving render-cost candidate:
-  A Shau / Open Frontier size, draw distance, heightmap sampling, CDLOD morph
-  rules, seam coverage on LOD transitions, vegetation, wildlife, weather, war
-  assets, combat pressure, and player flow are preserved. Focused terrain,
-  recorder, perf-summary, and perf-driver tests passed, along with
-  `npm run typecheck`, targeted ESLint, and `npm run build:perf`.
+- Terrain skirt stability checkpoint:
+  `CDLODRenderer` now uses full perimeter skirts as the production default
+  again. The sparse edge-only skirt path weakened the old blanket seam-cover
+  guarantee and is now diagnostic-only via `?terrainSparseTerrainSkirts=1` /
+  `perf-capture --terrain-sparse-skirts`; the no-skirt diagnostic remains
+  `--disable-terrain-skirts` and is not a gameplay candidate. This restores the
+  proper terrain-continuity invariant for A Shau / Open Frontier size, draw
+  distance, heightmap sampling, CDLOD morph rules, selected/frustum/height-bound
+  edges, world/DEM edges, vegetation, wildlife, weather, war assets, combat
+  pressure, and player flow. Focused terrain tests and build proof are still
+  required before treating this checkpoint as source-stable.
+- Camera/aim inspection:
+  Infantry movement still grounds the player at effective terrain height plus
+  eye height, recoil and camera shake are angular only, and `setViewAngles`
+  refreshes camera rotation from the player position. Continue watching harness
+  aim/view snaps and shot-time terrain/CDLOD sync, but do not assume camera
+  position clipping without a clearance artifact.
 - First sparse-skirt A Shau runtime artifact:
   `artifacts/perf/2026-06-16T18-37-52-915Z` ran headed 60-NPC A Shau active
   combat with `TIJ_QUIET_MACHINE=1` and WebGPU, but measurement trust failed

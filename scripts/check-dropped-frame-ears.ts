@@ -144,9 +144,9 @@ const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
     message: 'height-aware terrain frustum is disabled',
   },
   {
-    id: 'terrain_full_skirts_requested',
-    path: ['perfRuntime', 'terrainFullSkirtsRequested'],
-    message: 'full terrain skirts are explicitly requested',
+    id: 'terrain_sparse_skirts_requested',
+    path: ['perfRuntime', 'terrainSparseSkirtsRequested'],
+    message: 'sparse terrain skirts are explicitly requested',
   },
   {
     id: 'terrain_skirts_disabled',
@@ -178,7 +178,7 @@ const FORBIDDEN_QUERY_FLAGS = [
   'terrainForceInstanceUpload',
   'perfTerrainHeightAwareFrustum',
   'perfDisableTerrainHeightAwareFrustum',
-  'terrainFullTerrainSkirts',
+  'terrainSparseTerrainSkirts',
   'perfDisableTerrainSkirts',
   'perfDisableTerrainFarCanopyTint',
   'perfDisableTerrainLowSunOcclusion',

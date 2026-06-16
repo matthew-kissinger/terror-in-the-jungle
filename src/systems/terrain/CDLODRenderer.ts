@@ -65,7 +65,8 @@ export function isTerrainSkirtPerfIsolationEnabled(): boolean {
 function getTerrainSkirtMode(): TerrainSkirtMode {
   if (isTerrainSkirtPerfIsolationEnabled()) return 'none';
   if (readBooleanQueryFlag('terrainFullTerrainSkirts')) return 'full';
-  return 'sparse-edge';
+  if (readBooleanQueryFlag('terrainSparseTerrainSkirts')) return 'sparse-edge';
+  return 'full';
 }
 
 export function isTerrainBoundedShadowPassEnabled(): boolean {
@@ -134,10 +135,10 @@ export class CDLODRenderer {
   ) {
     this.maxInstances = maxInstances;
 
-    // Shared base geometry: a flat XZ plane with 1x1 dimensions. The default
-    // path moves seam skirts into separate edge-only instanced meshes so tiles
-    // pay skirt triangles only where the quadtree marks an edge as needing
-    // visual crack cover.
+    // Shared base geometry: a flat XZ plane with 1x1 dimensions. Production
+    // keeps the legacy full perimeter skirt so every selected tile boundary has
+    // visual cover; the sparse edge-skirt path remains an explicit diagnostic
+    // opt-in while its finite-edge guarantees are evaluated.
     const skirtMode = getTerrainSkirtMode();
     const includeSkirts = skirtMode === 'full';
     this.sparseEdgeSkirtsEnabled = skirtMode === 'sparse-edge';
