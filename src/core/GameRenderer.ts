@@ -15,6 +15,7 @@ import {
   createInitialRendererCapabilities,
   createWebGLRenderer,
   createWebGPURenderer,
+  attachRendererDeviceLossHandler,
   initializeCommonRenderer,
   inspectResolvedRendererBackend,
   isWebGPURenderer,
@@ -281,6 +282,20 @@ export class GameRenderer {
       this.applyCommonRendererSettings(renderer);
       renderer.domElement.style.display = previousDisplay;
       await initializeCommonRenderer(renderer);
+      const deviceLoss = attachRendererDeviceLossHandler(renderer, (state) => {
+        this.rendererCapabilities = {
+          ...this.rendererCapabilities,
+          deviceLoss: state,
+          notes: [
+            ...this.rendererCapabilities.notes,
+            `WebGPU device loss reported (${state.reason ?? 'unknown'}).`,
+          ],
+        };
+        Logger.warn(
+          'Renderer',
+          `WebGPU device lost (${state.reason ?? 'unknown'}): ${state.message ?? 'no message'}`
+        );
+      });
       const resolvedBackend = inspectResolvedRendererBackend(renderer);
 
       if (resolvedBackend !== 'webgpu') {
@@ -315,6 +330,7 @@ export class GameRenderer {
         ...capabilities,
         resolvedBackend,
         initStatus: 'ready',
+        deviceLoss,
         notes: [
           ...capabilities.notes,
           `Renderer initialized as ${resolvedBackend}.`,
@@ -350,6 +366,7 @@ export class GameRenderer {
       ...this.rendererCapabilities,
       adapterFeatures: [...this.rendererCapabilities.adapterFeatures],
       adapterLimits: { ...this.rendererCapabilities.adapterLimits },
+      deviceLoss: { ...this.rendererCapabilities.deviceLoss },
       notes: [...this.rendererCapabilities.notes],
     };
   }

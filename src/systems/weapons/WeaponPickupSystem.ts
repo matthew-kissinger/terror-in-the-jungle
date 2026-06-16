@@ -233,6 +233,8 @@ export class WeaponPickupSystem implements GameSystem {
     }
 
     const billboard = new THREE.Mesh(geometry, material);
+    billboard.name = `WeaponPickup_${type}`;
+    billboard.userData.perfCategory = 'weapons';
     billboard.position.copy(position);
     billboard.position.y = this.BILLBOARD_HEIGHT;
     billboard.matrixAutoUpdate = true;

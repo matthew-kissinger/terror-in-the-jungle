@@ -168,6 +168,7 @@ export class ZoneRenderer {
     const ringGeometry = new THREE.RingGeometry(zone.radius - 1, zone.radius, 32);
     const ringMaterial = this.getMaterialForState(zone.state);
     zone.zoneMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+    zone.zoneMesh.name = `ZoneRing_${zone.id}`;
     zone.zoneMesh.rotation.x = -Math.PI / 2;
     zone.zoneMesh.position.copy(zone.position);
     zone.zoneMesh.position.y = terrainHeight + 0.1;
@@ -178,6 +179,7 @@ export class ZoneRenderer {
     // Create flag pole
     const poleGeometry = new THREE.CylinderGeometry(0.2, 0.2, zone.height, 8);
     zone.flagPole = new THREE.Mesh(poleGeometry, this.flagPoleMaterial);
+    zone.flagPole.name = `ZoneFlagPole_${zone.id}`;
     zone.flagPole.position.copy(zone.position);
     zone.flagPole.position.y = terrainHeight + zone.height / 2;
     this.markZoneVisual(zone.flagPole);
@@ -186,6 +188,7 @@ export class ZoneRenderer {
 
     // Create both flags (US and OPFOR)
     zone.usFlagMesh = new THREE.Mesh(this.flagGeometry, this.usFlagMaterial);
+    zone.usFlagMesh.name = `ZoneFlag_US_${zone.id}`;
     zone.usFlagMesh.position.copy(zone.position);
     zone.usFlagMesh.position.x += 2.5;
     zone.usFlagMesh.position.y = terrainHeight;
@@ -195,6 +198,7 @@ export class ZoneRenderer {
 
     // OPFOR Flag (red)
     zone.opforFlagMesh = new THREE.Mesh(this.flagGeometry, this.opforFlagMaterial);
+    zone.opforFlagMesh.name = `ZoneFlag_OPFOR_${zone.id}`;
     zone.opforFlagMesh.position.copy(zone.position);
     zone.opforFlagMesh.position.x += 2.5;
     zone.opforFlagMesh.position.y = terrainHeight;
@@ -221,6 +225,7 @@ export class ZoneRenderer {
     // Create progress ring
     const progressGeometry = createProgressRingGeometry(zone.radius);
     zone.progressRing = new THREE.Mesh(progressGeometry, this.progressMaterial);
+    zone.progressRing.name = `ZoneProgressRing_${zone.id}`;
     zone.progressRing.rotation.x = -Math.PI / 2;
     zone.progressRing.position.copy(zone.position);
     zone.progressRing.position.y = terrainHeight + 0.2;
@@ -255,6 +260,7 @@ export class ZoneRenderer {
     });
 
     const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.name = `ZoneLabel_${zone.id}`;
     sprite.position.copy(zone.position);
     sprite.position.y = zone.position.y + zone.height + 3;
     sprite.scale.set(10, 2.5, 1);

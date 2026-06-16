@@ -373,6 +373,7 @@ export class SunDiscMesh {
     this.geometry = new THREE.PlaneGeometry(size, size);
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.name = 'SunDiscSprite';
+    this.mesh.userData.perfCategory = 'atmosphere';
     this.mesh.frustumCulled = false;
     // Render after the dome (`renderOrder = -1`) so the additive blend
     // composites against the painted sky background, not before it.

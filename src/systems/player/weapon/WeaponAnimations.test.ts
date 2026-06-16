@@ -508,7 +508,7 @@ describe('WeaponAnimations', () => {
   describe('Position Getters', () => {
     it('getBasePosition() returns correct values', () => {
       const pos = animations.getBasePosition()
-      expect(pos).toEqual({ x: 0.5, y: -0.45, z: -0.75 })
+      expect(pos).toEqual({ x: 0.5, y: -0.6, z: -0.82 })
     })
 
     it('getADSPosition() returns correct values', () => {

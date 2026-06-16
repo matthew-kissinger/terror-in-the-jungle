@@ -7,6 +7,16 @@ import { WebGLNodesHandler } from 'three/addons/tsl/WebGLNodesHandler.js';
 export type RendererBackendMode = 'webgl' | 'webgpu' | 'webgpu-force-webgl' | 'webgpu-strict';
 export type ResolvedRendererBackend = 'webgl' | 'webgpu' | 'webgpu-webgl-fallback' | 'unknown';
 export type RendererInitStatus = 'ready' | 'pending' | 'fallback-webgl' | 'failed';
+export type RendererDeviceLossReason = 'unknown' | 'destroyed' | 'unavailable';
+
+export interface RendererDeviceLossState {
+  supported: boolean;
+  lost: boolean;
+  reason: RendererDeviceLossReason | null;
+  message: string | null;
+  eventCount: number;
+  lastEventAtMs: number | null;
+}
 
 export interface RendererBackendCapabilities {
   requestedMode: RendererBackendMode;
@@ -20,9 +30,19 @@ export interface RendererBackendCapabilities {
   adapterName: string | null;
   adapterFeatures: string[];
   adapterLimits: Record<string, number | string | boolean | null>;
+  deviceLoss: RendererDeviceLossState;
   error: string | null;
   notes: string[];
 }
+
+type GPUDeviceLostInfoLike = {
+  reason?: string;
+  message?: string;
+};
+
+type GPUDeviceLike = {
+  lost?: Promise<GPUDeviceLostInfoLike>;
+};
 
 export type CommonRenderer = THREE.WebGLRenderer & {
   init?: () => Promise<unknown>;
@@ -31,6 +51,7 @@ export type CommonRenderer = THREE.WebGLRenderer & {
   backend?: {
     isWebGPUBackend?: boolean;
     isWebGLBackend?: boolean;
+    device?: GPUDeviceLike;
   };
 };
 
@@ -127,6 +148,7 @@ export function createInitialRendererCapabilities(
     adapterName: null,
     adapterFeatures: [],
     adapterLimits: {},
+    deviceLoss: createInitialRendererDeviceLossState(false),
     error: null,
     notes: requestedMode === 'webgl'
       ? ['Explicit WebGL diagnostic renderer selected.']
@@ -162,10 +184,66 @@ export async function createWebGPURenderer(
       adapterName: adapter.adapterName,
       adapterFeatures: adapter.adapterFeatures,
       adapterLimits: adapter.adapterLimits,
+      deviceLoss: createInitialRendererDeviceLossState(false),
       error: adapter.error,
       notes: adapter.notes,
     },
   };
+}
+
+export function createInitialRendererDeviceLossState(
+  supported: boolean,
+): RendererDeviceLossState {
+  return {
+    supported,
+    lost: false,
+    reason: supported ? null : 'unavailable',
+    message: null,
+    eventCount: 0,
+    lastEventAtMs: null,
+  };
+}
+
+export function attachRendererDeviceLossHandler(
+  renderer: CommonRenderer,
+  onLoss: (state: RendererDeviceLossState) => void,
+): RendererDeviceLossState {
+  const lostPromise = renderer.backend?.device?.lost;
+  if (!lostPromise || typeof lostPromise.then !== 'function') {
+    return createInitialRendererDeviceLossState(false);
+  }
+
+  const initialState = createInitialRendererDeviceLossState(true);
+  void lostPromise.then(
+    (info) => {
+      onLoss({
+        supported: true,
+        lost: true,
+        reason: normalizeDeviceLossReason(info?.reason),
+        message: typeof info?.message === 'string' && info.message.length > 0
+          ? info.message
+          : null,
+        eventCount: 1,
+        lastEventAtMs: Date.now(),
+      });
+    },
+    (error: unknown) => {
+      onLoss({
+        supported: true,
+        lost: true,
+        reason: 'unknown',
+        message: toErrorMessage(error),
+        eventCount: 1,
+        lastEventAtMs: Date.now(),
+      });
+    },
+  );
+
+  return initialState;
+}
+
+function normalizeDeviceLossReason(reason: unknown): RendererDeviceLossReason {
+  return reason === 'destroyed' || reason === 'unknown' ? reason : 'unknown';
 }
 
 export async function initializeCommonRenderer(renderer: CommonRenderer): Promise<void> {

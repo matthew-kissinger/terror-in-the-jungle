@@ -49,7 +49,7 @@ export class WeaponRigManager {
   private gunCore: GunplayCore // Current active weapon core
 
   // Base position (relative to screen)
-  private readonly basePosition = { x: 0.5, y: -0.45, z: -0.75 }
+  private readonly basePosition = { x: 0.5, y: -0.6, z: -0.82 }
 
   // Weapon switch animation state
   private isSwitchingWeapon = false

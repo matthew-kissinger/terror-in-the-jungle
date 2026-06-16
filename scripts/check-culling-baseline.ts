@@ -328,7 +328,7 @@ function perfDigest(path: string | null, mode: string): PerfDigest {
   const runtimeSamplesPath = join(path, '..', 'runtime-samples.json');
   const rawCategories = existsSync(sceneAttributionPath) ? readJson<SceneAttributionEntry[]>(sceneAttributionPath) : [];
   const samples = existsSync(runtimeSamplesPath) ? readJson<RuntimeSample[]>(runtimeSamplesPath) : [];
-  const categoryIds = [
+  const trackedCategoryIds = [
     'terrain',
     'vegetation_imposters',
     'world_static_features',
@@ -338,6 +338,12 @@ function perfDigest(path: string | null, mode: string): PerfDigest {
     'npc_imposters',
     'weapons',
     'unattributed',
+  ];
+  const categoryIds = [
+    ...trackedCategoryIds,
+    ...rawCategories
+      .map((entry) => entry.category)
+      .filter((category) => typeof category === 'string' && !trackedCategoryIds.includes(category)),
   ];
   const categories = categoryIds.map((id) => digestCategory(rawCategories.find((entry) => entry.category === id), id));
 

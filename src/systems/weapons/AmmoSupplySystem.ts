@@ -150,6 +150,8 @@ export class AmmoSupplySystem implements GameSystem {
 
   private createCrate(zone: CaptureZone): AmmoCrate {
     const crateGroup = new THREE.Group();
+    crateGroup.name = `AmmoCrate_${zone.id}`;
+    crateGroup.userData.perfCategory = 'ammo_supply';
 
     // Main crate box (brown/tan color)
     const boxGeometry = new THREE.BoxGeometry(this.CRATE_SIZE, this.CRATE_SIZE, this.CRATE_SIZE);

@@ -28,6 +28,7 @@ const _brake = new THREE.Vector3();
 const _force = new THREE.Vector3();
 const _accel = new THREE.Vector3();
 const _forward = new THREE.Vector3();
+const _right = new THREE.Vector3();
 const _worldUp = new THREE.Vector3(0, 1, 0);
 const _normal = new THREE.Vector3();
 const _yawAxis = new THREE.Vector3(0, 1, 0);
@@ -68,6 +69,15 @@ export interface GroundVehiclePhysicsConfig {
   airDragCoef: number;     // quadratic air drag (N per (m/s)^2)
   velocityDamping: number; // exponential damping base, e.g. 0.96
   angularDamping: number;  // exponential damping base, e.g. 0.85
+  /**
+   * Exponential retention for sideways tire slip while grounded. Lower values
+   * produce stronger arcade traction without changing forward speed.
+   */
+  lateralGripDamping: number;
+  /** Minimum drive authority retained on steep but still-climbable slopes. */
+  slopeDriveFloor: number;
+  /** Grounded gravity-tangent scale; below 1 reduces parked downhill sliding. */
+  slopeGravityScale: number;
   inputSmoothRate: number; // 1/s, per-second lerp rate toward raw input
   engineSpoolRate: number; // 1/s, engine RPM convergence rate
   /** Low-speed full-authority cutoff (m/s). Steering authority = 1 below this. */
@@ -101,16 +111,19 @@ const DEFAULT_PHYSICS: GroundVehiclePhysicsConfig = {
   wheelbase: 2.06,
   trackWidth: 1.42,
   axleOffset: 0.45,
-  engineTorque: 240,
-  gearRatio: 4.0,
+  engineTorque: 380,
+  gearRatio: 5.0,
   wheelRadius: 0.39,
   maxSteer: 0.6,
   maxBrake: 18000,
-  maxClimbSlope: 0.54,
-  rollingCoef: 60,
+  maxClimbSlope: 0.74,
+  rollingCoef: 85,
   airDragCoef: 1.6,
-  velocityDamping: 0.96,
-  angularDamping: 0.85,
+  velocityDamping: 0.9,
+  angularDamping: 0.78,
+  lateralGripDamping: 0.08,
+  slopeDriveFloor: 0.6,
+  slopeGravityScale: 0.3,
   inputSmoothRate: 8.0,
   engineSpoolRate: 2.0,
   steerLowSpeedCutoff: 5,
@@ -485,7 +498,7 @@ export class GroundVehiclePhysics {
     normal: THREE.Vector3,
   ): void {
     const { mass, engineTorque, gearRatio, wheelRadius, rollingCoef, airDragCoef,
-            maxBrake, maxClimbSlope } = this.cfg;
+            maxBrake, maxClimbSlope, slopeDriveFloor } = this.cfg;
 
     // Chassis-forward in world frame (model convention: local -Z forward).
     _forward.set(0, 0, -1).applyQuaternion(this.state.quaternion);
@@ -495,7 +508,12 @@ export class GroundVehiclePhysics {
     if (terrain && this.state.isGrounded) {
       const slope = terrain.getSlopeAt(this.state.position.x, this.state.position.z);
       if (slope > 0 && maxClimbSlope > 0) {
-        slopeFactor = THREE.MathUtils.clamp(1 - slope / maxClimbSlope, 0, 1);
+        slopeFactor = slope >= maxClimbSlope
+          ? 0
+          : Math.max(
+              THREE.MathUtils.clamp(slopeDriveFloor, 0, 1),
+              THREE.MathUtils.clamp(1 - slope / maxClimbSlope, 0, 1),
+            );
       }
     }
 
@@ -542,7 +560,7 @@ export class GroundVehiclePhysics {
         -gDotN * normal.x,
         this.GRAVITY - gDotN * normal.y,
         -gDotN * normal.z,
-      ).multiplyScalar(mass);
+      ).multiplyScalar(mass * this.cfg.slopeGravityScale);
     } else {
       _gravity.set(0, this.GRAVITY * mass, 0);
     }
@@ -553,9 +571,22 @@ export class GroundVehiclePhysics {
     // a = F / m; v += a * dt.
     _accel.copy(_force).divideScalar(mass);
     this.state.velocity.addScaledVector(_accel, deltaTime);
+    this.applyGroundTraction(deltaTime);
 
     // Integrate position from velocity.
     this.state.position.addScaledVector(this.state.velocity, deltaTime);
+  }
+
+  private applyGroundTraction(deltaTime: number): void {
+    if (!this.state.isGrounded) return;
+    _right.set(1, 0, 0).applyQuaternion(this.state.quaternion).normalize();
+    const lateralSpeed = this.state.velocity.dot(_right);
+    if (Math.abs(lateralSpeed) < 1e-5) return;
+    const retained = Math.pow(
+      THREE.MathUtils.clamp(this.cfg.lateralGripDamping, 0, 1),
+      deltaTime,
+    );
+    this.state.velocity.addScaledVector(_right, -lateralSpeed * (1 - retained));
   }
 
   // ---------- Ackermann yaw ----------

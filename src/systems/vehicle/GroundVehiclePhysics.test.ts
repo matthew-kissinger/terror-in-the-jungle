@@ -100,6 +100,35 @@ function makeSlopedTerrain(dydx: number): ITerrainRuntime {
   };
 }
 
+/**
+ * Mock terrain whose surface rises along chassis-forward for the default
+ * identity orientation (local/world -Z). risePerForwardMeter is rise/run as
+ * the vehicle moves toward negative Z.
+ */
+function makeForwardRampTerrain(risePerForwardMeter: number): ITerrainRuntime {
+  const slope = Math.atan(Math.abs(risePerForwardMeter));
+  const n = new THREE.Vector3(0, 1, risePerForwardMeter).normalize();
+  return {
+    getHeightAt: (_x: number, z: number) => -z * risePerForwardMeter,
+    getEffectiveHeightAt: (_x: number, z: number) => -z * risePerForwardMeter,
+    getSlopeAt: () => slope,
+    getNormalAt: (_x, _z, target) => {
+      const v = target ?? new THREE.Vector3();
+      return v.copy(n);
+    },
+    getPlayableWorldSize: () => 4000,
+    getWorldSize: () => 4000,
+    isTerrainReady: () => true,
+    hasTerrainAt: () => true,
+    getActiveTerrainTileCount: () => 1,
+    setSurfaceWetness: () => {},
+    updatePlayerPosition: () => {},
+    registerCollisionObject: () => {},
+    unregisterCollisionObject: () => {},
+    raycastTerrain: () => ({ hit: false }),
+  };
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -259,6 +288,39 @@ describe('GroundVehiclePhysics', () => {
       const travel = physics.getState().position.distanceTo(start);
       expect(travel).toBeGreaterThan(0.25);
       expect(physics.getForwardSpeed()).toBeGreaterThan(1.0);
+    });
+  });
+
+  describe('Arcade-hybrid traction', () => {
+    it('bleeds lateral slide faster than forward motion while grounded', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      for (let i = 0; i < 30; i++) physics.update(DT, flat);
+
+      physics.getState().velocity.set(6, 0, -4);
+      const initialLateral = Math.abs(physics.getState().velocity.x);
+      const initialForward = physics.getForwardSpeed();
+
+      for (let i = 0; i < 120; i++) physics.update(DT, flat);
+
+      expect(Math.abs(physics.getState().velocity.x)).toBeLessThan(initialLateral * 0.25);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(initialForward * 0.35);
+    });
+
+    it('keeps enough drive authority to climb a moderate jungle road grade', () => {
+      const ramp = makeForwardRampTerrain(0.5);
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      physics.setEngineActive(true);
+      for (let i = 0; i < 30; i++) physics.update(DT, ramp);
+
+      const start = physics.getState().position.clone();
+      physics.setControls({ throttle: 1.0, steerAngle: 0 });
+      for (let i = 0; i < 420; i++) physics.update(DT, ramp);
+
+      const state = physics.getState();
+      expect(state.position.z).toBeLessThan(start.z - 4);
+      expect(state.position.y).toBeGreaterThan(start.y + 1);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(0.8);
     });
   });
 

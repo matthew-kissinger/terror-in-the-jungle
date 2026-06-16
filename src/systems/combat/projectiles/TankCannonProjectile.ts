@@ -291,6 +291,7 @@ export class TankCannonProjectileSystem {
     });
     const mesh = new THREE.Mesh(geom, mat);
     mesh.name = `TankCannonShell_${index}`;
+    mesh.userData.perfCategory = 'projectiles';
     mesh.visible = false;
     mesh.frustumCulled = false;
     this.scene.add(mesh);

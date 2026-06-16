@@ -103,6 +103,35 @@ function makeSlopedTerrain(dydx: number): ITerrainRuntime {
   };
 }
 
+/**
+ * Surface rises along chassis-forward for the default identity orientation
+ * (local/world -Z). Used to prove tanks can crest practical jungle grades
+ * instead of stalling on every slope.
+ */
+function makeForwardRampTerrain(risePerForwardMeter: number): ITerrainRuntime {
+  const slope = Math.atan(Math.abs(risePerForwardMeter));
+  const n = new THREE.Vector3(0, 1, risePerForwardMeter).normalize();
+  return {
+    getHeightAt: (_x: number, z: number) => -z * risePerForwardMeter,
+    getEffectiveHeightAt: (_x: number, z: number) => -z * risePerForwardMeter,
+    getSlopeAt: () => slope,
+    getNormalAt: (_x, _z, target) => {
+      const v = target ?? new THREE.Vector3();
+      return v.copy(n);
+    },
+    getPlayableWorldSize: () => 4000,
+    getWorldSize: () => 4000,
+    isTerrainReady: () => true,
+    hasTerrainAt: () => true,
+    getActiveTerrainTileCount: () => 1,
+    setSurfaceWetness: () => {},
+    updatePlayerPosition: () => {},
+    registerCollisionObject: () => {},
+    unregisterCollisionObject: () => {},
+    raycastTerrain: () => ({ hit: false }),
+  };
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -263,6 +292,39 @@ describe('TrackedVehiclePhysics', () => {
       const ratio = Math.abs(state.angularVelocity.y) / Math.max(physics.getForwardSpeed(), 1e-3);
       expect(ratio).toBeGreaterThan(0.01);
       expect(ratio).toBeLessThan(10); // sanity ceiling — not pivoting in place
+    });
+  });
+
+  describe('Arcade-hybrid track grip', () => {
+    it('bleeds lateral hull slide faster than forward motion while grounded', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, DT);
+
+      physics.setControls(0.6, 0, false);
+      physics.getState().velocity.set(6, 0, -4);
+      const initialLateral = Math.abs(physics.getState().velocity.x);
+      const initialForward = physics.getForwardSpeed();
+
+      for (let i = 0; i < 120; i += 1) physics.update(DT, flat);
+
+      expect(Math.abs(physics.getState().velocity.x)).toBeLessThan(initialLateral * 0.2);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(initialForward * 0.3);
+    });
+
+    it('climbs a moderate jungle road grade under full throttle', () => {
+      const ramp = makeForwardRampTerrain(0.6);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, ramp, 30, DT);
+
+      const start = physics.getState().position.clone();
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 360; i += 1) physics.update(DT, ramp);
+
+      const state = physics.getState();
+      expect(state.position.z).toBeLessThan(start.z - 5);
+      expect(state.position.y).toBeGreaterThan(start.y + 1);
+      expect(physics.getForwardSpeed()).toBeGreaterThan(1.0);
     });
   });
 

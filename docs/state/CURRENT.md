@@ -1,17 +1,6 @@
 # Current State
 
-Last aligned: 2026-06-15 (active branch `task/dropped-frame-perf-harness`;
-current focus is dropped-frame time / visible-stutter reduction without
-shrinking Open Frontier or A Shau. Runtime completion is not yet verified: the
-latest known seeded A Shau evidence still failed the dropped-frame goal, and
-the newer static cleanups are unproven until the next quiet-machine capture.
-The 2026-06-12 war-asset repaint close remains the most recent production
-release proof: 191-GLB generated catalog live across all five consumer classes,
-`check:live-release` ALL PASS on the close deploy, combat120 steady-state p99
-33.40ms vs the 35.39 halt line; NOTE — all basin/level-depth water claims
-below are SUPERSEDED: hydrology + all water were stripped to first principles
-on 2026-06-09 and watercraft are dormant pending a future water rework; owner
-visual acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-06-15 (stabilization branch `task/dropped-frame-perf-harness` is being merged for release after the terrain coherency fix, dense vegetation-ring rollback, and dropped-frame harness alignment. The active goal remains dropped-frame time / visible-stutter reduction without shrinking Open Frontier or A Shau; runtime completion is not claimed until fresh quiet-machine capture and live release proof pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -57,6 +46,103 @@ The most recent shipped work, newest first:
   success still needs release shepherding through `validate:fast`, relevant
   perf/full evidence, merge to `master`, manual CI/deploy as needed,
   `check:live-release`, and owner playtest.
+- **2026-06-14 — Fable gated-systems readout**
+  (`cycle-2026-06-14-fable-gated-systems-readout`): docs/proof-only readout
+  is recorded. Renderer policy is promoted as one WebGPU-primary project with
+  fallback, not split WebGPU/WebGL2 projects. Heightfield/erosion remains
+  debug-only/deferred; debug hydrology remains future-VODA-only; sky/cloud/post
+  is the strongest visual spike candidate but still default-off pending strict
+  WebGPU visual matrix and owner acceptance; vegetation source assets are
+  deferred to an authored/imported asset pass; forest aggregate LOD and
+  Nanite-lite aggregate culling are deferred to scoped prototypes. Runtime
+  water, terrain authority swap, code-generated procedural vegetation, Fable
+  assets/species, full Forests port, and true meshlet Nanite remain no-go.
+- **2026-06-14 — procedural vegetation controlled burn**
+  (`cycle-2026-06-14-procedural-vegetation-controlled-burn`): the generated
+  procedural vegetation candidate path is rejected. The code-generated
+  banyan/rubber/teak/areca/mangrove/elephant-grass/deadfall/vine scaffold was
+  not visually acceptable and has been removed from prod-facing source. There
+  is no procedural vegetation pipeline, preview factory, gallery bootstrap
+  route, package script, runtime hook, or generated candidate asset shipping
+  from that pass. Fable remains useful only as an architecture reference:
+  accepted source assets first, then near geometry, mid aggregate/culling, and
+  far impostor or canopy shell only after source acceptance.
+- **2026-06-13 — CI release-signal housekeeping**
+  (`cycle-2026-06-13-ci-release-signal-housekeeping`): root cause for the
+  cancelled push checks was the manual `workflow_dispatch` CI sharing
+  `ci-${{ github.ref }}` with push CI. The wrapper behind `npm run ci:manual`
+  now checks for exact-HEAD `ci.yml` runs and watches/reuses an active or
+  successful run before dispatching a duplicate. If the latest exact-HEAD CI
+  run already completed non-success, the wrapper fails instead of masking it
+  with a new run. `ci.yml` concurrency is now
+  `ci-${{ github.event_name }}-${{ github.ref }}`, so push and manual CI can no
+  longer cancel each other while stale same-event attempts still collapse. The
+  separate Dependabot `esbuild` dynamic update failure on this head is handled
+  by a root `esbuild@0.28.1` override; remaining `npm audit` output is moderate
+  transitive `wrangler`/`miniflare`/`ws`/`brace-expansion` maintenance. This is
+  release housekeeping only: no gameplay code, vegetation assets, weapon pose,
+  vehicle tuning, water, terrain, sky, or renderer behavior changed.
+  Current production proof for head `68798b85d137c4fa50ae7f0de3f30f4113648af3`
+  is green: push CI run `27483500090`, deploy run `27483575632`, and
+  `npm run check:live-release` PASS at
+  `artifacts/perf/2026-06-14T00-41-05-810Z/projekt-143-live-release-proof/release-proof.json`.
+- **2026-06-13 — world-systems runtime release**
+  (`cycle-2026-06-13-world-systems-runtime-release`, deployed
+  `965f4fe5760896e57a40ffa46f571695403412e4`): latest `master` has
+  player-facing runtime changes, not only proof records. The
+  accepted vegetation aggregate LOD pass remains the vegetation scope for this
+  release: `JungleGroundRing`, far-canopy coverage, and the accepted
+  `fanPalm`/`coconut` canopy tier ship; broadleaf/rubber/banyan/mangrove/
+  elephant-grass source assets remain blocked until an accepted asset pass.
+  First-person weapon hip presentation is lowered for all guns while ADS stays
+  level. Wheeled and tracked vehicle physics now add lateral grip,
+  slope-drive floor, reduced grounded slope gravity, and retuned M151,
+  M35/ZIL, and M113 profiles for less ice-rink drift and better hill authority;
+  the shared ground follow camera is also pulled back/up so promoted trucks and
+  APCs do not trap the view inside the hull.
+  Existing sky-dome clouds receive a safe visibility-weight retune; the deeper
+  WebGPU-only sky/cloud/post replacement remains matrix-gated and default-off.
+  No terrain ownership swap, runtime water, wholesale Fable assets, full forest
+  port, or true meshlet Nanite ships in this release. Local runtime proof is
+  green across focused tests, `validate:fast`, `validate`, vegetation horizon /
+  grounding, TOD coherence, land-vehicle runtime proof, browser smoke, and Open
+  Frontier startup. Strict `perf:quick` all-green is a no-go for this slice
+  because the standard run still fails heap recovery and warns on p99; the CDP
+  forced-GC diagnostic shows heap can recover but is not clean frame-tail proof,
+  and `check:memory` is stale against the current deploy flow. Exact-HEAD CI
+  run `27482202770`, deploy run `27482272756`, and `npm run check:live-release`
+  all passed; live proof is
+  `artifacts/perf/2026-06-13T23-29-50-702Z/projekt-143-live-release-proof/release-proof.json`.
+- **2026-06-13 — world-systems promotion gates**
+  (`cycle-2026-06-13-world-systems-promotion-gates`): current next-cycle
+  scaffold turns the remaining Fable-derived topics into explicit GO/SPIKE/
+  NO-GO decisions. Safe runtime promotions are limited to existing accepted
+  vegetation/runtime renderer policy and vehicle interaction clarity; terrain
+  authority, debug water, sky/cloud/post, and forest aggregate LOD remain spike
+  lanes; runtime water, true meshlet Nanite, and wholesale Fable asset/species
+  ports are no-go until separately approved. The code-backed ledger is
+  `src/systems/world/WorldSystemsPromotionGate.ts` with gate script
+  `npm run check:world-systems-promotion`.
+- **2026-06-13 — Fable/world-systems release-decision run**
+  (`cycle-2026-06-13-world-systems-release-decision-run`): latest `master`
+  is treated as the release candidate. The proof/scaffold subset is GO:
+  renderer feature profile/device-loss/limits reporting, debug
+  heightfield/erosion spike, debug water proof, sky/cloud/post proof gate,
+  Vietnam vegetation species/source specs, forest aggregate LOD planner,
+  culling attribution tags, and documentation. The risky expansions stay
+  default-off/deferred: terrain authority swap, runtime water,
+  sky/cloud/post replacement, new vegetation source assets, runtime
+  forest/HLOD, and true meshlet Nanite. Release truth for the final
+  decision-record commit is `npm run validate`, `npm run deploy:prod`,
+  optional exact-HEAD `npm run ci:manual`, and `npm run check:live-release`.
+- **2026-06-13 — Fable5 world-system debug proofs**
+  (`cycle-2026-06-13-fable5-world-systems-debug-proofs`, deployed
+  `6796a6a6`): Fable5 is reference-only. The cycle shipped TIJ-owned
+  diagnostics and proof hooks for heightfield/erosion, debug-only water,
+  strict-WebGPU sky/cloud/post proof, Vietnam species specs, forest aggregate
+  LOD planning, and culling attribution. It did not copy Fable assets, swap
+  terrain authority, reactivate gameplay water, default-on cloud/post, or ship
+  runtime HLOD/Nanite.
 - **2026-06-12 — war-asset repaint integration** (`cycle-2026-06-11-war-asset-repaint`,
   12 PRs #383-#394, deployed `9c64c0bf`): the 108-asset Pixel Forge repaint
   flows through a generalized importer (`npm run assets:import-war-catalog` —

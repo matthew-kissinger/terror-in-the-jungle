@@ -415,6 +415,8 @@ export class AirSupportManager implements GameSystem {
 
 function createPlaceholderAircraft(type: AirSupportType): THREE.Group {
   const group = new THREE.Group();
+  group.name = `AirSupportPlaceholder_${type}`;
+  group.userData.perfCategory = 'fixed_wing_aircraft';
   // Simple box placeholder until GLB loads
   const size = type === 'spooky' ? 8 : type === 'napalm' ? 6 : 4;
   const geometry = new THREE.BoxGeometry(size * 0.3, size * 0.2, size);

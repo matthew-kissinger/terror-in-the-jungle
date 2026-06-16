@@ -1,0 +1,87 @@
+Stale remote prune candidates for cycle-2026-06-14-branch-shepherding-and-tank-salvage
+Generated after `git fetch origin --prune` on 2026-06-14.
+
+Rule used:
+- exclude origin/master, origin/HEAD, and active audit branch origin/codex/branch-shepherding-tank-cannon
+- require no open PR using the branch
+- require `git cherry origin/master <branch>` to report zero `+` commits
+- classify direct ancestors as `ancestor`
+- classify squash/cherry-pick equivalents as `patch-equivalent`
+
+Open PRs at refresh:
+- PR #398 uses origin/codex/branch-shepherding-tank-cannon and is excluded.
+
+Summary:
+- 68 stale remote candidates
+- 5 direct ancestors of origin/master
+- 63 patch-equivalent non-ancestors
+
+Candidates:
+- origin/codex/fable-world-systems-debug-proofs | 6796a6a6 | 2026-06-13 | ancestor | docs(cycle): align release acceptance evidence
+- origin/codex/vehicle-ac47-collision-polish | 58cc0d0a | 2026-06-13 | ancestor | feat(renderer): add WebGPU feature profile
+- origin/relicense-agpl-3.0 | d4b76100 | 2026-06-03 | ancestor | Relicense: MIT -> AGPL-3.0 (code) + CC BY-SA 4.0 (assets), forward-only
+- origin/task/ai-timing-gate | 3e09eff7 | 2026-06-09 | patch-equivalent | perf(combat): gate AI method-timing diagnostics + cache LOD interval params (ai-timing-gate)
+- origin/task/ambient-wildlife-mvp | a12b95c9 | 2026-06-12 | patch-equivalent | feat(wildlife): ambient ground-animal WildlifeSystem (tiger/buffalo/boar/macaque) (ambient-wildlife-mvp)
+- origin/task/asset-gallery-route | 1345fa0f | 2026-06-12 | patch-equivalent | feat(dev): war-asset review gallery + per-asset screenshot walk (asset-gallery-route)
+- origin/task/b52-arclight-callin | 2d4d3031 | 2026-06-12 | patch-equivalent | feat(airsupport): B-52 Arc Light high-altitude strike call-in (b52-arclight-callin)
+- origin/task/billboard-rig-migration | c18e8d29 | 2026-06-10 | patch-equivalent | feat(lighting): tune foliage rig response + fold billboard fog authority (billboard-rig-migration)
+- origin/task/budget-ratchet | c8ff8988 | 2026-06-09 | patch-equivalent | feat(lint): ratchet grandfathered file budgets to measured snapshots (budget-ratchet)
+- origin/task/bvh-rebuild-double-buffer | b4f2ed02 | 2026-06-09 | patch-equivalent | fix(terrain): double-buffer near-field BVH rebuild to stop hybrid LOS reads (bvh-rebuild-double-buffer)
+- origin/task/ci-gate-consolidation | 61364ec3 | 2026-06-09 | patch-equivalent | ci(gates): make fence/budget/docs/dead-code blocking on PRs (ci-gate-consolidation)
+- origin/task/combat-death-body-persistence | ffd33f19 | 2026-06-09 | patch-equivalent | fix(combat): make LOD manager sole body-despawn owner (combat-death-body-persistence)
+- origin/task/combat-death-unification | 2beda5e6 | 2026-06-09 | patch-equivalent | fix(combat): unify death pipeline + spatial-grid explosion query (combat-death-unification)
+- origin/task/dedup-map-renderers | 18950038 | 2026-06-09 | patch-equivalent | refactor(ui): unify world->map transforms + faction palette across map renderers (dedup-map-renderers)
+- origin/task/dedup-vehicle-adapters | 1be3a5b8 | 2026-06-09 | patch-equivalent | refactor(vehicle): extract shared player-adapter plumbing (dedup-vehicle-adapters)
+- origin/task/delete-orphan-modules | b06e359f | 2026-06-09 | patch-equivalent | docs: annotate deleted Konveyer spike paths for the doc-drift gate (delete-orphan-modules)
+- origin/task/deploy-armory-loadout-flow | a4b01c5d | 2026-06-07 | ancestor | feat(deploy): add armory loadout flow
+- origin/task/door-gun-seat | 4b6f49d5 | 2026-06-10 | patch-equivalent | feat(helicopter): player-crewable UH-1 door-gun seat (door-gun-seat)
+- origin/task/exposure-fog-presets-rig | abbec772 | 2026-06-10 | patch-equivalent | feat(lighting): rig-path fog + exposure policy + preset trims (exposure-fog-presets-rig)
+- origin/task/faction-isally-sweep | 50a54fad | 2026-06-09 | patch-equivalent | fix(combat): route faction comparisons through canonical isAlly helper (faction-isally-sweep)
+- origin/task/fire-gate-ordering | ae928a1d | 2026-06-09 | patch-equivalent | fix(combat): register NPC shots only after fire gates pass (fire-gate-ordering)
+- origin/task/fixed-wing-glb-cutover | a5678629 | 2026-06-12 | patch-equivalent | feat(vehicle): cut fixed-wing fleet over to normalized repaint GLBs (fixed-wing-glb-cutover)
+- origin/task/fixedwing-camera-fit | 70b834c2 | 2026-06-10 | patch-equivalent | feat(vehicle): per-airframe camera fit + AC-47 broadside view (fixedwing-camera-fit)
+- origin/task/fixedwing-gunsight | 9c78d183 | 2026-06-10 | patch-equivalent | feat(hud): fixed-wing reflector gunsight + visible ammo (fixedwing-gunsight)
+- origin/task/frame-order-guard | 006fa854 | 2026-06-09 | patch-equivalent | test(core): lock Vehicles-before-Player frame order + 'Other'-loop exclusion (frame-order-guard)
+- origin/task/gameplay-heightmap-resolution | d7c38d56 | 2026-06-09 | patch-equivalent | fix(terrain): DEM-faithful CPU gameplay-query heightmap (gameplay-heightmap-resolution)
+- origin/task/ground-vehicle-glb-cutover | d1fd1733 | 2026-06-12 | patch-equivalent | fix(vehicle): preserve m48 turret/barrel orientation across repaint axis wrapper (ground-vehicle-glb-cutover)
+- origin/task/gunship-reticle-upgrade | 995a1a2c | 2026-06-10 | patch-equivalent | feat(helicopter): Cobra CCIP rocket cue + per-weapon reticle + HUD ammo (gunship-reticle-upgrade)
+- origin/task/heli-hud-consolidation | bceb8a73 | 2026-06-10 | patch-equivalent | feat(helicopter): per-variant HUD + door-gun POV + traverse ticks (heli-hud-consolidation)
+- origin/task/helicopter-glb-cutover | 3a15064b | 2026-06-12 | patch-equivalent | feat(helicopter): static-GLB cutover with catalog-joint procedural rotors (helicopter-glb-cutover)
+- origin/task/konveyer-rename | c4903583 | 2026-06-10 | patch-equivalent | refactor: retire the konveyer codename - descriptive names for renderer-backend surface (konveyer-rename)
+- origin/task/legacy-path-deletion | 048c9cb1 | 2026-06-10 | patch-equivalent | fix(lighting): review fixes - assert emissive deleted, correct kill-switch doc (legacy-path-deletion)
+- origin/task/lighting-audit-memo | 7cc51a77 | 2026-06-09 | patch-equivalent | docs(rearch): lighting rig spike memo (lighting-audit-memo)
+- origin/task/loadout-deploy-equip-match | 9e5a1895 | 2026-06-04 | patch-equivalent | fix(player): deploy equips selected loadout primary, not in-flight weapon (loadout-deploy-equip-match)
+- origin/task/m2hb-gun-experience | 11a58962 | 2026-06-09 | patch-equivalent | feat(hud): M2HB gun experience - reticle, belt counter, traverse cue (m2hb-gun-experience)
+- origin/task/navmesh-coverage-ashau | 245d2cf7 | 2026-06-09 | patch-equivalent | fix(navigation): prebake full A Shau navmesh + worker-offload tiled gen (navmesh-coverage-ashau)
+- origin/task/npc-impostor-and-effects-rig | 585bc9ff | 2026-06-10 | patch-equivalent | feat(lighting): NPC impostors on the rig + sweep instrument fix (npc-impostor-and-effects-rig)
+- origin/task/npc-tank-cannon-wiring | 7ec47201 | 2026-06-09 | patch-equivalent | fix(combat): single-owner cannon pool stepping per review (npc-tank-cannon-wiring)
+- origin/task/per-aircraft-ordnance | 199428d4 | 2026-06-10 | patch-equivalent | feat(vehicle): per-airframe ordnance - A-1 wing cannons, F-4 rotary, AC-47 broadside (per-aircraft-ordnance)
+- origin/task/prune-prod-mockups | 903739b3 | 2026-06-09 | patch-equivalent | chore(build): strip public/mockups from prod build/deploy (prune-prod-mockups)
+- origin/task/purge-water-remnants | 38af1a35 | 2026-06-09 | patch-equivalent | chore(environment): purge unreachable underwater code + stranded river-asset pin (purge-water-remnants)
+- origin/task/real-mouse-input | c5cbed26 | 2026-06-09 | patch-equivalent | fix(input): real mouse-button state, delete dead fire-input probes (real-mouse-input)
+- origin/task/reticle-framework | ae974527 | 2026-06-09 | patch-equivalent | feat(hud): per-craft reticle modes for tank gunner + M2HB (reticle-framework)
+- origin/task/rig-prototype | 184d4382 | 2026-06-09 | patch-equivalent | feat(lighting): flag-gated unified rig prototype + A/B evidence (rig-prototype)
+- origin/task/settings-key-migration | 91e2b9c9 | 2026-06-09 | patch-equivalent | fix(settings): migrate localStorage key off legacy project name (settings-key-migration)
+- origin/task/tank-cannon-wiring | 5871e16a | 2026-06-09 | patch-equivalent | fix(vehicle): wire player tank cannon + M2HB fire on seated LMB (tank-cannon-wiring)
+- origin/task/tank-gunner-sight | 79977a70 | 2026-06-09 | patch-equivalent | feat(hud): M48 gunner sight reticle + panel + zoom (tank-gunner-sight)
+- origin/task/tank-interpolation | 4885849a | 2026-06-09 | patch-equivalent | fix(vehicle): render-time interpolation for tracked-vehicle physics (tank-interpolation)
+- origin/task/tank-sight-prod-wiring | 123fca18 | 2026-06-09 | patch-equivalent | feat(vehicle): route the prod gunner seat to the M48 sight (tank-sight-prod-wiring)
+- origin/task/terrain-rig-and-scene-lights | 64e6e6a5 | 2026-06-10 | patch-equivalent | feat(lighting): unify terrain + scene lights on the rig path (terrain-rig-and-scene-lights)
+- origin/task/terrain-worker-safety | fa2ee69c | 2026-06-09 | patch-equivalent | fix(terrain): harden TerrainWorkerPool lifecycle + evict DEM cache (terrain-worker-safety)
+- origin/task/tod-capture-harness | d6e276e5 | 2026-06-09 | patch-equivalent | feat(scripts): tod coherence sweep capture harness (tod-capture-harness)
+- origin/task/tod-coherence-gate | fa1984e5 | 2026-06-10 | patch-equivalent | feat(lighting): TOD coherence gate - committed tolerances + NPC fixture + deterministic anchor (tod-coherence-gate)
+- origin/task/ui-redesign-bakeoff | aff33284 | 2026-06-03 | ancestor | feat(ui): Field Journal frontend redesign (DIZAYN-4, 8-cycle campaign)
+- origin/task/vehicle-board-drive-e2e | 2471f74c | 2026-06-04 | patch-equivalent | fix(vehicle): seat-anchored board + spawn-on-terrain conform + jeep drive e2e (vehicle-board-drive-e2e)
+- origin/task/vehicle-player-position-sync | d4d73dc5 | 2026-06-09 | patch-equivalent | fix(vehicle): sync player position to chassis for ground/water/emplacement sessions (vehicle-player-position-sync)
+- origin/task/vehicle-seat-lifecycle | 104f1577 | 2026-06-09 | patch-equivalent | fix(vehicle): route every player enter/exit through the IVehicle seat model (vehicle-seat-lifecycle)
+- origin/task/war-asset-import-indexing-fix | 3171637e | 2026-06-12 | patch-equivalent | fix(assets): synthesize index buffers in war-asset importer (war-asset-import-indexing-fix)
+- origin/task/war-asset-import-pipeline | 1eaf6316 | 2026-06-12 | patch-equivalent | chore(docs-gate): grandfather seeded-brief forward refs (war-asset-import-pipeline)
+- origin/task/war-asset-import-repack-fix | d70b2335 | 2026-06-12 | patch-equivalent | fix(assets): repack interleaved vertex storage in war-asset importer (war-asset-import-repack-fix)
+- origin/task/watercraft-camera | cfc4b5e4 | 2026-06-09 | patch-equivalent | fix(vehicle): wire watercraft third-person follow camera on enter/exit (watercraft-camera)
+- origin/task/weapon-mag-transform-fix | 198b08a2 | 2026-06-12 | patch-equivalent | fix(weapons): seat viewmodel magazine inside axis wrapper (weapon-mag-transform-fix)
+- origin/task/weapon-recoil-plateau | 6b18a8ba | 2026-06-12 | patch-equivalent | fix(weapons): plateau sustained-fire recoil at a believable height (weapon-recoil-plateau)
+- origin/task/weapons-rig-cutover | d8effb4c | 2026-06-12 | patch-equivalent | feat(weapons): cut FP rig + NPC hold + M2HB visual to repaint GLBs (weapons-rig-cutover)
+- origin/task/wildlife-spawn-distance-race | 2d13cf5d | 2026-06-12 | patch-equivalent | fix(wildlife): re-check player distance after async spawn load (wildlife-spawn-distance-race)
+- origin/task/world-catalog-refresh | c5574a8f | 2026-06-12 | patch-equivalent | feat(world): cut settlement/firebase/airfield placements to repaint catalog (world-catalog-refresh)
+- origin/task/zone-base-ditch-placement | 72f5a9a0 | 2026-06-04 | patch-equivalent | fix(world): keep ZC bases + zones out of ditches via readiness guard + pad opt-out (zone-base-ditch-placement)
+- origin/task/zone-defenders-prune | e8ca47a4 | 2026-06-09 | patch-equivalent | fix(combat): shed dead/despawned ids from zoneDefenders so late-game zones keep getting fresh defenders (zone-defenders-prune)

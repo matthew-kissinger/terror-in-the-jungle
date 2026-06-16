@@ -32,6 +32,7 @@ const glassMat = new THREE.MeshStandardMaterial({ color: 0x8fb0ad, roughness: 0.
 export function buildM151JeepMesh(): THREE.Group {
   const root = new THREE.Group();
   root.name = 'm151_jeep_root';
+  root.userData.perfCategory = 'ground_vehicles';
 
   const chassis = new THREE.Mesh(
     new THREE.BoxGeometry(M151_HULL.width, M151_HULL.bodyHeight, M151_HULL.length),

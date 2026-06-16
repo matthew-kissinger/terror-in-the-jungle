@@ -177,6 +177,9 @@
     "check:route-quality": "npx tsx scripts/check-route-quality.ts",
     "check:helicopter-parity": "npx tsx scripts/check-helicopter-parity.ts",
     "check:platform-capabilities": "npx tsx scripts/check-platform-capabilities.ts",
+    "check:forest-lod-plan": "vitest run src/systems/terrain/ForestAggregateLodPlan.test.ts",
+    "check:world-systems-promotion": "vitest run src/systems/world/WorldSystemsPromotionGate.test.ts",
+    "check:sky-cloud-post-proof": "npx tsx scripts/check-sky-cloud-post-proof-gate.ts",
     "evidence:atmosphere": "npx tsx scripts/capture-atmosphere-recovery-shots.ts",
     "capture:tod-sweep": "npx tsx scripts/capture-tod-coherence-sweep.ts",
     "check:tod-coherence": "npx tsx scripts/capture-tod-coherence-sweep.ts --gate --label=gate",
@@ -212,6 +215,7 @@
     "wrangler": "^4.84.1"
   },
   "overrides": {
+    "esbuild": "0.28.1",
     "flatted": "^3.4.2",
     "postcss": "^8.5.10"
   },

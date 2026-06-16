@@ -472,6 +472,31 @@ describe('HosekWilkieSkyBackend (sky-integrated cloud coverage)', () => {
     expect(leftMask).toBeLessThanOrEqual(1);
     expect(Math.abs(rightMask - leftMask)).toBeLessThan(0.08);
   });
+
+  it('raises visual cloud contribution with coverage so cloudy presets read in ordinary sky views', () => {
+    const backend = new HosekWilkieSkyBackend();
+    backend.setCloudFeatureScaleMeters(900);
+    backend.setCloudWorldAnchor(new THREE.Vector3(120, 40, -80));
+
+    const directions: THREE.Vector3[] = [];
+    for (let i = 0; i < 32; i += 1) {
+      const azimuth = (i / 32) * Math.PI * 2;
+      directions.push(new THREE.Vector3(
+        Math.cos(azimuth),
+        0.55,
+        Math.sin(azimuth),
+      ).normalize());
+    }
+
+    backend.setCloudCoverage(0.35);
+    const low = Math.max(...directions.map((dir) => backend.sampleCloudVisualWeightForDebug(dir)));
+    backend.setCloudCoverage(0.9);
+    const high = Math.max(...directions.map((dir) => backend.sampleCloudVisualWeightForDebug(dir)));
+
+    expect(high).toBeGreaterThan(low);
+    expect(high).toBeGreaterThan(0.2);
+    expect(high).toBeLessThanOrEqual(1);
+  });
 });
 
 describe('ScenarioAtmospherePresets', () => {

@@ -9,9 +9,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import {
+  attachRendererDeviceLossHandler,
   collectNodeMaterialShaders,
+  type CommonRenderer,
   createInitialRendererCapabilities,
   resolveRendererBackendMode,
+  type RendererDeviceLossState,
 } from './RendererBackend';
 
 const originalHref = window.location.href;
@@ -96,6 +99,49 @@ describe('createInitialRendererCapabilities', () => {
     expect(caps.resolvedBackend).toBe('unknown');
     expect(caps.initStatus).toBe('pending');
     expect(caps.strictWebGPU).toBe(true);
+  });
+});
+
+describe('attachRendererDeviceLossHandler', () => {
+  it('reports WebGPU device loss from the renderer backend promise', async () => {
+    let resolveLoss: (info: { reason: string; message: string }) => void = () => {};
+    const lost = new Promise<{ reason: string; message: string }>((resolve) => {
+      resolveLoss = resolve;
+    });
+    const renderer = {
+      backend: {
+        isWebGPUBackend: true,
+        device: { lost },
+      },
+    } as unknown as CommonRenderer;
+    const events: RendererDeviceLossState[] = [];
+
+    const initial = attachRendererDeviceLossHandler(renderer, (state) => {
+      events.push(state);
+    });
+
+    expect(initial.supported).toBe(true);
+    expect(initial.lost).toBe(false);
+
+    resolveLoss({ reason: 'unknown', message: 'adapter reset' });
+    await Promise.resolve();
+
+    expect(events).toHaveLength(1);
+    expect(events[0].lost).toBe(true);
+    expect(events[0].reason).toBe('unknown');
+    expect(events[0].message).toBe('adapter reset');
+    expect(events[0].eventCount).toBe(1);
+  });
+
+  it('marks legacy renderers as not supporting WebGPU device-loss reporting', () => {
+    const renderer = { backend: { isWebGLBackend: true } } as unknown as CommonRenderer;
+    const initial = attachRendererDeviceLossHandler(renderer, () => {
+      throw new Error('legacy renderer should not report device loss');
+    });
+
+    expect(initial.supported).toBe(false);
+    expect(initial.lost).toBe(false);
+    expect(initial.reason).toBe('unavailable');
   });
 });
 

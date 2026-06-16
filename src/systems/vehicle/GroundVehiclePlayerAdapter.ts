@@ -91,14 +91,12 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
   // movement keys + fire suppression as needed by the session controller.
   readonly inputContext: InputContext = 'gameplay';
 
-  // Third-person follow tuning (jeep-sized; tank/truck adapters may override).
-  // Height + look-ahead frame the road ahead at a shallow (~6°) downward
-  // view pitch instead of staring down at the chassis roof; the camera still
-  // sits clearly above the vehicle so it can never read as a bumper cam.
-  cameraDistance = 7.25;
-  cameraHeight = 4.0;
-  cameraLookHeight = 1.6;
-  cameraLookAhead = 14.0;
+  // Shared follow tuning must clear jeeps, cargo trucks, and APCs because all
+  // promoted support vehicles use this adapter today.
+  cameraDistance = 12.0;
+  cameraHeight = 6.0;
+  cameraLookHeight = 2.0;
+  cameraLookAhead = 20.0;
 
   private controls: GroundVehicleControls = {
     throttle: 0,
