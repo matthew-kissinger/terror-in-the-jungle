@@ -103,6 +103,7 @@ export async function configureHeightSource(
     }
     return {
       kind: 'dem',
+      heightSampleSpacingMeters: metersPerPixel,
       terrainFingerprint: computeNavmeshBakeSignature({
         heightSource: config.heightSource,
         resolvedPath,
@@ -147,6 +148,7 @@ export async function configureHeightSource(
             gridSize,
             workerConfig,
           },
+          heightSampleSpacingMeters: config.worldSize / Math.max(1, gridSize - 1),
           terrainFingerprint: config.heightmapAsset,
         };
       }

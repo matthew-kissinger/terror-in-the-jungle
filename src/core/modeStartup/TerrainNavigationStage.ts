@@ -54,6 +54,7 @@ export async function configureTerrainAndNavigation(
     renderDistance: config.chunkRenderDistance,
     defaultBiomeId: defaultBiome,
     biomeRules: config.terrain?.biomeRules,
+    heightSampleSpacingMeters: preparedTerrainSource.heightSampleSpacingMeters,
   });
   terrainSystem.setFarCanopyTint(config.terrain?.farCanopyTint);
   markStartup(`engine-init.start-game.${config.id}.terrain-config.end`);

@@ -79,6 +79,7 @@ describe('ModeStartupPreparer', () => {
     const provider = getHeightQueryCache().getProvider();
 
     expect(result.kind).toBe('dem');
+    expect(result.heightSampleSpacingMeters).toBe(10);
     expect(provider).toBeInstanceOf(DEMHeightProvider);
     // Provider should report a non-zero height at the DEM center, proving the
     // buffer actually fed the DEM sampler rather than silently falling back.
@@ -232,6 +233,7 @@ describe('ModeStartupPreparer', () => {
     const provider = getHeightQueryCache().getProvider();
 
     expect(result.kind).toBe('prebaked');
+    expect(result.heightSampleSpacingMeters).toBe(3200);
     expect(result.preparedHeightmap?.gridSize).toBe(2);
     expect(result.preparedHeightmap?.workerConfig.type).toBe('noise');
     expect(provider).toBeInstanceOf(BakedHeightProvider);

@@ -12,6 +12,8 @@ export interface PreparedHeightmapGrid {
 export interface PreparedTerrainSource {
   kind: 'procedural' | 'dem' | 'prebaked';
   preparedHeightmap?: PreparedHeightmapGrid;
+  /** Approximate spacing between authoritative height samples, when finite. */
+  heightSampleSpacingMeters?: number;
   /** Deterministic source identity for runtime navmesh cache invalidation. */
   terrainFingerprint?: string | number;
 }
