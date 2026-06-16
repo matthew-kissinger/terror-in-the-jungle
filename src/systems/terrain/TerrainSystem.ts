@@ -28,10 +28,8 @@ import { TerrainQueries } from './TerrainQueries';
 import { VisualExtentHeightProvider } from './VisualExtentHeightProvider';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
 import { TerrainStreamingScheduler } from './streaming/TerrainStreamingScheduler';
-import {
-  buildTerrainVegetationRuntimeConfig,
-} from './TerrainBiomeRuntimeConfig';
-import { createTerrainConfig, computeDefaultLODRanges, computeMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
+import { buildTerrainVegetationRuntimeConfig } from './TerrainBiomeRuntimeConfig';
+import { createTerrainConfig, computeDefaultLODRanges, computeSourceAwareMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
 import { TerrainVegetationRuntime, type TerrainVegetationRuntimeDebugInfo } from './TerrainVegetationRuntime';
 
 interface TerrainStreamingMetricDebug {
@@ -50,6 +48,7 @@ interface TerrainModeSurfaceOptions {
   renderDistance?: number;
   defaultBiomeId: string;
   biomeRules?: BiomeClassificationRule[];
+  heightSampleSpacingMeters?: number;
 }
 
 interface TerrainAtmosphereLightingInput {
@@ -134,6 +133,7 @@ export class TerrainSystem implements GameSystem {
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
   private surfaceWetness = 0;
+  private heightSampleSpacingMeters: number | null = null;
   private preparedHeightmap: PreparedHeightmapGrid | null = null;
   private terrainFeatures: CompiledTerrainFeatureSet = {
     stamps: [],
@@ -162,11 +162,7 @@ export class TerrainSystem implements GameSystem {
     // Default world extent follows startup config until a mode sets an explicit map size.
     const worldSize = this.computeWorldSize();
 
-    this.config = createTerrainConfig({
-      worldSize,
-      visualMargin: 200,
-      maxLODLevels: computeMaxLODLevels(worldSize, 200, 32),
-    });
+    this.config = createTerrainConfig({ worldSize, visualMargin: 200, maxLODLevels: computeSourceAwareMaxLODLevels(worldSize, 200, 32) });
 
     this.surfaceRuntime = new TerrainSurfaceRuntime(assetLoader, this.config.splatmap, this.config.tileResolution - 1, this.config.lodRanges);
     const losAccelerator = new LOSAccelerator();
@@ -590,6 +586,7 @@ export class TerrainSystem implements GameSystem {
 
     this.config.worldSize = this.computeWorldSize();
     this.config.visualMargin = Math.max(0, options.visualMargin);
+    this.heightSampleSpacingMeters = Number.isFinite(options.heightSampleSpacingMeters) && options.heightSampleSpacingMeters! > 0 ? options.heightSampleSpacingMeters! : null;
     this.defaultBiomeId = options.defaultBiomeId;
     this.biomeRules = options.biomeRules ?? [];
     this.recomputeLodConfig();
@@ -877,11 +874,7 @@ export class TerrainSystem implements GameSystem {
   }
 
   private recomputeLodConfig(): void {
-    this.config.maxLODLevels = computeMaxLODLevels(
-      this.config.worldSize,
-      this.config.visualMargin,
-      this.config.tileResolution - 1,
-    );
+    this.config.maxLODLevels = computeSourceAwareMaxLODLevels(this.config.worldSize, this.config.visualMargin, this.config.tileResolution - 1, undefined, this.heightSampleSpacingMeters);
     this.surfaceRuntime.setLodRanges(this.config.lodRanges = computeDefaultLODRanges(this.config.worldSize, this.config.maxLODLevels));
   }
 

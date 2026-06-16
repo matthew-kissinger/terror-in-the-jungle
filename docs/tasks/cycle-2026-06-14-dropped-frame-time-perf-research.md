@@ -48,9 +48,36 @@ need the same release shepherding before they are called shipped.
 - When captures resume, inspect `summary.json`, `presentation-epochs.json`,
   tail attribution, browser stall entries, and driver trust fields before
   making more broad performance changes.
+- Do not use a visual smoke as the primary proof for intermittent terrain
+  see-through / sky-band issues. Browser images are supporting evidence only;
+  terrain fixes must preserve a structural CDLOD / height-source / submission
+  invariant that applies outside the specific camera, airfield, or screenshot
+  where a symptom was observed.
 
 ## Latest Static Sidecar Findings
 
+- Source-aware CDLOD resolution correction:
+  A Shau's renderer was still choosing near CDLOD depth from the default
+  procedural 4 m target even though its authoritative DEM source is 9 m per
+  pixel. That made the 21 km DEM produce sub-source render triangles and extra
+  morphing/seam work that no height source could actually justify. The terrain
+  startup path now carries finite height sample spacing from DEM and prebaked
+  heightmaps into `TerrainSystem.configureModeSurface()`, and
+  `computeSourceAwareMaxLODLevels()` caps CDLOD depth from that source spacing.
+  Procedural/Open Frontier terrain keeps the existing 4 m target path. This is
+  a source-authority fix, not an airfield/screenshot-specific visual smoke:
+  focused tests assert the A Shau 9 m DEM no longer selects a finer-than-source
+  LOD0 grid while procedural and fine prebaked sources preserve current depth.
+  Diagnostic headed A Shau EARS capture
+  `artifacts/perf/2026-06-16T21-06-02-113Z` still failed the dropped-frame
+  gate and measurement trust, so the goal remains open, but it shows the fix
+  moved the terrain geometry pressure in the intended direction: CDLOD depth
+  `8 -> 6`, LOD0 spacing `2.63m -> 10.52m`, average selected terrain tiles
+  about `139` instead of the prior `270` neighborhood, average main terrain
+  triangles about `305k` instead of the prior `584k` neighborhood, and tail
+  terrain triangles about `311k` instead of the prior `695k` neighborhood.
+  Remaining failures are render-time / presentation-time failures, not proof
+  that the visual terrain artifact is fixed.
 - Sparse CDLOD edge-skirt correction:
   The first sparse-skirt pass was too narrow: it populated edge-only skirt
   meshes only from `edgeMorphMask`, so it preserved coarser-neighbor

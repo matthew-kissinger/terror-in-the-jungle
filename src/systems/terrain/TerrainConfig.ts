@@ -43,6 +43,10 @@ export interface TerrainSystemConfig {
   vegetationUpdateBudgetMs: number;
 }
 
+const MIN_CDLOD_LEVELS = 4;
+const MAX_CDLOD_LEVELS = 8;
+const DEFAULT_RENDER_TARGET_SPACING_METERS = 4;
+
 /** Default 4-layer splatmap matching the existing biome textures. */
 const DEFAULT_SPLATMAP: SplatmapConfig = {
   layers: [
@@ -66,11 +70,51 @@ export function computeMaxLODLevels(
   worldSize: number,
   visualMargin: number,
   tileQuads: number = 32,
-  targetSpacing: number = 4,
+  targetSpacing: number = DEFAULT_RENDER_TARGET_SPACING_METERS,
 ): number {
   const quadtreeSize = worldSize + visualMargin * 2;
   const needed = Math.ceil(Math.log2(quadtreeSize / (targetSpacing * tileQuads)));
-  return Math.max(4, Math.min(8, needed));
+  return clampCDLODLevels(needed);
+}
+
+/**
+ * Compute render LOD depth while respecting the authority of the height source.
+ *
+ * The default target keeps procedural maps at the existing 4 m near-grid goal.
+ * For DEM/prebaked sources, sourceSampleSpacing prevents CDLOD from producing
+ * sub-source near triangles that only interpolate one height texel into many
+ * unstable/morphing render triangles.
+ */
+export function computeSourceAwareMaxLODLevels(
+  worldSize: number,
+  visualMargin: number,
+  tileQuads: number = 32,
+  targetSpacing: number = DEFAULT_RENDER_TARGET_SPACING_METERS,
+  sourceSampleSpacing?: number | null,
+): number {
+  const targetLevels = computeMaxLODLevels(worldSize, visualMargin, tileQuads, targetSpacing);
+  const sourceSpacing = sourceSampleSpacing;
+  if (sourceSpacing === null || sourceSpacing === undefined || !Number.isFinite(sourceSpacing) || sourceSpacing <= targetSpacing) {
+    return targetLevels;
+  }
+
+  const quadtreeSize = worldSize + visualMargin * 2;
+  const sourceBound = Math.floor(Math.log2(quadtreeSize / (sourceSpacing * tileQuads)));
+  return Math.min(targetLevels, clampCDLODLevels(sourceBound));
+}
+
+export function computeLOD0VertexSpacing(
+  worldSize: number,
+  visualMargin: number,
+  maxLODLevels: number,
+  tileQuads: number = 32,
+): number {
+  const quadtreeSize = worldSize + visualMargin * 2;
+  return quadtreeSize / Math.pow(2, maxLODLevels) / tileQuads;
+}
+
+function clampCDLODLevels(levels: number): number {
+  return Math.max(MIN_CDLOD_LEVELS, Math.min(MAX_CDLOD_LEVELS, levels));
 }
 
 /**
