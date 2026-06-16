@@ -86,8 +86,17 @@ export type PresentationGapTerrainSummary = {
   shadowPrefixRatio?: NumericStats;
   renderSelectionMs?: NumericStats;
   renderUpdateInstancesMs?: NumericStats;
+  mainTerrainTriangleEstimate?: NumericStats;
+  mainTerrainInteriorTriangleEstimate?: NumericStats;
+  mainTerrainFullSkirtTriangleEstimate?: NumericStats;
+  edgeTransitionSkirtTriangleEstimate?: NumericStats;
+  potentialSkirtTriangleSavingsEstimate?: NumericStats;
+  potentialSkirtTriangleSavingsRatio?: NumericStats;
+  shadowTerrainTriangleEstimate?: NumericStats;
   avgLodCounts: Record<string, number>;
   maxLodCounts: Record<string, number>;
+  avgEdgeMorphMaskCounts: Record<string, number>;
+  maxEdgeMorphMaskCounts: Record<string, number>;
 };
 
 export type PresentationGapContextSummary = {
@@ -307,6 +316,41 @@ function addLodCounts(
   }
 }
 
+function addStringNumberCounts(
+  counts: Record<string, unknown> | null,
+  totals: Record<string, number>,
+  maxes: Record<string, number>,
+): void {
+  if (!counts) return;
+  for (const [key, value] of Object.entries(counts)) {
+    const count = finiteNumber(value);
+    if (count === null) continue;
+    totals[key] = (totals[key] ?? 0) + count;
+    maxes[key] = Math.max(maxes[key] ?? 0, count);
+  }
+}
+
+function countMaskBits(value: number): number {
+  const mask = Math.max(0, Math.trunc(value));
+  let bits = 0;
+  for (let bit = 1; bit <= 8; bit <<= 1) {
+    if ((mask & bit) !== 0) bits += 1;
+  }
+  return bits;
+}
+
+function countEdgeMorphEdges(edgeMorphMaskCounts: Record<string, unknown> | null): number {
+  if (!edgeMorphMaskCounts) return 0;
+  let edges = 0;
+  for (const [maskKey, value] of Object.entries(edgeMorphMaskCounts)) {
+    const mask = finiteNumber(maskKey);
+    const count = finiteNumber(value);
+    if (mask === null || count === null) continue;
+    edges += countMaskBits(mask) * count;
+  }
+  return edges;
+}
+
 function classifyShadowPrefixCoverage(
   terrainRender: Record<string, unknown> | null,
 ): string {
@@ -359,8 +403,17 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
   const shadowPrefixRatios: number[] = [];
   const renderSelectionMs: number[] = [];
   const renderUpdateInstancesMs: number[] = [];
+  const mainTerrainTriangleEstimates: number[] = [];
+  const mainTerrainInteriorTriangleEstimates: number[] = [];
+  const mainTerrainFullSkirtTriangleEstimates: number[] = [];
+  const edgeTransitionSkirtTriangleEstimates: number[] = [];
+  const potentialSkirtTriangleSavingsEstimates: number[] = [];
+  const potentialSkirtTriangleSavingsRatios: number[] = [];
+  const shadowTerrainTriangleEstimates: number[] = [];
   const lodTotals: Record<string, number> = {};
   const lodMaxes: Record<string, number> = {};
+  const edgeMorphMaskTotals: Record<string, number> = {};
+  const edgeMorphMaskMaxes: Record<string, number> = {};
 
   for (const gap of gaps) {
     const presentationContext = objectOrNull(gap.presentationContext);
@@ -447,6 +500,41 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     pushFinite(edgeMorphTiles, terrain?.edgeMorphTiles);
     pushFinite(maxMorphFactors, terrain?.maxMorphFactor);
     addLodCounts(objectOrNull(terrain?.lodCounts), lodTotals, lodMaxes);
+    const edgeMorphMaskCounts = objectOrNull(terrain?.edgeMorphMaskCounts);
+    addStringNumberCounts(edgeMorphMaskCounts, edgeMorphMaskTotals, edgeMorphMaskMaxes);
+
+    const tileCount = finiteNumber(terrain?.tileCount);
+    const tileInteriorTriangles = finiteNumber(terrainRender?.tileInteriorTriangles);
+    const tileSkirtTriangles = finiteNumber(terrainRender?.tileSkirtTriangles);
+    const tileSkirtTrianglesPerEdge = finiteNumber(terrainRender?.tileSkirtTrianglesPerEdge);
+    const tileTotalTriangles = finiteNumber(terrainRender?.tileTotalTriangles);
+    if (
+      tileCount !== null
+      && tileInteriorTriangles !== null
+      && tileSkirtTriangles !== null
+      && tileSkirtTrianglesPerEdge !== null
+      && tileTotalTriangles !== null
+    ) {
+      const interiorTriangles = tileCount * tileInteriorTriangles;
+      const fullSkirtTriangles = tileCount * tileSkirtTriangles;
+      const fullTriangles = tileCount * tileTotalTriangles;
+      const edgeTransitionSkirtTriangles = countEdgeMorphEdges(edgeMorphMaskCounts)
+        * tileSkirtTrianglesPerEdge;
+      const potentialSkirtSavings = Math.max(0, fullSkirtTriangles - edgeTransitionSkirtTriangles);
+      mainTerrainInteriorTriangleEstimates.push(interiorTriangles);
+      mainTerrainFullSkirtTriangleEstimates.push(fullSkirtTriangles);
+      mainTerrainTriangleEstimates.push(fullTriangles);
+      edgeTransitionSkirtTriangleEstimates.push(edgeTransitionSkirtTriangles);
+      potentialSkirtTriangleSavingsEstimates.push(potentialSkirtSavings);
+      if (fullTriangles > 0) {
+        potentialSkirtTriangleSavingsRatios.push(potentialSkirtSavings / fullTriangles);
+      }
+    }
+
+    const shadowInstances = finiteNumber(terrainRender?.lastShadowPassInstances);
+    if (shadowInstances !== null && tileTotalTriangles !== null) {
+      shadowTerrainTriangleEstimates.push(shadowInstances * tileTotalTriangles);
+    }
 
     const cameraSample = objectOrNull(terrain?.cameraSample);
     const clearance = pushFinite(cameraClearances, cameraSample?.clearanceMeters);
@@ -471,6 +559,10 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
   const avgLodCounts: Record<string, number> = {};
   for (const [lod, total] of Object.entries(lodTotals)) {
     avgLodCounts[lod] = total / gapCount;
+  }
+  const avgEdgeMorphMaskCounts: Record<string, number> = {};
+  for (const [mask, total] of Object.entries(edgeMorphMaskTotals)) {
+    avgEdgeMorphMaskCounts[mask] = total / gapCount;
   }
 
   return {
@@ -512,8 +604,17 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     shadowPrefixRatio: numericStats(shadowPrefixRatios),
     renderSelectionMs: numericStats(renderSelectionMs),
     renderUpdateInstancesMs: numericStats(renderUpdateInstancesMs),
+    mainTerrainTriangleEstimate: numericStats(mainTerrainTriangleEstimates),
+    mainTerrainInteriorTriangleEstimate: numericStats(mainTerrainInteriorTriangleEstimates),
+    mainTerrainFullSkirtTriangleEstimate: numericStats(mainTerrainFullSkirtTriangleEstimates),
+    edgeTransitionSkirtTriangleEstimate: numericStats(edgeTransitionSkirtTriangleEstimates),
+    potentialSkirtTriangleSavingsEstimate: numericStats(potentialSkirtTriangleSavingsEstimates),
+    potentialSkirtTriangleSavingsRatio: numericStats(potentialSkirtTriangleSavingsRatios),
+    shadowTerrainTriangleEstimate: numericStats(shadowTerrainTriangleEstimates),
     avgLodCounts,
     maxLodCounts: lodMaxes,
+    avgEdgeMorphMaskCounts,
+    maxEdgeMorphMaskCounts: edgeMorphMaskMaxes,
   };
 }
 

@@ -66,6 +66,10 @@ describe('PresentationEpochRecorder', () => {
           lastMainPassInstances: 160,
           lastShadowPassInstances: 40,
           shadowPassReductions: 7,
+          tileInteriorTriangles: 2048,
+          tileSkirtTriangles: 512,
+          tileSkirtTrianglesPerEdge: 128,
+          tileTotalTriangles: 2560,
         }),
         getHeightAt: () => 18,
         getEffectiveHeightAt: () => 19,
@@ -151,6 +155,10 @@ describe('PresentationEpochRecorder', () => {
       lastShadowPassInstances: 40,
       shadowPrefixRatio: 0.25,
       shadowPassReductions: 7,
+      tileInteriorTriangles: 2048,
+      tileSkirtTriangles: 512,
+      tileSkirtTrianglesPerEdge: 128,
+      tileTotalTriangles: 2560,
     });
     expect(context?.terrain?.tileHash).toMatch(/^[0-9a-f]{8}$/);
     expect(context?.terrain?.tileIdentityHash).toMatch(/^[0-9a-f]{8}$/);

@@ -966,6 +966,10 @@
       lastShadowPassInstances: finiteOrNull(value.lastShadowPassInstances),
       shadowPrefixRatio: finiteOrNull(value.shadowPrefixRatio),
       shadowPassReductions: finiteOrNull(value.shadowPassReductions),
+      tileInteriorTriangles: finiteOrNull(value.tileInteriorTriangles),
+      tileSkirtTriangles: finiteOrNull(value.tileSkirtTriangles),
+      tileSkirtTrianglesPerEdge: finiteOrNull(value.tileSkirtTrianglesPerEdge),
+      tileTotalTriangles: finiteOrNull(value.tileTotalTriangles),
     };
   }
 

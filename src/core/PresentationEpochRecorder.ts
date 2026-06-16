@@ -35,6 +35,10 @@ type TerrainRenderDebugStatsLike = {
   lastMainPassInstances?: unknown;
   lastShadowPassInstances?: unknown;
   shadowPassReductions?: unknown;
+  tileInteriorTriangles?: unknown;
+  tileSkirtTriangles?: unknown;
+  tileSkirtTrianglesPerEdge?: unknown;
+  tileTotalTriangles?: unknown;
 };
 
 type TerrainDebugSource = {
@@ -127,6 +131,10 @@ export interface PresentationTerrainRenderEpoch {
   lastShadowPassInstances: number;
   shadowPrefixRatio: number | null;
   shadowPassReductions: number;
+  tileInteriorTriangles: number;
+  tileSkirtTriangles: number;
+  tileSkirtTrianglesPerEdge: number;
+  tileTotalTriangles: number;
 }
 
 export interface PresentationEpochContext {
@@ -444,6 +452,10 @@ function summarizeTerrainRender(source: TerrainDebugSource): PresentationTerrain
     lastShadowPassInstances: finiteNumber(stats.lastShadowPassInstances),
     shadowPrefixRatio,
     shadowPassReductions: finiteNumber(stats.shadowPassReductions),
+    tileInteriorTriangles: finiteNumber(stats.tileInteriorTriangles),
+    tileSkirtTriangles: finiteNumber(stats.tileSkirtTriangles),
+    tileSkirtTrianglesPerEdge: finiteNumber(stats.tileSkirtTrianglesPerEdge),
+    tileTotalTriangles: finiteNumber(stats.tileTotalTriangles),
   };
 }
 

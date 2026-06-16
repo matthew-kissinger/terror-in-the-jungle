@@ -84,6 +84,10 @@ export interface TerrainRenderSubmissionStats {
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
   shadowPassReductions: number;
+  tileInteriorTriangles: number;
+  tileSkirtTriangles: number;
+  tileSkirtTrianglesPerEdge: number;
+  tileTotalTriangles: number;
 }
 
 const CAMERA_RENDER_SYNC_POSITION_EPSILON_METERS = 0;
@@ -475,6 +479,10 @@ export class TerrainRenderRuntime {
       lastMainPassInstances: shadowStats.lastMainPassInstances,
       lastShadowPassInstances: shadowStats.lastShadowPassInstances,
       shadowPassReductions: shadowStats.shadowPassReductions,
+      tileInteriorTriangles: shadowStats.tileInteriorTriangles,
+      tileSkirtTriangles: shadowStats.tileSkirtTriangles,
+      tileSkirtTrianglesPerEdge: shadowStats.tileSkirtTrianglesPerEdge,
+      tileTotalTriangles: shadowStats.tileTotalTriangles,
     };
   }
 

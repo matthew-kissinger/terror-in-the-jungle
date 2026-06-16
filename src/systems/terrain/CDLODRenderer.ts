@@ -14,10 +14,15 @@ import { TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS } from './TerrainShadowBoun
  * cull the seam cover from oblique helicopter/far-horizon views. Stage
  * D2/D3 of `terrain-cdlod-seam`. Total verts = N*N + 4*N - 4.
  */
-export function createTileGeometry(tileResolution: number): THREE.BufferGeometry {
+export function createTileGeometry(
+  tileResolution: number,
+  options: { includeSkirts?: boolean } = {},
+): THREE.BufferGeometry {
   const N = tileResolution;
+  const includeSkirts = options.includeSkirts ?? true;
+  const geometryStats = computeTileGeometryStats(N, includeSkirts);
   const interiorCount = N * N;
-  const totalVerts = interiorCount + 4 * N - 4;
+  const totalVerts = interiorCount + geometryStats.tileSkirtVertices;
   const positions = new Float32Array(totalVerts * 3);
   const isSkirtArr = new Float32Array(totalVerts);
 
@@ -38,26 +43,28 @@ export function createTileGeometry(tileResolution: number): THREE.BufferGeometry
   // Skirt ring duplicates each perimeter vertex (corners shared between
   // sides), tagged isSkirt=1. Walk the perimeter once.
   const skirtIndexOf = new Int32Array(interiorCount).fill(-1);
-  let cursor = interiorCount;
-  const dup = (interiorIdx: number): void => {
-    if (skirtIndexOf[interiorIdx] !== -1) return;
-    const ib = interiorIdx * 3;
-    const sb = cursor * 3;
-    positions[sb] = positions[ib];
-    positions[sb + 2] = positions[ib + 2];
-    isSkirtArr[cursor] = 1;
-    skirtIndexOf[interiorIdx] = cursor;
-    cursor++;
-  };
-  for (let i = 0; i < N; i++) dup(i);                            // top
-  for (let j = 1; j < N; j++) dup(j * N + (N - 1));              // right
-  for (let i = N - 2; i >= 0; i--) dup((N - 1) * N + i);          // bottom
-  for (let j = N - 2; j >= 1; j--) dup(j * N + 0);                // left
+  if (includeSkirts) {
+    let cursor = interiorCount;
+    const dup = (interiorIdx: number): void => {
+      if (skirtIndexOf[interiorIdx] !== -1) return;
+      const ib = interiorIdx * 3;
+      const sb = cursor * 3;
+      positions[sb] = positions[ib];
+      positions[sb + 2] = positions[ib + 2];
+      isSkirtArr[cursor] = 1;
+      skirtIndexOf[interiorIdx] = cursor;
+      cursor++;
+    };
+    for (let i = 0; i < N; i++) dup(i);                            // top
+    for (let j = 1; j < N; j++) dup(j * N + (N - 1));              // right
+    for (let i = N - 2; i >= 0; i--) dup((N - 1) * N + i);          // bottom
+    for (let j = N - 2; j >= 1; j--) dup(j * N + 0);                // left
+  }
 
   // Indices: interior triangles (PlaneGeometry winding) + two-sided
   // skirt strips. Only skirt walls duplicate winding; the terrain top
   // remains FrontSide so we do not pay a full-material DoubleSide cost.
-  const indexCount = ((N - 1) * (N - 1) * 2 + (N - 1) * 4 * 4) * 3;
+  const indexCount = geometryStats.tileTotalTriangles * 3;
   const indices = totalVerts > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
   let k = 0;
   for (let j = 0; j < N - 1; j++) {
@@ -78,10 +85,12 @@ export function createTileGeometry(tileResolution: number): THREE.BufferGeometry
     indices[k++] = ia; indices[k++] = ib; indices[k++] = sa;
     indices[k++] = ib; indices[k++] = sb; indices[k++] = sa;
   };
-  for (let i = 0; i < N - 1; i++) addQuad(i, i + 1);
-  for (let j = 0; j < N - 1; j++) addQuad(j * N + (N - 1), (j + 1) * N + (N - 1));
-  for (let i = 0; i < N - 1; i++) addQuad((N - 1) * N + (i + 1), (N - 1) * N + i);
-  for (let j = 0; j < N - 1; j++) addQuad((j + 1) * N + 0, j * N + 0);
+  if (includeSkirts) {
+    for (let i = 0; i < N - 1; i++) addQuad(i, i + 1);
+    for (let j = 0; j < N - 1; j++) addQuad(j * N + (N - 1), (j + 1) * N + (N - 1));
+    for (let i = 0; i < N - 1; i++) addQuad((N - 1) * N + (i + 1), (N - 1) * N + i);
+    for (let j = 0; j < N - 1; j++) addQuad((j + 1) * N + 0, j * N + 0);
+  }
 
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -108,6 +117,12 @@ export function isTerrainShadowPerfIsolationEnabled(): boolean {
     && readBooleanQueryFlag('perfDisableTerrainShadows');
 }
 
+export function isTerrainSkirtPerfIsolationEnabled(): boolean {
+  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
+    && isPerfHarnessEnabled()
+    && readBooleanQueryFlag('perfDisableTerrainSkirts');
+}
+
 export function isTerrainBoundedShadowPassEnabled(): boolean {
   return !readBooleanQueryFlag('terrainFullShadowPass');
 }
@@ -121,6 +136,37 @@ export interface CDLODRendererShadowPassStats {
   lastMainPassInstances: number;
   lastShadowPassInstances: number;
   shadowPassReductions: number;
+  tileInteriorTriangles: number;
+  tileSkirtTriangles: number;
+  tileSkirtTrianglesPerEdge: number;
+  tileTotalTriangles: number;
+}
+
+export interface CDLODTileGeometryStats {
+  tileResolution: number;
+  tileInteriorVertices: number;
+  tileSkirtVertices: number;
+  tileInteriorTriangles: number;
+  tileSkirtTriangles: number;
+  tileSkirtTrianglesPerEdge: number;
+  tileTotalTriangles: number;
+}
+
+export function computeTileGeometryStats(tileResolution: number, includeSkirts = true): CDLODTileGeometryStats {
+  const N = Math.max(2, Math.floor(tileResolution));
+  const edgeSegments = N - 1;
+  const tileInteriorTriangles = edgeSegments * edgeSegments * 2;
+  const tileSkirtTrianglesPerEdge = includeSkirts ? edgeSegments * 4 : 0;
+  const tileSkirtTriangles = tileSkirtTrianglesPerEdge * 4;
+  return {
+    tileResolution: N,
+    tileInteriorVertices: N * N,
+    tileSkirtVertices: includeSkirts ? 4 * N - 4 : 0,
+    tileInteriorTriangles,
+    tileSkirtTriangles,
+    tileSkirtTrianglesPerEdge,
+    tileTotalTriangles: tileInteriorTriangles + tileSkirtTriangles,
+  };
 }
 
 /**
@@ -147,6 +193,7 @@ export class CDLODRenderer {
   private lastShadowPassInstances = 0;
   private shadowPassReductions = 0;
   private restoreShadowCount: number | null = null;
+  private readonly geometryStats: CDLODTileGeometryStats;
 
   // Scratch matrix for setting instance transforms
   private readonly _matrix = new THREE.Matrix4();
@@ -163,7 +210,9 @@ export class CDLODRenderer {
     // this to the tile's world size. The vertex shader drops skirt verts
     // by a per-LOD amount to hide sub-pixel cracks at chunk borders. See
     // `createTileGeometry` and `terrain-cdlod-seam` Stage D2.
-    const geo = createTileGeometry(tileResolution);
+    const includeSkirts = !isTerrainSkirtPerfIsolationEnabled();
+    const geo = createTileGeometry(tileResolution, { includeSkirts });
+    this.geometryStats = computeTileGeometryStats(tileResolution, includeSkirts);
 
     this.mesh = new THREE.InstancedMesh(geo, material, maxInstances);
     this.mesh.frustumCulled = false; // Quadtree already culls
@@ -371,6 +420,10 @@ export class CDLODRenderer {
       lastMainPassInstances: this.lastMainPassInstances,
       lastShadowPassInstances: this.lastShadowPassInstances,
       shadowPassReductions: this.shadowPassReductions,
+      tileInteriorTriangles: this.geometryStats.tileInteriorTriangles,
+      tileSkirtTriangles: this.geometryStats.tileSkirtTriangles,
+      tileSkirtTrianglesPerEdge: this.geometryStats.tileSkirtTrianglesPerEdge,
+      tileTotalTriangles: this.geometryStats.tileTotalTriangles,
     };
   }
 
