@@ -59,6 +59,7 @@ const {
   createIdleBotIntent,
   selectDriverViewTarget,
   computeWorldMovementIntent,
+  computeCameraRelativeMovementIntent,
   computeAimMovementDivergence,
   computeViewMovementDivergence,
   isRouteOverlayMicroTarget,
@@ -1717,6 +1718,51 @@ describe('PlayerBot driver mirror — world movement intent', () => {
       aimTarget: { x: 10, y: 2, z: 0 },
     }, null, { x: 0, y: 2, z: 0 });
     expect(movement).toBeNull();
+  });
+});
+
+describe('PlayerBot driver mirror — camera-relative movement intent', () => {
+  it('maps a movement target in front of the current view to forward movement', () => {
+    const movement = computeCameraRelativeMovementIntent({
+      ...createIdleBotIntent(),
+      moveForward: 1,
+      movementTarget: { x: 0, y: 2, z: -20 },
+    }, null, { x: 0, y: 2, z: 0 }, 0);
+    expect(movement.forward).toBeCloseTo(1, 5);
+    expect(movement.strafe).toBeCloseTo(0, 5);
+    expect(movement.targetDistance).toBeCloseTo(20, 5);
+  });
+
+  it('maps a movement target to camera-right as strafe instead of world movement', () => {
+    const movement = computeCameraRelativeMovementIntent({
+      ...createIdleBotIntent(),
+      moveForward: 1,
+      movementTarget: { x: 20, y: 2, z: 0 },
+    }, null, { x: 0, y: 2, z: 0 }, 0);
+    expect(movement.forward).toBeCloseTo(0, 5);
+    expect(movement.strafe).toBeCloseTo(1, 5);
+    expect(movement.targetYawDeltaDeg).toBeCloseTo(90, 5);
+  });
+
+  it('does not backpedal when a route target is behind the currently slewed view', () => {
+    const movement = computeCameraRelativeMovementIntent({
+      ...createIdleBotIntent(),
+      moveForward: 1,
+      movementTarget: { x: 0, y: 2, z: 20 },
+    }, null, { x: 0, y: 2, z: 0 }, 0);
+    expect(movement.forward).toBe(0);
+    expect(Math.abs(movement.strafe)).toBeLessThan(0.001);
+    expect(movement.targetYawDeltaDeg).toBeCloseTo(180, 5);
+  });
+
+  it('preserves explicit strafe input when no world target is available', () => {
+    const movement = computeCameraRelativeMovementIntent({
+      ...createIdleBotIntent(),
+      moveStrafe: -0.5,
+    }, null, { x: 0, y: 2, z: 0 }, 0);
+    expect(movement.forward).toBe(0);
+    expect(movement.strafe).toBeCloseTo(-0.5, 5);
+    expect(movement.targetDistance).toBeNull();
   });
 });
 

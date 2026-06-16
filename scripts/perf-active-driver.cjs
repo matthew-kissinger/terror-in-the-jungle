@@ -1122,6 +1122,40 @@
     return { x: dx / len, z: dz / len, distance: len };
   }
 
+  function computeCameraRelativeMovementIntent(intent, overlayPoint, playerPos, yawRad) {
+    const forward = Number(intent && intent.moveForward || 0);
+    const strafe = Number(intent && intent.moveStrafe || 0);
+    const wantsMove = Math.abs(forward) > 0.1 || Math.abs(strafe) > 0.1;
+    if (!intent || !wantsMove) {
+      return { forward: 0, strafe: 0, targetDistance: null, targetYawDeltaDeg: null };
+    }
+    const target = intent.movementTarget || overlayPoint || (forward > 0.1 ? intent.aimTarget : null) || null;
+    if (!target || !playerPos || !Number.isFinite(Number(yawRad))) {
+      return { forward: forward, strafe: strafe, targetDistance: null, targetYawDeltaDeg: null };
+    }
+    const dx = Number(target.x || 0) - Number(playerPos.x || 0);
+    const dz = Number(target.z || 0) - Number(playerPos.z || 0);
+    const len = Math.hypot(dx, dz);
+    if (!Number.isFinite(len) || len < 0.5) {
+      return { forward: 0, strafe: 0, targetDistance: Number.isFinite(len) ? len : 0, targetYawDeltaDeg: 0 };
+    }
+    // PlayerMovement camera-relative convention: yaw 0 means world -Z
+    // forward, and positive strafe is camera-right.
+    const targetYaw = Math.atan2(dx, -dz);
+    const delta = signedYawDelta(Number(yawRad), targetYaw);
+    const relativeForward = Math.max(0, Math.cos(delta));
+    const relativeStrafe = Math.sin(delta);
+    const axisLen = Math.hypot(relativeForward, relativeStrafe);
+    const normalizedForward = axisLen > 1 ? relativeForward / axisLen : relativeForward;
+    const normalizedStrafe = axisLen > 1 ? relativeStrafe / axisLen : relativeStrafe;
+    return {
+      forward: normalizedForward,
+      strafe: normalizedStrafe,
+      targetDistance: len,
+      targetYawDeltaDeg: Math.abs(delta) * 180 / Math.PI,
+    };
+  }
+
   function computeViewMovementDivergence(viewTarget, intent, overlayPoint, playerPos) {
     if (!viewTarget || !intent || !playerPos) return null;
     const movementTarget = intent.movementTarget || overlayPoint || null;
@@ -3416,47 +3450,9 @@
       const pc = getPlayerController(systems);
       if (!pc) return;
 
-      // Movement intent.
-      const forward = clampAxis(intent.moveForward);
-      const strafe = clampAxis(intent.moveStrafe);
-      const sprint = !!intent.sprint && forward > 0.1;
-      const wantsMovement = Math.abs(forward) > 0.01 || Math.abs(strafe) > 0.01;
-      const worldMovement = computeWorldMovementIntent(intent, overlayPoint, playerPos);
-      if (typeof pc.applyMovementIntent === 'function') {
-        const usesWorldMovement = Boolean(worldMovement && typeof pc.applyWorldMovementIntent === 'function');
-        if (usesWorldMovement) {
-          pc.applyWorldMovementIntent({ x: worldMovement.x, z: worldMovement.z, sprint });
-        } else {
-          pc.applyMovementIntent({ forward, strafe, sprint });
-        }
-        const movementIntent = {
-          forward,
-          strafe,
-          sprint,
-          wantsMovement,
-          movementMode: usesWorldMovement ? 'world' : 'camera',
-          worldX: usesWorldMovement ? worldMovement.x : null,
-          worldZ: usesWorldMovement ? worldMovement.z : null,
-          worldDistance: usesWorldMovement ? worldMovement.distance : null,
-          atMs: Date.now(),
-        };
-        state.movementIntentCalls++;
-        if (usesWorldMovement) {
-          state.worldMovementIntentCalls++;
-        } else {
-          state.cameraMovementIntentCalls++;
-        }
-        state.lastMovementIntent = movementIntent;
-        if (wantsMovement) {
-          state.nonZeroMovementIntentCalls++;
-          if (usesWorldMovement) {
-            state.nonZeroWorldMovementIntentCalls++;
-          } else {
-            state.nonZeroCameraMovementIntentCalls++;
-          }
-          state.lastNonZeroMovementIntent = movementIntent;
-        }
-      }
+      const requestedForward = clampAxis(intent.moveForward);
+      const requestedStrafe = clampAxis(intent.moveStrafe);
+      const wantsMovement = Math.abs(requestedForward) > 0.01 || Math.abs(requestedStrafe) > 0.01;
 
       // ── Aim path: camera.lookAt() is the ONLY place the rotation
       // convention lives. The bot writes a world-space aim target; the
@@ -3593,6 +3589,40 @@
             aimDot = (_tmpForward.x * tx + _tmpForward.y * ty + _tmpForward.z * tz) / tLen;
             state.lastAimDot = Number.isFinite(aimDot) ? aimDot : null;
           }
+        }
+      }
+
+      // Movement intent. Apply after view slew so the normal camera-relative
+      // PlayerMovement path sees the same orientation the harness just
+      // committed. This keeps route-following measurable without using the
+      // perf-driver-only world-movement bypass.
+      const cameraRelativeMovement = computeCameraRelativeMovementIntent(intent, overlayPoint, playerPos, yawNext);
+      const forward = clampAxis(cameraRelativeMovement.forward);
+      const strafe = clampAxis(cameraRelativeMovement.strafe);
+      const sprint = !!intent.sprint && forward > 0.1;
+      if (typeof pc.applyMovementIntent === 'function') {
+        pc.applyMovementIntent({ forward, strafe, sprint });
+        const movementIntent = {
+          forward,
+          strafe,
+          sprint,
+          wantsMovement,
+          requestedForward,
+          requestedStrafe,
+          movementMode: 'camera',
+          worldX: null,
+          worldZ: null,
+          worldDistance: cameraRelativeMovement.targetDistance,
+          targetYawDeltaDeg: cameraRelativeMovement.targetYawDeltaDeg,
+          atMs: Date.now(),
+        };
+        state.movementIntentCalls++;
+        state.cameraMovementIntentCalls++;
+        state.lastMovementIntent = movementIntent;
+        if (wantsMovement) {
+          state.nonZeroMovementIntentCalls++;
+          state.nonZeroCameraMovementIntentCalls++;
+          state.lastNonZeroMovementIntent = movementIntent;
         }
       }
 
@@ -4177,6 +4207,7 @@
       createIdleBotIntent: createIdleBotIntent,
       selectDriverViewTarget: selectDriverViewTarget,
       computeWorldMovementIntent: computeWorldMovementIntent,
+      computeCameraRelativeMovementIntent: computeCameraRelativeMovementIntent,
       computeAimMovementDivergence: function (intent, overlayPoint, playerPos) {
         return computeViewMovementDivergence(intent && intent.aimTarget, intent, overlayPoint, playerPos);
       },
