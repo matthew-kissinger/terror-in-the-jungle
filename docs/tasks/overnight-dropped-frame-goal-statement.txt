@@ -4127,3 +4127,87 @@ Latest 2026-06-16 14:39 UTC / 10:39 EDT update:
   presentation epochs. If `RenderMain.renderer.render` remains the tail owner,
   prioritize terrain material cost while low-sun occlusion is active, CDLOD
   morph/late-sync cadence, or render-submission batching before content cuts.
+
+Latest 2026-06-16 15:10 UTC / 11:10 EDT update:
+
+- Current local candidate now also shares terrain material fragment context
+  between `colorNode` and `roughnessNode`: terrain normal / biome blend,
+  lowland wetness, far-canopy tint, feature-surface weights, and low-sun
+  horizon occlusion are built once and reused by both material properties.
+  This preserves the existing formulas and keeps terrain, vegetation,
+  wildlife, combat, weather, draw distance, and player flow unchanged.
+- Verification passed for the source slice: focused `TerrainMaterial` Vitest,
+  `npm run typecheck`, targeted ESLint, `npm run build:perf`, and
+  `npm run validate:fast`.
+- Shader-cost proof, not runtime completion proof:
+  pre-edit probe
+  `artifacts/cycle-mobile-webgl2-fallback-fix/tsl-shader-cost/2026-06-16T15-01-34-285Z/report.json`
+  versus post-edit probe
+  `artifacts/cycle-mobile-webgl2-fallback-fix/tsl-shader-cost/2026-06-16T15-18-26-831Z/report.json`.
+  The largest terrain-like fragment shader stayed at max sampler count 7 while
+  dropping from 4140 to 3927 instruction-proxy lines, 6596 to 6335 emitted GLSL
+  lines, 177 to 171 texture calls, and 71 to 41 smoothsteps.
+- The goal remains open. The next proof must be a trusted quiet-machine A Shau
+  active-combat capture, then Open Frontier if A Shau improves. Do not claim
+  dropped-frame completion from the shader-cost probe alone.
+
+Latest 2026-06-16 15:22 UTC / 11:22 EDT update:
+
+- The bounded headed A Shau 60 NPC active-combat capture after the terrain
+  material shared-context cleanup is
+  `artifacts/perf/2026-06-16T15-19-59-122Z`. It failed validation and failed
+  measurement trust (`probeAvg=119.22ms`, `probeP95=145ms`), so treat it as
+  directional evidence only.
+- Directional runtime metrics remain unacceptable: rAF >25ms `91.06%`, rAF
+  >33ms `57.77%`, estimated dropped 60Hz frames `1055` over 30s (`35.17/s`),
+  and dropped-frame time `16308.2ms` over 30s (`543.6ms/s`).
+- Tail attribution still points at render/presentation first. The sampled tail
+  frame was about `89.9ms`; the slow loop callback was `50.1ms`, led by
+  `RenderMain.renderer.render 39.2ms`, `Simulation.updateSystems 9.1ms`, and
+  `RenderOverlay.weapon 1.1ms`.
+- Terrain epoch context suggests the next high-value target is CDLOD
+  dynamics/render cadence, not content cuts: `terrainBufferSubmittedCount=751`,
+  `terrainStageHashChangedCount=506`, `terrainStageMorphHashChangedCount=506`,
+  `terrainStageIdentityHashChangedCount=162`, avg tile count `278.23`, avg
+  morphing tiles `256.45`, and avg render instance update CPU only `0.017ms`.
+- Continue by reducing render-side terrain churn while preserving the same
+  Open Frontier and A Shau experience. Do not claim completion until trusted
+  quiet-machine A Shau and Open Frontier captures pass with real combat and
+  representative world content.
+
+Latest 2026-06-16 15:50 UTC / 11:50 EDT update:
+
+- Current local candidate changes CDLOD morph cadence rather than content:
+  terrain morph factor is computed in the terrain vertex node from the render
+  camera, tile bounds, LOD ranges, and the existing morph-start rule. Tile-set
+  and edge-morph-mask changes still submit coherent terrain instance buffers;
+  morph-only camera changes no longer rewrite the terrain instance buffers.
+- The change preserves terrain selection, LOD ranges, edge-morph masks,
+  skirts, heightmap sampling, A Shau/Open Frontier size, vegetation, wildlife,
+  weather, combat pressure, draw distance, and player flow.
+- Verification so far: focused terrain tests, `npm run typecheck`, targeted
+  ESLint, `npm run lint:budget`, and `npm run build:perf` pass. Shader probe
+  `artifacts/cycle-mobile-webgl2-fallback-fix/tsl-shader-cost/2026-06-16T15-44-01-673Z/report.json`
+  compiles WebGPU WebGL fallback with no renderer error and max fragment
+  sampler count `7`.
+- Short A Shau counter-check
+  `artifacts/perf/2026-06-16T15-45-19-572Z` failed validation and measurement
+  trust (`probeAvg=121ms`, `probeP95=157ms`) and had no firing (`shots=0`), so
+  it is not dropped-frame proof. It does confirm the intended counter movement:
+  `terrainSyncRechecked=210`, `terrainBufferSubmitted=12`, `same-identity=198`,
+  `tile-set-changed=12`, and same-identity tail contexts report
+  `submitted=false`.
+- The goal remains open. The next valid proof is trusted active-combat A Shau,
+  then Open Frontier. If those runs still fail, keep pursuing
+  `RenderMain.renderer.render` terrain/render cost rather than declaring the
+  morph-cadence candidate done.
+
+Latest 2026-06-16 15:53 UTC / 11:53 EDT update:
+
+- `npm run validate:fast` passed for the camera-driven CDLOD morph candidate.
+  This makes the source slice stable enough to preserve, but it is not runtime
+  completion proof.
+- The finish line remains unchanged: trusted active-combat A Shau dropped-frame
+  evidence with representative firing and presentation epochs, then Open
+  Frontier confirmation without reducing scene scale, vegetation, wildlife,
+  weather, draw distance, combat pressure, or normal player flow.

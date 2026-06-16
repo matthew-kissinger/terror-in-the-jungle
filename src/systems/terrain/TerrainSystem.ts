@@ -168,7 +168,7 @@ export class TerrainSystem implements GameSystem {
       maxLODLevels: computeMaxLODLevels(worldSize, 200, 32),
     });
 
-    this.surfaceRuntime = new TerrainSurfaceRuntime(assetLoader, this.config.splatmap, this.config.tileResolution - 1);
+    this.surfaceRuntime = new TerrainSurfaceRuntime(assetLoader, this.config.splatmap, this.config.tileResolution - 1, this.config.lodRanges);
     const losAccelerator = new LOSAccelerator();
     this.raycastRuntime = new TerrainRaycastRuntime(losAccelerator);
     this.terrainQueries = new TerrainQueries(losAccelerator);
@@ -882,7 +882,7 @@ export class TerrainSystem implements GameSystem {
       this.config.visualMargin,
       this.config.tileResolution - 1,
     );
-    this.config.lodRanges = computeDefaultLODRanges(this.config.worldSize, this.config.maxLODLevels);
+    this.surfaceRuntime.setLodRanges(this.config.lodRanges = computeDefaultLODRanges(this.config.worldSize, this.config.maxLODLevels));
   }
 
   private createVisualExtentProvider(provider: IHeightProvider): IHeightProvider {

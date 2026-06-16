@@ -105,6 +105,8 @@ import {
   createTerrainMaterial,
   updateTerrainMaterialAtmosphereLighting,
   updateTerrainMaterialFarCanopyTint,
+  updateTerrainMaterialLodRanges,
+  updateTerrainMaterialMorphCamera,
   updateTerrainMaterialTextures,
   updateTerrainMaterialWetness,
 } from './TerrainMaterial';
@@ -177,6 +179,31 @@ describe('TerrainMaterial', () => {
     expect(uniforms.atmosphereDirectLightDirection.value.y).toBe(1);
     expect(uniforms.atmosphereDaylightFactor.value).toBe(1);
     expect(uniforms.atmosphereLowSunOcclusionStrength.value).toBe(0);
+    expect(uniforms.terrainMorphStart.value).toBeCloseTo(0.8);
+    expect(uniforms.terrainMorphCameraRelativeY.value).toBe(0);
+    expect(uniforms.terrainLodRange0.value).toBeGreaterThan(0);
+    expect(uniforms.terrainLodRange7.value).toBeGreaterThan(uniforms.terrainLodRange0.value);
+  });
+
+  it('updates CDLOD morph uniforms without rebuilding the node graph', () => {
+    const mat = createTerrainMaterial({
+      heightTexture: makeMockTexture(),
+      normalTexture: makeMockTexture(),
+      worldSize: 1024,
+      splatmap: testSplatmap,
+      biomeConfig: testBiomeConfig,
+      lodRanges: [100, 200, 400],
+    });
+    const uniforms = terrainUniforms(mat);
+
+    updateTerrainMaterialLodRanges(mat, 1024, [125, 250, 500, 1000], 0.75);
+    updateTerrainMaterialMorphCamera(mat, 42.5);
+
+    expect(uniforms.terrainLodRange0.value).toBe(125);
+    expect(uniforms.terrainLodRange3.value).toBe(1000);
+    expect(uniforms.terrainLodRange7.value).toBe(1000);
+    expect(uniforms.terrainMorphStart.value).toBe(0.75);
+    expect(uniforms.terrainMorphCameraRelativeY.value).toBe(42.5);
   });
 
   it('binds playable and visual terrain extents for edge-only visual tinting', () => {

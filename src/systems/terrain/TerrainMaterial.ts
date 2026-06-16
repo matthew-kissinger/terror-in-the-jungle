@@ -35,9 +35,11 @@ import {
 import type { SplatmapConfig } from './TerrainConfig';
 import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTypes';
 import type { TerrainFarCanopyTintConfig } from '../../config/biomes';
+export { TERRAIN_VERTEX_MAIN } from './TerrainVertexMain';
 
 const MAX_BIOME_TEXTURES = 8;
 const MAX_BIOME_RULES = 8;
+const MAX_TERRAIN_LOD_RANGES = 8;
 // Keep this conservative for mobile GPUs.
 // Large float-array uniforms in fragment shaders can exceed low-end WebGL
 // uniform budgets and fail terrain material compilation, resulting in an
@@ -48,6 +50,9 @@ const TERRAIN_HORIZON_SHADOW_SAMPLE_DISTANCES = [96, 192, 384, 768, 1536] as con
 type UniformSlot<T = unknown> = { value: T };
 type TerrainUniforms = Record<string, UniformSlot>;
 type TslNode = any;
+type TerrainBiomeBlend = ReturnType<typeof classifyBiomeBlend>;
+type TerrainFeatureSurfaceWeights = [TslNode, TslNode, TslNode, TslNode, TslNode];
+type TerrainFragmentContext = { worldPos: TslNode; terrainNormal: TslNode; biomeBlend: TerrainBiomeBlend; lowlandWetness: TslNode; farCanopyTint: TslNode; featureSurfaces: TerrainFeatureSurfaceWeights; lowSunOcclusion: TslNode };
 
 export type TerrainMaterial = MeshStandardNodeMaterial & {
   uniforms: TerrainUniforms;
@@ -69,78 +74,6 @@ const tslMin = (...args: TslNode[]): TslNode => (tslMinBase as (...values: TslNo
 const tslPositionGeometry = positionGeometry as TslNode;
 const tslPositionWorld = positionWorld as TslNode;
 const tslCameraPosition = cameraPosition as TslNode;
-
-export const TERRAIN_VERTEX_MAIN = /* glsl */ `
-// CDLOD morph: snap fine-grid vertices toward parent LOD grid for smooth transitions.
-// tileGridResolution is the QUAD count (e.g. 32 for the default 33-vertex
-// tile), set via tileResolution - 1 at TerrainSystem.ts:114 -> wired into
-// TerrainSurfaceRuntime.ts:67 as the uniform value. Vertex spacing in
-// tile-local gridPos units (gridPos = position.xz + 0.5, range [0,1]) is
-// 1/tileGridResolution; the parent LOD grid hits every other vertex, so
-// parent spacing is 2/tileGridResolution. Don't change this without also
-// updating the JS port in TerrainMaterial.morph.test.ts.
-float parentStep = 2.0 / tileGridResolution;
-vec2 gridPos = position.xz + 0.5;
-
-// Force full morph on edges abutting a coarser-LOD neighbour. The
-// neighbour's vertex grid spacing is 2x ours; without the force-morph
-// our edge vertices drift between the neighbour's verts at any partial
-// morphFactor and reopen the T-junction crack. Bits: 1=+Z(N), 2=+X(E),
-// 4=-Z(S), 8=-X(W). Perimeter verts hit gridPos==0 or gridPos==1 exactly
-// (PlaneGeometry-derived; see createTileGeometry).
-float effectiveMorph = morphFactor;
-const float EDGE_EPS = 1.0e-4;
-int mask = int(edgeMorphMask + 0.5);
-if (gridPos.y >= 1.0 - EDGE_EPS && (mask & 1) != 0) effectiveMorph = 1.0;
-if (gridPos.x >= 1.0 - EDGE_EPS && (mask & 2) != 0) effectiveMorph = 1.0;
-if (gridPos.y <= EDGE_EPS         && (mask & 4) != 0) effectiveMorph = 1.0;
-if (gridPos.x <= EDGE_EPS         && (mask & 8) != 0) effectiveMorph = 1.0;
-
-vec2 snapped = floor(gridPos / parentStep + 0.5) * parentStep;
-vec3 morphedPos = vec3(
-  mix(gridPos.x, snapped.x, effectiveMorph) - 0.5,
-  position.y,
-  mix(gridPos.y, snapped.y, effectiveMorph) - 0.5
-);
-
-vec4 worldPos4 = instanceMatrix * vec4(morphedPos, 1.0);
-float halfWorld = terrainWorldSize * 0.5;
-// Half-texel correction: GPU texture2D maps UV via pixelCoord = UV * gridSize - 0.5,
-// but the CPU BakedHeightProvider maps via gx = normalizedPos * (gridSize - 1).
-// Without correction these diverge by up to 0.5 texels at world edges (~3m for 3200m maps).
-// Remap UV so texel centers align with the bake-loop sample positions.
-float texelHalf = 0.5 / heightmapGridSize;
-float uvScale = (heightmapGridSize - 1.0) / heightmapGridSize;
-vec2 normalizedPos = vec2(
-  (worldPos4.x + halfWorld) / terrainWorldSize,
-  (worldPos4.z + halfWorld) / terrainWorldSize
-);
-vWorldUV = clamp(normalizedPos * uvScale + texelHalf, 0.0, 1.0);
-
-float terrainH = texture2D(terrainHeightmap, vWorldUV).r;
-worldPos4.y = terrainH;
-
-// CDLOD skirt: perimeter-ring duplicate vertices drop below the heightmap
-// to hide sub-pixel cracks at chunk borders. Coarser tiles (higher
-// lodLevel) get larger drops because their seam-cracks scale with tile
-// size. Skirts only ever drop, never rise — guarantees no poke-through
-// into adjacent tiles. See terrain-cdlod-seam Stage D2.
-float skirtDrop = max(2.0, 4.0 * (lodLevel + 1.0));
-worldPos4.y -= step(0.5, isSkirt) * skirtDrop;
-
-vWorldPosition = worldPos4.xyz;
-vLodLevel = lodLevel;
-vMorphFactor = morphFactor;
-
-vec3 nSample = texture2D(terrainNormalMap, vWorldUV).rgb * 2.0 - 1.0;
-vTerrainNormal = normalize(nSample);
-
-// Set transformed to local-space position so any Three.js includes that apply
-// instanceMatrix get the correct single application.  worldpos_vertex is
-// replaced below to use worldPos4 directly (which already includes instanceMatrix
-// and heightmap displacement).
-transformed = morphedPos;
-`;
 
 export interface TerrainBiomeLayerConfig {
   biomeId: string;
@@ -175,6 +108,8 @@ interface TerrainMaterialOptions {
   farCanopyTint?: TerrainFarCanopyTintConfig;
   surfaceWetness?: number;
   tileGridResolution?: number;
+  lodRanges?: readonly number[];
+  morphStart?: number;
   surfacePatches?: TerrainSurfacePatch[];
   atmosphereLighting?: TerrainAtmosphereLightingMaterialConfig;
 }
@@ -199,6 +134,17 @@ function uniformArrayValue(uniforms: TerrainUniforms, key: string, index: number
   return (uniforms[key].value as Float32Array)[index] ?? 0;
 }
 
+function fallbackTerrainLodRanges(worldSize: number): number[] {
+  const base = Math.max(1, worldSize / 64);
+  return Array.from({ length: MAX_TERRAIN_LOD_RANGES }, (_, i) => base * 4 * 2 ** i);
+}
+
+function normalizeTerrainLodRanges(worldSize: number, lodRanges?: readonly number[]): number[] {
+  const fallback = lodRanges?.length ? lodRanges : fallbackTerrainLodRanges(worldSize);
+  const last = fallback[fallback.length - 1] ?? Math.max(1, worldSize);
+  return Array.from({ length: MAX_TERRAIN_LOD_RANGES }, (_, i) => Math.max(1, fallback[i] ?? last));
+}
+
 function createTerrainWorldUvNode(uniforms: TerrainUniforms, worldPos: TslNode): TslNode {
   const terrainWorldSize = tslReference('float', uniforms.terrainWorldSize);
   const heightmapGridSize = tslReference('float', uniforms.heightmapGridSize);
@@ -216,6 +162,26 @@ function edgeBit(edgeMorphMask: TslNode, bit: number): TslNode {
   return step(tslFloat(0.5), floor(edgeMorphMask.div(bit)).mod(2)) as TslNode;
 }
 
+function terrainLodRangeNode(lodLevel: TslNode, uniforms: TerrainUniforms): TslNode {
+  let range = tslReference('float', uniforms.terrainLodRange7);
+  for (let i = 0; i < MAX_TERRAIN_LOD_RANGES; i++) {
+    const match = tslFloat(1).sub(step(tslFloat(0.5), abs(lodLevel.sub(i))));
+    range = tslMix(range, tslReference('float', uniforms[`terrainLodRange${i}`]), match);
+  }
+  return range;
+}
+
+function createTerrainMorphFactorNode(tileCenterX: TslNode, tileCenterZ: TslNode, tileSize: TslNode, lodLevel: TslNode, uniforms: TerrainUniforms): TslNode {
+  const halfSize = tileSize.mul(0.5);
+  const dx = tslMax(abs(tslCameraPosition.x.sub(tileCenterX)).sub(halfSize), tslFloat(0));
+  const dz = tslMax(abs(tslCameraPosition.z.sub(tileCenterZ)).sub(halfSize), tslFloat(0));
+  const cameraY = tslReference('float', uniforms.terrainMorphCameraRelativeY);
+  const dist = tslLength(tslVec3(dx, cameraY, dz));
+  const range = terrainLodRangeNode(lodLevel, uniforms);
+  const morphBegin = range.mul(tslReference('float', uniforms.terrainMorphStart));
+  return tslClamp(dist.sub(morphBegin).div(tslMax(range.sub(morphBegin), tslFloat(0.001))), tslFloat(0), tslFloat(1));
+}
+
 function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
   const tileParams0 = tslAttribute('tileParams0', 'vec4');
   const tileParams1 = tslAttribute('tileParams1', 'vec4');
@@ -223,7 +189,7 @@ function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
   const tileCenterZ = tileParams0.y;
   const tileSize = tileParams0.z;
   const lodLevel = tileParams0.w;
-  const morphFactor = tileParams1.x;
+  const morphFactor = createTerrainMorphFactorNode(tileCenterX, tileCenterZ, tileSize, lodLevel, uniforms);
   const edgeMorphMask = tileParams1.y;
   const isSkirt = tslAttribute('isSkirt', 'float');
   const tileGridResolution = tslReference('float', uniforms.tileGridResolution);
@@ -579,24 +545,26 @@ function featureSurfaceWeight(surfaceTypeId: number, worldPos: TslNode, uniforms
   return tslClamp(weight, tslFloat(0), tslFloat(1));
 }
 
-function applyFeatureSurfaceColor(color: TslNode, worldPos: TslNode, uniforms: TerrainUniforms): TslNode {
-  const packedEarthWeight = featureSurfaceWeight(1, worldPos, uniforms);
-  const runwayWeight = featureSurfaceWeight(2, worldPos, uniforms);
-  const dirtRoadWeight = featureSurfaceWeight(3, worldPos, uniforms);
-  const gravelRoadWeight = featureSurfaceWeight(4, worldPos, uniforms);
-  const jungleTrailWeight = featureSurfaceWeight(5, worldPos, uniforms);
-  let result = tslMix(color, tslVec3(0.47, 0.38, 0.24), packedEarthWeight.mul(0.78));
-  result = tslMix(result, tslVec3(0.41, 0.39, 0.36), runwayWeight.mul(0.82));
-  result = tslMix(result, tslVec3(0.45, 0.35, 0.22), dirtRoadWeight.mul(0.70));
-  result = tslMix(result, tslVec3(0.48, 0.44, 0.38), gravelRoadWeight.mul(0.75));
-  result = tslMix(result, tslVec3(0.32, 0.26, 0.18), jungleTrailWeight.mul(0.50));
+function applyFeatureSurfaceColor(color: TslNode, weights: TerrainFeatureSurfaceWeights): TslNode {
+  const [packedEarth, runway, dirtRoad, gravelRoad, jungleTrail] = weights;
+  let result = tslMix(color, tslVec3(0.47, 0.38, 0.24), packedEarth.mul(0.78));
+  result = tslMix(result, tslVec3(0.41, 0.39, 0.36), runway.mul(0.82));
+  result = tslMix(result, tslVec3(0.45, 0.35, 0.22), dirtRoad.mul(0.70));
+  result = tslMix(result, tslVec3(0.48, 0.44, 0.38), gravelRoad.mul(0.75));
+  result = tslMix(result, tslVec3(0.32, 0.26, 0.18), jungleTrail.mul(0.50));
   return result;
 }
 
-function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
+function createTerrainFragmentContext(uniforms: TerrainUniforms): TerrainFragmentContext {
   const worldPos = tslPositionWorld;
   const terrainNormal = createTerrainNormalNode(uniforms, worldPos);
   const biomeBlend = classifyBiomeBlend(worldPos, terrainNormal, uniforms);
+  const featureSurfaces = [1, 2, 3, 4, 5].map((surfaceType) => featureSurfaceWeight(surfaceType, worldPos, uniforms)) as TerrainFeatureSurfaceWeights;
+  return { worldPos, terrainNormal, biomeBlend, lowlandWetness: lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms), farCanopyTint: farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms), featureSurfaces, lowSunOcclusion: terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms) };
+}
+
+function createTerrainColorNode(uniforms: TerrainUniforms, context = createTerrainFragmentContext(uniforms)): TslNode {
+  const { worldPos, terrainNormal, biomeBlend, lowlandWetness, farCanopyTint, featureSurfaces, lowSunOcclusion } = context;
   const antiTilingStrength = tslReference('float', uniforms.antiTilingStrength);
   const uvOffset = tslVec2(
     hashUvNode(createTerrainWorldUvNode(uniforms, worldPos).mul(7)),
@@ -629,7 +597,7 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const lowlandFactor = tslFloat(1).sub(smoothstep(tslFloat(900), tslFloat(1500), worldPos.y));
   const flatFactor = smoothstep(tslFloat(0.45), tslFloat(0.95), biomeBlend.slopeUp);
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.93, 1.01, 0.94)), lowlandFactor.mul(flatFactor).mul(0.22));
-  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.82, 0.9, 0.84)), lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms).mul(0.35));
+  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.82, 0.9, 0.84)), lowlandWetness.mul(0.35));
   const cliffMask = tslFloat(1).sub(smoothstep(tslFloat(0.50), tslFloat(0.74), biomeBlend.slopeUp));
   const proceduralHillMask = smoothstep(tslFloat(20), tslFloat(60), worldPos.y)
     .mul(tslFloat(1).sub(smoothstep(tslFloat(150), tslFloat(300), worldPos.y)));
@@ -638,22 +606,19 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   const rockPlanar = sampleBiomeTexture(tslReference('float', uniforms.cliffRockBiomeSlot), worldPos.xz, uvOffset, uniforms);
   const mossyRock = tslMix(rockPlanar.rgb, rockPlanar.rgb.mul(tslVec3(0.66, 0.86, 0.68)), tslFloat(0.45));
   finalColor = tslMix(finalColor, mossyRock, rockBlend);
-  const farCanopyMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
   const canopyColor = tslReference('color', uniforms.farCanopyTintColor)
     .mul(tslMix(tslFloat(0.82), tslFloat(1.18), hashUvNode(worldPos.xz.mul(0.007).add(tslVec2(1.37, 8.53)))));
-  finalColor = tslMix(finalColor, canopyColor, farCanopyMask);
+  finalColor = tslMix(finalColor, canopyColor, farCanopyTint);
   const canopyCoverageMask = farCanopyCoverageMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
   const canopyCoverageColor = canopyColor.mul(
     tslMix(tslFloat(0.72), tslFloat(1.08), hashUvNode(worldPos.xz.mul(0.014).add(tslVec2(4.91, 6.73)))),
   );
   finalColor = tslMix(finalColor, canopyCoverageColor, canopyCoverageMask);
-  finalColor = applyFeatureSurfaceColor(finalColor, worldPos, uniforms);
+  finalColor = applyFeatureSurfaceColor(finalColor, featureSurfaces);
   const visualEdgeMask = visualEdgeTintMask(worldPos, uniforms);
   finalColor = tslMix(finalColor, canopyColor.mul(0.78), visualEdgeMask.mul(0.92));
-  const farCanopyFogMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms)
-    .mul(tslReference('float', uniforms.farCanopyTintFogStrength));
+  const farCanopyFogMask = farCanopyTint.mul(tslReference('float', uniforms.farCanopyTintFogStrength));
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
-  const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
   finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.28, 0.36, 0.44)), lowSunOcclusion);
   // Rig is the only path (`legacy-path-deletion`): the colorNode emits RAW albedo,
   // and the rig-driven PBR scene lights (sun/sky/ground/ambient from
@@ -675,35 +640,30 @@ function createTerrainColorNode(uniforms: TerrainUniforms): TslNode {
   return tslMix(finalColor, debugColor, step(tslFloat(0.5), debugWireframe));
 }
 
-function createTerrainRoughnessNode(uniforms: TerrainUniforms): TslNode {
-  const worldPos = tslPositionWorld;
-  const terrainNormal = createTerrainNormalNode(uniforms, worldPos);
-  const biomeBlend = classifyBiomeBlend(worldPos, terrainNormal, uniforms);
+function createTerrainRoughnessNode(uniforms: TerrainUniforms, context = createTerrainFragmentContext(uniforms)): TslNode {
+  const { biomeBlend, lowlandWetness, farCanopyTint, featureSurfaces, lowSunOcclusion } = context;
   let roughnessSample = sampleBiomeScalar(biomeBlend.primarySlot, uniforms, 'biomeRoughness');
   const secondaryRoughness = sampleBiomeScalar(biomeBlend.secondarySlot, uniforms, 'biomeRoughness');
   roughnessSample = tslMix(roughnessSample, secondaryRoughness, biomeBlend.secondaryBlend);
-  const wetness = lowlandWetnessMask(biomeBlend.slopeUp, worldPos.y, uniforms);
-  // Wet ground reads darker (handled in colorNode at line 553), not glossier.
+  // Wet ground reads darker in colorNode, not glossier.
   // Old value 0.72 dropped roughness 28% which produced glass-like specular
   // highlights at low sun angles, especially on highland (base 0.78) in A
   // Shau. 0.94 keeps a subtle wet sheen without going to glass.
-  roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.94), wetness);
-  roughnessSample = tslMix(roughnessSample, tslFloat(0.96), featureSurfaceWeight(1, worldPos, uniforms));
-  roughnessSample = tslMix(roughnessSample, tslFloat(0.82), featureSurfaceWeight(2, worldPos, uniforms));
-  roughnessSample = tslMix(roughnessSample, tslFloat(0.94), featureSurfaceWeight(3, worldPos, uniforms));
-  roughnessSample = tslMix(roughnessSample, tslFloat(0.90), featureSurfaceWeight(4, worldPos, uniforms));
-  roughnessSample = tslMix(roughnessSample, tslFloat(0.95), featureSurfaceWeight(5, worldPos, uniforms));
-  const lowSunOcclusion = terrainLowSunOcclusionMask(terrainNormal, worldPos, uniforms);
+  roughnessSample = tslMix(roughnessSample, roughnessSample.mul(0.94), lowlandWetness);
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.96), featureSurfaces[0]);
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.82), featureSurfaces[1]);
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.94), featureSurfaces[2]);
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.90), featureSurfaces[3]);
+  roughnessSample = tslMix(roughnessSample, tslFloat(0.95), featureSurfaces[4]);
   roughnessSample = tslMix(
     roughnessSample,
     tslMax(roughnessSample, tslFloat(0.97)),
     lowSunOcclusion.mul(0.65),
   );
-  const farCanopyRoughnessMask = farCanopyTintMask(biomeBlend.slopeUp, worldPos.y, worldPos, uniforms);
   const farCanopyAdjusted = tslMix(
     roughnessSample,
     tslMax(roughnessSample, tslFloat(0.92)),
-    farCanopyRoughnessMask.mul(0.55),
+    farCanopyTint.mul(0.55),
   );
   // Vietnam-jungle matte floor. Highland (base 0.78) is the lowest biome
   // and is rocky-looking; combined with wetness/feature mixing it can drift
@@ -767,8 +727,9 @@ function configureTerrainNodeMaterial(material: TerrainMaterial, uniforms: Terra
   material.fog = false;
   material.positionNode = createTerrainPositionNode(uniforms);
   material.normalNode = createTerrainNormalNode(uniforms);
-  material.colorNode = createTerrainColorNode(uniforms);
-  material.roughnessNode = createTerrainRoughnessNode(uniforms);
+  const terrainFragment = createTerrainFragmentContext(uniforms);
+  material.colorNode = createTerrainColorNode(uniforms, terrainFragment);
+  material.roughnessNode = createTerrainRoughnessNode(uniforms, terrainFragment);
   material.metalnessNode = tslFloat(0);
   // Night-fill emissive deleted (`legacy-path-deletion`): the rig's
   // ambientRadiance, fed through the PBR scene lights, is the single night
@@ -800,6 +761,8 @@ export function updateTerrainMaterialTextures(
   farCanopyTint?: TerrainFarCanopyTintConfig,
   playableWorldSize?: number,
   visualMargin?: number,
+  lodRanges?: readonly number[],
+  morphStart?: number,
 ): void {
   applyTerrainMaterialOptions(material, {
     heightTexture,
@@ -817,6 +780,8 @@ export function updateTerrainMaterialTextures(
     surfaceWetness: readCurrentSurfaceWetness(material),
     surfacePatches,
     atmosphereLighting: readCurrentAtmosphereLighting(material),
+    lodRanges,
+    morphStart,
   });
   material.needsUpdate = true;
 }
@@ -888,6 +853,30 @@ export function updateTerrainMaterialAtmosphereLighting(
   stashed.lowSunOcclusionStrength = terrainUniforms.atmosphereLowSunOcclusionStrength.value as number;
 }
 
+export function updateTerrainMaterialLodRanges(
+  material: THREE.Material,
+  worldSize: number,
+  lodRanges: readonly number[],
+  morphStart = 0.8,
+): void {
+  const uniforms = material.userData?.terrainUniforms as TerrainUniforms | undefined;
+  if (!uniforms) return;
+  const normalized = normalizeTerrainLodRanges(worldSize, lodRanges);
+  for (let i = 0; i < MAX_TERRAIN_LOD_RANGES; i++) {
+    uniforms[`terrainLodRange${i}`].value = normalized[i];
+  }
+  uniforms.terrainMorphStart.value = THREE.MathUtils.clamp(morphStart, 0, 0.999);
+}
+
+export function updateTerrainMaterialMorphCamera(
+  material: THREE.Material,
+  cameraRelativeY: number,
+): void {
+  const uniforms = material.userData?.terrainUniforms as TerrainUniforms | undefined;
+  if (!uniforms?.terrainMorphCameraRelativeY) return;
+  uniforms.terrainMorphCameraRelativeY.value = Number.isFinite(cameraRelativeY) ? cameraRelativeY : 0;
+}
+
 function applyTerrainMaterialOptions(
   material: TerrainMaterial,
   options: TerrainMaterialOptions,
@@ -945,6 +934,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const surfacePatches = options.surfacePatches ?? [];
   const surfaceWetness = THREE.MathUtils.clamp(options.surfaceWetness ?? 0, 0, 1);
   const farCanopyTint = normalizeFarCanopyTint(options.farCanopyTint);
+  const lodRanges = normalizeTerrainLodRanges(worldSize, options.lodRanges);
 
   if (layers.length === 0) {
     throw new Error('Terrain material requires at least one biome layer');
@@ -1049,6 +1039,8 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     terrainVisualMargin: { value: visualMargin },
     heightmapGridSize: { value: heightmapGridSize },
     tileGridResolution: { value: tileGridRes },
+    terrainMorphStart: { value: THREE.MathUtils.clamp(options.morphStart ?? 0.8, 0, 0.999) },
+    terrainMorphCameraRelativeY: { value: 0 },
     debugWireframe: { value: 0 },
     antiTilingStrength: { value: splatmap.antiTilingStrength },
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
@@ -1094,6 +1086,10 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     biomeRulePriority: { value: rulePriority },
     biomeRuleEnabled: { value: ruleEnabled },
   };
+
+  for (let i = 0; i < MAX_TERRAIN_LOD_RANGES; i++) {
+    uniforms[`terrainLodRange${i}`] = { value: lodRanges[i] };
+  }
 
   for (let i = 0; i < MAX_BIOME_TEXTURES; i++) {
     uniforms[`biomeTexture${i}`] = { value: (layers[i] ?? layers[0]).texture };

@@ -11,6 +11,7 @@ import {
 } from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
 import { computeTerrainShadowBoundRadius } from './TerrainShadowBounds';
+import { updateTerrainMaterialMorphCamera } from './TerrainMaterial';
 
 export interface TerrainDebugTile {
   x: number;
@@ -87,7 +88,6 @@ export interface TerrainRenderSubmissionStats {
 
 const CAMERA_RENDER_SYNC_POSITION_EPSILON_METERS = 0;
 const CAMERA_RENDER_SYNC_ROTATION_EPSILON_RAD = THREE.MathUtils.degToRad(0.01);
-const CAMERA_SELECTION_MORPH_EPSILON = 1e-5;
 const CAMERA_SELECTION_PROJECTION_EPSILON = 1e-7;
 
 function readBooleanQueryFlag(name: string): boolean {
@@ -174,7 +174,7 @@ export class TerrainRenderRuntime {
   constructor(
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
-    material: THREE.Material,
+    private readonly material: THREE.Material,
     config: TerrainRenderRuntimeConfig,
     terrainHeightAt?: (x: number, z: number) => number,
     shadowLight?: THREE.DirectionalLight | null,
@@ -205,6 +205,7 @@ export class TerrainRenderRuntime {
       && sameTileSet
       && sameDynamics
     ) {
+      this.copySelectedTilesForDebug(tiles);
       this.rememberSelectionPose(camera);
       this.unchangedSubmissionSkips += 1;
       this.lastSubmissionSkipped = true;
@@ -253,10 +254,8 @@ export class TerrainRenderRuntime {
     const classification = this.classifySubmission(this.hasSelectionPose, sameTileSet, sameDynamics, false);
     if (sameTileSet) {
       if (sameDynamics) {
-        this.resubmitCurrentTileBuffers(camera, {
-          origin: 'late-sync',
-          classification,
-        });
+        this.copySelectedTilesForDebug(tiles);
+        this.rememberSelectionPose(camera);
       } else {
         this.submitTiles(camera, tiles, {
           origin: 'late-sync',
@@ -265,7 +264,7 @@ export class TerrainRenderRuntime {
       }
       return this.buildSyncResult(true, 'stale', positionDelta, rotationDelta, {
         ...recheckContext,
-        terrainBufferSubmitted: true,
+        terrainBufferSubmitted: !sameDynamics,
         submissionClassification: classification,
       });
     }
@@ -296,6 +295,7 @@ export class TerrainRenderRuntime {
   private selectTiles(camera: THREE.Camera): readonly CDLODTile[] {
     this.updateFrustumPlanes(camera);
     const lodCameraY = this.getTerrainRelativeCameraY(camera);
+    updateTerrainMaterialMorphCamera(this.material, lodCameraY);
     const tiles = this.quadtree.selectTiles(
       camera.position.x,
       lodCameraY,
@@ -322,22 +322,6 @@ export class TerrainRenderRuntime {
     this.configureTerrainShadowPass(camera);
     const updateStartedAt = nowMs();
     this.renderer.updateInstances(tiles);
-    this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
-    this.recordSubmission(options);
-    this.rememberSelectionPose(camera);
-  }
-
-  private resubmitCurrentTileBuffers(
-    camera: THREE.Camera,
-    options: {
-      forced?: boolean;
-      origin: TerrainRenderSubmissionOrigin;
-      classification: TerrainRenderSubmissionClassification;
-    },
-  ): void {
-    this.configureTerrainShadowPass(camera);
-    const updateStartedAt = nowMs();
-    this.renderer.resubmitCurrentInstances();
     this.lastUpdateInstancesMs = nowMs() - updateStartedAt;
     this.recordSubmission(options);
     this.rememberSelectionPose(camera);
@@ -633,10 +617,6 @@ export class TerrainRenderRuntime {
     if (tiles.length !== this.lastSelectedTiles.length) return false;
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i];
-      const previous = this.lastSelectedTiles[i];
-      if (Math.abs(tile.morphFactor - previous.morphFactor) > CAMERA_SELECTION_MORPH_EPSILON) {
-        return false;
-      }
       if (Number(tile.edgeMorphMask ?? 0) !== Number(this.lastSelectedTileEdgeMorphMasks[i] ?? 0)) {
         return false;
       }
