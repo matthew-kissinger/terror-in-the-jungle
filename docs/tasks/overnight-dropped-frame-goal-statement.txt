@@ -4211,3 +4211,28 @@ Latest 2026-06-16 15:53 UTC / 11:53 EDT update:
   evidence with representative firing and presentation epochs, then Open
   Frontier confirmation without reducing scene scale, vegetation, wildlife,
   weather, draw distance, combat pressure, or normal player flow.
+
+Latest 2026-06-16 16:27 UTC / 12:27 EDT update:
+
+- Fixed a render-submission attribution blind spot before trusting the next
+  optimization target. The tracker recorded terrain/world-feature submissions
+  before each object's `onBeforeShadow`/`onBeforeRender` callback ran, so it
+  over-reported pre-hook instanced counts and double-counted WebGPU shadow
+  renders (`onBeforeShadow` plus the paired shadow-pass `onBeforeRender`).
+- Corrected active-combat A Shau evidence:
+  `artifacts/perf/2026-06-16T16-23-13-537Z`. This run still failed validation
+  and measurement trust (`probeAvg=182.8ms`, `probeP95=266ms`), so it is not a
+  baseline or completion proof. It did reproduce real combat (`60` shots,
+  `10` hits) and the dropped-frame symptom remains severe: rAF >25ms
+  `93.65%`, rAF >33ms `72.15%`, estimated dropped frames `36.57/s`, and
+  dropped-frame time `595.71ms/s`.
+- The corrected tail changed the diagnosis: terrain is bounded to `2`
+  submissions in the sampled tail, not the earlier misleading 3-4 submission
+  shape. Tail render is still the lead cost (`RenderMain.renderer.render`
+  `27.7ms`), with terrain triangles (`939,520` tris / `2` submissions),
+  vegetation imposters (`100,788` tris / `6` submissions), and world-static
+  detail draw pressure (`86` submissions / `16,006` tris) all visible.
+- Next aligned target: reduce render cost without content cuts. Treat terrain
+  triangle/shader cost and world-static detail submission/shadow pressure as
+  the leading suspects. Do not chase the rejected shadow-proxy branch; it added
+  a main-scene proxy draw and was discarded.

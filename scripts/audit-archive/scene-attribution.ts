@@ -444,7 +444,8 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     record(object, geometry, material, group, passType = 'main') {
       const category = categoryFor(object, material);
       const instances = instanceCountFor(object, geometry);
-      const triangles = Math.round(triangleCountFor(geometry, group) * Math.max(1, instances));
+      const instanceMultiplier = object?.isInstancedMesh ? instances : Math.max(1, instances);
+      const triangles = Math.round(triangleCountFor(geometry, group) * instanceMultiplier);
       const frameCount = readFrameCount();
       if (frameCount !== state.lastEventScanFrameCount) {
         addMetricEventFrames(globalScope.__metrics?.getSnapshot?.(), state.interestingFrameCounts);
@@ -523,22 +524,30 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
           ? object.onBeforeShadow
           : null;
         object.onBeforeRender = function(...args) {
+          const result = original
+            ? original.apply(this, args)
+            : undefined;
           try {
-            const geometry = args[3] ?? this.geometry;
-            const material = args[4] ?? this.material;
-            const group = args[5] ?? null;
-            state.record(this, geometry, material, group, 'main');
+            const scene = args[1];
+            const isShadowRender = Boolean(scene?.overrideMaterial?.isShadowPassMaterial) ||
+              nameChainFor(this).includes('shadow map');
+            if (!isShadowRender) {
+              const geometry = args[3] ?? this.geometry;
+              const material = args[4] ?? this.material;
+              const group = args[5] ?? null;
+              state.record(this, geometry, material, group, 'main');
+            }
           } catch (error) {
             if (state.errors.length < 12) {
               state.errors.push(error instanceof Error ? error.message : String(error));
             }
           }
-          if (original) {
-            return original.apply(this, args);
-          }
-          return undefined;
+          return result;
         };
         object.onBeforeShadow = function(...args) {
+          const result = originalShadow
+            ? originalShadow.apply(this, args)
+            : undefined;
           try {
             const geometry = args[4] ?? this.geometry;
             const material = args[5] ?? this.material;
@@ -549,10 +558,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
               state.errors.push(error instanceof Error ? error.message : String(error));
             }
           }
-          if (originalShadow) {
-            return originalShadow.apply(this, args);
-          }
-          return undefined;
+          return result;
         };
       });
       return {
