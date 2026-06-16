@@ -606,7 +606,9 @@ export class GroundVehiclePhysics {
     const steer = this.smoothedControls.steerAngle * authority;
     let omegaY = 0;
     if (this.cfg.wheelbase > 0 && Math.abs(fwdSpeed) > 1e-3) {
-      omegaY = (fwdSpeed / this.cfg.wheelbase) * Math.tan(steer);
+      // Three.js positive yaw turns local -Z toward world -X. Positive steer is
+      // player-right, so apply the Ackermann rate as negative world-Y yaw.
+      omegaY = -(fwdSpeed / this.cfg.wheelbase) * Math.tan(steer);
     }
     this.state.angularVelocity.x = 0;
     this.state.angularVelocity.y = omegaY;

@@ -3,7 +3,11 @@
 
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { isHelicopterAnimatedRotorMesh, optimizeRotorJointDrawCalls } from './HelicopterGeometry';
+import {
+  isHelicopterAnimatedRotorMesh,
+  optimizeRotorJointDrawCalls,
+  repairKnownAircraftRotorGeometry,
+} from './HelicopterGeometry';
 import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
 
 function makeMesh(name: string): THREE.Mesh {
@@ -80,6 +84,52 @@ describe('HelicopterGeometry rotor exclusion', () => {
     expect(meshes[0].userData.generatedOptimizedMesh).toBe(true);
     expect(joint.userData.type).toBe('mainBlades');
     expect(isHelicopterAnimatedRotorMesh(meshes[0])).toBe(true);
+  });
+
+  it('repairs the known-bad UH-1H repaint main rotor while preserving the joint pivot', () => {
+    const root = new THREE.Group();
+    const joint = new THREE.Group();
+    joint.name = 'Joint_MainRotor';
+    joint.userData.type = 'mainBlades';
+    joint.userData.spinAxis = 'y';
+    joint.position.set(1, 3, 2);
+    joint.add(makeMesh('Mesh_RotorHub'));
+    joint.add(makeMesh('Mesh_BladeFwd'));
+    joint.add(makeMesh('Mesh_BladeAft'));
+    joint.add(makeMesh('Mesh_StabBar'));
+    root.add(joint);
+
+    repairKnownAircraftRotorGeometry(root, 'UH1_HUEY');
+
+    expect(joint.getObjectByName('Mesh_BladeFwd')).toBeUndefined();
+    expect(joint.getObjectByName('Mesh_BladeAft')).toBeUndefined();
+    expect(joint.getObjectByName('Mesh_StabBar')).toBeUndefined();
+    expect(joint.position.toArray()).toEqual([1, 3, 2]);
+
+    const repaired = joint.getObjectByName('Mesh_UH1RuntimeMainRotorBlades');
+    expect(repaired).toBeInstanceOf(THREE.Mesh);
+    expect(isHelicopterAnimatedRotorMesh(repaired as THREE.Mesh)).toBe(true);
+
+    const box = new THREE.Box3().setFromObject(repaired!);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    expect(size.x).toBeGreaterThan(10);
+    expect(size.y).toBeLessThan(0.1);
+    expect(size.z).toBeLessThan(0.5);
+  });
+
+  it('does not alter non-Huey rotor geometry during the UH-1H repair pass', () => {
+    const root = new THREE.Group();
+    const joint = new THREE.Group();
+    joint.name = 'Joint_MainRotor';
+    joint.userData.type = 'mainBlades';
+    joint.add(makeMesh('Mesh_BladeFwd'));
+    root.add(joint);
+
+    repairKnownAircraftRotorGeometry(root, 'AH1_COBRA');
+
+    expect(joint.getObjectByName('Mesh_BladeFwd')).toBeDefined();
+    expect(joint.getObjectByName('Mesh_UH1RuntimeMainRotorBlades')).toBeUndefined();
   });
 });
 

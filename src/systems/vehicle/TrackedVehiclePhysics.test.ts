@@ -33,7 +33,7 @@
  *   leftTrackCmd  = clamp(throttle - turn, -1, +1)
  *   rightTrackCmd = clamp(throttle + turn, -1, +1)
  *   v_forward = (leftTrackSpeed + rightTrackSpeed) * 0.5 * maxTrackSpeed
- *   omega_y   = (rightTrackSpeed - leftTrackSpeed) * maxTrackSpeed
+ *   omega_y   = (leftTrackSpeed - rightTrackSpeed) * maxTrackSpeed
  *               / trackSeparation
  *
  * Tests are L2 (one system + mocked ITerrainRuntime) per docs/TESTING.md.
@@ -259,6 +259,23 @@ describe('TrackedVehiclePhysics', () => {
       // Forward speed along chassis -Z stays near zero.
       expect(Math.abs(physics.getForwardSpeed())).toBeLessThan(1.0);
     });
+
+    it('turns right for positive turn axis and left for negative turn axis', () => {
+      const flat = makeFlatTerrain(0);
+
+      function forwardXAfterTurn(turnAxis: number): number {
+        const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+        settle(physics, flat, 30, DT);
+
+        physics.setControls(0, turnAxis, false);
+        for (let i = 0; i < 120; i += 1) physics.update(DT, flat);
+
+        return worldForward(physics.getState().quaternion).x;
+      }
+
+      expect(forwardXAfterTurn(1.0)).toBeGreaterThan(0.05);
+      expect(forwardXAfterTurn(-1.0)).toBeLessThan(-0.05);
+    });
   });
 
   describe('Throttle + turn coupling', () => {
@@ -282,12 +299,12 @@ describe('TrackedVehiclePhysics', () => {
       expect(Math.abs(state.angularVelocity.y)).toBeGreaterThan(0.05);
 
       // Coupling shape from differential-drive kinematics:
-      //   omega_y = (rv - lv) / trackSeparation
+      //   omega_y = (lv - rv) / trackSeparation
       //   v_forward target = (lv + rv) / 2
-      // ratio omega / v = 2 * (rv - lv) / ((lv + rv) * trackSeparation).
+      // ratio omega / v = 2 * (lv - rv) / ((lv + rv) * trackSeparation).
       // The integrator's drag + exponential approach means v and omega lag
       // their targets, but the ratio of sign and order-of-magnitude must
-      // match — both are positive (right turn while driving forward).
+      // match: positive turn input produces negative world-Y yaw while driving forward.
       // We assert the *ratio of magnitudes* is non-degenerate.
       const ratio = Math.abs(state.angularVelocity.y) / Math.max(physics.getForwardSpeed(), 1e-3);
       expect(ratio).toBeGreaterThan(0.01);

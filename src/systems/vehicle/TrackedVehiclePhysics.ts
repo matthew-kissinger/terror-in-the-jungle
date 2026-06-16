@@ -534,11 +534,11 @@ export class TrackedVehiclePhysics {
     // v_forward target (m/s) from per-track speeds. Slope-stall scales the
     // drive component; rolling resistance + brake act on actual velocity.
     const vForwardTarget = (lv + rv) * 0.5 * (this.state.isGrounded ? slopeFactor : 0);
-    // omega_y target (rad/s); right faster than left = yaw right (negative
-    // about world Y under +X-right, -Z-forward, +Y-up).
+    // omega_y target (rad/s); right faster than left = yaw right, which is
+    // negative world-Y yaw under +X-right, -Z-forward, +Y-up.
     let omegaYTarget = 0;
     if (trackSeparation > 0) {
-      omegaYTarget = (rv - lv) / trackSeparation;
+      omegaYTarget = (lv - rv) / trackSeparation;
       if (this.state.isGrounded) omegaYTarget *= slopeFactor;
     }
 

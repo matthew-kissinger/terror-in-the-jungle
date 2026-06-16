@@ -241,6 +241,29 @@ describe('GroundVehiclePhysics', () => {
       // Higher steer angle → higher yaw rate (Ackermann scales with tan(steer)).
       expect(Math.abs(yawHigh)).toBeGreaterThan(Math.abs(yawLow));
     });
+
+    it('turns right for positive steer and left for negative steer', () => {
+      const flat = makeFlatTerrain(0);
+
+      function forwardXAfterSteer(steerAngle: number): number {
+        const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+        physics.setEngineActive(true);
+        for (let i = 0; i < 30; i++) physics.update(DT, flat);
+
+        physics.setControls({ throttle: 0.8, steerAngle: 0 });
+        for (let i = 0; i < 180; i++) physics.update(DT, flat);
+
+        physics.setControls({ throttle: 0.8, steerAngle });
+        for (let i = 0; i < 90; i++) physics.update(DT, flat);
+
+        return new THREE.Vector3(0, 0, -1)
+          .applyQuaternion(physics.getState().quaternion)
+          .x;
+      }
+
+      expect(forwardXAfterSteer(0.35)).toBeGreaterThan(0.05);
+      expect(forwardXAfterSteer(-0.35)).toBeLessThan(-0.05);
+    });
   });
 
   describe('Brake', () => {
