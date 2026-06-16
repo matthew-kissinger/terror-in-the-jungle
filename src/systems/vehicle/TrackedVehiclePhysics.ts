@@ -227,6 +227,23 @@ export class TrackedVehiclePhysics {
     this.snapshotPrevious();
   }
 
+  resetToStable(position: THREE.Vector3): void {
+    this.state.position.copy(position);
+    this.state.velocity.set(0, 0, 0); this.state.angularVelocity.set(0, 0, 0);
+    this.state.quaternion.identity();
+    this.state.leftTrackSpeed = this.state.rightTrackSpeed = 0;
+    this.state.isGrounded = true;
+    this.state.groundHeight = position.y - this.cfg.axleOffset;
+    for (let i = 0; i < CORNER_COUNT; i += 1) {
+      this.state.cornerSamples[i].position.copy(position);
+      this.state.cornerSamples[i].terrainHeight = position.y - this.cfg.axleOffset;
+      this.state.cornerSamples[i].inBounds = true;
+    }
+    this.rawControls.throttleAxis = this.rawControls.turnAxis = this.rawControls.brake = 0;
+    this.snapshotPrevious();
+    this.stepper.reset();
+  }
+
   setTracksBlown(blown: boolean): void {
     this.state.tracksBlown = blown;
     if (blown) {

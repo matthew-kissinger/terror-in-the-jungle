@@ -4,21 +4,45 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 
-const { mockQuadtreeCtor, mockSelectTiles, mockUpdateInstances, mockWasLastSelectionSaturated } = vi.hoisted(() => ({
+const {
+  mockQuadtreeCtor,
+  mockSelectTiles,
+  mockUpdateInstances,
+  mockWasLastSelectionSaturated,
+  mockGetLastSelectionStats,
+} = vi.hoisted(() => ({
   mockQuadtreeCtor: vi.fn(),
   mockSelectTiles: vi.fn().mockReturnValue([]),
   mockUpdateInstances: vi.fn(),
   mockWasLastSelectionSaturated: vi.fn().mockReturnValue(false),
+  mockGetLastSelectionStats: vi.fn().mockReturnValue({
+    selectedTiles: 0,
+    nodesVisited: 0,
+    frustumTests: 0,
+    frustumRejectedNodes: 0,
+    heightBoundsEnabled: false,
+    heightBoundsTests: 0,
+    heightBoundsFallbacks: 0,
+    heightBoundsRejectedNodes: 0,
+    saturated: false,
+  }),
 }));
 
 vi.mock('./CDLODQuadtree', () => ({
   CDLODQuadtree: class {
-    constructor(worldSize: number, maxLOD: number, lodRanges: readonly number[]) {
-      mockQuadtreeCtor(worldSize, maxLOD, lodRanges);
+    constructor(
+      worldSize: number,
+      maxLOD: number,
+      lodRanges: readonly number[],
+      morphStart?: number,
+      heightBoundsForTile?: unknown,
+    ) {
+      mockQuadtreeCtor(worldSize, maxLOD, lodRanges, morphStart, heightBoundsForTile);
     }
     selectTiles = mockSelectTiles;
     getSelectedTileCount = vi.fn().mockReturnValue(0);
     wasLastSelectionSaturated = mockWasLastSelectionSaturated;
+    getLastSelectionStats = mockGetLastSelectionStats;
   },
 }));
 
@@ -58,6 +82,18 @@ describe('TerrainRenderRuntime', () => {
     mockUpdateInstances.mockClear();
     mockWasLastSelectionSaturated.mockClear();
     mockWasLastSelectionSaturated.mockReturnValue(false);
+    mockGetLastSelectionStats.mockClear();
+    mockGetLastSelectionStats.mockReturnValue({
+      selectedTiles: 0,
+      nodesVisited: 0,
+      frustumTests: 0,
+      frustumRejectedNodes: 0,
+      heightBoundsEnabled: false,
+      heightBoundsTests: 0,
+      heightBoundsFallbacks: 0,
+      heightBoundsRejectedNodes: 0,
+      saturated: false,
+    });
   });
 
   it('renders over an extent larger than the playable world when a visual margin is configured', () => {
@@ -169,6 +205,94 @@ describe('TerrainRenderRuntime', () => {
 
     const [, yForLod] = mockSelectTiles.mock.calls.at(-1) ?? [];
     expect(yForLod).toBe(camera.position.y);
+  });
+
+  it('does not wire height-aware frustum culling unless the proof flag is enabled', () => {
+    new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 21000,
+        visualMargin: 200,
+        maxLODLevels: 8,
+        lodRanges: [300, 600, 1200, 2400, 4800, 9600, 16000, 22000],
+        tileResolution: 33,
+      },
+      () => 42,
+    );
+
+    const heightBoundsForTile = mockQuadtreeCtor.mock.calls.at(-1)?.[4];
+    expect(heightBoundsForTile).toBeUndefined();
+  });
+
+  it('wires conservative terrain height bounds when the proof flag is enabled', () => {
+    setRuntimeSearch('?perfTerrainHeightAwareFrustum=1');
+    const heightAt = vi.fn((x: number, z: number) => x + z);
+    new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 21000,
+        visualMargin: 200,
+        maxLODLevels: 8,
+        lodRanges: [300, 600, 1200, 2400, 4800, 9600, 16000, 22000],
+        tileResolution: 33,
+      },
+      heightAt,
+    );
+
+    const heightBoundsForTile = mockQuadtreeCtor.mock.calls.at(-1)?.[4] as
+      | ((cx: number, cz: number, size: number, target: { minY: number; maxY: number }) => { minY: number; maxY: number } | null)
+      | undefined;
+    expect(heightBoundsForTile).toBeTypeOf('function');
+
+    const bounds = heightBoundsForTile?.(10, 20, 100, { minY: 0, maxY: 0 });
+    expect(bounds).toBeDefined();
+    expect(bounds!.minY).toBeLessThan(-170);
+    expect(bounds!.maxY).toBeGreaterThan(220);
+    expect(heightAt).toHaveBeenCalledTimes(9);
+  });
+
+  it('surfaces height-aware selection stats in terrain render debug', () => {
+    setRuntimeSearch('?perfTerrainHeightAwareFrustum=1');
+    mockGetLastSelectionStats.mockReturnValue({
+      selectedTiles: 12,
+      nodesVisited: 40,
+      frustumTests: 36,
+      frustumRejectedNodes: 9,
+      heightBoundsEnabled: true,
+      heightBoundsTests: 36,
+      heightBoundsFallbacks: 1,
+      heightBoundsRejectedNodes: 7,
+      saturated: false,
+    });
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 21000,
+        visualMargin: 200,
+        maxLODLevels: 8,
+        lodRanges: [300, 600, 1200, 2400, 4800, 9600, 16000, 22000],
+        tileResolution: 33,
+      },
+      () => 42,
+    );
+
+    runtime.update();
+
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      heightAwareFrustumEnabled: true,
+      selectionNodesVisited: 40,
+      selectionFrustumTests: 36,
+      selectionFrustumRejectedNodes: 9,
+      selectionHeightBoundsTests: 36,
+      selectionHeightBoundsFallbacks: 1,
+      selectionHeightBoundsRejectedNodes: 7,
+    });
   });
 
   it('refreshes camera matrices before extracting CDLOD frustum planes', () => {

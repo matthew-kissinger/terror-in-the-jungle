@@ -846,6 +846,7 @@ type CaptureSummary = {
     terrainShadowsDisabled: boolean;
     boundedTerrainShadowPassEnabled: boolean;
     terrainForceInstanceUploadEnabled: boolean;
+    terrainHeightAwareFrustumEnabled: boolean;
     terrainFarCanopyTintDisabled: boolean;
     terrainLowSunOcclusionDisabled: boolean;
     wildlifeDisabled: boolean;
@@ -1022,6 +1023,7 @@ type MeasurementTrustReport = {
   missedSampleRate: number;
   sampleIntervalMs: number;
   detailEverySamples: number;
+  rendererBackend?: RuntimeSample['rendererBackend'];
   checks: ValidationCheck[];
   summary: string;
 };
@@ -1715,6 +1717,7 @@ Common options:
   --disable-terrain-shadows
   --bounded-terrain-shadow-pass
   --terrain-force-instance-upload
+  --terrain-height-aware-frustum
   --disable-terrain-far-canopy-tint
   --disable-terrain-low-sun-occlusion
   --disable-wildlife
@@ -1807,6 +1810,10 @@ function computeMeasurementTrust(options: {
   missedSamples: number;
   sampleIntervalMs: number;
   detailEverySamples: number;
+  rendererBackend?: RuntimeSample['rendererBackend'];
+  headed?: boolean;
+  scenarioMode?: string;
+  rendererMode?: string;
 }): MeasurementTrustReport {
   const probeRoundTripAvgMs = average(options.probeRoundTripMs);
   const probeRoundTripP95Ms = percentile(options.probeRoundTripMs, 0.95);
@@ -1844,6 +1851,13 @@ function computeMeasurementTrust(options: {
       message: `Collected ${options.runtimeSampleCount} trusted-window runtime samples`
     }
   ];
+  const rendererCheck = rendererBackendTrustCheck({
+    rendererBackend: options.rendererBackend,
+    headed: Boolean(options.headed),
+    scenarioMode: options.scenarioMode ?? '',
+    rendererMode: options.rendererMode ?? ''
+  });
+  if (rendererCheck) checks.push(rendererCheck);
   const status = getOverallStatus(checks);
   const summary = status === 'pass'
     ? 'Measurement path certified for regression comparison.'
@@ -1862,8 +1876,52 @@ function computeMeasurementTrust(options: {
     missedSampleRate,
     sampleIntervalMs: options.sampleIntervalMs,
     detailEverySamples: options.detailEverySamples,
+    rendererBackend: options.rendererBackend,
     checks,
     summary
+  };
+}
+
+function rendererBackendTrustCheck(options: {
+  rendererBackend?: RuntimeSample['rendererBackend'];
+  headed: boolean;
+  scenarioMode: string;
+  rendererMode: string;
+}): ValidationCheck {
+  const explicitWebgl = options.rendererMode.toLowerCase() === 'webgl';
+  const largeTerrainScenario = options.scenarioMode === 'open_frontier' || options.scenarioMode === 'a_shau_valley';
+  const backend = options.rendererBackend;
+  if (!backend) {
+    return {
+      id: 'measurement_renderer_backend',
+      status: 'warn',
+      value: 0,
+      message: 'Renderer backend unavailable in runtime samples; corroborate before baseline decisions.'
+    };
+  }
+
+  const resolvedBackend = String(backend.resolvedBackend ?? 'unknown');
+  if (resolvedBackend === 'webgpu-webgl-fallback' && largeTerrainScenario && !options.headed && !explicitWebgl) {
+    return {
+      id: 'measurement_renderer_backend',
+      status: 'fail',
+      value: 0,
+      message: `${options.scenarioMode} captured headless in WebGPU-unavailable WebGL fallback; not trusted for dropped-frame regression decisions.`
+    };
+  }
+  if (resolvedBackend === 'webgpu-webgl-fallback' && !explicitWebgl) {
+    return {
+      id: 'measurement_renderer_backend',
+      status: 'warn',
+      value: 0.5,
+      message: `Captured in WebGPU-unavailable WebGL fallback (${options.headed ? 'headed' : 'headless'}); compare only against matching backend evidence.`
+    };
+  }
+  return {
+    id: 'measurement_renderer_backend',
+    status: 'pass',
+    value: 1,
+    message: `Renderer backend ${resolvedBackend} accepted for this capture.`
   };
 }
 
@@ -4002,6 +4060,7 @@ async function runCapture(): Promise<void> {
   const disableTerrainShadows = parseBooleanFlag('disable-terrain-shadows', false);
   const boundedTerrainShadowPass = parseBooleanFlag('bounded-terrain-shadow-pass', false);
   const terrainForceInstanceUpload = parseBooleanFlag('terrain-force-instance-upload', false);
+  const terrainHeightAwareFrustum = parseBooleanFlag('terrain-height-aware-frustum', false);
   const disableTerrainFarCanopyTint = parseBooleanFlag('disable-terrain-far-canopy-tint', false);
   const disableTerrainLowSunOcclusion = parseBooleanFlag('disable-terrain-low-sun-occlusion', false);
   const disableWildlife = parseBooleanFlag('disable-wildlife', false);
@@ -4059,7 +4118,7 @@ async function runCapture(): Promise<void> {
     seenKeys: new Set<string>(),
     lastCaptureElapsedMs: -1
   };
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
   if (shotVisualCaptureState.enabled) {
     logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
   }
@@ -4109,13 +4168,14 @@ async function runCapture(): Promise<void> {
   const disableTerrainShadowsQuery = disableTerrainShadows ? '&perfDisableTerrainShadows=1' : '';
   const boundedTerrainShadowPassQuery = boundedTerrainShadowPass ? '&perfBoundedTerrainShadowPass=1' : '';
   const terrainForceInstanceUploadQuery = terrainForceInstanceUpload ? '&terrainForceInstanceUpload=1' : '';
+  const terrainHeightAwareFrustumQuery = terrainHeightAwareFrustum ? '&perfTerrainHeightAwareFrustum=1' : '';
   const disableTerrainFarCanopyTintQuery = disableTerrainFarCanopyTint ? '&perfDisableTerrainFarCanopyTint=1' : '';
   const disableTerrainLowSunOcclusionQuery = disableTerrainLowSunOcclusion ? '&perfDisableTerrainLowSunOcclusion=1' : '';
   const disableWildlifeQuery = disableWildlife ? '&perfDisableWildlife=1' : '';
   const vegetationDensityScaleQuery = vegetationDensityScale !== null
     ? `&perfVegetationDensityScale=${vegetationDensityScale}`
     : '';
-  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainForceInstanceUploadQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}${vegetationDensityScaleQuery}`;
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainForceInstanceUploadQuery}${terrainHeightAwareFrustumQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}${vegetationDensityScaleQuery}`;
   const query = sandboxMode
     ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`
     : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`;
@@ -4531,7 +4591,11 @@ async function runCapture(): Promise<void> {
         runtimeSampleCount: runtimeSamples.length,
         missedSamples,
         sampleIntervalMs,
-        detailEverySamples
+        detailEverySamples,
+        rendererBackend: startupDiagnostics?.rendererBackend ?? latestRendererBackend(runtimeSamples),
+        headed,
+        scenarioMode: requestedMode,
+        rendererMode
       });
       validation.checks.push(measurementTrustValidationCheck(measurementTrust));
       validation.overall = getOverallStatus(validation.checks);
@@ -5793,6 +5857,9 @@ async function runCapture(): Promise<void> {
         const terrainSyncSuffix = renderTerrainDebug && lateSyncSubmissions > 0
           ? ` terrainSync=late:${lateSyncSubmissions} same=${Number(renderTerrainDebug.lateSyncSameIdentitySubmissions ?? 0)} dyn=${Number(renderTerrainDebug.lateSyncDynamicsChangedSubmissions ?? 0)} tile=${Number(renderTerrainDebug.lateSyncTileSetChangedSubmissions ?? 0)} lastSel=${Number(renderTerrainDebug.lastSelectionMs ?? 0).toFixed(2)}ms lastUpload=${Number(renderTerrainDebug.lastUpdateInstancesMs ?? 0).toFixed(2)}ms`
           : '';
+        const heightAwareTerrainSuffix = renderTerrainDebug?.heightAwareFrustumEnabled === true
+          ? ` terrainHA=rej:${Number(renderTerrainDebug.selectionHeightBoundsRejectedNodes ?? 0)}/${Number(renderTerrainDebug.selectionFrustumRejectedNodes ?? 0)} tests=${Number(renderTerrainDebug.selectionHeightBoundsTests ?? 0)} fallbacks=${Number(renderTerrainDebug.selectionHeightBoundsFallbacks ?? 0)}`
+          : '';
         const closeModelSuffix = closeStats
           ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
           : '';
@@ -5815,7 +5882,7 @@ async function runCapture(): Promise<void> {
         const fireTerrainBlockSuffix = fireTerrainBlockedFrame > 0 || fireTerrainBlockedTotal > 0
           ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}%`
           : '';
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${vegetationSuffix}${closeModelSuffix}${driverSuffix}`);
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${heightAwareTerrainSuffix}${vegetationSuffix}${closeModelSuffix}${driverSuffix}`);
         // harness-lifecycle-halt-on-match-end: latch the first match-end
         // observation, then break the loop after MATCH_END_TAIL_MS so we
         // finalize close to the moment the engine declared a winner instead
@@ -5938,7 +6005,11 @@ async function runCapture(): Promise<void> {
       runtimeSampleCount: runtimeSamples.length,
       missedSamples,
       sampleIntervalMs,
-      detailEverySamples
+      detailEverySamples,
+      rendererBackend: latestRendererBackend(runtimeSamples),
+      headed,
+      scenarioMode: requestedMode,
+      rendererMode
     });
     validation.checks.push(measurementTrustValidationCheck(measurementTrust));
     validation.overall = getOverallStatus(validation.checks);
@@ -6017,7 +6088,11 @@ async function runCapture(): Promise<void> {
           runtimeSampleCount: runtimeSamples.length,
           missedSamples,
           sampleIntervalMs,
-          detailEverySamples
+          detailEverySamples,
+          rendererBackend: startupDiagnostics?.rendererBackend ?? latestRendererBackend(runtimeSamples),
+          headed,
+          scenarioMode: requestedMode,
+          rendererMode
         });
       }
       if (page) {
@@ -6163,6 +6238,7 @@ async function runCapture(): Promise<void> {
           terrainShadowsDisabled: disableTerrainShadows,
           boundedTerrainShadowPassEnabled: boundedTerrainShadowPass,
           terrainForceInstanceUploadEnabled: terrainForceInstanceUpload,
+          terrainHeightAwareFrustumEnabled: terrainHeightAwareFrustum,
           terrainFarCanopyTintDisabled: disableTerrainFarCanopyTint,
           terrainLowSunOcclusionDisabled: disableTerrainLowSunOcclusion,
           wildlifeDisabled: disableWildlife

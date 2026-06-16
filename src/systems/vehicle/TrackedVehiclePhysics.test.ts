@@ -19,6 +19,7 @@
  *                 isGrounded, tracksBlown };
  *   setPosition(p): void;
  *   setQuaternion(q): void;
+ *   resetToStable(position): void;
  *   setTracksBlown(blown): void;
  *   dispose(): void;
  *   setWorldHalfExtent(halfExtent): void;
@@ -275,6 +276,35 @@ describe('TrackedVehiclePhysics', () => {
 
       expect(forwardXAfterTurn(1.0)).toBeGreaterThan(0.05);
       expect(forwardXAfterTurn(-1.0)).toBeLessThan(-0.05);
+    });
+
+    it('resetToStable clears residual track motion before a new control sample', () => {
+      const flat = makeFlatTerrain(0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      settle(physics, flat, 30, DT);
+
+      physics.setControls(1.0, 1.0, false);
+      for (let i = 0; i < 90; i += 1) physics.update(DT, flat);
+
+      expect(Math.abs(physics.getState().angularVelocity.y)).toBeGreaterThan(0.01);
+      expect(physics.getState().rightTrackSpeed).toBeGreaterThan(0.1);
+
+      const target = new THREE.Vector3(12, 1.5, -8);
+      physics.resetToStable(target);
+      const reset = physics.getState();
+
+      expect(reset.position.x).toBeCloseTo(target.x);
+      expect(reset.position.y).toBeCloseTo(target.y);
+      expect(reset.position.z).toBeCloseTo(target.z);
+      expect(reset.velocity.length()).toBe(0);
+      expect(reset.angularVelocity.length()).toBe(0);
+      expect(reset.leftTrackSpeed).toBe(0);
+      expect(reset.rightTrackSpeed).toBe(0);
+
+      physics.update(DT, flat);
+      const afterIdleStep = physics.getState();
+      expect(afterIdleStep.position.x).toBeCloseTo(target.x);
+      expect(afterIdleStep.position.z).toBeCloseTo(target.z);
     });
   });
 

@@ -37,8 +37,34 @@ export interface FrustumPlane {
   nx: number; ny: number; nz: number; d: number;
 }
 
+export interface TerrainTileHeightBounds {
+  minY: number;
+  maxY: number;
+}
+
+export type TerrainTileHeightBoundsProvider = (
+  cx: number,
+  cz: number,
+  size: number,
+  target: TerrainTileHeightBounds,
+) => TerrainTileHeightBounds | null | undefined;
+
+export interface CDLODSelectionStats {
+  selectedTiles: number;
+  nodesVisited: number;
+  frustumTests: number;
+  frustumRejectedNodes: number;
+  heightBoundsEnabled: boolean;
+  heightBoundsTests: number;
+  heightBoundsFallbacks: number;
+  heightBoundsRejectedNodes: number;
+  saturated: boolean;
+}
+
 const MAX_TILES = 2048;
 const EDGE_PROBE_EPSILON = 1e-3;
+const DEFAULT_MIN_Y = -500;
+const DEFAULT_MAX_Y = 2000;
 // computeMaxLODLevels currently caps CDLOD depth at 8. Keep a wider stride so
 // numeric grid keys stay collision-free if that cap moves modestly.
 const TILE_KEY_STRIDE = 2048;
@@ -49,6 +75,8 @@ export class CDLODQuadtree {
   private readonly maxLOD: number;
   private readonly lodRanges: readonly number[];
   private readonly morphStart: number; // fraction of range where morph begins (e.g. 0.8)
+  private readonly heightBoundsForTile?: TerrainTileHeightBoundsProvider;
+  private readonly selectionStatsEnabled: boolean;
 
   // Pre-allocated output buffer
   private readonly tileBuffer: CDLODTile[] = [];
@@ -59,12 +87,32 @@ export class CDLODQuadtree {
   // each frame; integer-cell key (see tileKey()) -> tile index in tileBuffer.
   private readonly tileIndex: Map<number, number> = new Map();
   private selectionSaturated = false;
+  private readonly heightBoundsScratch: TerrainTileHeightBounds = { minY: DEFAULT_MIN_Y, maxY: DEFAULT_MAX_Y };
+  private readonly selectionStats: CDLODSelectionStats = {
+    selectedTiles: 0,
+    nodesVisited: 0,
+    frustumTests: 0,
+    frustumRejectedNodes: 0,
+    heightBoundsEnabled: false,
+    heightBoundsTests: 0,
+    heightBoundsFallbacks: 0,
+    heightBoundsRejectedNodes: 0,
+    saturated: false,
+  };
 
-  constructor(worldSize: number, maxLOD: number, lodRanges: readonly number[], morphStart = 0.8) {
+  constructor(
+    worldSize: number,
+    maxLOD: number,
+    lodRanges: readonly number[],
+    morphStart = 0.8,
+    heightBoundsForTile?: TerrainTileHeightBoundsProvider,
+  ) {
     this.worldSize = worldSize;
     this.maxLOD = maxLOD;
     this.lodRanges = lodRanges;
     this.morphStart = morphStart;
+    this.heightBoundsForTile = heightBoundsForTile;
+    this.selectionStatsEnabled = Boolean(heightBoundsForTile);
 
     // Pre-allocate tile objects
     for (let i = 0; i < MAX_TILES; i++) {
@@ -84,6 +132,7 @@ export class CDLODQuadtree {
   ): readonly CDLODTile[] {
     this.tileCount = 0;
     this.selectionSaturated = false;
+    if (this.selectionStatsEnabled) this.resetSelectionStats();
 
     const rootSize = this.worldSize;
     const halfWorld = rootSize / 2;
@@ -104,6 +153,10 @@ export class CDLODQuadtree {
     this.selectedTiles.length = this.tileCount;
     for (let i = 0; i < this.tileCount; i++) {
       this.selectedTiles[i] = this.tileBuffer[i];
+    }
+    if (this.selectionStatsEnabled) {
+      this.selectionStats.selectedTiles = this.tileCount;
+      this.selectionStats.saturated = this.selectionSaturated;
     }
     return this.selectedTiles;
   }
@@ -189,20 +242,45 @@ export class CDLODQuadtree {
     return this.selectionSaturated;
   }
 
+  getLastSelectionStats(): CDLODSelectionStats {
+    return { ...this.selectionStats };
+  }
+
+  private resetSelectionStats(): void {
+    this.selectionStats.selectedTiles = 0;
+    this.selectionStats.nodesVisited = 0;
+    this.selectionStats.frustumTests = 0;
+    this.selectionStats.frustumRejectedNodes = 0;
+    this.selectionStats.heightBoundsEnabled = Boolean(this.heightBoundsForTile);
+    this.selectionStats.heightBoundsTests = 0;
+    this.selectionStats.heightBoundsFallbacks = 0;
+    this.selectionStats.heightBoundsRejectedNodes = 0;
+    this.selectionStats.saturated = false;
+  }
+
   private selectNode(
     cx: number, cz: number, size: number,
     lodLevel: number,
     camX: number, camY: number, camZ: number,
     frustum: readonly FrustumPlane[] | null,
   ): void {
+    if (this.selectionStatsEnabled) this.selectionStats.nodesVisited += 1;
     if (this.tileCount >= MAX_TILES) {
       this.selectionSaturated = true;
       return;
     }
 
     // Frustum cull
-    if (frustum && !this.intersectsFrustum(cx, cz, size, frustum)) {
-      return;
+    if (frustum) {
+      if (this.selectionStatsEnabled) this.selectionStats.frustumTests += 1;
+      const result = this.intersectsFrustum(cx, cz, size, frustum);
+      if (!result.intersects) {
+        if (this.selectionStatsEnabled) this.selectionStats.frustumRejectedNodes += 1;
+        if (result.usedHeightBounds) {
+          this.selectionStats.heightBoundsRejectedNodes += 1;
+        }
+        return;
+      }
     }
 
     // Distance from camera to *nearest point* of this tile's XZ AABB
@@ -265,16 +343,17 @@ export class CDLODQuadtree {
   /**
    * Axis-aligned box vs frustum planes test.
    * The box is centered at (cx, 0, cz) with XZ half-extent = size/2
-   * and a generous Y range of [-500, 2000] to cover all terrain heights.
+   * and either the default generous Y range or opt-in terrain height bounds.
    */
   private intersectsFrustum(
     cx: number, cz: number, size: number,
     planes: readonly FrustumPlane[],
-  ): boolean {
+  ): { intersects: boolean; usedHeightBounds: boolean } {
     const halfSize = size / 2;
     const minX = cx - halfSize, maxX = cx + halfSize;
-    const minY = -500, maxY = 2000;
     const minZ = cz - halfSize, maxZ = cz + halfSize;
+    const bounds = this.getVerticalBounds(cx, cz, size);
+    const minY = bounds.minY, maxY = bounds.maxY;
 
     for (const plane of planes) {
       // Find the vertex most in the direction of the plane normal (p-vertex)
@@ -283,10 +362,35 @@ export class CDLODQuadtree {
       const pz = plane.nz >= 0 ? maxZ : minZ;
 
       if (plane.nx * px + plane.ny * py + plane.nz * pz + plane.d < 0) {
-        return false; // Entirely outside this plane
+        return { intersects: false, usedHeightBounds: bounds.usedHeightBounds }; // Entirely outside this plane
       }
     }
 
-    return true;
+    return { intersects: true, usedHeightBounds: bounds.usedHeightBounds };
+  }
+
+  private getVerticalBounds(
+    cx: number,
+    cz: number,
+    size: number,
+  ): { minY: number; maxY: number; usedHeightBounds: boolean } {
+    if (!this.heightBoundsForTile) {
+      return { minY: DEFAULT_MIN_Y, maxY: DEFAULT_MAX_Y, usedHeightBounds: false };
+    }
+
+    const provided = this.heightBoundsForTile(cx, cz, size, this.heightBoundsScratch);
+    if (
+      !provided
+      || !Number.isFinite(provided.minY)
+      || !Number.isFinite(provided.maxY)
+    ) {
+      if (this.selectionStatsEnabled) this.selectionStats.heightBoundsFallbacks += 1;
+      return { minY: DEFAULT_MIN_Y, maxY: DEFAULT_MAX_Y, usedHeightBounds: false };
+    }
+
+    if (this.selectionStatsEnabled) this.selectionStats.heightBoundsTests += 1;
+    const minY = Math.min(provided.minY, provided.maxY);
+    const maxY = Math.max(provided.minY, provided.maxY);
+    return { minY, maxY, usedHeightBounds: true };
   }
 }

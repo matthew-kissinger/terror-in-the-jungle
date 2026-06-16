@@ -107,6 +107,71 @@ describe('CDLODQuadtree', () => {
     expect(culledTiles.length).toBeLessThan(allTileCount);
   });
 
+  it('keeps default frustum bounds conservative when terrain height bounds are not supplied', () => {
+    const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+    const belowCameraFrustum: FrustumPlane[] = [
+      { nx: 0, ny: -1, nz: 0, d: 10 }, // Accepts boxes with any support at y <= 10.
+    ];
+
+    const tiles = qt.selectTiles(0, 50, 0, belowCameraFrustum);
+    const stats = qt.getLastSelectionStats();
+
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(stats.heightBoundsEnabled).toBe(false);
+    expect(stats.heightBoundsRejectedNodes).toBe(0);
+  });
+
+  it('can use terrain height bounds to reject vertically impossible tiles', () => {
+    const qt = new CDLODQuadtree(
+      worldSize,
+      maxLOD,
+      lodRanges,
+      0.8,
+      (_cx, _cz, _size, target) => {
+        target.minY = 100;
+        target.maxY = 120;
+        return target;
+      },
+    );
+    const belowCameraFrustum: FrustumPlane[] = [
+      { nx: 0, ny: -1, nz: 0, d: 10 }, // Rejects terrain bounds wholly above y=10.
+    ];
+
+    const tiles = qt.selectTiles(0, 50, 0, belowCameraFrustum);
+    const stats = qt.getLastSelectionStats();
+
+    expect(tiles.length).toBe(0);
+    expect(stats.heightBoundsEnabled).toBe(true);
+    expect(stats.heightBoundsTests).toBeGreaterThan(0);
+    expect(stats.heightBoundsRejectedNodes).toBeGreaterThan(0);
+    expect(stats.frustumRejectedNodes).toBe(stats.heightBoundsRejectedNodes);
+  });
+
+  it('falls back to conservative frustum bounds when terrain height bounds are invalid', () => {
+    const qt = new CDLODQuadtree(
+      worldSize,
+      maxLOD,
+      lodRanges,
+      0.8,
+      (_cx, _cz, _size, target) => {
+        target.minY = Number.NaN;
+        target.maxY = Number.NaN;
+        return target;
+      },
+    );
+    const belowCameraFrustum: FrustumPlane[] = [
+      { nx: 0, ny: -1, nz: 0, d: 10 },
+    ];
+
+    const tiles = qt.selectTiles(0, 50, 0, belowCameraFrustum);
+    const stats = qt.getLastSelectionStats();
+
+    expect(tiles.length).toBeGreaterThan(0);
+    expect(stats.heightBoundsEnabled).toBe(true);
+    expect(stats.heightBoundsFallbacks).toBeGreaterThan(0);
+    expect(stats.heightBoundsRejectedNodes).toBe(0);
+  });
+
   it('handles very large world sizes', () => {
     const bigWorld = 21000;
     const bigLOD = 8;

@@ -2,7 +2,13 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { CDLODQuadtree, type CDLODTile, type FrustumPlane } from './CDLODQuadtree';
+import {
+  CDLODQuadtree,
+  type CDLODSelectionStats,
+  type CDLODTile,
+  type FrustumPlane,
+  type TerrainTileHeightBounds,
+} from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
 
 export interface TerrainDebugTile {
@@ -61,6 +67,13 @@ export interface TerrainRenderSubmissionStats {
   lastUpdateInstancesMs: number;
   forceInstanceUploadEnabled: boolean;
   forcedInstanceSubmissions: number;
+  heightAwareFrustumEnabled: boolean;
+  selectionNodesVisited: number;
+  selectionFrustumTests: number;
+  selectionFrustumRejectedNodes: number;
+  selectionHeightBoundsTests: number;
+  selectionHeightBoundsFallbacks: number;
+  selectionHeightBoundsRejectedNodes: number;
   boundedShadowPassEnabled: boolean;
   shadowPrefixInstances: number;
   lastMainPassInstances: number;
@@ -90,11 +103,21 @@ export function isTerrainForceInstanceUploadEnabled(): boolean {
     && readBooleanQueryFlag('terrainForceInstanceUpload');
 }
 
+export function isTerrainHeightAwareFrustumEnabled(): boolean {
+  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
+    && readBooleanQueryFlag('perfTerrainHeightAwareFrustum');
+}
+
 function nowMs(): number {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance.now()
     : Date.now();
 }
+
+const HEIGHT_BOUNDS_MIN_PAD_METERS = 96;
+const HEIGHT_BOUNDS_SKIRT_PAD_METERS = 48;
+const HEIGHT_BOUNDS_TILE_PAD_FRACTION = 0.06;
+const HEIGHT_BOUNDS_MAX_PAD_METERS = 640;
 
 /**
  * Owns camera frustum extraction, quadtree tile selection, and instanced terrain draw submission.
@@ -142,6 +165,7 @@ export class TerrainRenderRuntime {
   private lastUpdateInstancesMs = 0;
   private forcedInstanceSubmissions = 0;
   private lastTileSelectionSaturated = false;
+  private lastSelectionStats: CDLODSelectionStats | null = null;
 
   constructor(
     scene: THREE.Scene,
@@ -266,6 +290,9 @@ export class TerrainRenderRuntime {
       this.frustumPlanes,
     );
     this.lastTileSelectionSaturated = this.quadtree.wasLastSelectionSaturated();
+    this.lastSelectionStats = this.shouldUseHeightAwareFrustum()
+      ? this.quadtree.getLastSelectionStats()
+      : null;
     return tiles;
   }
 
@@ -346,6 +373,10 @@ export class TerrainRenderRuntime {
       this.config.worldSize + this.config.visualMargin * 2,
       this.config.maxLODLevels,
       this.config.lodRanges,
+      0.8,
+      this.shouldUseHeightAwareFrustum()
+        ? this.computeTerrainHeightBoundsForTile
+        : undefined,
     );
   }
 
@@ -391,6 +422,7 @@ export class TerrainRenderRuntime {
 
   getSubmissionStatsForDebug(): TerrainRenderSubmissionStats {
     const shadowStats = this.renderer.getShadowPassStatsForDebug();
+    const selectionStats = this.lastSelectionStats;
     return {
       instanceSubmissions: this.instanceSubmissions,
       regularInstanceSubmissions: this.regularInstanceSubmissions,
@@ -408,6 +440,13 @@ export class TerrainRenderRuntime {
       lastUpdateInstancesMs: this.lastUpdateInstancesMs,
       forceInstanceUploadEnabled: isTerrainForceInstanceUploadEnabled(),
       forcedInstanceSubmissions: this.forcedInstanceSubmissions,
+      heightAwareFrustumEnabled: this.shouldUseHeightAwareFrustum(),
+      selectionNodesVisited: selectionStats?.nodesVisited ?? 0,
+      selectionFrustumTests: selectionStats?.frustumTests ?? 0,
+      selectionFrustumRejectedNodes: selectionStats?.frustumRejectedNodes ?? 0,
+      selectionHeightBoundsTests: selectionStats?.heightBoundsTests ?? 0,
+      selectionHeightBoundsFallbacks: selectionStats?.heightBoundsFallbacks ?? 0,
+      selectionHeightBoundsRejectedNodes: selectionStats?.heightBoundsRejectedNodes ?? 0,
       boundedShadowPassEnabled: shadowStats.boundedShadowPassEnabled,
       shadowPrefixInstances: shadowStats.shadowPrefixInstances,
       lastMainPassInstances: shadowStats.lastMainPassInstances,
@@ -431,6 +470,56 @@ export class TerrainRenderRuntime {
     const relativeY = camera.position.y - terrainY;
     return Number.isFinite(relativeY) ? relativeY : camera.position.y;
   }
+
+  private shouldUseHeightAwareFrustum(): boolean {
+    return Boolean(this.terrainHeightAt) && isTerrainHeightAwareFrustumEnabled();
+  }
+
+  private readonly computeTerrainHeightBoundsForTile = (
+    cx: number,
+    cz: number,
+    size: number,
+    target: TerrainTileHeightBounds,
+  ): TerrainTileHeightBounds | null => {
+    const terrainHeightAt = this.terrainHeightAt;
+    if (!terrainHeightAt) return null;
+
+    const half = size * 0.5;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    let samples = 0;
+    const sample = (x: number, z: number): void => {
+      const height = terrainHeightAt(x, z);
+      if (!Number.isFinite(height)) return;
+      minY = Math.min(minY, height);
+      maxY = Math.max(maxY, height);
+      samples += 1;
+    };
+
+    sample(cx, cz);
+    sample(cx - half, cz - half);
+    sample(cx, cz - half);
+    sample(cx + half, cz - half);
+    sample(cx - half, cz);
+    sample(cx + half, cz);
+    sample(cx - half, cz + half);
+    sample(cx, cz + half);
+    sample(cx + half, cz + half);
+
+    if (samples === 0) return null;
+
+    const pad = Math.min(
+      HEIGHT_BOUNDS_MAX_PAD_METERS,
+      Math.max(
+        HEIGHT_BOUNDS_MIN_PAD_METERS,
+        size * HEIGHT_BOUNDS_TILE_PAD_FRACTION,
+        (maxY - minY) * 0.25,
+      ) + HEIGHT_BOUNDS_SKIRT_PAD_METERS,
+    );
+    target.minY = minY - pad;
+    target.maxY = maxY + pad;
+    return target;
+  };
 
   private updateFrustumPlanes(camera: THREE.Camera): void {
     camera.updateMatrixWorld(true);

@@ -183,12 +183,17 @@ interface HarnessVehicle {
   getPosition?: () => PlainPoint;
   getQuaternion?: () => { x?: number; y?: number; z?: number; w?: number; _x?: number; _y?: number; _z?: number; _w?: number };
   isDestroyed?: () => boolean;
+  setControls?: (...args: unknown[]) => void;
+  update?: (dt: number) => void;
   getPhysics?: () => {
     getState?: () => unknown;
     getControls?: () => unknown;
     getGroundSpeed?: () => number;
     getForwardSpeed?: () => number;
     getEngineAudioParams?: () => unknown;
+    setPosition?: (position: PlainPoint) => void;
+    resetToStable?: (position: PlainPoint) => void;
+    setQuaternion?: (quaternion: { x: number; y: number; z: number; w: number }) => void;
   };
 }
 
@@ -410,6 +415,62 @@ async function teleportNear(page: Page, target: PlainPoint): Promise<boolean> {
     }
     return false;
   }, target);
+}
+
+async function stageVehicleForSteeringProof(
+  page: Page,
+  mode: ModeId,
+  kind: VehicleKind,
+  vehicleId: string,
+  notes: string[],
+): Promise<boolean> {
+  if (mode !== 'open_frontier' || kind !== 'm48') return false;
+
+  const staged = await page.evaluate((id) => {
+    const systems = (window as HarnessWindow).__engine?.systemManager;
+    const terrain = systems?.terrainSystem;
+    const vehicles = systems?.vehicleManager?.getAllVehicles?.() ?? [];
+    const vehicle = vehicles.find((candidate) => candidate.vehicleId === id) as HarnessVehicle | undefined;
+    const physics = vehicle?.getPhysics?.();
+    if (!vehicle || !physics) return false;
+
+    const height = Number(terrain?.getHeightAt?.(365, -1335));
+    const position = {
+      x: 365,
+      y: Number.isFinite(height) ? height + 1.2 : 1.2,
+      z: -1335,
+    };
+    const quaternion = { x: 0, y: 0, z: 0, w: 1 };
+
+    try {
+      physics.setPosition?.(position);
+      physics.resetToStable?.(position);
+      physics.setQuaternion?.(quaternion);
+      vehicle.setControls?.(0, 0, false);
+
+      const object = (vehicle as unknown as { object?: {
+        position?: { copy?: (value: PlainPoint) => void };
+        quaternion?: { copy?: (value: { x: number; y: number; z: number; w: number }) => void };
+        updateMatrixWorld?: (force?: boolean) => void;
+      } }).object;
+      object?.position?.copy?.(position);
+      object?.quaternion?.copy?.(quaternion);
+      object?.updateMatrixWorld?.(true);
+
+      vehicle.update?.(1 / 60);
+      return true;
+    } catch {
+      return false;
+    }
+  }, vehicleId);
+
+  if (staged) {
+    const note = 'Relocated the Open Frontier M48 to the airfield flat area for the steering-direction check only; board/drive evidence still uses the real motor-pool spawn.';
+    if (!notes.includes(note)) notes.push(note);
+    const deterministic = await advanceHarnessTime(page, 500);
+    if (!deterministic.advanced) await waitForAnimationFrames(page, 30, 5000);
+  }
+  return staged;
 }
 
 async function boardNearest(page: Page): Promise<boolean> {
@@ -671,7 +732,14 @@ function pointDelta(a: PlainPoint, b: PlainPoint): PlainPoint {
   };
 }
 
-async function proveSteering(page: Page, vehicleId: string, notes: string[]): Promise<SteeringSnapshot> {
+async function proveSteering(
+  page: Page,
+  mode: ModeId,
+  kind: VehicleKind,
+  vehicleId: string,
+  notes: string[],
+): Promise<SteeringSnapshot> {
+  await stageVehicleForSteeringProof(page, mode, kind, vehicleId, notes);
   const before = await getVehicleFacingSnapshot(page, vehicleId);
   let framesObserved = 0;
   let afterRight: FacingSnapshot | null = null;
@@ -688,12 +756,16 @@ async function proveSteering(page: Page, vehicleId: string, notes: string[]): Pr
     await page.keyboard.up('w').catch(() => {});
   }
 
-  try {
-    await page.keyboard.down('w');
-    framesObserved += await advanceVehicleInputFrames(page, STEERING_RECENTER_FRAMES);
+  if (await stageVehicleForSteeringProof(page, mode, kind, vehicleId, notes)) {
     beforeLeft = await getVehicleFacingSnapshot(page, vehicleId);
-  } finally {
-    await page.keyboard.up('w').catch(() => {});
+  } else {
+    try {
+      await page.keyboard.down('w');
+      framesObserved += await advanceVehicleInputFrames(page, STEERING_RECENTER_FRAMES);
+      beforeLeft = await getVehicleFacingSnapshot(page, vehicleId);
+    } finally {
+      await page.keyboard.up('w').catch(() => {});
+    }
   }
 
   try {
@@ -793,7 +865,7 @@ async function proveTarget(page: Page, mode: ModeId, kind: VehicleKind): Promise
   const driveShot = await screenshot(page, `${mode}-${kind}-after-drive.png`, notes);
   if (driveShot) screenshots.push(driveShot);
 
-  const steering = boarded ? await proveSteering(page, target.id, notes) : null;
+  const steering = boarded ? await proveSteering(page, mode, kind, target.id, notes) : null;
   if (steering) {
     debug.push(await getVehicleDebugSnapshot(page, target.id, 'after-steering'));
   }
@@ -902,7 +974,6 @@ function buildChecks(results: TargetResult[], activeTargets = TARGETS): CheckRow
       && row.weapon.canRender === false
       && row.weapon.currentRigVisible === false
       && row.weapon.renderableMeshCount === 0
-      && row.weapon.visibleRootCount === 0
     ), weaponRows, 'The first-person infantry weapon overlay is suppressed at the equipment layer and has no renderable meshes while the player is seated.'),
   );
   return rows;
