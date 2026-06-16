@@ -346,6 +346,11 @@ const COMPUTE_FLANK_DEST_KEY = 'engage.suppression.initiate.computeFlankDestinat
 type TailAttributionOptions = {
   presentationEpochs?: Record<string, unknown>[];
   finalSceneAttribution?: TailAttributionSample['sceneAttribution'];
+  /**
+   * Full capture stream. Used to join sparse render-submission drains to the
+   * selected tail sample when the exact worst-p99 sample did not capture one.
+   */
+  runtimeSamples?: TailAttributionSample[];
 };
 
 type RenderSubmissionCategoryLike = NonNullable<
@@ -494,13 +499,56 @@ function compactRenderSubmissionCategory(
   };
 }
 
+function hasRenderSubmissionContext(sample: TailAttributionSample): boolean {
+  return !!sample.renderSubmissions || !!sample.renderSubmissionError;
+}
+
+function renderSubmissionTailDistance(sample: TailAttributionSample, tailFrameCount: number): number {
+  const start = numberOrNull(sample.renderSubmissions?.frameCountStart);
+  const end = numberOrNull(sample.renderSubmissions?.frameCountEnd);
+  if (start !== null && end !== null) {
+    const min = Math.min(start, end);
+    const max = Math.max(start, end);
+    if (tailFrameCount >= min && tailFrameCount <= max) {
+      return 0;
+    }
+    return Math.min(Math.abs(tailFrameCount - min), Math.abs(tailFrameCount - max));
+  }
+
+  return Math.abs(numberValue(sample.frameCount) - tailFrameCount);
+}
+
+function selectRenderSubmissionSample(
+  tail: TailAttributionSample,
+  samples: TailAttributionSample[] | undefined,
+): TailAttributionSample {
+  if (hasRenderSubmissionContext(tail)) {
+    return tail;
+  }
+
+  const tailFrameCount = numberValue(tail.frameCount);
+  return (samples ?? [])
+    .filter((sample) => sample !== tail && hasRenderSubmissionContext(sample))
+    .slice()
+    .sort((a, b) => {
+      const aDelta = renderSubmissionTailDistance(a, tailFrameCount);
+      const bDelta = renderSubmissionTailDistance(b, tailFrameCount);
+      if (aDelta !== bDelta) return aDelta - bDelta;
+      const aHasDrain = a.renderSubmissions ? 1 : 0;
+      const bHasDrain = b.renderSubmissions ? 1 : 0;
+      return bHasDrain - aHasDrain;
+    })[0] ?? tail;
+}
+
 function summarizeRenderSubmissionContext(
   tail: TailAttributionSample,
+  options?: TailAttributionOptions,
 ): TailAttribution['renderSubmissionContext'] {
-  const drain = tail.renderSubmissions;
+  const source = selectRenderSubmissionSample(tail, options?.runtimeSamples);
+  const drain = source.renderSubmissions;
   if (!drain) {
-    return tail.renderSubmissionError
-      ? { available: false, error: tail.renderSubmissionError }
+    return source.renderSubmissionError
+      ? { available: false, error: source.renderSubmissionError }
       : null;
   }
 
@@ -518,7 +566,7 @@ function summarizeRenderSubmissionContext(
   if (!nearestFrame) {
     return {
       available: false,
-      error: tail.renderSubmissionError ?? 'render_submission_frames_unavailable',
+      error: source.renderSubmissionError ?? 'render_submission_frames_unavailable',
       mode: drain.mode,
       frameCountStart: drain.frameCountStart ?? null,
       frameCountEnd: drain.frameCountEnd ?? null,
@@ -550,7 +598,7 @@ function summarizeRenderSubmissionContext(
 
   return {
     available: true,
-    error: tail.renderSubmissionError ?? drain.errors?.[0] ?? null,
+    error: source.renderSubmissionError ?? drain.errors?.[0] ?? null,
     mode: drain.mode,
     frameCountStart: drain.frameCountStart ?? null,
     frameCountEnd: drain.frameCountEnd ?? null,
@@ -749,7 +797,7 @@ function summarizePresentationGapContext(
   options?: TailAttributionOptions,
 ): TailAttribution['presentationGapContext'] {
   const candidates: Array<{
-    source: TailAttribution['presentationGapContext']['source'];
+    source: NonNullable<TailAttribution['presentationGapContext']>['source'];
     entry: Record<string, unknown>;
   }> = [];
   for (const entry of options?.presentationEpochs ?? []) {
@@ -956,7 +1004,7 @@ export function computeTailAttribution(
         .join(', ')
     : 'none in top sampled systems';
   const loopFrameBreakdown = summarizeLoopFrameBreakdown(tail.loopFrameBreakdown);
-  const renderSubmissionContext = summarizeRenderSubmissionContext(tail);
+  const renderSubmissionContext = summarizeRenderSubmissionContext(tail, options);
   const sceneAttributionContext = summarizeSceneAttributionContext(tail, options);
   const presentationGapContext = summarizePresentationGapContext(tail, options);
   const loopBreakdownSummary = loopFrameBreakdown
@@ -982,9 +1030,13 @@ export function computeTailAttribution(
         : 'none'}, ` +
       `unmeasured callback ${loopFrameBreakdown.unmeasuredCallbackMs.toFixed(1)}ms`
     : 'slow-loop callback breakdown unavailable';
+  const renderWindowSummary = renderSubmissionContext?.nearestFrame &&
+    (renderSubmissionContext.frameCountStart !== null || renderSubmissionContext.frameCountEnd !== null)
+    ? `, sample window ${renderSubmissionContext.frameCountStart ?? 'n/a'}-${renderSubmissionContext.frameCountEnd ?? 'n/a'}`
+    : '';
   const renderContextSummary = renderSubmissionContext?.nearestFrame
     ? `tail render frame ${renderSubmissionContext.nearestFrame.frameCount} ` +
-      `(Δ${renderSubmissionContext.nearestFrame.frameCountDelta}), ` +
+      `(Δ${renderSubmissionContext.nearestFrame.frameCountDelta}${renderWindowSummary}), ` +
       `draw submissions ${renderSubmissionContext.nearestFrame.drawSubmissions}, ` +
       `triangles ${renderSubmissionContext.nearestFrame.triangles}, ` +
       `top render submissions: ${renderSubmissionContext.nearestFrame.topCategories.length > 0

@@ -477,6 +477,94 @@ describe('computeTailAttribution', () => {
     expect(a.conclusion).toContain('fireLOS=false/terrain_hit_before_target');
   });
 
+  it('joins sparse render samples when the selected tail lacks a render drain', () => {
+    const tail = tailSample();
+    const renderSample: TailAttributionSample = {
+      ts: '2026-06-03T00:00:10.500Z',
+      frameCount: 5100,
+      renderSubmissions: {
+        mode: 'summary',
+        frameCountStart: 4998,
+        frameCountEnd: 5012,
+        frames: [
+          {
+            frameCount: 5009,
+            drawSubmissions: 64,
+            triangles: 1_750_000,
+            instances: 12,
+            categories: [
+              {
+                category: 'terrain',
+                drawSubmissions: 4,
+                triangles: 1_700_000,
+                instances: 4,
+                meshes: 4,
+                materials: 1,
+                geometries: 4,
+              },
+              {
+                category: 'vegetation_imposters',
+                drawSubmissions: 44,
+                triangles: 38_000,
+                instances: 900,
+                meshes: 44,
+                materials: 6,
+                geometries: 6,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const nearerSampleWithWrongWindow: TailAttributionSample = {
+      ts: '2026-06-03T00:00:10.250Z',
+      frameCount: 5002,
+      renderSubmissions: {
+        mode: 'summary',
+        frameCountStart: 5200,
+        frameCountEnd: 5210,
+        frames: [
+          {
+            frameCount: 5201,
+            drawSubmissions: 12,
+            triangles: 12_000,
+            instances: 12,
+            categories: [
+              {
+                category: 'weapons',
+                drawSubmissions: 12,
+                triangles: 12_000,
+                instances: 12,
+                meshes: 12,
+                materials: 12,
+                geometries: 12,
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    const a = computeTailAttribution([tail, nearerSampleWithWrongWindow, renderSample], {
+      runtimeSamples: [tail, nearerSampleWithWrongWindow, renderSample],
+    })!;
+
+    expect(a.sampleFrameCount).toBe(5000);
+    expect(a.renderSubmissionContext?.nearestFrame).toMatchObject({
+      frameCount: 5009,
+      frameCountDelta: 9,
+      drawSubmissions: 64,
+      triangles: 1_750_000,
+    });
+    expect(a.renderSubmissionContext?.nearestFrame?.topTriangleCategories[0]).toMatchObject({
+      category: 'terrain',
+      triangles: 1_700_000,
+    });
+    expect(a.conclusion).toContain('tail render frame 5009');
+    expect(a.conclusion).toContain('top render triangles: terrain 1700000 tris/4 submissions');
+    expect(a.conclusion).not.toContain('tail render context unavailable');
+  });
+
   it('falls back to final scene attribution when tail samples lack frame-local scene context', () => {
     const a = computeTailAttribution([tailSample()], {
       finalSceneAttribution: [

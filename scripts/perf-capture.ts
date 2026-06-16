@@ -6300,7 +6300,8 @@ async function runCapture(): Promise<void> {
           : undefined,
         tailAttribution: computeTailAttribution(runtimeSamples, {
           presentationEpochs: finalPresentationEpochs,
-          finalSceneAttribution: sceneAttribution
+          finalSceneAttribution: sceneAttribution,
+          runtimeSamples
         })
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
