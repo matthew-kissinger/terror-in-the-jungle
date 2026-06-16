@@ -1095,3 +1095,24 @@ Update 2026-06-16 19:25 UTC / 15:25 EDT:
 - This is repo scaffolding, not runtime proof. The goal still needs paired
   quiet-machine captures, owner terrain/camera visual acceptance, and the
   release proof chain before completion.
+
+Update 2026-06-16 19:33 UTC / 15:33 EDT:
+
+- Source-stable harness-equivalence candidate: the active perf driver no
+  longer uses `PlayerController.applyWorldMovementIntent` in its apply loop.
+  It now slews the camera toward the route/aim target first, then converts the
+  route target into camera-relative `forward` / `strafe` and issues the normal
+  `applyMovementIntent` path. This preserves route-following intent while
+  removing the perf-driver-only movement mode that made
+  `harness_movement_mode_equivalence` structurally warn.
+- Guardrails: the conversion uses the live `PlayerMovement` convention
+  (`yaw=0` means world `-Z` forward), maps right-side route targets to strafe,
+  does not backpedal when the route target is behind the current slewed view,
+  and keeps explicit strafe-only intent when no world target exists.
+- Verification passed: `npx vitest run
+  scripts/perf-harness/perf-active-driver.test.js`, targeted ESLint for
+  `scripts/perf-active-driver.cjs` plus the active-driver test, and full
+  `npm run validate:fast` (existing grandfathered source-budget/doc warnings
+  only). This is not runtime proof; the next quiet-machine A Shau/Open
+  Frontier artifacts must show the movement-mode warning gone and must still
+  pass real combat, dropped-frame, trust, and visual gates.
