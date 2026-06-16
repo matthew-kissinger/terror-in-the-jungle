@@ -19,10 +19,29 @@ type TerrainDebugTileLike = {
   edgeMorphMask?: number;
 };
 
+type TerrainRenderDebugStatsLike = {
+  instanceSubmissions?: unknown;
+  regularInstanceSubmissions?: unknown;
+  lateSyncInstanceSubmissions?: unknown;
+  lateSyncSameIdentitySubmissions?: unknown;
+  lateSyncDynamicsChangedSubmissions?: unknown;
+  lateSyncTileSetChangedSubmissions?: unknown;
+  unchangedSubmissionSkips?: unknown;
+  lastSelectionMs?: unknown;
+  lastUpdateInstancesMs?: unknown;
+  boundedShadowPassEnabled?: unknown;
+  shadowRadiusMeters?: unknown;
+  shadowPrefixInstances?: unknown;
+  lastMainPassInstances?: unknown;
+  lastShadowPassInstances?: unknown;
+  shadowPassReductions?: unknown;
+};
+
 type TerrainDebugSource = {
   getActiveTilesForDebug?: () => ReadonlyArray<TerrainDebugTileLike>;
   getActiveTerrainTileCount?: () => number;
   wasLastTileSelectionSaturated?: () => boolean;
+  getRenderSubmissionStatsForDebug?: () => TerrainRenderDebugStatsLike | null;
   getHeightAt?: (x: number, z: number) => number;
   getEffectiveHeightAt?: (x: number, z: number) => number;
   hasTerrainAt?: (x: number, z: number) => boolean;
@@ -57,6 +76,9 @@ export interface PresentationTerrainEpoch {
   tileCount: number;
   tileSelectionSaturated?: boolean;
   tileHash: string;
+  tileIdentityHash: string;
+  morphHash: string;
+  edgeMaskHash: string;
   lodCounts: Record<string, number>;
   morphingTiles: number;
   maxMorphFactor: number;
@@ -88,6 +110,25 @@ export interface PresentationTerrainSyncEpoch {
   submissionClassification?: string | null;
 }
 
+export interface PresentationTerrainRenderEpoch {
+  instanceSubmissions: number;
+  regularInstanceSubmissions: number;
+  lateSyncInstanceSubmissions: number;
+  lateSyncSameIdentitySubmissions: number;
+  lateSyncDynamicsChangedSubmissions: number;
+  lateSyncTileSetChangedSubmissions: number;
+  unchangedSubmissionSkips: number;
+  lastSelectionMs: number;
+  lastUpdateInstancesMs: number;
+  boundedShadowPassEnabled: boolean;
+  shadowRadiusMeters: number;
+  shadowPrefixInstances: number;
+  lastMainPassInstances: number;
+  lastShadowPassInstances: number;
+  shadowPrefixRatio: number | null;
+  shadowPassReductions: number;
+}
+
 export interface PresentationEpochContext {
   frameCount: number;
   atMs: number;
@@ -95,6 +136,7 @@ export interface PresentationEpochContext {
   terrain?: PresentationTerrainEpoch;
   terrainByStage?: Partial<Record<CameraEpochStage, PresentationTerrainEpoch>>;
   terrainSync?: PresentationTerrainSyncEpoch;
+  terrainRender?: PresentationTerrainRenderEpoch;
   renderer?: RendererStatsSource;
 }
 
@@ -180,6 +222,8 @@ function getPresentationEpochStore(): PresentationEpochStore | null {
           latestContext.terrain = terrain;
           latestContext.terrainByStage = latestContext.terrainByStage ?? {};
           latestContext.terrainByStage[input.stage] = terrain;
+          const terrainRender = summarizeTerrainRender(input.terrain);
+          if (terrainRender) latestContext.terrainRender = terrainRender;
         }
         if (input.terrainSync) {
           latestContext.terrainSync = sanitizeTerrainSync(input.terrainSync);
@@ -279,6 +323,9 @@ function summarizeTerrain(source: TerrainDebugSource, camera: THREE.Camera): Pre
   const lodCounts: Record<string, number> = {};
   const edgeMorphMaskCounts: Record<string, number> = {};
   let hash = 2166136261;
+  let tileIdentityHash = 2166136261;
+  let morphHash = 2166136261;
+  let edgeMaskHash = 2166136261;
   let morphingTiles = 0;
   let maxMorphFactor = 0;
   let edgeMorphTiles = 0;
@@ -303,6 +350,12 @@ function summarizeTerrain(source: TerrainDebugSource, camera: THREE.Camera): Pre
     hash = hashNumber(hash, finiteNumber(tile.lodLevel));
     hash = hashNumber(hash, Math.round(morphFactor * 1000));
     hash = hashNumber(hash, edgeMorphMask);
+    tileIdentityHash = hashNumber(tileIdentityHash, Math.round(finiteNumber(tile.x) * 10));
+    tileIdentityHash = hashNumber(tileIdentityHash, Math.round(finiteNumber(tile.z) * 10));
+    tileIdentityHash = hashNumber(tileIdentityHash, Math.round(finiteNumber(tile.size) * 10));
+    tileIdentityHash = hashNumber(tileIdentityHash, finiteNumber(tile.lodLevel));
+    morphHash = hashNumber(morphHash, Math.round(morphFactor * 1000));
+    edgeMaskHash = hashNumber(edgeMaskHash, edgeMorphMask);
   }
 
   const fallbackCount = finiteNumber(source.getActiveTerrainTileCount?.());
@@ -311,6 +364,9 @@ function summarizeTerrain(source: TerrainDebugSource, camera: THREE.Camera): Pre
     tileCount,
     tileSelectionSaturated: Boolean(source.wasLastTileSelectionSaturated?.()),
     tileHash: hash.toString(16).padStart(8, '0'),
+    tileIdentityHash: tileIdentityHash.toString(16).padStart(8, '0'),
+    morphHash: morphHash.toString(16).padStart(8, '0'),
+    edgeMaskHash: edgeMaskHash.toString(16).padStart(8, '0'),
     lodCounts,
     morphingTiles,
     maxMorphFactor,
@@ -361,6 +417,36 @@ function sanitizeTerrainSync(input: PresentationTerrainSyncEpoch): PresentationT
   };
 }
 
+function summarizeTerrainRender(source: TerrainDebugSource): PresentationTerrainRenderEpoch | undefined {
+  const stats = safeTerrainRenderStats(() => source.getRenderSubmissionStatsForDebug?.());
+  if (!stats) return undefined;
+
+  const lastMainPassInstances = finiteNumber(stats.lastMainPassInstances);
+  const shadowPrefixInstances = finiteNumber(stats.shadowPrefixInstances);
+  const shadowPrefixRatio = lastMainPassInstances > 0
+    ? shadowPrefixInstances / lastMainPassInstances
+    : null;
+
+  return {
+    instanceSubmissions: finiteNumber(stats.instanceSubmissions),
+    regularInstanceSubmissions: finiteNumber(stats.regularInstanceSubmissions),
+    lateSyncInstanceSubmissions: finiteNumber(stats.lateSyncInstanceSubmissions),
+    lateSyncSameIdentitySubmissions: finiteNumber(stats.lateSyncSameIdentitySubmissions),
+    lateSyncDynamicsChangedSubmissions: finiteNumber(stats.lateSyncDynamicsChangedSubmissions),
+    lateSyncTileSetChangedSubmissions: finiteNumber(stats.lateSyncTileSetChangedSubmissions),
+    unchangedSubmissionSkips: finiteNumber(stats.unchangedSubmissionSkips),
+    lastSelectionMs: finiteNumber(stats.lastSelectionMs),
+    lastUpdateInstancesMs: finiteNumber(stats.lastUpdateInstancesMs),
+    boundedShadowPassEnabled: Boolean(stats.boundedShadowPassEnabled),
+    shadowRadiusMeters: finiteNumber(stats.shadowRadiusMeters),
+    shadowPrefixInstances,
+    lastMainPassInstances,
+    lastShadowPassInstances: finiteNumber(stats.lastShadowPassInstances),
+    shadowPrefixRatio,
+    shadowPassReductions: finiteNumber(stats.shadowPassReductions),
+  };
+}
+
 function cloneContext(context: PresentationEpochContext | null): PresentationEpochContext | null {
   if (!context) return null;
   const terrainByStage = context.terrainByStage
@@ -384,6 +470,7 @@ function cloneContext(context: PresentationEpochContext | null): PresentationEpo
     terrain: cloneTerrainEpoch(context.terrain),
     terrainByStage,
     terrainSync: context.terrainSync ? { ...context.terrainSync } : undefined,
+    terrainRender: context.terrainRender ? { ...context.terrainRender } : undefined,
     renderer: context.renderer ? { ...context.renderer } : undefined,
   };
 }
@@ -412,6 +499,17 @@ function safeBoolean(read: () => boolean | undefined): boolean | null {
   try {
     const value = read();
     return typeof value === 'boolean' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeTerrainRenderStats(
+  read: () => TerrainRenderDebugStatsLike | null | undefined,
+): TerrainRenderDebugStatsLike | null {
+  try {
+    const value = read();
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
   } catch {
     return null;
   }

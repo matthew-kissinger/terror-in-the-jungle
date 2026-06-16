@@ -6225,7 +6225,11 @@ async function runCapture(): Promise<void> {
         droppedFrameMetrics: summarizeDroppedFrames(runtimeSamples, durationSeconds),
         renderSubmissionMetrics: summarizeRenderSubmissions(runtimeSamples),
         materializationTierMetrics: summarizeMaterializationTierEvents(runtimeSamples),
-        presentationGapContexts: summarizePresentationGapContexts(runtimeSamples, finalPresentationEpochs),
+        presentationGapContexts: summarizePresentationGapContexts(
+          runtimeSamples,
+          finalPresentationEpochs,
+          { finalSceneAttribution: sceneAttribution },
+        ),
         sceneAttribution: sceneAttribution ?? undefined,
         startupTiming: {
           firstEngineSeenSec: startupState.firstEngineSeenSec,
@@ -6270,7 +6274,8 @@ async function runCapture(): Promise<void> {
           ? shotVisualCaptureState.captures
           : undefined,
         tailAttribution: computeTailAttribution(runtimeSamples, {
-          presentationEpochs: finalPresentationEpochs
+          presentationEpochs: finalPresentationEpochs,
+          finalSceneAttribution: sceneAttribution
         })
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');

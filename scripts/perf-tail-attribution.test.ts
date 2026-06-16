@@ -477,6 +477,38 @@ describe('computeTailAttribution', () => {
     expect(a.conclusion).toContain('fireLOS=false/terrain_hit_before_target');
   });
 
+  it('falls back to final scene attribution when tail samples lack frame-local scene context', () => {
+    const a = computeTailAttribution([tailSample()], {
+      finalSceneAttribution: [
+        {
+          category: 'terrain',
+          visibleDrawCallLike: 4,
+          visibleTriangles: 696_000,
+          visibleInstances: 2,
+          visibleMeshes: 2,
+        },
+        {
+          category: 'vegetation_imposters',
+          visibleDrawCallLike: 102,
+          visibleTriangles: 101_000,
+          visibleInstances: 50,
+          visibleMeshes: 50,
+        },
+      ],
+    })!;
+
+    expect(a.sceneAttributionContext).toMatchObject({
+      available: true,
+      source: 'finalSceneAttribution',
+      correlation: 'run-final-uncorrelated',
+      categoryCount: 2,
+      visibleDrawCallLikeTotal: 106,
+      visibleTrianglesTotal: 797_000,
+    });
+    expect(a.conclusion).toContain('final visible scene categories: vegetation_imposters 102 visible draw-like');
+    expect(a.conclusion).toContain('(run-final uncorrelated)');
+  });
+
   it('ranks named AI methods and carries call counts', () => {
     const a = computeTailAttribution([tailSample()])!;
     // The non-cover AI method outranks every cover timer.

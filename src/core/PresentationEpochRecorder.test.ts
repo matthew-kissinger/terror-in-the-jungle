@@ -50,6 +50,23 @@ describe('PresentationEpochRecorder', () => {
           { x: 128, z: 0, size: 64, lodLevel: 2, morphFactor: 0, edgeMorphMask: 0 },
         ],
         wasLastTileSelectionSaturated: () => true,
+        getRenderSubmissionStatsForDebug: () => ({
+          instanceSubmissions: 12,
+          regularInstanceSubmissions: 3,
+          lateSyncInstanceSubmissions: 9,
+          lateSyncSameIdentitySubmissions: 2,
+          lateSyncDynamicsChangedSubmissions: 6,
+          lateSyncTileSetChangedSubmissions: 1,
+          unchangedSubmissionSkips: 4,
+          lastSelectionMs: 0.25,
+          lastUpdateInstancesMs: 0.5,
+          boundedShadowPassEnabled: true,
+          shadowRadiusMeters: 640,
+          shadowPrefixInstances: 40,
+          lastMainPassInstances: 160,
+          lastShadowPassInstances: 40,
+          shadowPassReductions: 7,
+        }),
         getHeightAt: () => 18,
         getEffectiveHeightAt: () => 19,
         hasTerrainAt: () => true,
@@ -121,7 +138,24 @@ describe('PresentationEpochRecorder', () => {
       terrainBufferSubmitted: true,
       submissionClassification: 'dynamics-changed',
     });
+    expect(context?.terrainRender).toMatchObject({
+      instanceSubmissions: 12,
+      lateSyncInstanceSubmissions: 9,
+      lateSyncDynamicsChangedSubmissions: 6,
+      lastSelectionMs: 0.25,
+      lastUpdateInstancesMs: 0.5,
+      boundedShadowPassEnabled: true,
+      shadowRadiusMeters: 640,
+      shadowPrefixInstances: 40,
+      lastMainPassInstances: 160,
+      lastShadowPassInstances: 40,
+      shadowPrefixRatio: 0.25,
+      shadowPassReductions: 7,
+    });
     expect(context?.terrain?.tileHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(context?.terrain?.tileIdentityHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(context?.terrain?.morphHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(context?.terrain?.edgeMaskHash).toMatch(/^[0-9a-f]{8}$/);
     expect(context?.renderer).toMatchObject({
       drawCalls: 42,
       triangles: 1234,
@@ -219,6 +253,10 @@ describe('PresentationEpochRecorder', () => {
     });
     expect(context?.terrainByStage?.['after-simulation']?.tileHash)
       .not.toBe(context?.terrainByStage?.['before-render']?.tileHash);
+    expect(context?.terrainByStage?.['after-simulation']?.tileIdentityHash)
+      .toBe(context?.terrainByStage?.['before-render']?.tileIdentityHash);
+    expect(context?.terrainByStage?.['after-simulation']?.edgeMaskHash)
+      .not.toBe(context?.terrainByStage?.['before-render']?.edgeMaskHash);
   });
 
   it('resets the exposed context', () => {

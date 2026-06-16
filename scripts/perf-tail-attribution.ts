@@ -271,6 +271,8 @@ export type TailAttribution = {
   } | null;
   sceneAttributionContext: {
     available: boolean;
+    source?: 'runtimeSample' | 'finalSceneAttribution';
+    correlation?: 'frame-local' | 'run-final-uncorrelated';
     error?: string | null;
     categoryCount: number;
     visibleDrawCallLikeTotal: number;
@@ -343,6 +345,7 @@ const COMPUTE_FLANK_DEST_KEY = 'engage.suppression.initiate.computeFlankDestinat
 
 type TailAttributionOptions = {
   presentationEpochs?: Record<string, unknown>[];
+  finalSceneAttribution?: TailAttributionSample['sceneAttribution'];
 };
 
 type RenderSubmissionCategoryLike = NonNullable<
@@ -567,12 +570,22 @@ function summarizeRenderSubmissionContext(
 
 function summarizeSceneAttributionContext(
   tail: TailAttributionSample,
+  options?: TailAttributionOptions,
 ): TailAttribution['sceneAttributionContext'] {
-  const entries = Array.isArray(tail.sceneAttribution) ? tail.sceneAttribution : [];
+  const hasRuntimeSceneAttribution = Array.isArray(tail.sceneAttribution) && tail.sceneAttribution.length > 0;
+  const hasFinalSceneAttribution = Array.isArray(options?.finalSceneAttribution)
+    && options.finalSceneAttribution.length > 0;
+  const entries = hasRuntimeSceneAttribution
+    ? tail.sceneAttribution!
+    : hasFinalSceneAttribution
+      ? options!.finalSceneAttribution!
+      : [];
   if (entries.length === 0) {
     return tail.sceneAttributionError
       ? {
           available: false,
+          source: 'runtimeSample',
+          correlation: 'frame-local',
           error: tail.sceneAttributionError,
           categoryCount: 0,
           visibleDrawCallLikeTotal: 0,
@@ -593,6 +606,8 @@ function summarizeSceneAttributionContext(
 
   return {
     available: true,
+    source: hasRuntimeSceneAttribution ? 'runtimeSample' : 'finalSceneAttribution',
+    correlation: hasRuntimeSceneAttribution ? 'frame-local' : 'run-final-uncorrelated',
     error: tail.sceneAttributionError ?? null,
     categoryCount: normalized.length,
     visibleDrawCallLikeTotal: normalized.reduce((sum, entry) => sum + entry.visibleDrawCallLike, 0),
@@ -942,7 +957,7 @@ export function computeTailAttribution(
     : 'none in top sampled systems';
   const loopFrameBreakdown = summarizeLoopFrameBreakdown(tail.loopFrameBreakdown);
   const renderSubmissionContext = summarizeRenderSubmissionContext(tail);
-  const sceneAttributionContext = summarizeSceneAttributionContext(tail);
+  const sceneAttributionContext = summarizeSceneAttributionContext(tail, options);
   const presentationGapContext = summarizePresentationGapContext(tail, options);
   const loopBreakdownSummary = loopFrameBreakdown
     ? `slow-loop callback ${loopFrameBreakdown.slowestCallbackMs.toFixed(1)}ms ` +
@@ -992,14 +1007,14 @@ export function computeTailAttribution(
       ? `tail render context unavailable (${renderSubmissionContext.error ?? 'unknown'})`
       : 'tail render context unavailable';
   const sceneContextSummary = sceneAttributionContext?.available
-    ? `visible scene categories: ${sceneAttributionContext.topVisibleCategories.length > 0
+    ? `${sceneAttributionContext.source === 'finalSceneAttribution' ? 'final visible scene categories' : 'visible scene categories'}: ${sceneAttributionContext.topVisibleCategories.length > 0
       ? sceneAttributionContext.topVisibleCategories
           .slice(0, 4)
           .map((category) =>
             `${category.category} ${category.visibleDrawCallLike} visible draw-like/${category.visibleTriangles} tris`
           )
           .join(', ')
-      : 'none'}`
+      : 'none'}${sceneAttributionContext.correlation === 'run-final-uncorrelated' ? ' (run-final uncorrelated)' : ''}`
     : sceneAttributionContext
       ? `visible scene context unavailable (${sceneAttributionContext.error ?? 'unknown'})`
       : 'visible scene context unavailable';

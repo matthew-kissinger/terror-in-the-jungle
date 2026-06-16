@@ -19,12 +19,32 @@ export type PresentationGapContextEntry = {
   sampleFrameCount?: number;
 };
 
+type SceneAttributionCategory = {
+  category: string;
+  visibleDrawCallLike: number;
+  visibleTriangles: number;
+  visibleInstances: number;
+  visibleMeshes: number;
+};
+
 export type NumericStats = {
   count: number;
   total: number;
   avg: number;
   min: number;
   max: number;
+};
+
+export type PresentationGapSceneSummary = {
+  source: 'runtime-scene-attribution' | 'final-scene-attribution';
+  correlation: 'runtime-sampled' | 'run-final-uncorrelated';
+  sceneSampleCount: number;
+  categoryCount: number;
+  visibleDrawCallLikeTotal: number;
+  visibleTrianglesTotal: number;
+  visibleInstancesTotal: number;
+  topVisibleDrawCallLike: SceneAttributionCategory[];
+  topVisibleTriangles: SceneAttributionCategory[];
 };
 
 export type PresentationGapTerrainSummary = {
@@ -39,6 +59,9 @@ export type PresentationGapTerrainSummary = {
   terrainSyncPoseStaleCount: number;
   terrainSyncProjectionChangedCount: number;
   terrainStageHashChangedCount: number;
+  terrainStageIdentityHashChangedCount: number;
+  terrainStageMorphHashChangedCount: number;
+  terrainStageEdgeMaskHashChangedCount: number;
   terrainStageTileCountChangedCount: number;
   terrainSelectionSaturatedCount: number;
   terrainNotReadyCount: number;
@@ -53,6 +76,16 @@ export type PresentationGapTerrainSummary = {
   cameraClearanceMeters?: NumericStats;
   terrainSyncPositionDeltaMeters?: NumericStats;
   terrainSyncRotationDeltaDeg?: NumericStats;
+  terrainRenderObservedCount: number;
+  boundedShadowPassCount: number;
+  byShadowPrefixCoverage: Record<string, number>;
+  droppedFrameTimeByShadowPrefixCoverage: Record<string, number>;
+  shadowPrefixInstances?: NumericStats;
+  lastMainPassInstances?: NumericStats;
+  lastShadowPassInstances?: NumericStats;
+  shadowPrefixRatio?: NumericStats;
+  renderSelectionMs?: NumericStats;
+  renderUpdateInstancesMs?: NumericStats;
   avgLodCounts: Record<string, number>;
   maxLodCounts: Record<string, number>;
 };
@@ -64,7 +97,12 @@ export type PresentationGapContextSummary = {
   totalDroppedFrameTime60HzMs: number;
   totalOverBudget60HzMs: number;
   terrain?: PresentationGapTerrainSummary;
+  scene?: PresentationGapSceneSummary;
   latest: PresentationGapContextEntry[];
+};
+
+export type PresentationGapSummaryOptions = {
+  finalSceneAttribution?: unknown[] | null;
 };
 
 const LOW_CLEARANCE_THRESHOLD_METERS = 2.5;
@@ -125,6 +163,85 @@ function numericStats(values: number[]): NumericStats | undefined {
     min,
     max,
   };
+}
+
+function normalizeSceneAttributionCategories(value: unknown): SceneAttributionCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => objectOrNull(entry))
+    .filter((entry): entry is Record<string, unknown> => entry !== null)
+    .map((entry) => ({
+      category: stringOrNull(entry.category) ?? 'unattributed',
+      visibleDrawCallLike: numberOrZero(entry.visibleDrawCallLike ?? entry.drawCallLike),
+      visibleTriangles: numberOrZero(entry.visibleTriangles ?? entry.triangles),
+      visibleInstances: numberOrZero(entry.visibleInstances ?? entry.instances),
+      visibleMeshes: numberOrZero(entry.visibleMeshes ?? entry.meshes),
+    }))
+    .filter((entry) =>
+      entry.visibleDrawCallLike > 0
+      || entry.visibleTriangles > 0
+      || entry.visibleInstances > 0
+      || entry.visibleMeshes > 0
+    );
+}
+
+function summarizeSceneCategories(
+  categories: SceneAttributionCategory[],
+  source: PresentationGapSceneSummary['source'],
+  correlation: PresentationGapSceneSummary['correlation'],
+  sceneSampleCount: number,
+): PresentationGapSceneSummary | undefined {
+  if (categories.length === 0) return undefined;
+  return {
+    source,
+    correlation,
+    sceneSampleCount,
+    categoryCount: categories.length,
+    visibleDrawCallLikeTotal: categories.reduce((sum, entry) => sum + entry.visibleDrawCallLike, 0),
+    visibleTrianglesTotal: categories.reduce((sum, entry) => sum + entry.visibleTriangles, 0),
+    visibleInstancesTotal: categories.reduce((sum, entry) => sum + entry.visibleInstances, 0),
+    topVisibleDrawCallLike: categories
+      .slice()
+      .sort((a, b) =>
+        b.visibleDrawCallLike - a.visibleDrawCallLike ||
+        b.visibleTriangles - a.visibleTriangles
+      )
+      .slice(0, 8),
+    topVisibleTriangles: categories
+      .slice()
+      .sort((a, b) =>
+        b.visibleTriangles - a.visibleTriangles ||
+        b.visibleDrawCallLike - a.visibleDrawCallLike
+      )
+      .slice(0, 8),
+  };
+}
+
+function summarizeSceneContext(
+  runtimeSamples: unknown[],
+  options?: PresentationGapSummaryOptions,
+): PresentationGapSceneSummary | undefined {
+  const runtimeSceneSamples = runtimeSamples
+    .map((sample) => objectOrNull(sample))
+    .filter((sample): sample is Record<string, unknown> =>
+      sample !== null && Array.isArray(sample.sceneAttribution)
+    );
+  const latestRuntimeScene = runtimeSceneSamples.at(-1);
+  if (latestRuntimeScene) {
+    return summarizeSceneCategories(
+      normalizeSceneAttributionCategories(latestRuntimeScene.sceneAttribution),
+      'runtime-scene-attribution',
+      'runtime-sampled',
+      runtimeSceneSamples.length,
+    );
+  }
+
+  return summarizeSceneCategories(
+    normalizeSceneAttributionCategories(options?.finalSceneAttribution),
+    'final-scene-attribution',
+    'run-final-uncorrelated',
+    Array.isArray(options?.finalSceneAttribution) ? 1 : 0,
+  );
 }
 
 function normalizeFinalPresentationGap(entry: Record<string, unknown>): PresentationGapContextEntry | null {
@@ -190,6 +307,20 @@ function addLodCounts(
   }
 }
 
+function classifyShadowPrefixCoverage(
+  terrainRender: Record<string, unknown> | null,
+): string {
+  if (!terrainRender) return 'missing';
+  if (terrainRender.boundedShadowPassEnabled === false) return 'unbounded';
+
+  const ratio = finiteNumber(terrainRender.shadowPrefixRatio);
+  if (ratio === null) return 'unknown';
+  if (ratio <= 0) return 'none';
+  if (ratio < 0.35) return 'low';
+  if (ratio < 0.7) return 'medium';
+  return 'high';
+}
+
 function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): PresentationGapTerrainSummary | undefined {
   let gapCount = 0;
   let droppedFrameTime60HzMs = 0;
@@ -201,6 +332,9 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
   let terrainSyncPoseStaleCount = 0;
   let terrainSyncProjectionChangedCount = 0;
   let terrainStageHashChangedCount = 0;
+  let terrainStageIdentityHashChangedCount = 0;
+  let terrainStageMorphHashChangedCount = 0;
+  let terrainStageEdgeMaskHashChangedCount = 0;
   let terrainStageTileCountChangedCount = 0;
   let terrainSelectionSaturatedCount = 0;
   let terrainNotReadyCount = 0;
@@ -208,6 +342,10 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
   let fireIntentCount = 0;
   let nonFireIntentCount = 0;
   let unknownFireIntentCount = 0;
+  let terrainRenderObservedCount = 0;
+  let boundedShadowPassCount = 0;
+  const byShadowPrefixCoverage: Record<string, number> = {};
+  const droppedFrameTimeByShadowPrefixCoverage: Record<string, number> = {};
   const tileCounts: number[] = [];
   const morphingTiles: number[] = [];
   const edgeMorphTiles: number[] = [];
@@ -215,18 +353,25 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
   const cameraClearances: number[] = [];
   const terrainSyncPositionDeltas: number[] = [];
   const terrainSyncRotationDeltas: number[] = [];
+  const shadowPrefixInstances: number[] = [];
+  const lastMainPassInstances: number[] = [];
+  const lastShadowPassInstances: number[] = [];
+  const shadowPrefixRatios: number[] = [];
+  const renderSelectionMs: number[] = [];
+  const renderUpdateInstancesMs: number[] = [];
   const lodTotals: Record<string, number> = {};
   const lodMaxes: Record<string, number> = {};
 
   for (const gap of gaps) {
     const presentationContext = objectOrNull(gap.presentationContext);
     const terrain = objectOrNull(presentationContext?.terrain);
+    const terrainRender = objectOrNull(presentationContext?.terrainRender);
     const terrainSync = objectOrNull(presentationContext?.terrainSync);
     const terrainByStage = objectOrNull(presentationContext?.terrainByStage);
     const afterSimulation = objectOrNull(terrainByStage?.['after-simulation']);
     const beforeRender = objectOrNull(terrainByStage?.['before-render']);
     const harnessContext = objectOrNull(gap.harnessContext);
-    if (!presentationContext && !terrain && !terrainSync && !terrainByStage && !harnessContext) {
+    if (!presentationContext && !terrain && !terrainRender && !terrainSync && !terrainByStage && !harnessContext) {
       continue;
     }
 
@@ -248,10 +393,47 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     pushFinite(terrainSyncPositionDeltas, terrainSync?.positionDeltaMeters);
     pushFinite(terrainSyncRotationDeltas, terrainSync?.rotationDeltaDeg);
 
+    const shadowCoverageClass = classifyShadowPrefixCoverage(terrainRender);
+    incrementCount(byShadowPrefixCoverage, shadowCoverageClass);
+    addByKey(droppedFrameTimeByShadowPrefixCoverage, shadowCoverageClass, gapDropped);
+    if (terrainRender) {
+      terrainRenderObservedCount++;
+      if (terrainRender.boundedShadowPassEnabled === true) boundedShadowPassCount++;
+      pushFinite(shadowPrefixInstances, terrainRender.shadowPrefixInstances);
+      pushFinite(lastMainPassInstances, terrainRender.lastMainPassInstances);
+      pushFinite(lastShadowPassInstances, terrainRender.lastShadowPassInstances);
+      pushFinite(shadowPrefixRatios, terrainRender.shadowPrefixRatio);
+      pushFinite(renderSelectionMs, terrainRender.lastSelectionMs);
+      pushFinite(renderUpdateInstancesMs, terrainRender.lastUpdateInstancesMs);
+    }
+
     const afterHash = stringOrNull(afterSimulation?.tileHash);
     const beforeHash = stringOrNull(beforeRender?.tileHash);
     if (afterHash !== null && beforeHash !== null && afterHash !== beforeHash) {
       terrainStageHashChangedCount++;
+    }
+    const afterIdentityHash = stringOrNull(afterSimulation?.tileIdentityHash);
+    const beforeIdentityHash = stringOrNull(beforeRender?.tileIdentityHash);
+    if (
+      afterIdentityHash !== null
+      && beforeIdentityHash !== null
+      && afterIdentityHash !== beforeIdentityHash
+    ) {
+      terrainStageIdentityHashChangedCount++;
+    }
+    const afterMorphHash = stringOrNull(afterSimulation?.morphHash);
+    const beforeMorphHash = stringOrNull(beforeRender?.morphHash);
+    if (afterMorphHash !== null && beforeMorphHash !== null && afterMorphHash !== beforeMorphHash) {
+      terrainStageMorphHashChangedCount++;
+    }
+    const afterEdgeMaskHash = stringOrNull(afterSimulation?.edgeMaskHash);
+    const beforeEdgeMaskHash = stringOrNull(beforeRender?.edgeMaskHash);
+    if (
+      afterEdgeMaskHash !== null
+      && beforeEdgeMaskHash !== null
+      && afterEdgeMaskHash !== beforeEdgeMaskHash
+    ) {
+      terrainStageEdgeMaskHashChangedCount++;
     }
     const afterTileCount = finiteNumber(afterSimulation?.tileCount);
     const beforeTileCount = finiteNumber(beforeRender?.tileCount);
@@ -303,6 +485,9 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     terrainSyncPoseStaleCount,
     terrainSyncProjectionChangedCount,
     terrainStageHashChangedCount,
+    terrainStageIdentityHashChangedCount,
+    terrainStageMorphHashChangedCount,
+    terrainStageEdgeMaskHashChangedCount,
     terrainStageTileCountChangedCount,
     terrainSelectionSaturatedCount,
     terrainNotReadyCount,
@@ -317,6 +502,16 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     cameraClearanceMeters: numericStats(cameraClearances),
     terrainSyncPositionDeltaMeters: numericStats(terrainSyncPositionDeltas),
     terrainSyncRotationDeltaDeg: numericStats(terrainSyncRotationDeltas),
+    terrainRenderObservedCount,
+    boundedShadowPassCount,
+    byShadowPrefixCoverage,
+    droppedFrameTimeByShadowPrefixCoverage,
+    shadowPrefixInstances: numericStats(shadowPrefixInstances),
+    lastMainPassInstances: numericStats(lastMainPassInstances),
+    lastShadowPassInstances: numericStats(lastShadowPassInstances),
+    shadowPrefixRatio: numericStats(shadowPrefixRatios),
+    renderSelectionMs: numericStats(renderSelectionMs),
+    renderUpdateInstancesMs: numericStats(renderUpdateInstancesMs),
     avgLodCounts,
     maxLodCounts: lodMaxes,
   };
@@ -325,6 +520,7 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
 export function summarizePresentationGapContexts(
   runtimeSamples: unknown[],
   finalPresentationEpochs: Record<string, unknown>[] = [],
+  options?: PresentationGapSummaryOptions,
 ): PresentationGapContextSummary | undefined {
   const gaps: PresentationGapContextEntry[] = [];
 
@@ -371,6 +567,7 @@ export function summarizePresentationGapContexts(
       0,
     ),
     terrain: summarizeTerrainGaps(gaps),
+    scene: summarizeSceneContext(runtimeSamples, options),
     latest,
   };
 }

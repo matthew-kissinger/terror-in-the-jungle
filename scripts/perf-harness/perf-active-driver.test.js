@@ -1450,6 +1450,9 @@ describe('PlayerBot driver mirror — shot presentation context', () => {
         tileCount: 12,
         tileSelectionSaturated: false,
         tileHash: 'abcd1234',
+        tileIdentityHash: 'identity123',
+        morphHash: 'morph123',
+        edgeMaskHash: 'edge123',
         lodCounts: { 0: 1, 1: 11 },
         morphingTiles: 2,
         maxMorphFactor: 0.4,
@@ -1481,6 +1484,24 @@ describe('PlayerBot driver mirror — shot presentation context', () => {
         tileCount: 12,
         tileSelectionSaturated: false,
       },
+      terrainRender: {
+        instanceSubmissions: 18,
+        regularInstanceSubmissions: 4,
+        lateSyncInstanceSubmissions: 14,
+        lateSyncSameIdentitySubmissions: 3,
+        lateSyncDynamicsChangedSubmissions: 10,
+        lateSyncTileSetChangedSubmissions: 1,
+        unchangedSubmissionSkips: 8,
+        lastSelectionMs: 0.3,
+        lastUpdateInstancesMs: 0.7,
+        boundedShadowPassEnabled: true,
+        shadowRadiusMeters: 640,
+        shadowPrefixInstances: 32,
+        lastMainPassInstances: 128,
+        lastShadowPassInstances: 32,
+        shadowPrefixRatio: 0.25,
+        shadowPassReductions: 12,
+      },
       renderer: {
         drawCalls: 321,
         triangles: 456789,
@@ -1501,6 +1522,9 @@ describe('PlayerBot driver mirror — shot presentation context', () => {
     expect(context.terrain).toMatchObject({
       tileCount: 12,
       tileHash: 'abcd1234',
+      tileIdentityHash: 'identity123',
+      morphHash: 'morph123',
+      edgeMaskHash: 'edge123',
       cameraSample: {
         effectiveClearanceMeters: 2.5,
         areaReady: true,
@@ -1514,6 +1538,13 @@ describe('PlayerBot driver mirror — shot presentation context', () => {
       didSync: true,
       reason: 'stale',
       rotationDeltaDeg: 5,
+    });
+    expect(context.terrainRender).toMatchObject({
+      lateSyncInstanceSubmissions: 14,
+      boundedShadowPassEnabled: true,
+      shadowPrefixInstances: 32,
+      lastMainPassInstances: 128,
+      shadowPrefixRatio: 0.25,
     });
     expect(context.renderer).toMatchObject({
       drawCalls: 321,

@@ -908,6 +908,9 @@
         ? value.tileSelectionSaturated
         : null,
       tileHash: typeof value.tileHash === 'string' ? value.tileHash : null,
+      tileIdentityHash: typeof value.tileIdentityHash === 'string' ? value.tileIdentityHash : null,
+      morphHash: typeof value.morphHash === 'string' ? value.morphHash : null,
+      edgeMaskHash: typeof value.edgeMaskHash === 'string' ? value.edgeMaskHash : null,
       lodCounts: sanitizeStringNumberRecord(value.lodCounts),
       morphingTiles: finiteOrNull(value.morphingTiles),
       maxMorphFactor: finiteOrNull(value.maxMorphFactor),
@@ -942,6 +945,30 @@
     };
   }
 
+  function sanitizePresentationTerrainRender(value) {
+    if (!value || typeof value !== 'object') return null;
+    return {
+      instanceSubmissions: finiteOrNull(value.instanceSubmissions),
+      regularInstanceSubmissions: finiteOrNull(value.regularInstanceSubmissions),
+      lateSyncInstanceSubmissions: finiteOrNull(value.lateSyncInstanceSubmissions),
+      lateSyncSameIdentitySubmissions: finiteOrNull(value.lateSyncSameIdentitySubmissions),
+      lateSyncDynamicsChangedSubmissions: finiteOrNull(value.lateSyncDynamicsChangedSubmissions),
+      lateSyncTileSetChangedSubmissions: finiteOrNull(value.lateSyncTileSetChangedSubmissions),
+      unchangedSubmissionSkips: finiteOrNull(value.unchangedSubmissionSkips),
+      lastSelectionMs: finiteOrNull(value.lastSelectionMs),
+      lastUpdateInstancesMs: finiteOrNull(value.lastUpdateInstancesMs),
+      boundedShadowPassEnabled: typeof value.boundedShadowPassEnabled === 'boolean'
+        ? value.boundedShadowPassEnabled
+        : null,
+      shadowRadiusMeters: finiteOrNull(value.shadowRadiusMeters),
+      shadowPrefixInstances: finiteOrNull(value.shadowPrefixInstances),
+      lastMainPassInstances: finiteOrNull(value.lastMainPassInstances),
+      lastShadowPassInstances: finiteOrNull(value.lastShadowPassInstances),
+      shadowPrefixRatio: finiteOrNull(value.shadowPrefixRatio),
+      shadowPassReductions: finiteOrNull(value.shadowPassReductions),
+    };
+  }
+
   function sanitizePresentationRendererStats(value) {
     if (!value || typeof value !== 'object') return null;
     return {
@@ -972,6 +999,7 @@
       terrain: sanitizePresentationTerrainEpoch(value.terrain),
       terrainByStage,
       terrainSync: sanitizePresentationTerrainSync(value.terrainSync),
+      terrainRender: sanitizePresentationTerrainRender(value.terrainRender),
       renderer: sanitizePresentationRendererStats(value.renderer),
     };
   }

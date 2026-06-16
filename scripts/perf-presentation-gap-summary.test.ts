@@ -38,13 +38,28 @@ describe('summarizePresentationGapContexts', () => {
               rotationDeltaDeg: 0.1,
               submissionClassification: 'dynamics-changed',
             },
+            terrainRender: {
+              boundedShadowPassEnabled: true,
+              shadowPrefixInstances: 24,
+              lastMainPassInstances: 96,
+              lastShadowPassInstances: 24,
+              shadowPrefixRatio: 0.25,
+              lastSelectionMs: 0.2,
+              lastUpdateInstancesMs: 0.4,
+            },
             terrainByStage: {
               'after-simulation': {
                 tileHash: 'aaa111',
+                tileIdentityHash: 'identity-a',
+                morphHash: 'morph-a',
+                edgeMaskHash: 'edge-a',
                 tileCount: 10,
               },
               'before-render': {
                 tileHash: 'bbb222',
+                tileIdentityHash: 'identity-a',
+                morphHash: 'morph-b',
+                edgeMaskHash: 'edge-a',
                 tileCount: 10,
               },
             },
@@ -84,13 +99,28 @@ describe('summarizePresentationGapContexts', () => {
               rotationDeltaDeg: 0.25,
               submissionClassification: 'tile-set-changed',
             },
+            terrainRender: {
+              boundedShadowPassEnabled: false,
+              shadowPrefixInstances: 14,
+              lastMainPassInstances: 14,
+              lastShadowPassInstances: 14,
+              shadowPrefixRatio: 1,
+              lastSelectionMs: 0.6,
+              lastUpdateInstancesMs: 0.8,
+            },
             terrainByStage: {
               'after-simulation': {
                 tileHash: 'ccc333',
+                tileIdentityHash: 'identity-c',
+                morphHash: 'morph-c',
+                edgeMaskHash: 'edge-c',
                 tileCount: 12,
               },
               'before-render': {
                 tileHash: 'ddd444',
+                tileIdentityHash: 'identity-d',
+                morphHash: 'morph-d',
+                edgeMaskHash: 'edge-d',
                 tileCount: 14,
               },
             },
@@ -129,6 +159,9 @@ describe('summarizePresentationGapContexts', () => {
       terrainSyncPoseStaleCount: 1,
       terrainSyncProjectionChangedCount: 1,
       terrainStageHashChangedCount: 2,
+      terrainStageIdentityHashChangedCount: 1,
+      terrainStageMorphHashChangedCount: 2,
+      terrainStageEdgeMaskHashChangedCount: 1,
       terrainStageTileCountChangedCount: 1,
       terrainSelectionSaturatedCount: 1,
       terrainNotReadyCount: 1,
@@ -136,10 +169,22 @@ describe('summarizePresentationGapContexts', () => {
       fireIntentCount: 1,
       nonFireIntentCount: 1,
       unknownFireIntentCount: 1,
+      terrainRenderObservedCount: 2,
+      boundedShadowPassCount: 1,
+      byShadowPrefixCoverage: {
+        low: 1,
+        unbounded: 1,
+        missing: 1,
+      },
     });
     expect(summary?.terrain?.droppedFrameTimeByTerrainSyncSubmission).toMatchObject({
       'dynamics-changed': 15.3,
       'tile-set-changed': 31.3,
+      missing: 13.3,
+    });
+    expect(summary?.terrain?.droppedFrameTimeByShadowPrefixCoverage).toMatchObject({
+      low: 15.3,
+      unbounded: 31.3,
       missing: 13.3,
     });
     expect(summary?.terrain?.tileCount).toMatchObject({
@@ -149,6 +194,20 @@ describe('summarizePresentationGapContexts', () => {
       min: 10,
       max: 14,
     });
+    expect(summary?.terrain?.shadowPrefixRatio).toMatchObject({
+      count: 2,
+      total: 1.25,
+      avg: 0.625,
+      min: 0.25,
+      max: 1,
+    });
+    expect(summary?.terrain?.renderUpdateInstancesMs).toMatchObject({
+      count: 2,
+      min: 0.4,
+      max: 0.8,
+    });
+    expect(summary?.terrain?.renderUpdateInstancesMs?.total).toBeCloseTo(1.2, 5);
+    expect(summary?.terrain?.renderUpdateInstancesMs?.avg).toBeCloseTo(0.6, 5);
     expect(summary?.terrain?.avgLodCounts).toMatchObject({
       0: 14 / 3,
       1: 10 / 3,
@@ -206,5 +265,112 @@ describe('summarizePresentationGapContexts', () => {
       none: 1,
     });
     expect(summary?.terrain?.nonFireIntentCount).toBe(1);
+  });
+
+  it('surfaces final scene attribution as an explicitly uncorrelated fallback', () => {
+    const summary = summarizePresentationGapContexts(
+      [],
+      [
+        {
+          seq: 1,
+          gapMs: 40,
+          estimatedDropped60HzFrames: 1,
+          droppedFrameTime60HzMs: 23.3,
+          presentationContext: {},
+        },
+      ],
+      {
+        finalSceneAttribution: [
+          {
+            category: 'terrain',
+            visibleDrawCallLike: 1,
+            visibleTriangles: 714240,
+            visibleInstances: 279,
+            visibleMeshes: 1,
+          },
+          {
+            category: 'wildlife',
+            visibleDrawCallLike: 40,
+            visibleTriangles: 23460,
+            visibleInstances: 40,
+            visibleMeshes: 40,
+          },
+        ],
+      },
+    );
+
+    expect(summary?.scene).toMatchObject({
+      source: 'final-scene-attribution',
+      correlation: 'run-final-uncorrelated',
+      sceneSampleCount: 1,
+      categoryCount: 2,
+      visibleDrawCallLikeTotal: 41,
+      visibleTrianglesTotal: 737700,
+    });
+    expect(summary?.scene?.topVisibleDrawCallLike[0]).toMatchObject({
+      category: 'wildlife',
+      visibleDrawCallLike: 40,
+    });
+    expect(summary?.scene?.topVisibleTriangles[0]).toMatchObject({
+      category: 'terrain',
+      visibleTriangles: 714240,
+    });
+  });
+
+  it('prefers runtime scene attribution samples over the final fallback', () => {
+    const summary = summarizePresentationGapContexts(
+      [
+        {
+          frameCount: 10,
+          sceneAttribution: [
+            {
+              category: 'terrain',
+              visibleDrawCallLike: 1,
+              visibleTriangles: 500000,
+              visibleInstances: 200,
+            },
+          ],
+        },
+        {
+          frameCount: 20,
+          sceneAttribution: [
+            {
+              category: 'vegetation_imposters',
+              visibleDrawCallLike: 6,
+              visibleTriangles: 100000,
+              visibleInstances: 50000,
+            },
+          ],
+        },
+      ],
+      [
+        {
+          seq: 1,
+          gapMs: 36,
+          estimatedDropped60HzFrames: 1,
+          droppedFrameTime60HzMs: 19.3,
+          presentationContext: {},
+        },
+      ],
+      {
+        finalSceneAttribution: [
+          {
+            category: 'terrain',
+            visibleDrawCallLike: 1,
+            visibleTriangles: 900000,
+          },
+        ],
+      },
+    );
+
+    expect(summary?.scene).toMatchObject({
+      source: 'runtime-scene-attribution',
+      correlation: 'runtime-sampled',
+      sceneSampleCount: 2,
+      categoryCount: 1,
+      visibleDrawCallLikeTotal: 6,
+      visibleTrianglesTotal: 100000,
+    });
+    expect(summary?.scene?.topVisibleDrawCallLike[0]?.category).toBe('vegetation_imposters');
   });
 });
