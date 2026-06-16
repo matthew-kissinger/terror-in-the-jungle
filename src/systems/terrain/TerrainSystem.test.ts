@@ -162,6 +162,7 @@ vi.mock('./TerrainMaterial', () => ({
   }),
   updateTerrainMaterialAtmosphereLighting: mockUpdateAtmosphereLighting,
   updateTerrainMaterialFarCanopyTint: mockUpdateFarCanopyTint,
+  updateTerrainMaterialLodRanges: vi.fn(),
   updateTerrainMaterialTextures: vi.fn(),
   updateTerrainMaterialWetness: vi.fn(),
 }));

@@ -14,6 +14,7 @@ import {
   type TerrainAtmosphereLightingMaterialConfig,
   updateTerrainMaterialAtmosphereLighting,
   updateTerrainMaterialFarCanopyTint,
+  updateTerrainMaterialLodRanges,
   updateTerrainMaterialTextures,
   updateTerrainMaterialWetness,
 } from './TerrainMaterial';
@@ -159,14 +160,25 @@ export class TerrainSurfaceRuntime {
   private currentWorldSize = 0;
   private currentPlayableWorldSize = 0;
   private currentVisualMargin = 0;
+  private currentLodRanges: number[];
+  private currentMorphStart = 0.8;
   private currentDefaultBiomeId = 'denseJungle';
   private currentBiomeRules: BiomeClassificationRule[] = [];
 
-  constructor(assetLoader: AssetLoader, splatmap: SplatmapConfig, tileGridResolution = 32) {
+  constructor(assetLoader: AssetLoader, splatmap: SplatmapConfig, tileGridResolution = 32, lodRanges: readonly number[] = []) {
     this.assetLoader = assetLoader;
     this.splatmap = splatmap;
     this.tileGridResolution = tileGridResolution;
+    this.currentLodRanges = [...lodRanges];
     this.heightmapGPU = new HeightmapGPU();
+  }
+
+  setLodRanges(lodRanges: readonly number[], morphStart = 0.8): void {
+    this.currentLodRanges = [...lodRanges];
+    this.currentMorphStart = morphStart;
+    if (this.terrainMaterial) {
+      updateTerrainMaterialLodRanges(this.terrainMaterial, this.currentWorldSize, this.currentLodRanges, morphStart);
+    }
   }
 
   initialize(
@@ -201,6 +213,8 @@ export class TerrainSurfaceRuntime {
       atmosphereLighting: this.atmosphereLighting,
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
+      lodRanges: this.currentLodRanges,
+      morphStart: this.currentMorphStart,
       surfacePatches: this.featureSurfacePatches,
     });
 
@@ -250,6 +264,8 @@ export class TerrainSurfaceRuntime {
       atmosphereLighting: this.atmosphereLighting,
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
+      lodRanges: this.currentLodRanges,
+      morphStart: this.currentMorphStart,
       surfacePatches: this.featureSurfacePatches,
     });
 
@@ -411,6 +427,8 @@ export class TerrainSurfaceRuntime {
     this.farCanopyTint,
     this.currentPlayableWorldSize,
     this.currentVisualMargin,
+    this.currentLodRanges,
+    this.currentMorphStart,
   );
     updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
     updateTerrainMaterialAtmosphereLighting(this.terrainMaterial, this.atmosphereLighting);

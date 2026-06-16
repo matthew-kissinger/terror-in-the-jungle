@@ -10,14 +10,16 @@ const {
   mockConfigureBoundedShadowPass,
   mockUpdateInstances,
   mockResubmitCurrentInstances,
+  mockUpdateTerrainMaterialMorphCamera,
   mockWasLastSelectionSaturated,
   mockGetLastSelectionStats,
 } = vi.hoisted(() => ({
     mockQuadtreeCtor: vi.fn(),
     mockSelectTiles: vi.fn().mockReturnValue([]),
-    mockConfigureBoundedShadowPass: vi.fn(),
-    mockUpdateInstances: vi.fn(),
+  mockConfigureBoundedShadowPass: vi.fn(),
+  mockUpdateInstances: vi.fn(),
   mockResubmitCurrentInstances: vi.fn(),
+  mockUpdateTerrainMaterialMorphCamera: vi.fn(),
   mockWasLastSelectionSaturated: vi.fn().mockReturnValue(false),
   mockGetLastSelectionStats: vi.fn().mockReturnValue({
     selectedTiles: 0,
@@ -30,6 +32,10 @@ const {
     heightBoundsRejectedNodes: 0,
     saturated: false,
   }),
+}));
+
+vi.mock('./TerrainMaterial', () => ({
+  updateTerrainMaterialMorphCamera: mockUpdateTerrainMaterialMorphCamera,
 }));
 
 vi.mock('./CDLODQuadtree', () => ({
@@ -91,6 +97,7 @@ describe('TerrainRenderRuntime', () => {
     mockConfigureBoundedShadowPass.mockClear();
     mockUpdateInstances.mockClear();
     mockResubmitCurrentInstances.mockClear();
+    mockUpdateTerrainMaterialMorphCamera.mockClear();
     mockWasLastSelectionSaturated.mockClear();
     mockWasLastSelectionSaturated.mockReturnValue(false);
     mockGetLastSelectionStats.mockClear();
@@ -582,7 +589,7 @@ describe('TerrainRenderRuntime', () => {
     });
   });
 
-  it('keeps regular terrain buffer submissions when morph data changes', () => {
+  it('skips regular terrain buffer submissions when only shader-computed morph data changes', () => {
     const firstTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.1, edgeMorphMask: 0 };
     const morphedTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.6, edgeMorphMask: 0 };
     mockSelectTiles
@@ -605,13 +612,46 @@ describe('TerrainRenderRuntime', () => {
     runtime.update();
 
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      instanceSubmissions: 1,
+      unchangedSubmissionSkips: 1,
+      lastSubmissionSkipped: true,
+    });
+    expect(runtime.getActiveTilesForDebug()[0]).toMatchObject({ morphFactor: 0.6 });
+  });
+
+  it('keeps regular terrain buffer submissions when edge morph data changes', () => {
+    const firstTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.1, edgeMorphMask: 0 };
+    const edgeChangedTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.6, edgeMorphMask: 1 };
+    mockSelectTiles
+      .mockReturnValueOnce([firstTile])
+      .mockReturnValue([edgeChangedTile]);
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 1000,
+        visualMargin: 0,
+        maxLODLevels: 4,
+        lodRanges: [100, 250, 500, 1000],
+        tileResolution: 33,
+      },
+    );
+
+    runtime.update();
+    runtime.update();
+
+    expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       instanceSubmissions: 2,
       unchangedSubmissionSkips: 0,
       lastSubmissionSkipped: false,
+      lastSubmissionClassification: 'dynamics-changed',
     });
-    expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([morphedTile]);
+    expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([edgeChangedTile]);
   });
 
   it('skips a late render-camera sync when the submitted CDLOD selection already matches the camera epoch', () => {
@@ -642,7 +682,7 @@ describe('TerrainRenderRuntime', () => {
     expect(mockSelectTiles).toHaveBeenCalledTimes(1);
   });
 
-  it('resubmits terrain buffers when a late render-camera sync selects the same tiles', () => {
+  it('rechecks terrain selection without resubmitting buffers when late sync selects the same tile data', () => {
     const camera = new THREE.PerspectiveCamera();
     const runtime = new TerrainRenderRuntime(
       { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
@@ -666,24 +706,24 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.projectionChanged).toBe(false);
-    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.terrainBufferSubmitted).toBe(false);
     expect(result.submissionClassification).toBe('same-identity');
     expect(result.rotationDeltaDeg).toBeGreaterThan(4);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
-    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       regularInstanceSubmissions: 1,
-      lateSyncInstanceSubmissions: 1,
-      lateSyncSameIdentitySubmissions: 1,
+      lateSyncInstanceSubmissions: 0,
+      lateSyncSameIdentitySubmissions: 0,
       lateSyncDynamicsChangedSubmissions: 0,
       lateSyncTileSetChangedSubmissions: 0,
-      lastSubmissionOrigin: 'late-sync',
-      lastSubmissionClassification: 'same-identity',
+      lastSubmissionOrigin: 'regular',
+      lastSubmissionClassification: 'initial',
     });
   });
 
-  it('resubmits CDLOD selection on sub-degree render-camera rotation for GPU-buffer coherency', () => {
+  it('rechecks CDLOD selection on sub-degree render-camera rotation without buffer upload when tile data is unchanged', () => {
     const tile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0, edgeMorphMask: 0 };
     mockSelectTiles.mockReturnValue([tile]);
     const camera = new THREE.PerspectiveCamera();
@@ -709,21 +749,21 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.projectionChanged).toBe(false);
-    expect(result.terrainBufferSubmitted).toBe(true);
+    expect(result.terrainBufferSubmitted).toBe(false);
     expect(result.submissionClassification).toBe('same-identity');
     expect(result.rotationDeltaDeg).toBeGreaterThan(0.2);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
-    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
 
     const secondResult = runtime.syncSelectionForCamera(camera);
     expect(secondResult.reason).toBe('current');
     expect(secondResult.selectionRechecked).toBe(false);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
-    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
   });
 
-  it('resubmits same terrain tiles when the late render-camera sync changes morph data', () => {
+  it('skips terrain buffer submission when late render-camera sync only changes shader-computed morph data', () => {
     const firstTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.1, edgeMorphMask: 0 };
     const morphedTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.7, edgeMorphMask: 0 };
     mockSelectTiles
@@ -752,17 +792,53 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(true);
     expect(result.projectionChanged).toBe(false);
+    expect(result.terrainBufferSubmitted).toBe(false);
+    expect(result.submissionClassification).toBe('same-identity');
+    expect(mockSelectTiles).toHaveBeenCalledTimes(2);
+    expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
+    expect(runtime.getActiveTilesForDebug()[0]).toMatchObject({ morphFactor: 0.7 });
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      lateSyncInstanceSubmissions: 0,
+      lateSyncSameIdentitySubmissions: 0,
+      lateSyncDynamicsChangedSubmissions: 0,
+      lateSyncTileSetChangedSubmissions: 0,
+      lastSubmissionOrigin: 'regular',
+      lastSubmissionClassification: 'initial',
+    });
+  });
+
+  it('resubmits same terrain tiles when the late render-camera sync changes edge morph data', () => {
+    const firstTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.1, edgeMorphMask: 0 };
+    const edgeChangedTile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0.7, edgeMorphMask: 4 };
+    mockSelectTiles
+      .mockReturnValueOnce([firstTile])
+      .mockReturnValue([edgeChangedTile]);
+    const camera = new THREE.PerspectiveCamera();
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      camera,
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 1000,
+        visualMargin: 0,
+        maxLODLevels: 4,
+        lodRanges: [100, 250, 500, 1000],
+        tileResolution: 33,
+      },
+    );
+
+    runtime.update();
+    camera.rotation.y = THREE.MathUtils.degToRad(5);
+    const result = runtime.syncSelectionForCamera(camera);
+
     expect(result.terrainBufferSubmitted).toBe(true);
     expect(result.submissionClassification).toBe('dynamics-changed');
-    expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(2);
-    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
-    expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([morphedTile]);
+    expect(mockUpdateInstances.mock.calls.at(-1)?.[0]).toEqual([edgeChangedTile]);
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       lateSyncInstanceSubmissions: 1,
-      lateSyncSameIdentitySubmissions: 0,
       lateSyncDynamicsChangedSubmissions: 1,
-      lateSyncTileSetChangedSubmissions: 0,
       lastSubmissionOrigin: 'late-sync',
       lastSubmissionClassification: 'dynamics-changed',
     });
@@ -866,7 +942,7 @@ describe('TerrainRenderRuntime', () => {
     expect(runtime.wasLastTileSelectionSaturated()).toBe(true);
   });
 
-  it('resubmits projection-only rechecks for render-camera GPU-buffer coherency', () => {
+  it('rechecks projection-only changes without buffer upload when tile data is unchanged', () => {
     const tile = { x: 0, z: 0, size: 100, lodLevel: 2, morphFactor: 0, edgeMorphMask: 0 };
     mockSelectTiles.mockReturnValue([tile]);
     const camera = new THREE.PerspectiveCamera(75, 16 / 9, 0.1, 1000);
@@ -893,9 +969,10 @@ describe('TerrainRenderRuntime', () => {
     expect(result.selectionRechecked).toBe(true);
     expect(result.poseWasStale).toBe(false);
     expect(result.projectionChanged).toBe(true);
+    expect(result.terrainBufferSubmitted).toBe(false);
     expect(mockSelectTiles).toHaveBeenCalledTimes(2);
     expect(mockUpdateInstances).toHaveBeenCalledTimes(1);
-    expect(mockResubmitCurrentInstances).toHaveBeenCalledTimes(1);
+    expect(mockResubmitCurrentInstances).not.toHaveBeenCalled();
   });
 
   it('rechecks CDLOD selection when render-camera projection changes without a pose change', () => {
