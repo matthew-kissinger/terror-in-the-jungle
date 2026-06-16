@@ -4104,3 +4104,26 @@ LOD/shadow proxy design, render-submission batching, wildlife material
 consolidation that does not repeat the rejected species-level instancing spike,
 and imposter bake validation. If new data looks strange, assume the harness may
 still be missing a system interaction and instrument before trusting a shortcut.
+
+Latest 2026-06-16 14:39 UTC / 10:39 EDT update:
+
+- Current local candidate keeps the CDLOD render-camera coherency repair but
+  narrows terrain instance GPU dirty ranges to the active terrain prefix instead
+  of the full 2048-instance buffer capacity. This should remove unused terrain
+  upload pressure without reducing terrain, vegetation, combat, weather,
+  wildlife, or visual range.
+- Current local candidate also gates the low-sun terrain horizon-occlusion
+  heightmap march inside the TSL graph when its strength is zero. This makes
+  the existing low-sun isolation flag and naturally inactive high-sun path
+  avoid dead shader work instead of only multiplying the result by zero.
+- Focused tests, typecheck, targeted ESLint, `npm run build:perf`,
+  `npm run validate:fast`, and the browser shader-cost probe
+  `artifacts/cycle-mobile-webgl2-fallback-fix/tsl-shader-cost/2026-06-16T14-39-03-967Z/report.json`
+  pass for this local slice. The probe compiled the A Shau WebGPU WebGL
+  fallback material set with no renderer compile error, no high-sampler cache
+  entries, and max fragment sampler count 7.
+- This is not dropped-frame completion proof. The next quiet-machine run must
+  measure default A Shau and Open Frontier with real combat and trusted
+  presentation epochs. If `RenderMain.renderer.render` remains the tail owner,
+  prioritize terrain material cost while low-sun occlusion is active, CDLOD
+  morph/late-sync cadence, or render-submission batching before content cuts.

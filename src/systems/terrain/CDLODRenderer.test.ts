@@ -128,6 +128,12 @@ function setRuntimeSearch(search: string): void {
   });
 }
 
+function expectActivePrefixUpdateRanges(mesh: any, instanceCount: number): void {
+  expect(mesh.instanceMatrix.updateRanges).toEqual([{ start: 0, count: instanceCount * 16 }]);
+  expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([{ start: 0, count: instanceCount * 4 }]);
+  expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([{ start: 0, count: instanceCount * 4 }]);
+}
+
 describe('CDLODRenderer', () => {
   let renderer: CDLODRenderer;
 
@@ -208,9 +214,7 @@ describe('CDLODRenderer', () => {
     expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
     expect(mesh.matrixWriteCount).toBe(3);
-    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expectActivePrefixUpdateRanges(mesh, 3);
   });
 
   it('keeps terrain instance buffers coherent when only morph params change', () => {
@@ -241,9 +245,7 @@ describe('CDLODRenderer', () => {
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
-    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expectActivePrefixUpdateRanges(mesh, 2);
     expect(Array.from(params0.slice(0, 8))).toEqual([
       0, 0, 64, 0,
       64, 0, 64, 1,
@@ -278,9 +280,7 @@ describe('CDLODRenderer', () => {
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
-    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expectActivePrefixUpdateRanges(mesh, 2);
   });
 
   it('rewrites the active terrain prefix when any tile identity changes', () => {
@@ -312,9 +312,7 @@ describe('CDLODRenderer', () => {
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
-    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expectActivePrefixUpdateRanges(mesh, 3);
     expect(Array.from(params0.slice(0, 12))).toEqual([
       0, 0, 64, 0,
       96, 0, 64, 1,
@@ -352,9 +350,7 @@ describe('CDLODRenderer', () => {
     expect(mesh.instanceMatrix.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams0.needsUpdate).toBe(true);
     expect(mesh.geometry.attributes.tileParams1.needsUpdate).toBe(true);
-    expect(mesh.instanceMatrix.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams0.updateRanges).toEqual([]);
-    expect(mesh.geometry.attributes.tileParams1.updateRanges).toEqual([]);
+    expectActivePrefixUpdateRanges(mesh, 2);
   });
 
   it('keeps terrain shadow casting enabled by default', () => {
