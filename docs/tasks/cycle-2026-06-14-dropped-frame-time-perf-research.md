@@ -1135,3 +1135,15 @@ Update 2026-06-16 19:55 UTC / 15:55 EDT:
   summary render-submission attribution, and `--compress-frontline false`.
   Goal status is still open until quiet-machine artifacts from both commands
   pass the EARS checker and owner visual/game-feel acceptance.
+
+Update 2026-06-16 20:05 UTC / 16:05 EDT:
+
+- Reduced the harness bot's default pre-slew aim blend from snap-request
+  behavior to a humanized partial request in both the TypeScript
+  `PlayerBot` config and the CJS `perf-active-driver` mirror. The actual
+  per-tick view cap remains unchanged; the change targets the synthetic
+  "requested 180 degree turn" path that can poison
+  `harness_view_slew_request_equivalence` and owner-visible camera feel.
+- Added TS and CJS tests that keep the default aim request below `1.0`.
+  Runtime proof is still required: the next EARS captures must show large
+  requested view turns gone while shots/hits and route progress remain real.

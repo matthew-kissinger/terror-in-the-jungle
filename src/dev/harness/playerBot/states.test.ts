@@ -583,6 +583,11 @@ describe('pure helpers', () => {
   it('default bot config disables scripted ENGAGE strafe for perf captures', () => {
     expect(DEFAULT_PLAYER_BOT_CONFIG.engageStrafeAmplitude).toBe(0);
   });
+
+  it('default bot config humanizes aim requests before view slew caps', () => {
+    expect(DEFAULT_PLAYER_BOT_CONFIG.aimLerpRate).toBeGreaterThan(0);
+    expect(DEFAULT_PLAYER_BOT_CONFIG.aimLerpRate).toBeLessThan(1);
+  });
 });
 
 describe('stepState — absorbing RESPAWN_WAIT guard', () => {

@@ -129,7 +129,7 @@ export interface PlayerBotConfig {
   readonly approachDistance: number;
   /** Distance (m) below which ENGAGE stops pushing forward (0 — never −1). */
   readonly pushInDistance: number;
-  /** Aim blend rate per tick (0..1). 1 requests target angle before slew caps. */
+  /** Aim blend rate per tick (0..1). Keep default below 1 so requests stay humanized before slew caps. */
   readonly aimLerpRate: number;
   /** Strafe amplitude in ENGAGE (0..1). 0 disables player-dodge. */
   readonly engageStrafeAmplitude: number;
@@ -152,7 +152,7 @@ export const DEFAULT_PLAYER_BOT_CONFIG: PlayerBotConfig = {
   sprintDistance: 200,
   approachDistance: 120,
   pushInDistance: 18,
-  aimLerpRate: 1,
+  aimLerpRate: 0.2,
   engageStrafeAmplitude: 0,
   engageStrafePeriodMs: 750,
   minEngageStateMs: 700,

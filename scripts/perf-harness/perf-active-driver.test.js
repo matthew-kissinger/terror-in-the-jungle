@@ -1287,6 +1287,12 @@ describe('PlayerBot driver mirror — mode profiles', () => {
     expect(config.minAdvanceStateMs).toBeGreaterThan(0);
   });
 
+  it('botConfigForProfile humanizes aim requests before view slew caps', () => {
+    const config = botConfigForProfile(profileForMode('ai_sandbox'));
+    expect(config.aimLerpRate).toBeGreaterThan(0);
+    expect(config.aimLerpRate).toBeLessThan(1);
+  });
+
   it('botConfigForProfile disables scripted strafe so stress captures do not mimic cover-peeking', () => {
     const config = botConfigForProfile(profileForMode('ai_sandbox'));
     expect(config.engageStrafeAmplitude).toBe(0);
