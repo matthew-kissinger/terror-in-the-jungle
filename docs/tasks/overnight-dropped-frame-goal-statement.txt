@@ -12,7 +12,9 @@ Completion evidence required:
    `docs/tasks/dropped-frame-ears-criteria.md` is the current pass/fail shape
    for STABILIZAT-4. Future agents should treat those EARS criteria as the
    default loop contract unless the owner explicitly changes thresholds or
-   scope.
+   scope. Use `npm run check:dropped-frame-ears -- --dir <ashau-artifact>
+   --dir <open-frontier-artifact> --strict` as the local artifact gate before
+   claiming a completion candidate.
 1. The perf harness measures the player-visible symptom directly: dropped-frame
    time, rAF gaps, long tasks / LoAFs, frame-time tails, and presentation epochs.
    It must also expose enough context to distrust itself when data looks wrong:

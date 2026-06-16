@@ -173,6 +173,7 @@
     "check:culling-proof": "npx tsx scripts/check-culling-proof.ts --headed",
     "check:terrain-baseline": "npx tsx scripts/check-terrain-baseline.ts",
     "check:terrain-visual": "npx tsx scripts/check-terrain-visual.ts",
+    "check:dropped-frame-ears": "npx tsx scripts/check-dropped-frame-ears.ts",
     "check:visual-integrity": "npx tsx scripts/check-visual-integrity.ts",
     "check:route-quality": "npx tsx scripts/check-route-quality.ts",
     "check:helicopter-parity": "npx tsx scripts/check-helicopter-parity.ts",

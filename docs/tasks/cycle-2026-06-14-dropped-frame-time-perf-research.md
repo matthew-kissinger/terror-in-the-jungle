@@ -1078,3 +1078,20 @@ Update 2026-06-16 03:36 UTC / 23:36 EDT:
   `PresentationEpochRecorder`, `TerrainBiomeRuntimeConfig`, and tail
   attribution; targeted ESLint on all touched harness/diagnostics files;
   `npm run build:perf`; and `npm run validate:fast`.
+
+Update 2026-06-16 19:25 UTC / 15:25 EDT:
+
+- Added executable EARS artifact scaffolding for the dropped-frame finish line:
+  `npm run check:dropped-frame-ears`. It evaluates saved perf artifacts for
+  required files, quiet-machine attestation, capture/validation/trust pass,
+  strict WebGPU, rAF dropped-frame thresholds, real combat, same-experience
+  harness warnings, content-reduction flags, and the required Open Frontier +
+  A Shau artifact pair.
+- Ran it against the latest dirty A Shau packet
+  `artifacts/perf/2026-06-16T19-00-48-789Z`; the checker correctly classified
+  it as diagnostic-only and reported missing Open Frontier pair coverage,
+  failed capture/validation/measurement trust, failed rAF gates, and active
+  harness equivalence failures.
+- This is repo scaffolding, not runtime proof. The goal still needs paired
+  quiet-machine captures, owner terrain/camera visual acceptance, and the
+  release proof chain before completion.
