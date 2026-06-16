@@ -853,6 +853,10 @@ type CaptureSummary = {
     terrainHeightAwareFrustumRequested: boolean;
     terrainHeightAwareFrustumDisabled: boolean;
     terrainHeightAwareFrustumEnabled?: boolean;
+    terrainHeightBoundsSource?: string;
+    terrainHeightBoundsTests?: number;
+    terrainHeightBoundsFallbacks?: number;
+    terrainHeightBoundsRejectedNodes?: number;
     terrainFullSkirtsRequested: boolean;
     terrainSparseSkirtsRequested: boolean;
     terrainSkirtsDisabled: boolean;
@@ -2443,6 +2447,11 @@ function latestTerrainRenderDebug(runtimeSamples: RuntimeSample[]): Record<strin
     }
   }
   return undefined;
+}
+
+function terrainDebugNumber(debug: Record<string, unknown> | undefined, key: string): number | undefined {
+  const value = debug?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function summarizeGpuTiming(
@@ -5902,7 +5911,7 @@ async function runCapture(): Promise<void> {
           ? ` terrainSync=late:${lateSyncSubmissions} same=${Number(renderTerrainDebug.lateSyncSameIdentitySubmissions ?? 0)} dyn=${Number(renderTerrainDebug.lateSyncDynamicsChangedSubmissions ?? 0)} tile=${Number(renderTerrainDebug.lateSyncTileSetChangedSubmissions ?? 0)} lastSel=${Number(renderTerrainDebug.lastSelectionMs ?? 0).toFixed(2)}ms lastUpload=${Number(renderTerrainDebug.lastUpdateInstancesMs ?? 0).toFixed(2)}ms`
           : '';
         const heightAwareTerrainSuffix = renderTerrainDebug?.heightAwareFrustumEnabled === true
-          ? ` terrainHA=rej:${Number(renderTerrainDebug.selectionHeightBoundsRejectedNodes ?? 0)}/${Number(renderTerrainDebug.selectionFrustumRejectedNodes ?? 0)} tests=${Number(renderTerrainDebug.selectionHeightBoundsTests ?? 0)} fallbacks=${Number(renderTerrainDebug.selectionHeightBoundsFallbacks ?? 0)}`
+          ? ` terrainHA=${String(renderTerrainDebug.heightBoundsSource ?? 'unknown')} rej:${Number(renderTerrainDebug.selectionHeightBoundsRejectedNodes ?? 0)}/${Number(renderTerrainDebug.selectionFrustumRejectedNodes ?? 0)} tests=${Number(renderTerrainDebug.selectionHeightBoundsTests ?? 0)} fallbacks=${Number(renderTerrainDebug.selectionHeightBoundsFallbacks ?? 0)}`
           : '';
         const closeModelSuffix = closeStats
           ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
@@ -6212,6 +6221,12 @@ async function runCapture(): Promise<void> {
       const runtimeTerrainHeightAwareFrustum = typeof latestTerrainDebug?.heightAwareFrustumEnabled === 'boolean'
         ? Boolean(latestTerrainDebug.heightAwareFrustumEnabled)
         : undefined;
+      const runtimeTerrainHeightBoundsSource = typeof latestTerrainDebug?.heightBoundsSource === 'string'
+        ? latestTerrainDebug.heightBoundsSource
+        : undefined;
+      const runtimeTerrainHeightBoundsTests = terrainDebugNumber(latestTerrainDebug, 'selectionHeightBoundsTests');
+      const runtimeTerrainHeightBoundsFallbacks = terrainDebugNumber(latestTerrainDebug, 'selectionHeightBoundsFallbacks');
+      const runtimeTerrainHeightBoundsRejectedNodes = terrainDebugNumber(latestTerrainDebug, 'selectionHeightBoundsRejectedNodes');
       const summary: CaptureSummary = {
         startedAt,
         endedAt: nowIso(),
@@ -6297,6 +6312,10 @@ async function runCapture(): Promise<void> {
           terrainHeightAwareFrustumRequested: terrainHeightAwareFrustum,
           terrainHeightAwareFrustumDisabled: disableTerrainHeightAwareFrustum,
           terrainHeightAwareFrustumEnabled: runtimeTerrainHeightAwareFrustum,
+          terrainHeightBoundsSource: runtimeTerrainHeightBoundsSource,
+          terrainHeightBoundsTests: runtimeTerrainHeightBoundsTests,
+          terrainHeightBoundsFallbacks: runtimeTerrainHeightBoundsFallbacks,
+          terrainHeightBoundsRejectedNodes: runtimeTerrainHeightBoundsRejectedNodes,
           terrainFullSkirtsRequested: terrainFullSkirts,
           terrainSparseSkirtsRequested: terrainSparseSkirts,
           terrainSkirtsDisabled: disableTerrainSkirts,

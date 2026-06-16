@@ -7,11 +7,15 @@ import {
   type CDLODSelectionStats,
   type CDLODTile,
   type FrustumPlane,
-  type TerrainTileHeightBounds,
+  type TerrainTileHeightBoundsProvider,
 } from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
 import { computeTerrainShadowBoundRadius } from './TerrainShadowBounds';
 import { updateTerrainMaterialMorphCamera } from './TerrainMaterial';
+import {
+  createTerrainHeightBoundsSelection,
+  type TerrainHeightBoundsSource,
+} from './TerrainRenderHeightBounds';
 
 export interface TerrainDebugTile {
   x: number;
@@ -71,6 +75,7 @@ export interface TerrainRenderSubmissionStats {
   forceInstanceUploadEnabled: boolean;
   forcedInstanceSubmissions: number;
   heightAwareFrustumEnabled: boolean;
+  heightBoundsSource: TerrainHeightBoundsSource;
   selectionNodesVisited: number;
   selectionFrustumTests: number;
   selectionFrustumRejectedNodes: number;
@@ -119,21 +124,12 @@ export function isTerrainForceInstanceUploadEnabled(): boolean {
     && readBooleanQueryFlag('terrainForceInstanceUpload');
 }
 
-export function isTerrainHeightAwareFrustumEnabled(): boolean {
-  return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
-    && readBooleanQueryFlag('terrainEnableHeightAwareFrustum');
-}
-
 function nowMs(): number {
   return typeof performance !== 'undefined' && typeof performance.now === 'function'
     ? performance.now()
     : Date.now();
 }
 
-const HEIGHT_BOUNDS_MIN_PAD_METERS = 96;
-const HEIGHT_BOUNDS_SKIRT_PAD_METERS = 48;
-const HEIGHT_BOUNDS_TILE_PAD_FRACTION = 0.06;
-const HEIGHT_BOUNDS_MAX_PAD_METERS = 640;
 /**
  * Owns camera frustum extraction, quadtree tile selection, and instanced terrain draw submission.
  */
@@ -155,6 +151,7 @@ export class TerrainRenderRuntime {
   private quadtree: CDLODQuadtree;
   private renderer: CDLODRenderer;
   private readonly terrainHeightAt?: (x: number, z: number) => number;
+  private readonly terrainHeightBoundsForTile?: TerrainTileHeightBoundsProvider;
   private readonly shadowLight: THREE.DirectionalLight | null;
   private cameraOverride: THREE.PerspectiveCamera | null = null;
   private readonly lastSelectedTiles: TerrainDebugTile[] = [];
@@ -183,6 +180,7 @@ export class TerrainRenderRuntime {
   private forcedInstanceSubmissions = 0;
   private lastTileSelectionSaturated = false;
   private lastSelectionStats: CDLODSelectionStats | null = null;
+  private heightBoundsSource: TerrainHeightBoundsSource = 'none';
 
   constructor(
     scene: THREE.Scene,
@@ -191,11 +189,13 @@ export class TerrainRenderRuntime {
     config: TerrainRenderRuntimeConfig,
     terrainHeightAt?: (x: number, z: number) => number,
     shadowLight?: THREE.DirectionalLight | null,
+    terrainHeightBoundsForTile?: TerrainTileHeightBoundsProvider,
   ) {
     this.scene = scene;
     this.camera = camera;
     this.config = { ...config, lodRanges: [...config.lodRanges] };
     this.terrainHeightAt = terrainHeightAt;
+    this.terrainHeightBoundsForTile = terrainHeightBoundsForTile;
     this.shadowLight = shadowLight ?? null;
     this.quadtree = this.buildQuadtree();
     this.renderer = new CDLODRenderer(material, this.config.tileResolution);
@@ -401,6 +401,11 @@ export class TerrainRenderRuntime {
   }
 
   private buildQuadtree(): CDLODQuadtree {
+    const heightBoundsSelection = createTerrainHeightBoundsSelection(
+      this.terrainHeightBoundsForTile,
+      this.terrainHeightAt,
+    );
+    this.heightBoundsSource = heightBoundsSelection.source;
     // Inflate quadtree coverage so terrain tiles extend past the heightmap
     // boundary. Edge tiles sample clamped UVs, creating a seamless visual margin.
     return new CDLODQuadtree(
@@ -408,9 +413,7 @@ export class TerrainRenderRuntime {
       this.config.maxLODLevels,
       this.config.lodRanges,
       0.8,
-      this.shouldUseHeightAwareFrustum()
-        ? this.computeTerrainHeightBoundsForTile
-        : undefined,
+      heightBoundsSelection.provider,
     );
   }
 
@@ -476,6 +479,7 @@ export class TerrainRenderRuntime {
       forceInstanceUploadEnabled: isTerrainForceInstanceUploadEnabled(),
       forcedInstanceSubmissions: this.forcedInstanceSubmissions,
       heightAwareFrustumEnabled: this.shouldUseHeightAwareFrustum(),
+      heightBoundsSource: this.heightBoundsSource,
       selectionNodesVisited: selectionStats?.nodesVisited ?? 0,
       selectionFrustumTests: selectionStats?.frustumTests ?? 0,
       selectionFrustumRejectedNodes: selectionStats?.frustumRejectedNodes ?? 0,
@@ -530,54 +534,8 @@ export class TerrainRenderRuntime {
   }
 
   private shouldUseHeightAwareFrustum(): boolean {
-    return Boolean(this.terrainHeightAt) && isTerrainHeightAwareFrustumEnabled();
+    return this.heightBoundsSource !== 'none';
   }
-
-  private readonly computeTerrainHeightBoundsForTile = (
-    cx: number,
-    cz: number,
-    size: number,
-    target: TerrainTileHeightBounds,
-  ): TerrainTileHeightBounds | null => {
-    const terrainHeightAt = this.terrainHeightAt;
-    if (!terrainHeightAt) return null;
-
-    const half = size * 0.5;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-    let samples = 0;
-    const sample = (x: number, z: number): void => {
-      const height = terrainHeightAt(x, z);
-      if (!Number.isFinite(height)) return;
-      minY = Math.min(minY, height);
-      maxY = Math.max(maxY, height);
-      samples += 1;
-    };
-
-    sample(cx, cz);
-    sample(cx - half, cz - half);
-    sample(cx, cz - half);
-    sample(cx + half, cz - half);
-    sample(cx - half, cz);
-    sample(cx + half, cz);
-    sample(cx - half, cz + half);
-    sample(cx, cz + half);
-    sample(cx + half, cz + half);
-
-    if (samples === 0) return null;
-
-    const pad = Math.min(
-      HEIGHT_BOUNDS_MAX_PAD_METERS,
-      Math.max(
-        HEIGHT_BOUNDS_MIN_PAD_METERS,
-        size * HEIGHT_BOUNDS_TILE_PAD_FRACTION,
-        (maxY - minY) * 0.25,
-      ) + HEIGHT_BOUNDS_SKIRT_PAD_METERS,
-    );
-    target.minY = minY - pad;
-    target.maxY = maxY + pad;
-    return target;
-  };
 
   private updateFrustumPlanes(camera: THREE.Camera): void {
     camera.updateMatrixWorld(true);

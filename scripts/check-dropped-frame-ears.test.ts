@@ -143,6 +143,47 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_height_aware_frustum_requested' && check.status === 'fail')).toBe(true);
   });
+
+  it('accepts production baked-grid terrain height bounds as same-experience evidence', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: {
+        terrainHeightAwareFrustumEnabled: true,
+        terrainHeightBoundsSource: 'baked-grid',
+        terrainHeightBoundsTests: 120,
+        terrainHeightBoundsFallbacks: 0,
+      },
+    }));
+    expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_height_bounds_heuristic_enabled' && check.status === 'fail')).toBe(false);
+    expect(artifact.checks.some((check) => check.id === 'terrain_height_bounds_baked_grid_trust' && check.status === 'pass')).toBe(true);
+    expect(artifact.classification).toBe('proven');
+  });
+
+  it('keeps incomplete baked-grid terrain height bounds diagnostic', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: {
+        terrainHeightAwareFrustumEnabled: true,
+        terrainHeightBoundsSource: 'baked-grid',
+        terrainHeightBoundsTests: 120,
+        terrainHeightBoundsFallbacks: 6,
+      },
+    }));
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => check.id === 'terrain_height_bounds_baked_grid_trust' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects legacy heuristic height bounds even when the request flag is absent', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: {
+        terrainHeightAwareFrustumEnabled: true,
+        terrainHeightBoundsSource: 'heuristic-samples',
+      },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_height_bounds_heuristic_enabled' && check.status === 'fail')).toBe(true);
+  });
 });
 
 describe('evaluateDroppedFrameEars', () => {

@@ -22,6 +22,7 @@ import {
   type TerrainRenderSelectionSyncResult,
   type TerrainRenderSubmissionStats,
 } from './TerrainRenderRuntime';
+import { createBakedTerrainHeightBoundsProvider } from './TerrainRenderHeightBounds';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
 import { bakeGameplayQueryGrid, computeGameplayQueryGridSize, computeTerrainSurfaceGridSize, TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
@@ -190,6 +191,7 @@ export class TerrainSystem implements GameSystem {
 
     this.syncCpuHeightsToGpu();
 
+    const terrainHeightBoundsForTile = createBakedTerrainHeightBoundsProvider(this.surfaceRuntime, this.getVisualWorldSize.bind(this));
     this.renderRuntime = new TerrainRenderRuntime(
       this.scene,
       this.camera,
@@ -200,7 +202,10 @@ export class TerrainSystem implements GameSystem {
         maxLODLevels: this.config.maxLODLevels,
         lodRanges: this.config.lodRanges,
         tileResolution: this.config.tileResolution,
-      }, (x, z) => this.getHeightAt(x, z), this.shadowLight,
+      },
+      (x, z) => this.getHeightAt(x, z),
+      this.shadowLight,
+      terrainHeightBoundsForTile,
     );
     this.renderRuntime.init();
 

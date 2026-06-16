@@ -53,6 +53,7 @@ type ThresholdCheck = {
 type BooleanRuntimeFlag = {
   id: string;
   path: readonly string[];
+  equals?: boolean | string;
   message: string;
 };
 
@@ -137,6 +138,12 @@ const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
     id: 'terrain_height_aware_frustum_requested',
     path: ['perfRuntime', 'terrainHeightAwareFrustumRequested'],
     message: 'height-aware terrain frustum was explicitly requested as a diagnostic flag',
+  },
+  {
+    id: 'terrain_height_bounds_heuristic_enabled',
+    path: ['perfRuntime', 'terrainHeightBoundsSource'],
+    equals: 'heuristic-samples',
+    message: 'heuristic-sampled terrain height bounds are diagnostic-only',
   },
   {
     id: 'terrain_sparse_skirts_requested',
@@ -371,11 +378,15 @@ function addForbiddenRuntimeChecks(
   searchParams: URLSearchParams | null
 ): void {
   for (const flag of FORBIDDEN_RUNTIME_FLAGS) {
-    const enabled = getBoolean(summary, flag.path) === true;
+    const actual = getPath(summary, flag.path);
+    const forbiddenValue = flag.equals ?? true;
+    const enabled = actual === forbiddenValue;
     checks.push({
       id: `forbidden_${flag.id}`,
       status: enabled ? 'fail' : 'pass',
-      value: enabled,
+      value: typeof actual === 'string' || typeof actual === 'boolean' || typeof actual === 'number'
+        ? actual
+        : null,
       message: enabled
         ? `Rejected content/runtime variant: ${flag.message}`
         : `Forbidden runtime flag is not set: ${flag.id}`,
@@ -420,6 +431,35 @@ function addForbiddenRuntimeChecks(
         : `Forbidden query flag is not set: ${queryFlag}`,
     });
   }
+}
+
+function addTerrainHeightBoundsTrustChecks(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null
+): void {
+  const source = getString(summary, ['perfRuntime', 'terrainHeightBoundsSource']);
+  const tests = getNumber(summary, ['perfRuntime', 'terrainHeightBoundsTests']);
+  const fallbacks = getNumber(summary, ['perfRuntime', 'terrainHeightBoundsFallbacks']);
+
+  if (source !== 'baked-grid') {
+    checks.push({
+      id: 'terrain_height_bounds_baked_grid_trust',
+      status: 'pass',
+      value: source,
+      message: `Production baked-grid terrain bounds are not active: ${source ?? 'unknown'}`,
+    });
+    return;
+  }
+
+  const trusted = tests !== null && tests > 0 && fallbacks === 0;
+  checks.push({
+    id: 'terrain_height_bounds_baked_grid_trust',
+    status: trusted ? 'pass' : 'fail',
+    value: fallbacks,
+    message: trusted
+      ? `Baked-grid terrain bounds covered selection (${tests} tests, ${fallbacks} fallbacks)`
+      : `Baked-grid terrain bounds were incomplete (${tests ?? 'missing'} tests, ${fallbacks ?? 'missing'} fallbacks)`,
+  });
 }
 
 export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFrameEarsArtifactEvaluation {
@@ -494,6 +534,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addCombatChecks(checks, validationChecks);
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
+  addTerrainHeightBoundsTrustChecks(checks, summary);
 
   checks.push({
     id: 'owner_visual_acceptance_required',

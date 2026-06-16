@@ -8,6 +8,7 @@ import type { SplatmapConfig } from './TerrainConfig';
 import type { BiomeClassificationRule, TerrainFarCanopyTintConfig } from '../../config/biomes';
 import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
 import { HeightmapGPU } from './HeightmapGPU';
+import { TerrainHeightBoundsIndex } from './TerrainHeightBoundsIndex';
 import {
   createTerrainMaterial,
   type TerrainMaterial,
@@ -138,6 +139,7 @@ export class TerrainSurfaceRuntime {
   private readonly assetLoader: AssetLoader;
   private readonly splatmap: SplatmapConfig;
   private readonly heightmapGPU: HeightmapGPU;
+  private heightBoundsIndex: TerrainHeightBoundsIndex | null = null;
   private readonly tileGridResolution: number;
   private terrainMaterial: TerrainMaterial | null = null;
   private surfaceWetness = 0;
@@ -194,6 +196,7 @@ export class TerrainSurfaceRuntime {
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(surfaceWorldSize), surfaceWorldSize);
+    this.rebuildHeightBoundsIndex();
     const heightTexture = this.heightmapGPU.getHeightTexture();
     const normalTexture = this.heightmapGPU.getNormalTexture();
 
@@ -245,6 +248,7 @@ export class TerrainSurfaceRuntime {
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize);
+    this.rebuildHeightBoundsIndex();
     const heightTexture = this.heightmapGPU.getHeightTexture();
     const normalTexture = this.heightmapGPU.getNormalTexture();
 
@@ -286,6 +290,7 @@ export class TerrainSurfaceRuntime {
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(worldSize), worldSize);
+    this.rebuildHeightBoundsIndex();
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 
@@ -307,6 +312,7 @@ export class TerrainSurfaceRuntime {
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize, options.normalData);
+    this.rebuildHeightBoundsIndex();
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 
@@ -378,10 +384,24 @@ export class TerrainSurfaceRuntime {
     return { data, gridSize: this.heightmapGPU.getGridSize(), worldSize: this.heightmapGPU.getWorldSize() };
   }
 
+  getHeightBoundsIndex(): TerrainHeightBoundsIndex | null {
+    return this.heightBoundsIndex;
+  }
+
   dispose(): void {
     this.heightmapGPU.dispose();
+    this.heightBoundsIndex = null;
     this.terrainMaterial?.dispose();
     this.terrainMaterial = null;
+  }
+
+  private rebuildHeightBoundsIndex(): void {
+    const data = this.heightmapGPU.getHeightData();
+    const gridSize = this.heightmapGPU.getGridSize();
+    const worldSize = this.heightmapGPU.getWorldSize();
+    this.heightBoundsIndex = data && gridSize >= 2 && worldSize > 0
+      ? new TerrainHeightBoundsIndex(data, gridSize, worldSize)
+      : null;
   }
 
   private updateMaterial(worldSize: number, defaultBiomeId: string, biomeRules: BiomeClassificationRule[]): void {

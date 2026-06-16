@@ -281,7 +281,49 @@ describe('TerrainRenderRuntime', () => {
     expect(heightBoundsForTile).toBeUndefined();
   });
 
-  it('can enable height-aware frustum culling only for explicit perf diagnostics', () => {
+  it('uses baked-grid height bounds for production terrain culling when available', () => {
+    const heightAt = vi.fn(() => 42);
+    const indexedBounds = vi.fn((_cx: number, _cz: number, _size: number, target: { minY: number; maxY: number }) => {
+      target.minY = 5;
+      target.maxY = 55;
+      return target;
+    });
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 21000,
+        visualMargin: 200,
+        maxLODLevels: 8,
+        lodRanges: [300, 600, 1200, 2400, 4800, 9600, 16000, 22000],
+        tileResolution: 33,
+      },
+      heightAt,
+      undefined,
+      indexedBounds,
+    );
+
+    const heightBoundsForTile = mockQuadtreeCtor.mock.calls.at(-1)?.[4] as
+      | ((cx: number, cz: number, size: number, target: { minY: number; maxY: number }) => { minY: number; maxY: number } | null)
+      | undefined;
+    expect(heightBoundsForTile).toBeTypeOf('function');
+
+    const bounds = heightBoundsForTile?.(10, 20, 100, { minY: 0, maxY: 0 });
+    expect(bounds).toBeDefined();
+    expect(bounds!.minY).toBeLessThan(-100);
+    expect(bounds!.maxY).toBeGreaterThan(190);
+    expect(indexedBounds).toHaveBeenCalledTimes(1);
+    expect(heightAt).not.toHaveBeenCalled();
+
+    runtime.update();
+    expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
+      heightAwareFrustumEnabled: true,
+      heightBoundsSource: 'baked-grid',
+    });
+  });
+
+  it('can enable legacy height-aware frustum culling only for explicit perf diagnostics', () => {
     setRuntimeSearch('?terrainEnableHeightAwareFrustum=1');
     new TerrainRenderRuntime(
       { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
@@ -301,7 +343,7 @@ describe('TerrainRenderRuntime', () => {
     expect(heightBoundsForTile).toBeTypeOf('function');
   });
 
-  it('wires conservative terrain height bounds when height-aware frustum culling is enabled', () => {
+  it('wires conservative heuristic terrain height bounds only in the diagnostic path', () => {
     setRuntimeSearch('?terrainEnableHeightAwareFrustum=1');
     const heightAt = vi.fn((x: number, z: number) => x + z);
     new TerrainRenderRuntime(
@@ -361,6 +403,7 @@ describe('TerrainRenderRuntime', () => {
 
     expect(runtime.getSubmissionStatsForDebug()).toMatchObject({
       heightAwareFrustumEnabled: true,
+      heightBoundsSource: 'heuristic-samples',
       selectionNodesVisited: 40,
       selectionFrustumTests: 36,
       selectionFrustumRejectedNodes: 9,
