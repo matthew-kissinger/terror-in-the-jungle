@@ -30,6 +30,21 @@ Unless the owner explicitly changes this, a completion candidate means all of:
   evidence, merge/shepherd to `master`, exact-head CI, deploy, live release
   verification, and owner playtest for visual/game-feel acceptance.
 
+Executable scaffold:
+
+- Run `npm run check:dropped-frame-ears -- --dir artifacts/perf/<a-shau-capture> --dir artifacts/perf/<open-frontier-capture> --strict`
+  before calling a dropped-frame candidate complete.
+- Without `--dir`, the checker evaluates the latest `artifacts/perf/*`
+  capture only. That is useful for triage but cannot pass the completion lane
+  unless the required Open Frontier + A Shau artifact pair is supplied.
+- The checker intentionally rejects content-reduction flags and classifies
+  failed trust, WebGPU fallback, missing real combat, missing required files,
+  failed rAF gates, and harness-equivalence warnings as diagnostic rather than
+  completion evidence.
+- A passing checker result is still local artifact proof only. Owner playtest,
+  terrain/camera visual acceptance, exact-head CI, deploy, and
+  `check:live-release` remain required before production completion.
+
 ## EARS Requirements
 
 | id | kind | EARS statement | Quantitative pass signal | Evidence |
@@ -49,6 +64,7 @@ Unless the owner explicitly changes this, a completion candidate means all of:
 | ST4-PERF-013 | Unwanted behavior | If a proposed fix is a diagnostic bypass, the repo shall keep it opt-in and prevent it from being reported as shipped gameplay. | Flags such as disabled skirts/shadows or forced upload modes are documented as diagnostic unless promoted with visual proof. | code flags, docs |
 | ST4-PERF-014 | Complex | When a local candidate passes static validation while runtime proof is missing, the agent shall call it source-stable but unproven. | `validate:fast` and relevant focused checks pass, but STABILIZAT-4 remains open. | command output, `docs/DIRECTIVES.md` |
 | ST4-PERF-015 | Complex | When both required scenarios pass locally while default content is preserved, the agent shall run release proof before claiming production completion. | Exact-head CI, deploy, `check:live-release`, and owner playtest pass. | CI/deploy URLs, release proof JSON |
+| ST4-PERF-016 | Event-driven | When an agent evaluates saved dropped-frame artifacts, the repo shall provide an executable artifact classifier instead of relying on hand-scanned summaries. | `npm run check:dropped-frame-ears -- --dir <ashau> --dir <openfrontier> --strict` exits 0 only when both scenarios pass the EARS completion artifact gate. | `scripts/check-dropped-frame-ears.ts`, CLI output |
 
 ## Candidate Classification
 
