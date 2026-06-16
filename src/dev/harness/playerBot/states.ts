@@ -74,8 +74,10 @@ function shouldInterruptObjectiveForTarget(
 ): boolean {
   if (!objective) return true;
   const dist = horizontalDistance(ctx.eyePos, target.position);
+  const maxFireDistance = Math.max(0, ctx.config.maxFireDistance);
+  if (objective.kind === 'nearest_opfor' && dist <= maxFireDistance) return true;
   const acquisitionDistance = Math.max(0, ctx.config.targetAcquisitionDistance);
-  const interruptDistance = Math.max(acquisitionDistance, ctx.config.maxFireDistance);
+  const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
   return dist <= interruptDistance && ctx.canSeeTarget(target.position);
 }
 

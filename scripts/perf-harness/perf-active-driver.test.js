@@ -952,6 +952,34 @@ describe('PlayerBot driver mirror — PATROL and ALERT', () => {
     expect(step.nextState).toBe('ALERT');
   });
 
+  it('advances toward an occluded nearest-opfor objective inside weapon range', () => {
+    const config = botConfigForProfile(profileForMode('a_shau_valley'));
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -128 } });
+    const step = stepBotState('PATROL', makeBotCtx({
+      config,
+      findNearestEnemy: () => target,
+      getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
+      canSeeTarget: () => false,
+    }));
+    expect(step.nextState).toBe('ALERT');
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.aimTarget.z).toBeCloseTo(-128, 5);
+  });
+
+  it('keeps routing toward a far occluded nearest-opfor objective outside weapon range', () => {
+    const config = botConfigForProfile(profileForMode('a_shau_valley'));
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -500 } });
+    const step = stepBotState('PATROL', makeBotCtx({
+      config,
+      findNearestEnemy: () => target,
+      getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
+      canSeeTarget: () => false,
+    }));
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.firePrimary).toBe(false);
+  });
+
   it('ALERT hands off to ENGAGE when target is near and visible', () => {
     const target = makeBotTarget({ position: { x: 0, y: 0, z: -30 } });
     const step = stepBotState('ALERT', makeBotCtx({

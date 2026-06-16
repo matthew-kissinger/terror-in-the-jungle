@@ -1503,9 +1503,11 @@
     const enemy = ctx.findNearestEnemy();
     if (enemy) {
       const dist = botHorizontalDistance(ctx.eyePos, enemy.position);
+      const maxFireDistance = Math.max(0, Number(ctx.config.maxFireDistance || 0));
+      const advancesCombatObjective = objective && String(objective.kind || '') === 'nearest_opfor' && dist <= maxFireDistance;
       const acquisitionDistance = Math.max(0, Number(ctx.config.targetAcquisitionDistance || ctx.config.maxFireDistance || 0));
-      const interruptDistance = Math.max(acquisitionDistance, Number(ctx.config.maxFireDistance || acquisitionDistance));
-      const interruptsObjective = !objective || (dist <= interruptDistance && ctx.canSeeTarget(enemy.position));
+      const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
+      const interruptsObjective = !objective || advancesCombatObjective || (dist <= interruptDistance && ctx.canSeeTarget(enemy.position));
       if (interruptsObjective) {
         intent.aimTarget = botAimPoint(enemy);
         return { intent, nextState: 'ALERT', resetTimeInState: true };

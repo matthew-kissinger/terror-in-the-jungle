@@ -95,6 +95,7 @@ describe('states — CJS perf-driver mirror parity', () => {
       lastKnownMs: 900,
     });
     const objective = { position: { x: 140, y: 0, z: -30 }, priority: 1 };
+    const nearestOpforObjective = { kind: 'nearest_opfor', position: occludedTarget.position, priority: 3 };
 
     const cases: Array<{
       label: string;
@@ -109,6 +110,16 @@ describe('states — CJS perf-driver mirror parity', () => {
           findNearestEnemy: () => visibleTarget,
           getObjective: () => objective,
           canSeeTarget: () => true,
+        },
+      },
+      {
+        label: 'PATROL advances on an occluded nearest-opfor objective',
+        state: 'PATROL',
+        ctx: {
+          config,
+          findNearestEnemy: () => occludedTarget,
+          getObjective: () => nearestOpforObjective,
+          canSeeTarget: () => false,
         },
       },
       {
@@ -216,6 +227,42 @@ describe('states — PATROL', () => {
     }));
 
     expect(step.nextState).toBe('ALERT');
+  });
+
+  it('advances toward an occluded nearest-opfor objective inside weapon range', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -128 } });
+    const step = stepState('PATROL', makeCtx({
+      findNearestEnemy: () => target,
+      getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
+      canSeeTarget: () => false,
+      config: {
+        ...DEFAULT_PLAYER_BOT_CONFIG,
+        maxFireDistance: 235,
+        targetAcquisitionDistance: 150,
+      },
+    }));
+
+    expect(step.nextState).toBe('ALERT');
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.aimTarget?.z).toBeCloseTo(-128, 5);
+  });
+
+  it('keeps routing toward a far occluded nearest-opfor objective outside weapon range', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -500 } });
+    const step = stepState('PATROL', makeCtx({
+      findNearestEnemy: () => target,
+      getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
+      canSeeTarget: () => false,
+      config: {
+        ...DEFAULT_PLAYER_BOT_CONFIG,
+        maxFireDistance: 235,
+        targetAcquisitionDistance: 150,
+      },
+    }));
+
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.firePrimary).toBe(false);
   });
 
   it('emits no fire intent', () => {
