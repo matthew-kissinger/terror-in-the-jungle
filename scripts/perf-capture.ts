@@ -1728,8 +1728,8 @@ Common options:
   --bounded-terrain-shadow-pass     Legacy label; bounded terrain shadow casting is now the default
   --terrain-full-shadow-pass        Diagnostic A/B: submit all terrain tiles to the shadow pass
   --terrain-force-instance-upload
-  --terrain-height-aware-frustum
-  --disable-terrain-height-aware-frustum
+  --terrain-height-aware-frustum    Diagnostic A/B: opt into heuristic height-aware CDLOD frustum culling
+  --disable-terrain-height-aware-frustum Legacy no-op; conservative CDLOD bounds are now the default
   --terrain-full-skirts             Compatibility flag: production already uses full perimeter terrain skirts
   --terrain-sparse-skirts           Diagnostic A/B: opt into sparse edge-only terrain skirts
   --disable-terrain-skirts           Diagnostic A/B: interior terrain grid only; not a gameplay candidate
@@ -4208,8 +4208,8 @@ async function runCapture(): Promise<void> {
   const boundedTerrainShadowPassQuery = boundedTerrainShadowPass ? '&perfBoundedTerrainShadowPass=1' : '';
   const terrainFullShadowPassQuery = terrainFullShadowPass ? '&terrainFullShadowPass=1' : '';
   const terrainForceInstanceUploadQuery = terrainForceInstanceUpload ? '&terrainForceInstanceUpload=1' : '';
-  const terrainHeightAwareFrustumQuery = terrainHeightAwareFrustum ? '&perfTerrainHeightAwareFrustum=1' : '';
-  const disableTerrainHeightAwareFrustumQuery = disableTerrainHeightAwareFrustum ? '&perfDisableTerrainHeightAwareFrustum=1' : '';
+  const terrainHeightAwareFrustumQuery = terrainHeightAwareFrustum ? '&terrainEnableHeightAwareFrustum=1' : '';
+  const disableTerrainHeightAwareFrustumQuery = '';
   const terrainFullSkirtsQuery = terrainFullSkirts ? '&terrainFullTerrainSkirts=1' : '';
   const terrainSparseSkirtsQuery = terrainSparseSkirts ? '&terrainSparseTerrainSkirts=1' : '';
   const disableTerrainSkirtsQuery = disableTerrainSkirts ? '&perfDisableTerrainSkirts=1' : '';

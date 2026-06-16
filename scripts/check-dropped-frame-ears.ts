@@ -139,11 +139,6 @@ const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
     message: 'height-aware terrain frustum was explicitly requested as a diagnostic flag',
   },
   {
-    id: 'terrain_height_aware_frustum_disabled',
-    path: ['perfRuntime', 'terrainHeightAwareFrustumDisabled'],
-    message: 'height-aware terrain frustum is disabled',
-  },
-  {
     id: 'terrain_sparse_skirts_requested',
     path: ['perfRuntime', 'terrainSparseSkirtsRequested'],
     message: 'sparse terrain skirts are explicitly requested',
@@ -176,8 +171,8 @@ const FORBIDDEN_QUERY_FLAGS = [
   'perfBoundedTerrainShadowPass',
   'terrainFullShadowPass',
   'terrainForceInstanceUpload',
+  'terrainEnableHeightAwareFrustum',
   'perfTerrainHeightAwareFrustum',
-  'perfDisableTerrainHeightAwareFrustum',
   'terrainSparseTerrainSkirts',
   'perfDisableTerrainSkirts',
   'perfDisableTerrainFarCanopyTint',

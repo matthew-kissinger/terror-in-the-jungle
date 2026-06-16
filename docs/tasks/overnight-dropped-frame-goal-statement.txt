@@ -4275,32 +4275,34 @@ Latest 2026-06-16 16:27 UTC / 12:27 EDT update:
 
 Latest 2026-06-16 16:49 UTC / 12:49 EDT update:
 
-- Promoted conservative terrain height-aware CDLOD frustum culling from an
-  opt-in proof flag to the default runtime path when a terrain height sampler
-  is available. The old conservative slab behavior remains available for
-  controlled A/B captures with `--disable-terrain-height-aware-frustum`.
-- This is a same-experience optimization: it only rejects terrain tiles whose
-  sampled padded height bounds are outside the camera frustum. It does not
-  reduce A Shau/Open Frontier size, draw distance, terrain LOD ranges,
-  vegetation, wildlife, weather, war assets, combat pressure, or player flow.
-- Harness metadata now records requested, disabled, and actual runtime
-  `terrainHeightAwareFrustumEnabled` state instead of treating the old CLI
-  opt-in as truth. This matters because the goal depends on distrustable
-  measurements when harness and runtime state diverge.
-- Verification passed for this slice: focused `TerrainRenderRuntime` and
-  `CDLODQuadtree` tests, `npm run typecheck`, targeted ESLint, and
-  `npm run build:perf`.
-- Current default-on headed A Shau active-combat evidence:
+- Reverted heuristic height-aware CDLOD frustum culling back to diagnostic
+  opt-in. The 9-sample padded tile bounds are useful for A/B pressure
+  estimates but are not a production culling authority for large steep DEMs;
+  intermittent A Shau terrain sky-lines / see-through terrain must be solved
+  by conservative default selection or a real tile min/max hierarchy, not by a
+  visual smoke that may miss the transient.
+- Same-experience captures must use conservative default CDLOD bounds.
+  `--terrain-height-aware-frustum` maps to the explicit
+  `terrainEnableHeightAwareFrustum=1` diagnostic path and is rejected by EARS
+  completion, the same way sparse skirts are rejected.
+- Harness metadata still records requested, legacy-disabled, and actual runtime
+  `terrainHeightAwareFrustumEnabled` state so old artifacts can be interpreted,
+  but completion proof must not rely on the heuristic culling path.
+- Verification passed for this rollback: focused `TerrainRenderRuntime`,
+  `CDLODQuadtree`, `CDLODRenderer`, and EARS tests; `npm run typecheck`;
+  targeted ESLint; `npm run build:perf`; and `npm run validate:fast`.
+- Prior height-aware headed A Shau active-combat evidence:
   `artifacts/perf/2026-06-16T16-42-16-310Z`. The capture correctly reports
-  `terrainHeightAwareFrustumEnabled=true` without the old enable flag, but it
-  still failed validation and measurement trust (`probeAvg=159.3ms`,
-  `probeP95=247ms`). Browser rAF dropped-frame time remains unacceptable:
-  about `34.07` estimated dropped frames/s and `532.44ms/s` dropped-frame time.
+  `terrainHeightAwareFrustumEnabled=true`, but it is now diagnostic-only and
+  cannot prove completion. It also failed validation and measurement trust
+  (`probeAvg=159.3ms`, `probeP95=247ms`). Browser rAF dropped-frame time
+  remained unacceptable: about `34.07` estimated dropped frames/s and
+  `532.44ms/s` dropped-frame time.
 - Directional render movement: corrected no-height-aware evidence
   `artifacts/perf/2026-06-16T16-23-13-537Z` sampled terrain at about
-  `948,890` tris/frame; default height-aware evidence sampled about
-  `882,563` terrain tris/frame. This is useful pressure reduction, not goal
-  completion.
+  `948,890` tris/frame; the diagnostic height-aware evidence sampled about
+  `882,563` terrain tris/frame. This is useful pressure-reduction input, not a
+  production candidate until backed by real min/max tile bounds.
 - Next aligned target remains render cost without content cuts. Terrain is
   still the largest sampled triangle owner, vegetation imposters remain about
   `100,574` tris/frame, and world-static detail remains the largest
