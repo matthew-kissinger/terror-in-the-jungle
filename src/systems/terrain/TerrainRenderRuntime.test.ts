@@ -262,27 +262,7 @@ describe('TerrainRenderRuntime', () => {
     expect(yForLod).toBe(camera.position.y);
   });
 
-  it('wires height-aware frustum culling by default when terrain heights are available', () => {
-    new TerrainRenderRuntime(
-      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
-      new THREE.PerspectiveCamera(),
-      new THREE.MeshStandardMaterial(),
-      {
-        worldSize: 21000,
-        visualMargin: 200,
-        maxLODLevels: 8,
-        lodRanges: [300, 600, 1200, 2400, 4800, 9600, 16000, 22000],
-        tileResolution: 33,
-      },
-      () => 42,
-    );
-
-    const heightBoundsForTile = mockQuadtreeCtor.mock.calls.at(-1)?.[4];
-    expect(heightBoundsForTile).toBeTypeOf('function');
-  });
-
-  it('can disable height-aware frustum culling for perf A/B captures', () => {
-    setRuntimeSearch('?perfDisableTerrainHeightAwareFrustum=1');
+  it('keeps terrain frustum bounds conservative by default even when terrain heights are available', () => {
     new TerrainRenderRuntime(
       { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
       new THREE.PerspectiveCamera(),
@@ -301,7 +281,28 @@ describe('TerrainRenderRuntime', () => {
     expect(heightBoundsForTile).toBeUndefined();
   });
 
+  it('can enable height-aware frustum culling only for explicit perf diagnostics', () => {
+    setRuntimeSearch('?terrainEnableHeightAwareFrustum=1');
+    new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      {
+        worldSize: 21000,
+        visualMargin: 200,
+        maxLODLevels: 8,
+        lodRanges: [300, 600, 1200, 2400, 4800, 9600, 16000, 22000],
+        tileResolution: 33,
+      },
+      () => 42,
+    );
+
+    const heightBoundsForTile = mockQuadtreeCtor.mock.calls.at(-1)?.[4];
+    expect(heightBoundsForTile).toBeTypeOf('function');
+  });
+
   it('wires conservative terrain height bounds when height-aware frustum culling is enabled', () => {
+    setRuntimeSearch('?terrainEnableHeightAwareFrustum=1');
     const heightAt = vi.fn((x: number, z: number) => x + z);
     new TerrainRenderRuntime(
       { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
@@ -330,6 +331,7 @@ describe('TerrainRenderRuntime', () => {
   });
 
   it('surfaces height-aware selection stats in terrain render debug', () => {
+    setRuntimeSearch('?terrainEnableHeightAwareFrustum=1');
     mockGetLastSelectionStats.mockReturnValue({
       selectedTiles: 12,
       nodesVisited: 40,

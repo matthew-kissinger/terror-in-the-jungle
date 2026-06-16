@@ -134,6 +134,15 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_sparse_skirts_requested' && check.status === 'fail')).toBe(true);
   });
+
+  it('rejects heuristic height-aware terrain frustum diagnostic captures', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: { terrainHeightAwareFrustumRequested: true },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_height_aware_frustum_requested' && check.status === 'fail')).toBe(true);
+  });
 });
 
 describe('evaluateDroppedFrameEars', () => {
