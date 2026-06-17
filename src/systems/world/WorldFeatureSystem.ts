@@ -15,6 +15,7 @@ import { AIRFIELD_TEMPLATES, getAirfieldTemplateCompatibilityIssues } from './Ai
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { disposeGeneratedGroundVehicleResources, prepareDynamicGroundVehicleForRendering, updateDynamicGroundVehicleVisibility } from './GroundVehicleRenderOptimization';
+import { applyWorldFeatureGroupAttribution, applyWorldFeaturePlacementAttribution, applyWorldFeatureSectorAttribution, enableWorldFeatureShadows } from './WorldFeaturePerfAttribution';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import { createGroundVehicleForModelPath, groundVehicleIdForPlacement, isGroundVehicleModelPath } from '../vehicle/GroundVehicle';
@@ -266,7 +267,7 @@ export class WorldFeatureSystem implements GameSystem {
 
     const group = new THREE.Group();
     group.name = `WorldFeature_${feature.id}`;
-    group.userData.perfCategory = 'world_static_features';
+    applyWorldFeatureGroupAttribution(group, feature);
     sector.group.add(group);
     return group;
   }
@@ -282,7 +283,7 @@ export class WorldFeatureSystem implements GameSystem {
 
     const group = new THREE.Group();
     group.name = `WorldFeatureSector_${id}`;
-    group.userData.perfCategory = 'world_static_features';
+    applyWorldFeatureSectorAttribution(group, id);
     this.staticFeatureRoot?.add(group);
 
     const sector: WorldFeatureRenderSector = {
@@ -378,14 +379,10 @@ export class WorldFeatureSystem implements GameSystem {
         terrainPlacement.z
       );
       object.rotation.y = featureYaw + (placement.yaw ?? 0);
-      object.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-        }
-      });
       const objectId = `${feature.id}_${placement.id ?? i}`;
       const isDynamicGroundVehicle = isGroundVehicleModelPath(placement.modelPath) && Boolean(this.vehicleManager);
+      applyWorldFeaturePlacementAttribution(object, feature, placement, i, objectId, { perfCategory: isDynamicGroundVehicle ? undefined : 'world_static_features' });
+      enableWorldFeatureShadows(object);
       const detailRenderDistanceM = Number(profile.detailRenderDistanceM ?? 0);
       const hasDetailCull = !isDynamicGroundVehicle &&
         Number.isFinite(detailRenderDistanceM) &&
@@ -404,6 +401,7 @@ export class WorldFeatureSystem implements GameSystem {
             placement.modelPath,
             profile.drawCallOptimization ?? 'merge',
           );
+          applyWorldFeaturePlacementAttribution(object, feature, placement, i, objectId, { perfCategory: 'world_static_features' });
           parent.add(object);
           object.updateMatrixWorld(true);
           object.getWorldPosition(_detailWorldPosition);

@@ -52,10 +52,22 @@ export interface TailAttributionSample {
         materials: number;
         geometries: number;
         passTypes?: Record<string, number>;
+        topOwners?: Array<{
+          ownerKey: string;
+          ownerLabel: string;
+          ownerType: string | null;
+          drawSubmissions: number;
+          triangles: number;
+          instances: number;
+          meshes: number;
+        }>;
         examples?: Array<{
           nameChain: string;
           type: string;
           modelPath: string | null;
+          ownerKey?: string | null;
+          ownerLabel?: string | null;
+          ownerType?: string | null;
           materialType: string | null;
           passType?: string;
           triangles: number;
@@ -72,10 +84,22 @@ export interface TailAttributionSample {
       materials: number;
       geometries: number;
       passTypes?: Record<string, number>;
+      topOwners?: Array<{
+        ownerKey: string;
+        ownerLabel: string;
+        ownerType: string | null;
+        drawSubmissions: number;
+        triangles: number;
+        instances: number;
+        meshes: number;
+      }>;
       examples?: Array<{
         nameChain: string;
         type: string;
         modelPath: string | null;
+        ownerKey?: string | null;
+        ownerLabel?: string | null;
+        ownerType?: string | null;
         materialType: string | null;
         passType?: string;
         triangles: number;
@@ -246,6 +270,15 @@ export type TailAttribution = {
         materials: number;
         geometries: number;
         passTypes?: Record<string, number>;
+        topOwners?: Array<{
+          ownerKey: string;
+          ownerLabel: string;
+          ownerType: string | null;
+          drawSubmissions: number;
+          triangles: number;
+          instances: number;
+          meshes: number;
+        }>;
       }>;
       topTriangleCategories: Array<{
         category: string;
@@ -256,6 +289,15 @@ export type TailAttribution = {
         materials: number;
         geometries: number;
         passTypes?: Record<string, number>;
+        topOwners?: Array<{
+          ownerKey: string;
+          ownerLabel: string;
+          ownerType: string | null;
+          drawSubmissions: number;
+          triangles: number;
+          instances: number;
+          meshes: number;
+        }>;
       }>;
       unattributed?: {
         category: string;
@@ -266,6 +308,15 @@ export type TailAttribution = {
         materials: number;
         geometries: number;
         passTypes?: Record<string, number>;
+        topOwners?: Array<{
+          ownerKey: string;
+          ownerLabel: string;
+          ownerType: string | null;
+          drawSubmissions: number;
+          triangles: number;
+          instances: number;
+          meshes: number;
+        }>;
       };
     };
   } | null;
@@ -499,6 +550,17 @@ function compactRenderSubmissionCategory(
     materials: numberValue(category.materials),
     geometries: numberValue(category.geometries),
     passTypes: numberRecord(category.passTypes),
+    topOwners: Array.isArray(category.topOwners)
+      ? category.topOwners.slice(0, 6).map((owner) => ({
+          ownerKey: String(owner.ownerKey ?? 'unknown'),
+          ownerLabel: String(owner.ownerLabel ?? owner.ownerKey ?? 'unknown'),
+          ownerType: stringOrNull(owner.ownerType),
+          drawSubmissions: numberValue(owner.drawSubmissions),
+          triangles: numberValue(owner.triangles),
+          instances: numberValue(owner.instances),
+          meshes: numberValue(owner.meshes),
+        }))
+      : undefined,
   };
 }
 
@@ -1058,6 +1120,17 @@ export function computeTailAttribution(
     (renderSubmissionContext.frameCountStart !== null || renderSubmissionContext.frameCountEnd !== null)
     ? `, sample window ${renderSubmissionContext.frameCountStart ?? 'n/a'}-${renderSubmissionContext.frameCountEnd ?? 'n/a'}`
     : '';
+  const renderOwnerSummary = renderSubmissionContext?.nearestFrame
+    ? renderSubmissionContext.nearestFrame.topCategories
+        .flatMap((category) =>
+          (category.topOwners ?? []).slice(0, 3).map((owner) => ({
+            label: owner.ownerLabel,
+            drawSubmissions: owner.drawSubmissions,
+            triangles: owner.triangles,
+          }))
+        )
+        .slice(0, 4)
+    : [];
   const renderContextSummary = renderSubmissionContext?.nearestFrame
     ? `tail render frame ${renderSubmissionContext.nearestFrame.frameCount} ` +
       `(Δ${renderSubmissionContext.nearestFrame.frameCountDelta}${renderWindowSummary}), ` +
@@ -1077,6 +1150,11 @@ export function computeTailAttribution(
             .map((category) =>
               `${category.category} ${category.triangles} tris/${category.drawSubmissions} submissions`
             )
+            .join(', ')
+        : 'none'}` +
+      `, top render owners: ${renderOwnerSummary.length > 0
+        ? renderOwnerSummary
+            .map((owner) => `${owner.label} ${owner.drawSubmissions} submissions/${owner.triangles} tris`)
             .join(', ')
         : 'none'}`
     : renderSubmissionContext

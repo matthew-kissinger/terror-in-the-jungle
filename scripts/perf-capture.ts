@@ -26,6 +26,7 @@ import {
   summarizePresentationGapContexts,
   type PresentationGapContextSummary,
 } from './perf-presentation-gap-summary';
+import { terrainStageBufferVisibleChanged } from './perf-terrain-stage-classification';
 import { computeTailAttribution, type TailAttribution } from './perf-tail-attribution';
 import {
   PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE,
@@ -1162,10 +1163,22 @@ type RuntimeRenderSubmissionCategory = {
   materials: number;
   geometries: number;
   passTypes?: Record<string, number>;
+  topOwners?: Array<{
+    ownerKey: string;
+    ownerLabel: string;
+    ownerType: string | null;
+    drawSubmissions: number;
+    triangles: number;
+    instances: number;
+    meshes: number;
+  }>;
   examples?: Array<{
     nameChain: string;
     type: string;
     modelPath: string | null;
+    ownerKey?: string | null;
+    ownerLabel?: string | null;
+    ownerType?: string | null;
     materialType: string | null;
     passType?: string;
     triangles: number;
@@ -2384,6 +2397,7 @@ function compactRenderSubmissionCategory(
     materials: category.materials,
     geometries: category.geometries,
     passTypes: category.passTypes,
+    topOwners: category.topOwners?.slice(0, 6),
     examples: category.examples?.slice(0, 4)
   };
 }
@@ -2564,44 +2578,7 @@ function collectShotTerrainEpochs(context: Record<string, unknown>): Record<stri
 }
 
 function shotTerrainStageBufferVisibleChanged(context: Record<string, unknown>): boolean {
-  const terrainByStage = objectOrNull(context.terrainByStage);
-  const afterSimulation = objectOrNull(terrainByStage?.afterSimulation);
-  const beforeRender = objectOrNull(terrainByStage?.beforeRender);
-  if (!afterSimulation || !beforeRender) return false;
-
-  const afterIdentityHash = typeof afterSimulation.tileIdentityHash === 'string'
-    ? afterSimulation.tileIdentityHash
-    : null;
-  const beforeIdentityHash = typeof beforeRender.tileIdentityHash === 'string'
-    ? beforeRender.tileIdentityHash
-    : null;
-  if (
-    afterIdentityHash !== null
-    && beforeIdentityHash !== null
-    && afterIdentityHash !== beforeIdentityHash
-  ) {
-    return true;
-  }
-
-  const afterEdgeMaskHash = typeof afterSimulation.edgeMaskHash === 'string'
-    ? afterSimulation.edgeMaskHash
-    : null;
-  const beforeEdgeMaskHash = typeof beforeRender.edgeMaskHash === 'string'
-    ? beforeRender.edgeMaskHash
-    : null;
-  if (
-    afterEdgeMaskHash !== null
-    && beforeEdgeMaskHash !== null
-    && afterEdgeMaskHash !== beforeEdgeMaskHash
-  ) {
-    return true;
-  }
-
-  const afterTileCount = nullableNumber(afterSimulation.tileCount);
-  const beforeTileCount = nullableNumber(beforeRender.tileCount);
-  return afterTileCount !== null
-    && beforeTileCount !== null
-    && afterTileCount !== beforeTileCount;
+  return terrainStageBufferVisibleChanged(context.terrainByStage);
 }
 
 function summarizeShotPresentationContexts(

@@ -289,6 +289,32 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     if (names.includes('hitboxdebug')) return 'debug_overlays';
     return 'unattributed';
   };
+  const ownerInfoFor = (object) => {
+    let current = object;
+    while (current) {
+      const data = current.userData ?? {};
+      const key = data.perfOwnerKey;
+      if (typeof key === 'string' && key.length > 0) {
+        const label = data.perfOwnerLabel;
+        const type = data.perfOwnerType;
+        return {
+          ownerKey: key,
+          ownerLabel: typeof label === 'string' && label.length > 0 ? label : key,
+          ownerType: typeof type === 'string' && type.length > 0 ? type : null
+        };
+      }
+      current = current.parent;
+    }
+    const modelPath = modelPathFor(object);
+    if (modelPath) {
+      return {
+        ownerKey: \`model:\${modelPath}\`,
+        ownerLabel: modelPath,
+        ownerType: 'model'
+      };
+    }
+    return null;
+  };
   const triangleCountFor = (geometry, group) => {
     if (!geometry) return 0;
     const groupCount = Number(group?.count ?? 0);
@@ -337,11 +363,37 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
         materials: new Set(),
         geometries: new Set(),
         passTypes: new Map(),
+        owners: new Map(),
         examples: []
       };
       map.set(category, bucket);
     }
     return bucket;
+  };
+  const getOwnerBucket = (bucket, ownerInfo) => {
+    if (!ownerInfo) return null;
+    let owner = bucket.owners.get(ownerInfo.ownerKey);
+    if (!owner) {
+      owner = {
+        ownerKey: ownerInfo.ownerKey,
+        ownerLabel: ownerInfo.ownerLabel,
+        ownerType: ownerInfo.ownerType,
+        drawSubmissions: 0,
+        triangles: 0,
+        instances: 0,
+        meshes: 0
+      };
+      bucket.owners.set(ownerInfo.ownerKey, owner);
+    }
+    return owner;
+  };
+  const recordOwner = (bucket, ownerInfo, triangles, instances) => {
+    const owner = getOwnerBucket(bucket, ownerInfo);
+    if (!owner) return;
+    owner.drawSubmissions += 1;
+    owner.triangles += triangles;
+    owner.instances += instances;
+    owner.meshes += 1;
   };
   const normalizePassType = (passType) => {
     return typeof passType === 'string' && passType.length > 0 ? passType : 'unknown';
@@ -356,6 +408,11 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       Array.from(passTypes.entries()).sort((a, b) => a[0].localeCompare(b[0]))
     );
   };
+  const serializeOwners = (owners) => {
+    return Array.from(owners.values())
+      .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles)
+      .slice(0, 8);
+  };
   const serializeBucket = (bucket, includeExamples = true) => {
     const serialized = {
       category: bucket.category,
@@ -365,7 +422,8 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       meshes: bucket.meshes,
       materials: bucket.materials.size,
       geometries: bucket.geometries.size,
-      passTypes: serializePassTypes(bucket.passTypes)
+      passTypes: serializePassTypes(bucket.passTypes),
+      topOwners: serializeOwners(bucket.owners)
     };
     if (includeExamples) serialized.examples = bucket.examples;
     return serialized;
@@ -446,6 +504,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       const instances = instanceCountFor(object, geometry);
       const instanceMultiplier = object?.isInstancedMesh ? instances : Math.max(1, instances);
       const triangles = Math.round(triangleCountFor(geometry, group) * instanceMultiplier);
+      const ownerInfo = ownerInfoFor(object);
       const frameCount = readFrameCount();
       if (frameCount !== state.lastEventScanFrameCount) {
         addMetricEventFrames(globalScope.__metrics?.getSnapshot?.(), state.interestingFrameCounts);
@@ -479,11 +538,15 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       if (material) frameBucket.materials.add(material);
       if (geometry) frameBucket.geometries.add(geometry);
       incrementPassType(frameBucket.passTypes, normalizedPassType);
+      recordOwner(frameBucket, ownerInfo, triangles, instances);
       if (frameBucket.examples.length < 4) {
         frameBucket.examples.push({
           nameChain: nameChainFor(object) || '(unnamed)',
           type: object.type || 'Object3D',
           modelPath: modelPathFor(object) || null,
+          ownerKey: ownerInfo?.ownerKey ?? null,
+          ownerLabel: ownerInfo?.ownerLabel ?? null,
+          ownerType: ownerInfo?.ownerType ?? null,
           materialType: materialLabelFor(material),
           passType: normalizedPassType,
           triangles,
@@ -499,6 +562,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       if (material) totalBucket.materials.add(material);
       if (geometry) totalBucket.geometries.add(geometry);
       incrementPassType(totalBucket.passTypes, normalizedPassType);
+      recordOwner(totalBucket, ownerInfo, triangles, instances);
       if (totalBucket.examples.length < 4 && frameBucket.examples.length > 0) {
         totalBucket.examples.push(frameBucket.examples[frameBucket.examples.length - 1]);
       }

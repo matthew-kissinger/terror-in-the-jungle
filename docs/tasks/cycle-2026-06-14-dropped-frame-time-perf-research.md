@@ -1222,3 +1222,24 @@ Update 2026-06-17 09:45 UTC / 05:45 EDT:
   the route had a heavier late render/world-static tail and still failed at
   about `38.3ms/s`; harness view-slew and shot-presentation warnings also
   remained. These are useful diagnostics, not completion evidence.
+
+Update 2026-06-17 10:15 UTC / 06:15 EDT:
+
+- Fixed a shot-presentation terrain classifier blind spot: shot-level
+  `unsyncedBufferVisible` now reads the recorder's current hyphenated
+  `terrainByStage['after-simulation']` / `['before-render']` keys through a
+  shared classifier, while still accepting legacy camelCase keys for old
+  artifacts. Previously the shot classifier could undercount visible
+  identity/edge-mask/tile-count churn even when the presentation-gap summary
+  had the correct stage data.
+- Render-submission attribution now preserves `topOwners` per category, and
+  world feature groups/placements carry stable `perfOwnerKey` /
+  `perfOwnerLabel` / `perfOwnerType` metadata. The next A Shau/Open Frontier
+  EARS captures should be able to break a `world_static_features` tail down to
+  at least sector/feature/placement ownership instead of treating the whole
+  static world layer as one opaque bucket.
+- Verification passed: focused tests for terrain-stage classification,
+  presentation-gap summary, tail attribution, and world-feature metadata;
+  source `npm run typecheck`; and targeted ESLint on all touched source and
+  harness files. This is a harness/diagnostic improvement, not dropped-frame
+  completion evidence.

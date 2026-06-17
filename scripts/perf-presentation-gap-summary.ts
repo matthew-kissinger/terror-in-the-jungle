@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
+import {
+  terrainStageBufferVisibleChanged,
+  terrainStageRecord,
+} from './perf-terrain-stage-classification';
+
 export type PresentationGapContextEntry = {
   seq?: number;
   startAtMs?: number;
@@ -425,8 +430,8 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     const terrainRender = objectOrNull(presentationContext?.terrainRender);
     const terrainSync = objectOrNull(presentationContext?.terrainSync);
     const terrainByStage = objectOrNull(presentationContext?.terrainByStage);
-    const afterSimulation = objectOrNull(terrainByStage?.['after-simulation']);
-    const beforeRender = objectOrNull(terrainByStage?.['before-render']);
+    const afterSimulation = terrainStageRecord(terrainByStage, 'after-simulation');
+    const beforeRender = terrainStageRecord(terrainByStage, 'before-render');
     const harnessContext = objectOrNull(gap.harnessContext);
     if (!presentationContext && !terrain && !terrainRender && !terrainSync && !terrainByStage && !harnessContext) {
       continue;
@@ -503,7 +508,10 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
       tileCountChanged = true;
       terrainStageTileCountChangedCount++;
     }
-    const bufferVisibleChanged = identityChanged || edgeMaskChanged || tileCountChanged;
+    const bufferVisibleChanged = terrainStageBufferVisibleChanged(terrainByStage)
+      || identityChanged
+      || edgeMaskChanged
+      || tileCountChanged;
     if (bufferVisibleChanged) {
       terrainStageBufferVisibleChangedCount++;
       if (terrainSync && !boolIsTrue(terrainSync.terrainBufferSubmitted)) {
