@@ -17,13 +17,15 @@ import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
 const MAX_RAIN_OPACITY = 0.6;
 const MIN_ACTIVE_RAIN_FRACTION = 0.3;
+const RAIN_MATRIX_STAGGER_MIN_ACTIVE_COUNT = 512;
+const RAIN_MATRIX_STAGGER_CHUNKS = 2;
 
-function markActiveRainMatricesDirty(attribute: THREE.InstancedBufferAttribute, activeCount: number): void {
+function markRainMatrixRangeDirty(attribute: THREE.InstancedBufferAttribute, startInstance: number, instanceCount: number): void {
   if (typeof attribute.clearUpdateRanges === 'function') {
     attribute.clearUpdateRanges();
   }
   if (typeof attribute.addUpdateRange === 'function') {
-    attribute.addUpdateRange(0, activeCount * attribute.itemSize);
+    attribute.addUpdateRange(startInstance * attribute.itemSize, instanceCount * attribute.itemSize);
   }
   attribute.needsUpdate = true;
 }
@@ -55,6 +57,9 @@ export class WeatherSystem implements GameSystem {
   private rainPositions: Float32Array;
   private lastSurfaceWetness = Number.NaN;
   private rainInactive = true;
+  private rainMatrixUploadPhase = 0;
+  private lastRainMatrixUploadStart = 0;
+  private lastRainMatrixUploadCount = 0;
 
   // Lightning
   private lightningState: LightningState = {
@@ -274,7 +279,7 @@ export class WeatherSystem implements GameSystem {
 
   getDebugInfo(): Record<string, string | number | boolean> {
     const material = this.rainMesh?.material as THREE.MeshBasicMaterial | undefined;
-    const matrixElements = this.activeRainCount * 16;
+    const matrixElements = this.lastRainMatrixUploadCount * 16;
     return {
       configEnabled: this.config?.enabled === true,
       currentState: this.currentState,
@@ -287,6 +292,9 @@ export class WeatherSystem implements GameSystem {
       rainOpacity: Number(material?.opacity ?? 0),
       rainInactive: this.rainInactive,
       surfaceWetness: Number.isFinite(this.lastSurfaceWetness) ? this.lastSurfaceWetness : 0,
+      rainMatrixUploadStart: this.lastRainMatrixUploadStart,
+      rainMatrixUploadCount: this.lastRainMatrixUploadCount,
+      rainMatrixActiveElements: this.activeRainCount * 16,
       rainMatrixElementsPerFrame: matrixElements,
       rainMatrixBytesPerFrame: matrixElements * Float32Array.BYTES_PER_ELEMENT,
     };
@@ -316,15 +324,20 @@ export class WeatherSystem implements GameSystem {
       this.rainMesh.visible = false;
       this.rainMesh.count = 0;
       this.activeRainCount = 0;
+      this.rainMatrixUploadPhase = 0;
+      this.lastRainMatrixUploadStart = 0;
+      this.lastRainMatrixUploadCount = 0;
       this.rainInactive = true;
       return;
     }
 
+    const wasRainInactive = this.rainInactive;
     this.rainMesh.visible = true;
     this.rainInactive = false;
 
     const cameraPos = this.camera.position;
     const nextActiveRainCount = this.resolveActiveRainCount(intensity);
+    const activeCountChanged = nextActiveRainCount !== this.activeRainCount;
     if (nextActiveRainCount > this.activeRainCount) {
       for (let i = this.activeRainCount; i < nextActiveRainCount; i++) {
         this.resetRainDrop(i, true, cameraPos);
@@ -340,6 +353,8 @@ export class WeatherSystem implements GameSystem {
     );
 
     const windX = (this.currentState === WeatherState.STORM ? 5 : 2) * deltaTime;
+    const uploadWindow = this.resolveRainMatrixUploadWindow(nextActiveRainCount, wasRainInactive || activeCountChanged);
+    const uploadEnd = uploadWindow.start + uploadWindow.count;
 
     // Optimization: Use direct position tracking to avoid expensive matrix decomposition
     for (let i = 0; i < nextActiveRainCount; i++) {
@@ -374,15 +389,34 @@ export class WeatherSystem implements GameSystem {
       this.rainPositions[idx + 1] = y;
       this.rainPositions[idx + 2] = z;
 
-      this.writeRainTranslation(i, x, y, z);
+      if (i >= uploadWindow.start && i < uploadEnd) {
+        this.writeRainTranslation(i, x, y, z);
+      }
     }
-    markActiveRainMatricesDirty(this.rainMesh.instanceMatrix, nextActiveRainCount);
+    this.lastRainMatrixUploadStart = uploadWindow.start;
+    this.lastRainMatrixUploadCount = uploadWindow.count;
+    markRainMatrixRangeDirty(this.rainMesh.instanceMatrix, uploadWindow.start, uploadWindow.count);
   }
 
   private resolveActiveRainCount(intensity: number): number {
     if (this.rainCount <= 0 || intensity <= 0.01) return 0;
     const activeFraction = Math.min(1, Math.max(MIN_ACTIVE_RAIN_FRACTION, intensity));
     return Math.max(1, Math.min(this.rainCount, Math.ceil(this.rainCount * activeFraction)));
+  }
+
+  private resolveRainMatrixUploadWindow(activeCount: number, forceFullUpload: boolean): { start: number; count: number } {
+    if (activeCount <= 0) return { start: 0, count: 0 };
+    if (forceFullUpload || activeCount < RAIN_MATRIX_STAGGER_MIN_ACTIVE_COUNT) {
+      this.rainMatrixUploadPhase = 0;
+      return { start: 0, count: activeCount };
+    }
+
+    const chunkSize = Math.ceil(activeCount / RAIN_MATRIX_STAGGER_CHUNKS);
+    const phase = this.rainMatrixUploadPhase % RAIN_MATRIX_STAGGER_CHUNKS;
+    const start = Math.min(activeCount, phase * chunkSize);
+    const count = Math.max(0, Math.min(chunkSize, activeCount - start));
+    this.rainMatrixUploadPhase = (phase + 1) % RAIN_MATRIX_STAGGER_CHUNKS;
+    return { start, count };
   }
 
   private writeRainMatrix(index: number, x: number, y: number, z: number): void {
