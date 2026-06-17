@@ -22,6 +22,7 @@ type ArtifactOptions = {
   presentationGapCount?: number;
   harnessWarnings?: boolean;
   lowCombat?: boolean;
+  burstyCombatContact?: boolean;
   thinMaterializationPressure?: boolean;
   burstyMaterializationContact?: boolean;
 };
@@ -50,6 +51,11 @@ function tempArtifact(options: ArtifactOptions): string {
   const combatStatus = options.lowCombat ? 'fail' : 'pass';
   const shotCount = options.lowCombat ? 0 : 80;
   const hitCount = options.lowCombat ? 0 : 9;
+  const runtimeShotCounts = options.lowCombat
+    ? [0, 0, 0, 0, 0, 0, 0, 0]
+    : options.burstyCombatContact
+      ? [0, 0, 0, shotCount, shotCount, shotCount, shotCount, shotCount]
+      : [0, 4, 12, 24, 36, 48, 64, shotCount];
   const checks = [
     { id: 'raf_stutter_25ms_percent', status: 'pass', value: 0.1, message: 'ok' },
     { id: 'raf_hitch_33ms_percent', status: 'pass', value: 0.1, message: 'ok' },
@@ -134,6 +140,15 @@ function tempArtifact(options: ArtifactOptions): string {
   writeFileSync(join(dir, 'summary.json'), JSON.stringify(summary), 'utf-8');
   writeFileSync(join(dir, 'validation.json'), JSON.stringify(validation), 'utf-8');
   writeFileSync(join(dir, 'measurement-trust.json'), JSON.stringify(summary.measurementTrust), 'utf-8');
+  writeFileSync(join(dir, 'runtime-samples.json'), JSON.stringify(runtimeShotCounts.map((shotsThisSession, index) => ({
+    shotsThisSession,
+    hitsThisSession: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
+    harnessDriver: {
+      engineShotsFired: shotsThisSession,
+      engineShotsHit: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
+    },
+    pagePerformanceNowMs: index * 1500,
+  }))), 'utf-8');
   for (const file of REQUIRED_PLACEHOLDER_FILES) {
     writeFileSync(join(dir, file), file.endsWith('.png') ? '' : '[]', 'utf-8');
   }
@@ -208,6 +223,28 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       check.id === 'active_combat_shots'
       && check.status === 'fail'
       && check.value === 0
+    ))).toBe(true);
+    expect(artifact.checks.some((check) => (
+      check.id === 'active_combat_sustained_contact'
+      && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('keeps burst-only combat artifacts diagnostic even when aggregate shots pass', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      burstyCombatContact: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.contactQualified).toBe(false);
+    expect(artifact.checks.some((check) => (
+      check.id === 'active_combat_shots'
+      && check.status === 'pass'
+    ))).toBe(true);
+    expect(artifact.checks.some((check) => (
+      check.id === 'active_combat_sustained_contact'
+      && check.status === 'fail'
     ))).toBe(true);
   });
 

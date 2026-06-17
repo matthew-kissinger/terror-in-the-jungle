@@ -73,6 +73,8 @@ const REQUIRED_FILES = [
 
 const MIN_SUSTAINED_MATERIALIZATION_SAMPLES = 3;
 const MIN_SUSTAINED_MATERIALIZATION_RATIO = 0.1;
+const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES = 3;
+const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_RATIO = 0.05;
 
 const RAF_THRESHOLDS: readonly ThresholdCheck[] = [
   {
@@ -224,6 +226,16 @@ function readJsonObject(path: string): Record<string, unknown> | null {
   }
 }
 
+function readJsonArray(path: string): unknown[] | null {
+  if (!existsSync(path)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf-8'));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function getPath(root: Record<string, unknown> | null, path: readonly string[]): unknown {
   let cursor: unknown = root;
   for (const part of path) {
@@ -370,11 +382,26 @@ function addRafChecks(
   }
 }
 
-function addCombatChecks(checks: DroppedFrameEarsCheck[], validationChecks: readonly ValidationCheck[]): void {
+function runtimeSampleShotCount(sample: unknown): number | null {
+  const record = asRecord(sample);
+  if (!record) return null;
+  const harnessDriver = asRecord(record.harnessDriver);
+  const driverShots = harnessDriver ? harnessDriver.engineShotsFired : undefined;
+  if (typeof driverShots === 'number' && Number.isFinite(driverShots)) return driverShots;
+  const sessionShots = record.shotsThisSession;
+  return typeof sessionShots === 'number' && Number.isFinite(sessionShots) ? sessionShots : null;
+}
+
+function addCombatChecks(
+  checks: DroppedFrameEarsCheck[],
+  validationChecks: readonly ValidationCheck[],
+  runtimeSamples: readonly unknown[] | null
+): void {
   const shots = validationCheck(validationChecks, 'harness_min_shots_fired')
     ?? validationCheck(validationChecks, 'player_shots_recorded');
   const hits = validationCheck(validationChecks, 'harness_min_hits_recorded')
     ?? validationCheck(validationChecks, 'player_hits_recorded');
+  const aggregateCombatPassed = shots?.status === 'pass' && hits?.status === 'pass';
   checks.push(checkStatus(
     shots?.status === 'pass',
     'active_combat_shots',
@@ -389,6 +416,48 @@ function addCombatChecks(checks: DroppedFrameEarsCheck[], validationChecks: read
     'active combat hit threshold is missing or failed',
     typeof hits?.value === 'number' ? hits.value : null
   ));
+
+  if (runtimeSamples === null) {
+    checks.push({
+      id: 'active_combat_sustained_contact',
+      status: aggregateCombatPassed ? 'pass' : 'fail',
+      value: null,
+      message: aggregateCombatPassed
+        ? 'Aggregate combat thresholds passed; runtime sample distribution is unavailable in this artifact'
+        : 'Aggregate combat thresholds failed and runtime sample distribution is unavailable',
+    });
+    return;
+  }
+
+  const shotCounts = runtimeSamples
+    .map(runtimeSampleShotCount)
+    .filter((value): value is number => value !== null);
+  let previousMaxShots = 0;
+  let samplesWithAnyShots = 0;
+  let samplesWithShotIncreases = 0;
+  for (const shotCount of shotCounts) {
+    if (shotCount > 0) samplesWithAnyShots++;
+    if (shotCount > previousMaxShots) {
+      samplesWithShotIncreases++;
+      previousMaxShots = shotCount;
+    }
+  }
+  const shotIncreaseRatio = shotCounts.length > 0
+    ? samplesWithShotIncreases / shotCounts.length
+    : null;
+  const sustained = aggregateCombatPassed
+    && samplesWithAnyShots >= MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES
+    && samplesWithShotIncreases >= MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES
+    && shotIncreaseRatio !== null
+    && shotIncreaseRatio >= MIN_SUSTAINED_COMBAT_SHOT_INCREASE_RATIO;
+  checks.push({
+    id: 'active_combat_sustained_contact',
+    status: sustained ? 'pass' : 'fail',
+    value: shotIncreaseRatio,
+    message: sustained
+      ? `Active combat was sustained across runtime samples (shot increases=${samplesWithShotIncreases}/${shotCounts.length}, samplesWithShots=${samplesWithAnyShots}, ${formatPercent(shotIncreaseRatio)})`
+      : `Active combat was absent or too bursty for completion comparison (shot increases=${samplesWithShotIncreases}/${shotCounts.length}, samplesWithShots=${samplesWithAnyShots}, ${formatPercent(shotIncreaseRatio)}; min increases=${MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES}, min ratio=${formatPercent(MIN_SUSTAINED_COMBAT_SHOT_INCREASE_RATIO)})`,
+  });
 }
 
 function addMaterializationEnvelopeChecks(
@@ -674,6 +743,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   const summary = readJsonObject(join(absoluteArtifactDir, 'summary.json'));
   const validation = readJsonObject(join(absoluteArtifactDir, 'validation.json'));
   const measurementTrust = readJsonObject(join(absoluteArtifactDir, 'measurement-trust.json'));
+  const runtimeSamples = readJsonArray(join(absoluteArtifactDir, 'runtime-samples.json'));
   const validationChecks = getValidationChecks(validation, summary);
   const searchParams = urlSearchParams(summary);
   const checks: DroppedFrameEarsCheck[] = [];
@@ -738,7 +808,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   ));
 
   addRafChecks(checks, validationChecks, summary);
-  addCombatChecks(checks, validationChecks);
+  addCombatChecks(checks, validationChecks, runtimeSamples);
   addMaterializationEnvelopeChecks(checks, validationChecks, summary);
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
@@ -762,7 +832,8 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
       ? 'proven'
       : 'diagnostic';
   const contactQualified = checkPassed(checks, 'active_combat_shots')
-    && checkPassed(checks, 'active_combat_hits');
+    && checkPassed(checks, 'active_combat_hits')
+    && checkPassed(checks, 'active_combat_sustained_contact');
   const materializationQualified = checkPassed(checks, 'npc_materialization_pressure')
     && checkPassed(checks, 'npc_materialization_sustained_contact');
   const completionLaneQualified = classification === 'proven'

@@ -2053,13 +2053,24 @@ describe('PlayerBot driver mirror — route-overlay terrain recovery', () => {
     expect(computeAnchorContinuationPoint({ x: 0, y: 0, z: 0 }, null, 8)).toBeNull();
   });
 
-  it('walks instead of sprinting while following a route overlay', () => {
+  it('preserves sprint while route-overlay following is still making progress', () => {
     const intent = {
       ...createIdleBotIntent(),
       moveForward: 1,
       sprint: true,
     };
     applyRouteOverlayRecovery(intent, { x: 0, y: 2, z: -20 }, 0);
+    expect(intent.sprint).toBe(true);
+    expect(intent.moveStrafe).toBe(0);
+  });
+
+  it('walks instead of sprinting after route-overlay progress stalls', () => {
+    const intent = {
+      ...createIdleBotIntent(),
+      moveForward: 1,
+      sprint: true,
+    };
+    applyRouteOverlayRecovery(intent, { x: 0, y: 2, z: -20 }, 700);
     expect(intent.sprint).toBe(false);
     expect(intent.moveStrafe).toBe(0);
   });
@@ -2723,6 +2734,66 @@ describe('PlayerBot driver mirror — visible target preference', () => {
     expect(selected.visible).toBe(true);
   });
 
+  it('prefers a forward visible target over a nearer behind-camera target', () => {
+    const behind = makeBotTarget({
+      id: 'behind',
+      position: { x: 0, y: 0, z: 60 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+    const forward = makeBotTarget({
+      id: 'forward',
+      position: { x: 0, y: 0, z: -120 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+
+    const selected = selectVisiblePreferredEnemyCandidate({
+      combatants: [behind, forward],
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      perceptionRange: 300,
+      maxFireDistance: 245,
+      viewForward: { x: 0, y: 0, z: -1 },
+      isEnemy: combatant => combatant.faction === 'opfor',
+      canSeeTarget: () => true,
+    });
+
+    expect(selected.combatant.id).toBe('forward');
+    expect(selected.visible).toBe(true);
+  });
+
+  it('falls back to the nearest visible target when no visible target is forward-facing', () => {
+    const nearerBehind = makeBotTarget({
+      id: 'nearer_behind',
+      position: { x: 0, y: 0, z: 50 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+    const fartherBehind = makeBotTarget({
+      id: 'farther_behind',
+      position: { x: 30, y: 0, z: 120 },
+      faction: 'opfor',
+      health: 100,
+      state: 'alive',
+    });
+
+    const selected = selectVisiblePreferredEnemyCandidate({
+      combatants: [fartherBehind, nearerBehind],
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      perceptionRange: 300,
+      maxFireDistance: 245,
+      viewForward: { x: 0, y: 0, z: -1 },
+      isEnemy: combatant => combatant.faction === 'opfor',
+      canSeeTarget: () => true,
+    });
+
+    expect(selected.combatant.id).toBe('nearer_behind');
+    expect(selected.visible).toBe(true);
+  });
+
   it('falls back to the nearest perceived target when none are visible', () => {
     const nearOccluded = makeBotTarget({
       id: 'near_occluded',
@@ -3201,7 +3272,23 @@ describe('harness objective selector — selectPatrolObjective', () => {
       aggressiveMode: true,
       combatObjective: {
         ...combatObjective,
-        distance: 1233,
+        distance: 1850,
+      },
+      zoneObjective,
+      fallbackObjective,
+      combatObjectiveMaxDistance: combatObjectiveMaxDistanceForProfile(profile),
+    });
+    expect(choice).toBeTruthy();
+    expect(choice.kind).toBe('nearest_opfor');
+  });
+
+  it('keeps A Shau combat-front routing active across normal contact variance', () => {
+    const profile = profileForMode('a_shau_valley');
+    const choice = selectPatrolObjective({
+      aggressiveMode: true,
+      combatObjective: {
+        ...combatObjective,
+        distance: 2400,
       },
       zoneObjective,
       fallbackObjective,

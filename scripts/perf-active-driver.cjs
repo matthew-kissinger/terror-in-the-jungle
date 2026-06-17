@@ -204,6 +204,7 @@
   const ROUTE_PROGRESS_MIN_TRAVEL = 60;
   const ROUTE_NO_PROGRESS_TARGET_COOLDOWN_MS = 8000;
   const ROUTE_FAILED_OBJECTIVE_COOLDOWN_MS = 12000;
+  const ROUTE_OVERLAY_WALK_RECOVERY_STUCK_MS = 600;
   const RUNTIME_TERRAIN_BLOCK_TARGET_COOLDOWN_MS = 3000;
   const SHOT_EPOCH_HISTORY_LIMIT = 32;
   const ROUTE_SNAP_EPOCH_HISTORY_LIMIT = 32;
@@ -1268,12 +1269,14 @@
       || Math.abs(Number(intent.moveStrafe || 0)) > 0.1;
     if (!wantsMove) return intent;
 
-    // Route-following on real terrain is more reliable at infantry walk speed:
-    // sprinting into a navmesh corner can make PlayerMovement reject every
-    // step as a terrain lip before the route can bend around it.
-    intent.sprint = false;
-
     const stuck = Number(stuckMs || 0);
+    // Route-following on real terrain can need infantry walk speed once the
+    // stuck detector sees no progress, but healthy long-map route segments
+    // should keep normal player sprint so completion captures reach combat.
+    if (stuck >= ROUTE_OVERLAY_WALK_RECOVERY_STUCK_MS) {
+      intent.sprint = false;
+    }
+
     if (stuck > 2000) {
       const side = Math.floor(stuck / 1750) % 2 === 0 ? 1 : -1;
       const existingStrafe = Number(intent.moveStrafe || 0);
@@ -1406,6 +1409,12 @@
     const isEnemy = opts && typeof opts.isEnemy === 'function' ? opts.isEnemy : () => true;
     const isBlocked = opts && typeof opts.isBlocked === 'function' ? opts.isBlocked : () => false;
     const canSeeTarget = opts && typeof opts.canSeeTarget === 'function' ? opts.canSeeTarget : null;
+    const viewForward = opts && opts.viewForward;
+    const viewFx = Number(viewForward && viewForward.x);
+    const viewFz = Number(viewForward && viewForward.z);
+    const viewForwardLen = Math.hypot(viewFx, viewFz);
+    const hasViewForward = Number.isFinite(viewForwardLen) && viewForwardLen > 1e-6;
+    const minForwardDot = 0.5;
     let nearest = null;
     let nearestDistSq = Number.POSITIVE_INFINITY;
     const visibleCheckCandidates = [];
@@ -1430,16 +1439,27 @@
       }
     }
 
+    let fallbackVisible = null;
     for (let i = 0; i < visibleCheckCandidates.length; i++) {
       const candidate = visibleCheckCandidates[i];
       if (canSeeTarget(candidate.combatant.position)) {
-        return {
+        const selected = {
           combatant: candidate.combatant,
           distance: Math.sqrt(candidate.distSq),
           visible: true,
         };
+        if (!fallbackVisible) fallbackVisible = selected;
+        if (!hasViewForward) return selected;
+        const tx = Number(candidate.combatant.position.x) - Number(playerPos.x);
+        const tz = Number(candidate.combatant.position.z) - Number(playerPos.z);
+        const targetLen = Math.hypot(tx, tz);
+        const facingDot = Number.isFinite(targetLen) && targetLen > 1e-6
+          ? ((tx / targetLen) * (viewFx / viewForwardLen)) + ((tz / targetLen) * (viewFz / viewForwardLen))
+          : -1;
+        if (facingDot >= minForwardDot) return selected;
       }
     }
+    if (fallbackVisible) return fallbackVisible;
 
     return nearest ? {
       combatant: nearest,
@@ -1972,7 +1992,7 @@
         approachDistance: 185,
         retreatDistance: 16,
         perceptionRange: 900,
-        combatObjectiveRouteDistance: 1500,
+        combatObjectiveRouteDistance: 2200,
         targetAcquisitionDistance: 185,
         aggressiveMode: true,
         waypointReplanIntervalMs: 5000,
@@ -1984,7 +2004,7 @@
         approachDistance: 150,
         retreatDistance: 18,
         perceptionRange: 1100,
-        combatObjectiveRouteDistance: 1700,
+        combatObjectiveRouteDistance: 2600,
         targetAcquisitionDistance: 150,
         aggressiveMode: true,
         waypointReplanIntervalMs: 4000,
@@ -2515,12 +2535,17 @@
       state.nearestPerceivedEnemyDistance = null;
       if (!Array.isArray(combatants) || combatants.length === 0) return null;
       const nowMs = Date.now();
+      const camera = getCamera(systems);
+      const viewForward = camera && readCameraWorld(camera, _tmpEye, _tmpForward)
+        ? { x: _tmpForward.x, y: _tmpForward.y, z: _tmpForward.z }
+        : null;
       const selected = selectVisiblePreferredEnemyCandidate({
         combatants,
         playerPos,
         perceptionRange: botConfig.perceptionRange,
         maxFireDistance: botConfig.maxFireDistance,
         maxVisibleChecks: 12,
+        viewForward,
         isEnemy: (c) => isOpforFaction(c.faction),
         isBlocked: (c) => isTargetTemporarilyBlocked(c.id, state.blockedTargetUntil, nowMs),
         canSeeTarget: (pos) => canSeeTarget(systems, playerPos, pos),
@@ -4213,7 +4238,7 @@
               if (markTargetTemporarilyBlocked(
                 state.blockedTargetUntil,
                 blockedId,
-                now,
+                Date.now(),
                 RUNTIME_TERRAIN_BLOCK_TARGET_COOLDOWN_MS,
               )) {
                 state.currentTarget = null;

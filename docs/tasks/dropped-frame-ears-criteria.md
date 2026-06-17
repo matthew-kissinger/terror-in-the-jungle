@@ -47,9 +47,9 @@ Executable scaffold:
   completion evidence.
 - A Shau captures can vary naturally because the driver does not always reach
   sustained combat or close-model pressure on every run. Materialization and
-  combat-frame claims require sustained pressure evidence, not just a peak
-  shot/hit or candidate count, because otherwise one run can look better or
-  worse simply from route/contact variance.
+  combat-frame claims require sustained pressure evidence from runtime samples,
+  not just a peak shot/hit or candidate count, because otherwise one run can
+  look better or worse simply from route/contact variance.
 - A passing checker result is still local artifact proof only. Owner playtest,
   terrain/camera visual acceptance, exact-head CI, deploy, and
   `check:live-release` remain required before production completion.
@@ -61,7 +61,7 @@ Executable scaffold:
 | ST4-PERF-001 | Ubiquitous | The game shall reduce player-visible dropped-frame time without making Open Frontier or A Shau smaller, emptier, less alive, less visible, or less stressful. | Both required scenarios pass the rAF and dropped-frame gates with default representative content. | `summary.json`, `validation.json`, final frame, owner playtest |
 | ST4-PERF-002 | Complex | When running a completion-lane capture while the machine is quiet, the harness shall accept the run only if measurement trust passes. | `measurementTrust.status == "pass"` and quiet-machine attestation is recorded. | `summary.json`, measurement trust section |
 | ST4-PERF-003 | Complex | When running a completion-lane capture while WebGPU is expected, the harness shall reject silent fallback as completion evidence. | Renderer backend resolves to the accepted WebGPU path; fallback captures are diagnostic unless explicitly scoped. | `summary.json`, `perfRuntime`, validation warnings |
-| ST4-PERF-004 | Complex | When running a completion-lane capture while active combat is required, the driver shall produce real fire, hits, and enemy-state progression. | Mode-scaled shot/hit thresholds pass; zero-shot or no-contact runs are diagnostic only. | `summary.json`, driver final state, validation |
+| ST4-PERF-004 | Complex | When running a completion-lane capture while active combat is required, the driver shall produce real fire, hits, and enemy-state progression across the sampled window. | Mode-scaled shot/hit thresholds pass and `active_combat_sustained_contact` passes: runtime samples show at least 3 shot-increase samples and at least 5% of shot-counter samples include new shots. Zero-shot, no-contact, or burst-only runs are diagnostic only. | `summary.json`, `runtime-samples.json`, driver final state, validation |
 | ST4-PERF-005 | Ubiquitous | The harness shall fail completion if the capture uses a content-reduction or visual-degradation flag. | No forbidden flag is present in `perfRuntime` or URL params. | `summary.json`, `perfRuntime`, capture command |
 | ST4-PERF-006 | Ubiquitous | The rAF gate shall be treated as the primary player-visible frame-pacing contract. | `rAF >25ms <0.5%`, `rAF >33ms <0.25%`, estimated dropped 60 Hz frames `<0.1/s`, dropped-frame time `<1ms/s`. | `validation.json`, `summary.json` |
 | ST4-PERF-007 | Unwanted behavior | If a capture fails measurement trust, the agent shall classify all perf deltas from that run as diagnostic only. | Reports use "diagnostic" language and do not mark a candidate as a proven win. | handoff docs, `progress.md` |
@@ -74,7 +74,7 @@ Executable scaffold:
 | ST4-PERF-014 | Complex | When a local candidate passes static validation while runtime proof is missing, the agent shall call it source-stable but unproven. | `validate:fast` and relevant focused checks pass, but STABILIZAT-4 remains open. | command output, `docs/DIRECTIVES.md` |
 | ST4-PERF-015 | Complex | When both required scenarios pass locally while default content is preserved, the agent shall run release proof before claiming production completion. | Exact-head CI, deploy, `check:live-release`, and owner playtest pass. | CI/deploy URLs, release proof JSON |
 | ST4-PERF-016 | Event-driven | When an agent evaluates saved dropped-frame artifacts, the repo shall provide an executable artifact classifier instead of relying on hand-scanned summaries. | `npm run check:dropped-frame-ears -- --dir <ashau> --dir <openfrontier> --strict` exits 0 only when both scenarios pass the EARS completion artifact gate. | `scripts/check-dropped-frame-ears.ts`, CLI output |
-| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 detailed samples and at least 10% of detailed close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when shots/hits pass. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
+| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 detailed samples and at least 10% of detailed close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when aggregate combat passes. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 
 ## Candidate Classification
 

@@ -1272,3 +1272,19 @@ Update 2026-06-17 10:15 UTC / 06:15 EDT:
   source `npm run typecheck`; and targeted ESLint on all touched source and
   harness files. This is a harness/diagnostic improvement, not dropped-frame
   completion evidence.
+
+Update 2026-06-17 12:25 UTC / 08:25 EDT:
+
+- Tightened the A Shau evidence model around owner-observed run-to-run skew:
+  an A Shau perf capture is not comparable firefight evidence merely because
+  it has the right map, seed, duration, and quiet-machine conditions. Some
+  runs may contain little or no combat, and others may only touch combat in a
+  short burst. Those packets can still diagnose terrain, weather, loading,
+  route behavior, and measurement trust, but they must not be used as proof
+  that combat dropped-frame time improved.
+- `npm run check:dropped-frame-ears` now adds
+  `active_combat_sustained_contact` when `runtime-samples.json` is available.
+  A completion-lane artifact must still pass aggregate shots/hits, and it must
+  also show repeated shot-counter progression across runtime samples. This
+  keeps low/no-combat and burst-only A Shau packets diagnostic even when raw
+  timing numbers look cleaner.
