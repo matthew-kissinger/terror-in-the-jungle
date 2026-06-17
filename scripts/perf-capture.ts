@@ -5334,6 +5334,10 @@ async function runCapture(): Promise<void> {
           const materializationTierEvents = shouldIncludeDetails
             ? (window as any).__materializationTierEvents?.({ clear: true, limit: 128 }) ?? []
             : [];
+          const harnessCounters =
+            (window as any).__perfHarnessDriverState?.getCountersSnapshot?.()
+            ?? (window as any).__perfHarnessDriver?.getCountersSnapshot?.()
+            ?? null;
           const harnessDriver = shouldIncludeDetails
             ? (window as any).__perfHarnessDriverState?.getDebugSnapshot?.() ?? null
             : null;
@@ -5484,6 +5488,19 @@ async function runCapture(): Promise<void> {
               rainMatrixBytesPerFrame: Number(debug.rainMatrixBytesPerFrame ?? 0)
             };
           };
+          const harnessEngineShots = Number(harnessCounters?.engineShotsFired ?? harnessDriver?.engineShotsFired);
+          const harnessEngineHits = Number(harnessCounters?.engineShotsHit ?? harnessDriver?.engineShotsHit);
+          const reportShots = Number(basicValidation?.hitDetection?.shotsThisSession ?? report?.hitDetection?.shotsThisSession ?? 0);
+          const reportHits = Number(basicValidation?.hitDetection?.hitsThisSession ?? report?.hitDetection?.hitsThisSession ?? 0);
+          const shotsThisSession = Number.isFinite(harnessEngineShots)
+            ? harnessEngineShots
+            : reportShots;
+          const hitsThisSession = Number.isFinite(harnessEngineHits)
+            ? harnessEngineHits
+            : reportHits;
+          const hitRate = shotsThisSession > 0
+            ? hitsThisSession / shotsThisSession
+            : Number(basicValidation?.hitDetection?.hitRate ?? report?.hitDetection?.hitRate ?? 0);
           let sceneAttribution: any[] | null = null;
           let sceneAttributionError: string | null = null;
           let renderSubmissions: any | null = null;
@@ -5551,9 +5568,9 @@ async function runCapture(): Promise<void> {
             loopFrameBreakdown,
             combatantCount: Number(snapshot?.combatantCount ?? 0),
             overBudgetPercent: Number(basicValidation?.frameBudget?.overBudgetPercent ?? report?.overBudgetPercent ?? 0),
-            shotsThisSession: Number(basicValidation?.hitDetection?.shotsThisSession ?? report?.hitDetection?.shotsThisSession ?? 0),
-            hitsThisSession: Number(basicValidation?.hitDetection?.hitsThisSession ?? report?.hitDetection?.hitsThisSession ?? 0),
-            hitRate: Number(basicValidation?.hitDetection?.hitRate ?? report?.hitDetection?.hitRate ?? 0),
+            shotsThisSession,
+            hitsThisSession,
+            hitRate,
             heapUsedMb: memory?.usedJSHeapSize ? Number(memory.usedJSHeapSize) / (1024 * 1024) : undefined,
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),

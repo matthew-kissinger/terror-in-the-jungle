@@ -1724,7 +1724,6 @@ export class CombatantRenderer {
     const hand = instance.bones.get(`${side}Hand`);
     if (!upper || !fore || !hand) return;
 
-    instance.root.updateMatrixWorld(true);
     const shoulder = upper.getWorldPosition(this.scratchArmShoulder);
     const elbowNow = fore.getWorldPosition(this.scratchArmElbowNow);
     const handNow = hand.getWorldPosition(this.scratchArmHandNow);
@@ -1763,10 +1762,8 @@ export class CombatantRenderer {
       .add(bendDirection.multiplyScalar(height));
 
     this.setBoneDirectionWorld(upper, this.scratchArmUpperDirection.copy(elbow).sub(shoulder));
-    instance.root.updateMatrixWorld(true);
     const elbowWorld = fore.getWorldPosition(this.scratchArmElbowWorld);
     this.setBoneDirectionWorld(fore, this.scratchArmForeDirection.copy(clampedTarget).sub(elbowWorld));
-    instance.root.updateMatrixWorld(true);
   }
 
   private setBoneDirectionWorld(bone: THREE.Object3D, directionWorld: THREE.Vector3): void {

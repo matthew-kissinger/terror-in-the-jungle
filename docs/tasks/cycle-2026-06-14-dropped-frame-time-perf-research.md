@@ -1191,3 +1191,34 @@ Update 2026-06-16 20:05 UTC / 16:05 EDT:
 - Added TS and CJS tests that keep the default aim request below `1.0`.
   Runtime proof is still required: the next EARS captures must show large
   requested view turns gone while shots/hits and route progress remain real.
+
+Update 2026-06-17 09:45 UTC / 05:45 EDT:
+
+- A Shau capture variance is now explicit in the working evidence model:
+  A Shau EARS artifacts must be contact-qualified and materialization-qualified
+  before they can say anything useful about combat stutter. Low/no-combat
+  route runs can still diagnose terrain, weather, vegetation, startup, or
+  measurement trust, but they must not be used as proof that firefight
+  dropped-frame time improved.
+- The perf driver now exposes a compact counter snapshot, and `perf-capture`
+  uses it for top-level `shotsThisSession`, `hitsThisSession`, and `hitRate`
+  even on non-detail samples. This fixed the stale alternating zero-shot rows
+  in A Shau capture logs while preserving the full debug snapshot cadence.
+- Source-stable close-NPC CPU cleanup: `CombatantRenderer.solveArmToTarget`
+  no longer forces three redundant root `updateMatrixWorld(true)` calls inside
+  each arm solve; the caller already updates the root once before weapon-socket
+  refresh and `setBoneDirectionWorld()` updates the changed branch.
+- A Shau now uses an explicit `ashauJungle` default biome instead of reusing
+  Open Frontier's `denseJungle` palette. It keeps the same vegetation families
+  but lowers ground-cover/canopy multipliers so A Shau no longer inherits the
+  fern-heavy dense-ring look. Open Frontier remains on `denseJungle`.
+- Diagnostic A Shau captures after these changes remain failures, not proof:
+  `artifacts/perf/2026-06-17T09-29-51-947Z` was contact/materialization
+  qualified (`121` shots/hits, peak close candidates `27`) and improved to
+  about `34.3ms/s` dropped-frame time, but measurement trust failed
+  (`probeAvg=75.2ms`, `probeP95=170ms`). The stronger A Shau palette in
+  `artifacts/perf/2026-06-17T09-38-36-176Z` reduced active vegetation into the
+  roughly `20k-30k` range and tail vegetation triangles to about `59k`, but
+  the route had a heavier late render/world-static tail and still failed at
+  about `38.3ms/s`; harness view-slew and shot-presentation warnings also
+  remained. These are useful diagnostics, not completion evidence.
