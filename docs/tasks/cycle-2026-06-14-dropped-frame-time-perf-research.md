@@ -1447,3 +1447,26 @@ Update 2026-06-17 13:50 UTC / 09:50 EDT:
 - Focused verification passed:
   `npx vitest run src/systems/combat/CombatantRenderer.test.ts scripts/check-dropped-frame-ears.test.ts scripts/perf-presentation-gap-summary.test.ts`
   plus `npm run typecheck`.
+
+Update 2026-06-17 14:05 UTC / 10:05 EDT:
+
+- Post-patch Open Frontier EARS artifact
+  `artifacts/perf/2026-06-17T13-56-06-693Z` confirms the drained transition
+  window works: `materializationTierMetrics.totalEvents` from the old event
+  ring stayed `0`, but `transitionWindowTotalEvents=263` with
+  `51` `impostor->close-glb`, `39` `close-glb->impostor`, `39`
+  `culled->impostor`, and `5` `close-glb->culled` transitions. The EARS
+  classifier now marks materialization `qualified` instead of failing the
+  telemetry blind spot.
+- The artifact is still diagnostic, not a win: validation failed, measurement
+  trust warned, the shot count was below the completion threshold (`21/30`),
+  rAF estimated dropped frames were `0.97/s`, and dropped-frame time was
+  `13.37ms/s`.
+- Correlation split the stutter owner: `35/106` presentation gaps had
+  transition-window materialization events (`~815ms` dropped-frame time),
+  `50/106` gaps had active close models (`~1357ms` dropped-frame time), while
+  adjacent render submissions were still dominated by terrain
+  (`24.3M` triangles), vegetation imposters (`3.05M`), world-static draw/material
+  pressure (`792` submissions), and close GLBs (`581` submissions / `57k`
+  triangles). This supports the owner's visible LOD-transition observation
+  without absolving the broader render-tail stack.
