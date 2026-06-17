@@ -18,6 +18,8 @@ type ArtifactOptions = {
   measurementTrust?: 'pass' | 'fail';
   status?: 'ok' | 'failed';
   runtimeOverrides?: Record<string, unknown>;
+  presentationTerrainOverrides?: Record<string, unknown>;
+  presentationGapCount?: number;
   harnessWarnings?: boolean;
 };
 
@@ -59,6 +61,7 @@ function tempArtifact(options: ArtifactOptions): string {
     },
     rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
     perfRuntime: {
+      presentationContextCapture: true,
       frontlineCompressionRequested: false,
       victoryConditionsDisabled: false,
       npcCloseModelsDisabled: false,
@@ -83,6 +86,21 @@ function tempArtifact(options: ArtifactOptions): string {
       terrainLowSunOcclusionDisabled: false,
       wildlifeDisabled: false,
       ...(options.runtimeOverrides ?? {}),
+    },
+    presentationGapContexts: {
+      gapCount: options.presentationGapCount ?? 3,
+      terrain: {
+        gapCount: 3,
+        terrainStageHashChangedCount: 0,
+        terrainStageIdentityHashChangedCount: 0,
+        terrainStageMorphHashChangedCount: 0,
+        terrainStageEdgeMaskHashChangedCount: 0,
+        terrainStageTileCountChangedCount: 0,
+        terrainStageBufferVisibleChangedCount: 0,
+        terrainStageBufferVisibleChangedWithoutSubmissionCount: 0,
+        terrainSelectionSaturatedCount: 0,
+        ...(options.presentationTerrainOverrides ?? {}),
+      },
     },
   };
   writeFileSync(join(dir, 'summary.json'), JSON.stringify(summary), 'utf-8');
@@ -133,13 +151,40 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.checks.some((check) => check.id === 'forbidden_frontline_compression_requested' && check.status === 'fail')).toBe(true);
   });
 
-  it('rejects sparse terrain-skirt diagnostic captures as non-production terrain coverage', () => {
+  it('rejects thin presentation-context diagnostic captures', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      runtimeOverrides: { presentationContextCapture: false },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_presentation_context_capture_disabled' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects forced weather-state diagnostic captures', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: { weatherStateOverride: 'clear' },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_weather_state_override' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects explicit adaptive terrain-skirt diagnostic captures as flag-driven coverage', () => {
     const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
       scenario: 'a_shau_valley',
       runtimeOverrides: { terrainSparseSkirtsRequested: true },
     }));
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_sparse_skirts_requested' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects legacy full terrain-skirt diagnostic captures as non-production terrain coverage', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: { terrainFullSkirtsRequested: true },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_full_skirts_requested' && check.status === 'fail')).toBe(true);
   });
 
   it('rejects heuristic height-aware terrain frustum diagnostic captures', () => {
@@ -208,6 +253,82 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
 
     expect(artifact.classification).toBe('diagnostic');
     expect(artifact.checks.some((check) => check.id === 'terrain_lod_ranges_visual_extent_alignment' && check.status === 'fail')).toBe(true);
+  });
+
+  it('keeps unsynced buffer-visible CDLOD stage changes diagnostic', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      presentationTerrainOverrides: {
+        terrainStageHashChangedCount: 4,
+        terrainStageIdentityHashChangedCount: 1,
+        terrainStageMorphHashChangedCount: 3,
+        terrainStageEdgeMaskHashChangedCount: 1,
+        terrainStageTileCountChangedCount: 1,
+        terrainStageBufferVisibleChangedCount: 2,
+        terrainStageBufferVisibleChangedWithoutSubmissionCount: 1,
+      },
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'terrain_stage_buffer_submission_integrity'
+      && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('keeps saturated CDLOD selection captures diagnostic', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      presentationTerrainOverrides: {
+        terrainSelectionSaturatedCount: 1,
+      },
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'terrain_cdlod_selection_capacity'
+      && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('allows morph-only CDLOD stage churn when buffer-visible terrain data is stable', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      presentationTerrainOverrides: {
+        terrainStageHashChangedCount: 4,
+        terrainStageMorphHashChangedCount: 4,
+        terrainStageBufferVisibleChangedCount: 0,
+        terrainStageBufferVisibleChangedWithoutSubmissionCount: 0,
+      },
+    }));
+
+    expect(artifact.classification).toBe('proven');
+    expect(artifact.checks.some((check) => (
+      check.id === 'terrain_stage_buffer_submission_integrity'
+      && check.status === 'pass'
+    ))).toBe(true);
+  });
+
+  it('does not require dropped-frame terrain context when no presentation gaps were captured', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      presentationGapCount: 0,
+      presentationTerrainOverrides: {
+        gapCount: undefined,
+        terrainStageBufferVisibleChangedWithoutSubmissionCount: undefined,
+        terrainSelectionSaturatedCount: undefined,
+      },
+    }));
+
+    expect(artifact.classification).toBe('proven');
+    expect(artifact.checks.some((check) => (
+      check.id === 'terrain_stage_buffer_submission_integrity'
+      && check.status === 'pass'
+    ))).toBe(true);
+    expect(artifact.checks.some((check) => (
+      check.id === 'terrain_cdlod_selection_capacity'
+      && check.status === 'pass'
+    ))).toBe(true);
   });
 });
 

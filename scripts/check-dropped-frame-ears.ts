@@ -105,6 +105,12 @@ const HARNESS_EQUIVALENCE_IDS = [
 
 const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
   {
+    id: 'presentation_context_capture_disabled',
+    path: ['perfRuntime', 'presentationContextCapture'],
+    equals: false,
+    message: 'rich presentation context capture is disabled',
+  },
+  {
     id: 'frontline_compression_requested',
     path: ['perfRuntime', 'frontlineCompressionRequested'],
     message: 'frontline compression was requested',
@@ -146,9 +152,14 @@ const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
     message: 'heuristic-sampled terrain height bounds are diagnostic-only',
   },
   {
+    id: 'terrain_full_skirts_requested',
+    path: ['perfRuntime', 'terrainFullSkirtsRequested'],
+    message: 'legacy full terrain skirts are explicitly requested',
+  },
+  {
     id: 'terrain_sparse_skirts_requested',
     path: ['perfRuntime', 'terrainSparseSkirtsRequested'],
-    message: 'sparse terrain skirts are explicitly requested',
+    message: 'adaptive terrain skirts are explicitly requested by diagnostic flag',
   },
   {
     id: 'terrain_skirts_disabled',
@@ -180,6 +191,7 @@ const FORBIDDEN_QUERY_FLAGS = [
   'terrainForceInstanceUpload',
   'terrainEnableHeightAwareFrustum',
   'perfTerrainHeightAwareFrustum',
+  'terrainFullTerrainSkirts',
   'terrainSparseTerrainSkirts',
   'perfDisableTerrainSkirts',
   'perfDisableTerrainFarCanopyTint',
@@ -428,6 +440,17 @@ function addForbiddenRuntimeChecks(
       : `Vegetation density scale is default-compatible: ${vegetationDensityScale ?? 'default'}`,
   });
 
+  const weatherStateOverride = getString(summary, ['perfRuntime', 'weatherStateOverride']);
+  const changedWeatherState = weatherStateOverride !== null && weatherStateOverride !== 'default';
+  checks.push({
+    id: 'forbidden_weather_state_override',
+    status: changedWeatherState ? 'fail' : 'pass',
+    value: weatherStateOverride,
+    message: changedWeatherState
+      ? `Rejected weather-state diagnostic override: ${weatherStateOverride}`
+      : `Weather state is scenario default-compatible: ${weatherStateOverride ?? 'default'}`,
+  });
+
   for (const queryFlag of FORBIDDEN_QUERY_FLAGS) {
     const enabled = searchParams?.get(queryFlag) === '1';
     checks.push({
@@ -518,6 +541,68 @@ function addTerrainVisualDomainTrustChecks(
   });
 }
 
+function addTerrainPresentationIntegrityChecks(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null
+): void {
+  const presentationGapCount = getNumber(summary, ['presentationGapContexts', 'gapCount']);
+  const noPresentationGaps = presentationGapCount === 0;
+  const unsyncedBufferVisibleChanges = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainStageBufferVisibleChangedWithoutSubmissionCount']
+  );
+  const bufferVisibleChanges = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainStageBufferVisibleChangedCount']
+  );
+  const morphChanges = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainStageMorphHashChangedCount']
+  );
+  const terrainGapCount = getNumber(summary, ['presentationGapContexts', 'terrain', 'gapCount']);
+  const terrainSelectionSaturatedCount = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainSelectionSaturatedCount']
+  );
+
+  const hasTerrainGapSummary = terrainGapCount !== null;
+  const coherent = noPresentationGaps || (
+    hasTerrainGapSummary
+    && unsyncedBufferVisibleChanges !== null
+    && unsyncedBufferVisibleChanges === 0
+  );
+  checks.push({
+    id: 'terrain_stage_buffer_submission_integrity',
+    status: coherent ? 'pass' : 'fail',
+    value: unsyncedBufferVisibleChanges,
+    message: noPresentationGaps
+      ? 'No presentation gaps were captured; no dropped-frame CDLOD stage mismatch to classify'
+      : coherent
+        ? `CDLOD buffer-visible terrain stage changes were submitted (${bufferVisibleChanges ?? 0} buffer-visible changes; ${morphChanges ?? 0} morph-only changes may use shader uniforms)`
+      : hasTerrainGapSummary
+        ? `CDLOD buffer-visible terrain stage changed without terrain buffer submission (${unsyncedBufferVisibleChanges ?? 'missing'} unsynced of ${bufferVisibleChanges ?? 'missing'} changes)`
+        : 'Presentation gap terrain summary is missing; cannot prove CDLOD buffer submission integrity',
+  });
+
+  const selectionCapacityTrusted = noPresentationGaps || (
+    hasTerrainGapSummary
+    && terrainSelectionSaturatedCount !== null
+    && terrainSelectionSaturatedCount === 0
+  );
+  checks.push({
+    id: 'terrain_cdlod_selection_capacity',
+    status: selectionCapacityTrusted ? 'pass' : 'fail',
+    value: terrainSelectionSaturatedCount,
+    message: noPresentationGaps
+      ? 'No presentation gaps were captured; CDLOD selection capacity did not coincide with a dropped-frame context'
+      : selectionCapacityTrusted
+        ? 'CDLOD selection did not hit the tile cap in dropped-frame contexts'
+        : hasTerrainGapSummary
+          ? `CDLOD selection hit the tile cap in ${terrainSelectionSaturatedCount ?? 'missing'} dropped-frame contexts`
+          : 'Presentation gap terrain summary is missing; cannot prove CDLOD selection capacity',
+  });
+}
+
 export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFrameEarsArtifactEvaluation {
   const absoluteArtifactDir = resolve(artifactDir);
   const summary = readJsonObject(join(absoluteArtifactDir, 'summary.json'));
@@ -592,6 +677,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addForbiddenRuntimeChecks(checks, summary, searchParams);
   addTerrainHeightBoundsTrustChecks(checks, summary);
   addTerrainVisualDomainTrustChecks(checks, summary);
+  addTerrainPresentationIntegrityChecks(checks, summary);
 
   checks.push({
     id: 'owner_visual_acceptance_required',

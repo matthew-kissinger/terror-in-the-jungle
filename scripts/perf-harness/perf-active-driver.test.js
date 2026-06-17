@@ -35,9 +35,12 @@ const {
   shouldRecordRouteSnapEpoch,
   queryTerrainLineOfSight,
   hasClearTerrainLineOfSight,
+  computeRayAimMetrics,
   PLAYER_EYE_HEIGHT,
   TARGET_CHEST_HEIGHT,
   TARGET_ACTOR_AIM_Y_OFFSET,
+  targetActorAimYOffset,
+  targetChestProxyRadius,
   DEFAULT_BULLET_SPEED,
   PLAYER_CLIMB_SLOPE_DOT,
   PLAYER_MAX_CLIMB_ANGLE_RAD,
@@ -77,10 +80,17 @@ const {
   shouldUseTargetForCurrentObjective,
   shouldUseRouteOverlayForIntent,
   shouldUseDirectCombatRouteFallback,
+  shouldUseDirectCombatRouteBypass,
+  shouldUseTerrainDirectObjectiveRoute,
+  shouldCooldownCombatTargetAfterRouteFailure,
+  shouldCooldownObjectiveAfterRouteFailure,
   createDirectCombatFallbackPath,
   isRouteSnapTrusted,
+  shouldReloadMagazine,
   shouldIssueFireStart,
+  shouldPulseHarnessFire,
   shouldReleaseFireForRetarget,
+  classifyRuntimeShotPreview,
   selectLockedTarget,
   profileForMode,
   botConfigForProfile,
@@ -109,6 +119,8 @@ const {
   pickObjectiveZone,
   selectPatrolObjective,
   objectiveTelemetryKey,
+  objectiveBlockKey,
+  routeTargetIdentityKey,
 } = driver;
 
 function makeBotCtx(overrides = {}) {
@@ -210,6 +222,19 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
     expect(result.shouldFire).toBe(true);
   });
 
+  it('allows steep vertical angles for visible grounded combatants on hills', () => {
+    const result = evaluateFireDecision({
+      cameraForward: { x: 0, y: -0.76, z: -0.65 },
+      toTarget: { x: 0, y: -0.76, z: -0.65 },
+      aimDotThreshold: 0.8,
+      verticalThreshold: 0.45,
+      closeRange: false,
+      allowSteepGroundFire: true
+    });
+    expect(result.shouldFire).toBe(true);
+    expect(result.reason).toBe('ok');
+  });
+
   it('returns missing_vectors when inputs are incomplete', () => {
     const result = evaluateFireDecision({
       cameraForward: null,
@@ -233,6 +258,13 @@ describe('perf-active-driver fire-start retry', () => {
     expect(shouldIssueFireStart(true, false)).toBe(true);
   });
 
+  it('pulses non-launcher harness fire so recoil cannot drift automatic bursts between aim ticks', () => {
+    expect(shouldPulseHarnessFire({ firePrimary: true, weaponType: 'rifle' })).toBe(true);
+    expect(shouldPulseHarnessFire({ firePrimary: true, weaponType: 'lmg' })).toBe(true);
+    expect(shouldPulseHarnessFire({ firePrimary: false, weaponType: 'rifle' })).toBe(false);
+    expect(shouldPulseHarnessFire({ firePrimary: true, weaponType: 'launcher' })).toBe(false);
+  });
+
   it('releases fire when the held trigger crosses a target epoch boundary', () => {
     expect(shouldReleaseFireForRetarget(true, 'combatant_1', 'combatant_2')).toBe(true);
     expect(shouldReleaseFireForRetarget(true, 'combatant_1', null)).toBe(true);
@@ -241,6 +273,107 @@ describe('perf-active-driver fire-start retry', () => {
   it('keeps fire state when the target did not change or the trigger was not held', () => {
     expect(shouldReleaseFireForRetarget(true, 'combatant_1', 'combatant_1')).toBe(false);
     expect(shouldReleaseFireForRetarget(false, 'combatant_1', 'combatant_2')).toBe(false);
+  });
+});
+
+describe('perf-active-driver runtime shot preview gate', () => {
+  it('reports ray-to-aim miss distance so high aim-dot misses are explainable', () => {
+    const metrics = computeRayAimMetrics(
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      { x: 20, y: 1, z: 0 },
+      0.5,
+    );
+    expect(metrics.aimDot).toBeGreaterThan(0.998);
+    expect(metrics.aimAngleDeg).toBeGreaterThan(2);
+    expect(metrics.aimMissDistance).toBeCloseTo(1, 5);
+    expect(metrics.aimMissRadiusRatio).toBeCloseTo(2, 5);
+    expect(metrics.rayDistanceToClosestAim).toBeCloseTo(20, 5);
+  });
+
+  it('rejects fire when the runtime shot preview is unavailable', () => {
+    expect(classifyRuntimeShotPreview(null, 'combatant_1')).toMatchObject({
+      shouldFire: false,
+      status: 'unavailable',
+      reason: 'runtime_preview_unavailable',
+    });
+  });
+
+  it('rejects fire when the runtime shot preview misses', () => {
+    expect(classifyRuntimeShotPreview({
+      available: true,
+      hit: false,
+      status: 'target_not_in_spatial_query',
+      reason: 'runtime_preview_target_not_in_spatial_query',
+    }, 'combatant_1')).toMatchObject({
+      shouldFire: false,
+      status: 'target_not_in_spatial_query',
+      reason: 'runtime_preview_target_not_in_spatial_query',
+    });
+  });
+
+  it('classifies off-proxy misses as aim settling instead of runtime trust failures', () => {
+    expect(classifyRuntimeShotPreview({
+      available: true,
+      hit: false,
+      status: 'miss',
+      reason: 'runtime_preview_miss',
+      expectedAimMissRadiusRatio: 2.1,
+    }, 'combatant_1')).toMatchObject({
+      shouldFire: false,
+      status: 'aim_settling',
+      reason: 'runtime_preview_aim_settling',
+    });
+  });
+
+  it('classifies runtime terrain blockers separately from preview trust misses', () => {
+    expect(classifyRuntimeShotPreview({
+      available: true,
+      hit: false,
+      status: 'terrain_blocked',
+      reason: 'runtime_preview_terrain_blocked',
+      expectedAimMissRadiusRatio: 0,
+    }, 'combatant_1')).toMatchObject({
+      shouldFire: false,
+      status: 'terrain_blocked',
+      reason: 'runtime_preview_terrain_blocked',
+    });
+  });
+
+  it('rejects fire when the runtime hit is a different target', () => {
+    expect(classifyRuntimeShotPreview({
+      available: true,
+      hit: true,
+      hitTargetId: 'combatant_2',
+    }, 'combatant_1')).toMatchObject({
+      shouldFire: false,
+      status: 'wrong_target',
+      reason: 'runtime_preview_wrong_target',
+    });
+  });
+
+  it('allows fire when the runtime preview hits the selected target', () => {
+    expect(classifyRuntimeShotPreview({
+      available: true,
+      hit: true,
+      hitTargetId: 'combatant_1',
+    }, 'combatant_1')).toMatchObject({
+      shouldFire: true,
+      status: 'hit',
+      reason: 'ok',
+    });
+  });
+
+  it('allows fire when runtime preview hits but cannot expose a target id', () => {
+    expect(classifyRuntimeShotPreview({
+      available: true,
+      hit: true,
+      hitTargetId: null,
+    }, 'combatant_1')).toMatchObject({
+      shouldFire: true,
+      status: 'hit',
+      reason: 'ok',
+    });
   });
 });
 
@@ -372,6 +505,19 @@ describe('perf-active-driver terrain line of sight', () => {
     const terrain = {
       raycastTerrain: () => ({ hit: false }),
       getEffectiveHeightAt: (_x, z) => z < -12 && z > -24 ? 2.4 : -10,
+    };
+
+    expect(queryTerrainLineOfSight(
+      terrain,
+      { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      { x: 0, y: TARGET_CHEST_HEIGHT, z: -40 },
+    )).toMatchObject({ status: 'blocked', clear: false, reason: 'height_profile_blocked' });
+  });
+
+  it('blocks near-field hillside occlusion when terrain raycast misses', () => {
+    const terrain = {
+      raycastTerrain: () => ({ hit: false }),
+      getEffectiveHeightAt: (_x, z) => z < -1.25 && z > -5.5 ? 2.6 : -10,
     };
 
     expect(queryTerrainLineOfSight(
@@ -962,7 +1108,8 @@ describe('PlayerBot driver mirror — PATROL and ALERT', () => {
       getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
       canSeeTarget: () => false,
     }));
-    expect(step.nextState).toBe('ALERT');
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.aimTarget.z).toBeCloseTo(-128, 5);
   });
@@ -1028,6 +1175,21 @@ describe('PlayerBot driver mirror — ENGAGE', () => {
     }));
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.reload).toBe(true);
+  });
+
+  it('reloads instead of firing when the magazine is low', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -30 } }),
+      canSeeTarget: () => true,
+      magazine: { current: 2, max: 30 },
+    }));
+    expect(shouldReloadMagazine({ current: 2, max: 30 })).toBe(true);
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.reload).toBe(true);
+  });
+
+  it('does not reload above the low-magazine threshold', () => {
+    expect(shouldReloadMagazine({ current: 7, max: 30 })).toBe(false);
   });
 
   it('transitions to ADVANCE when LOS is lost mid-engagement (core bug fix)', () => {
@@ -1131,6 +1293,42 @@ describe('PlayerBot driver mirror — ENGAGE', () => {
     expect(step.intent.aimTarget.x).toBeCloseTo(36, 5);
     expect(step.intent.aimTarget.y).toBeCloseTo(PLAYER_EYE_HEIGHT + 0.5 + TARGET_ACTOR_AIM_Y_OFFSET, 5);
     expect(step.intent.aimTarget.z).toBeCloseTo(-4, 5);
+  });
+
+  it('scales aim height with the same visual body scale as hit proxies', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget({
+        position: { x: 30, y: PLAYER_EYE_HEIGHT, z: 0 },
+        scaleY: 1.25,
+      }),
+    }));
+    expect(step.intent.aimTarget.y).toBeCloseTo(
+      PLAYER_EYE_HEIGHT + targetActorAimYOffset(1.25),
+      5,
+    );
+    expect(targetChestProxyRadius(1.25)).toBeGreaterThan(targetChestProxyRadius(1));
+  });
+});
+
+describe('PlayerBot driver mirror — low-ammo sustainment', () => {
+  it('can reload while still patrolling toward an objective', () => {
+    const step = stepBotState('PATROL', makeBotCtx({
+      magazine: { current: 2, max: 30 },
+      findNearestEnemy: () => null,
+      getObjective: () => ({ kind: 'zone', position: { x: 100, y: 0, z: 0 }, priority: 1 }),
+    }));
+    expect(step.intent.reload).toBe(true);
+    expect(step.intent.moveForward).toBe(1);
+  });
+
+  it('can reload during advance without losing the aim target', () => {
+    const step = stepBotState('ADVANCE', makeBotCtx({
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -100 } }),
+      magazine: { current: 2, max: 30 },
+      canSeeTarget: () => false,
+    }));
+    expect(step.intent.reload).toBe(true);
+    expect(step.intent.aimTarget).not.toBeNull();
   });
 });
 
@@ -1259,10 +1457,11 @@ describe('PlayerBot driver mirror — mode profiles', () => {
     expect(config.targetAcquisitionDistance).toBeLessThan(profile.maxFireDistance);
   });
 
-  it('uses a longer combat-front route distance for aggressive large-map profiles', () => {
+  it('uses an explicit combat-front route distance for aggressive large-map profiles', () => {
     const profile = profileForMode('open_frontier');
     expect(combatObjectiveMaxDistanceForProfile(profile)).toBeGreaterThan(profile.targetAcquisitionDistance);
-    expect(combatObjectiveMaxDistanceForProfile(profile)).toBeLessThanOrEqual(profile.perceptionRange);
+    expect(combatObjectiveMaxDistanceForProfile(profile)).toBeGreaterThan(profile.perceptionRange);
+    expect(combatObjectiveMaxDistanceForProfile(profile)).toBe(profile.combatObjectiveRouteDistance);
   });
 
   it('keeps non-aggressive profiles on the immediate target acquisition distance', () => {
@@ -2158,17 +2357,115 @@ describe('route objective-progress recovery', () => {
       failureReason: 'end_snap_failed',
       targetDistance: 180,
       maxDistance: 700,
+      targetVisible: true,
     })).toBe(true);
+  });
+
+  it('bypasses navmesh routing for visible combat targets inside the pursuit band', () => {
+    expect(shouldUseDirectCombatRouteBypass({
+      targetKind: 'nearest_opfor',
+      targetDistance: 220,
+      maxDistance: 700,
+      targetVisible: true,
+    })).toBe(true);
+    expect(shouldUseDirectCombatRouteBypass({
+      targetKind: 'current_target',
+      targetDistance: 60,
+      maxDistance: 700,
+      targetVisible: true,
+    })).toBe(true);
+  });
+
+  it('keeps occluded, non-combat, and far targets on routed navigation', () => {
+    expect(shouldUseDirectCombatRouteBypass({
+      targetKind: 'nearest_opfor',
+      targetDistance: 220,
+      maxDistance: 700,
+      targetVisible: false,
+    })).toBe(false);
+    expect(shouldUseDirectCombatRouteBypass({
+      targetKind: 'zone',
+      targetDistance: 220,
+      maxDistance: 700,
+      targetVisible: true,
+    })).toBe(false);
+    expect(shouldUseDirectCombatRouteBypass({
+      targetKind: 'current_target',
+      targetDistance: 900,
+      maxDistance: 700,
+      targetVisible: true,
+    })).toBe(false);
+  });
+
+  it('uses terrain-direct objective routing for large-map patrol objectives', () => {
+    expect(shouldUseTerrainDirectObjectiveRoute({
+      allowTerrainDirect: true,
+      targetKind: 'zone',
+      targetDistance: 900,
+    })).toBe(true);
+    expect(shouldUseTerrainDirectObjectiveRoute({
+      allowTerrainDirect: true,
+      targetKind: 'engagement_center',
+      targetDistance: 1200,
+    })).toBe(true);
+    expect(shouldUseTerrainDirectObjectiveRoute({
+      allowTerrainDirect: true,
+      targetKind: 'nearest_opfor',
+      targetDistance: 650,
+      targetVisible: false,
+    })).toBe(true);
+  });
+
+  it('terrain-directs current target movement on large maps without changing fire visibility gates', () => {
+    expect(shouldUseTerrainDirectObjectiveRoute({
+      allowTerrainDirect: true,
+      targetKind: 'current_target',
+      targetDistance: 80,
+      targetVisible: false,
+    })).toBe(true);
+    expect(shouldUseTerrainDirectObjectiveRoute({
+      allowTerrainDirect: true,
+      targetKind: 'current_target',
+      targetDistance: 80,
+      targetVisible: true,
+    })).toBe(true);
+  });
+
+  it('keeps non-aggressive modes on normal route substrate', () => {
+    expect(shouldUseTerrainDirectObjectiveRoute({
+      allowTerrainDirect: false,
+      targetKind: 'zone',
+      targetDistance: 900,
+    })).toBe(false);
   });
 
   it('treats oversized navmesh snaps as untrusted route steering', () => {
     expect(isRouteSnapTrusted({
+      startFound: true,
+      endFound: true,
       startDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE - 1,
       endDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE,
     })).toBe(true);
     expect(isRouteSnapTrusted({
+      startFound: true,
+      endFound: true,
       startDistance: 2,
       endDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE + 1,
+    })).toBe(false);
+  });
+
+  it('does not trust missing navmesh snap evidence as a zero-distance route snap', () => {
+    expect(isRouteSnapTrusted({
+      startFound: false,
+      endFound: true,
+      startDistance: null,
+      endDistance: 2,
+    })).toBe(false);
+    expect(isRouteSnapTrusted({
+      startFound: true,
+      endFound: true,
+      startDistance: undefined,
+      endDistance: 2,
     })).toBe(false);
   });
 
@@ -2178,7 +2475,34 @@ describe('route objective-progress recovery', () => {
       failureReason: 'snap_distance_untrusted',
       targetDistance: 180,
       maxDistance: 700,
+      targetVisible: true,
     })).toBe(true);
+  });
+
+  it('does not direct-fallback combat targets that are terrain-occluded', () => {
+    expect(shouldUseDirectCombatRouteFallback({
+      targetKind: 'current_target',
+      failureReason: 'snap_distance_untrusted',
+      targetDistance: 180,
+      maxDistance: 700,
+      targetVisible: false,
+    })).toBe(false);
+  });
+
+  it('cools down occluded combat targets after trusted routing fails', () => {
+    expect(shouldCooldownCombatTargetAfterRouteFailure({
+      targetKind: 'current_target',
+      failureReason: 'snap_distance_untrusted',
+      targetVisible: false,
+    })).toBe(true);
+  });
+
+  it('keeps visible combat targets eligible for routed or direct pursuit', () => {
+    expect(shouldCooldownCombatTargetAfterRouteFailure({
+      targetKind: 'current_target',
+      failureReason: 'snap_distance_untrusted',
+      targetVisible: true,
+    })).toBe(false);
   });
 
   it('keeps zone routing failures as real route failures', () => {
@@ -2187,6 +2511,27 @@ describe('route objective-progress recovery', () => {
       failureReason: 'end_snap_failed',
       targetDistance: 180,
       maxDistance: 700,
+      targetVisible: true,
+    })).toBe(false);
+    expect(shouldCooldownCombatTargetAfterRouteFailure({
+      targetKind: 'zone',
+      failureReason: 'start_snap_failed',
+      targetVisible: false,
+    })).toBe(false);
+  });
+
+  it('cools down zone objectives after route anchor failures', () => {
+    expect(shouldCooldownObjectiveAfterRouteFailure({
+      targetKind: 'zone',
+      failureReason: 'snap_distance_untrusted',
+    })).toBe(true);
+    expect(shouldCooldownObjectiveAfterRouteFailure({
+      targetKind: 'zone',
+      failureReason: 'compute_path_failed',
+    })).toBe(true);
+    expect(shouldCooldownObjectiveAfterRouteFailure({
+      targetKind: 'current_target',
+      failureReason: 'snap_distance_untrusted',
     })).toBe(false);
   });
 
@@ -2196,6 +2541,7 @@ describe('route objective-progress recovery', () => {
       failureReason: 'end_snap_failed',
       targetDistance: 900,
       maxDistance: 700,
+      targetVisible: true,
     })).toBe(false);
   });
 
@@ -2254,6 +2600,21 @@ describe('route objective-progress recovery', () => {
       maxFireDistance: config.maxFireDistance,
       canSeeTarget: () => true,
     })).toBe(true);
+  });
+
+  it('does not turn an occluded nearest-opfor objective into a current fire target', () => {
+    const config = botConfigForProfile(profileForMode('open_frontier'));
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -180 } });
+    expect(shouldUseTargetForCurrentObjective({
+      target,
+      currentTarget: null,
+      objective: { id: target.id, kind: 'nearest_opfor', position: target.position, priority: 3 },
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      botState: 'PATROL',
+      acquisitionDistance: config.targetAcquisitionDistance,
+      maxFireDistance: config.maxFireDistance,
+      canSeeTarget: () => false,
+    })).toBe(false);
   });
 
   it('keeps an active close target through brief LOS flicker', () => {
@@ -2795,6 +3156,7 @@ describe('harness objective selector — selectPatrolObjective', () => {
     kind: 'nearest_opfor',
     position: { x: 900, y: 0, z: 100 },
     priority: 3,
+    distance: 450,
   };
   const zoneObjective = {
     kind: 'zone',
@@ -2818,6 +3180,22 @@ describe('harness objective selector — selectPatrolObjective', () => {
     expect(choice).toBe(combatObjective);
   });
 
+  it('keeps far-but-routable combat contact ahead of zone errands in Open Frontier EARS captures', () => {
+    const profile = profileForMode('open_frontier');
+    const choice = selectPatrolObjective({
+      aggressiveMode: true,
+      combatObjective: {
+        ...combatObjective,
+        distance: 1233,
+      },
+      zoneObjective,
+      fallbackObjective,
+      combatObjectiveMaxDistance: combatObjectiveMaxDistanceForProfile(profile),
+    });
+    expect(choice).toBeTruthy();
+    expect(choice.kind).toBe('nearest_opfor');
+  });
+
   it('returns to zone routing when the aggressive combat objective is too far', () => {
     const choice = selectPatrolObjective({
       aggressiveMode: true,
@@ -2830,6 +3208,35 @@ describe('harness objective selector — selectPatrolObjective', () => {
       combatObjectiveMaxDistance: 185,
     });
     expect(choice).toBe(zoneObjective);
+  });
+
+  it('uses the engagement center instead of a too-far combat target when no zone is available', () => {
+    const choice = selectPatrolObjective({
+      aggressiveMode: true,
+      combatObjective: {
+        ...combatObjective,
+        distance: 1100,
+      },
+      zoneObjective: null,
+      fallbackObjective,
+      combatObjectiveMaxDistance: 735,
+    });
+    expect(choice).toBe(fallbackObjective);
+  });
+
+  it('requires measured combat distance before treating an aggressive target as actionable', () => {
+    const choice = selectPatrolObjective({
+      aggressiveMode: true,
+      combatObjective: {
+        kind: 'nearest_opfor',
+        position: { x: 900, y: 0, z: 100 },
+        priority: 3,
+      },
+      zoneObjective: null,
+      fallbackObjective,
+      combatObjectiveMaxDistance: 1000,
+    });
+    expect(choice).toBe(fallbackObjective);
   });
 
   it('keeps zone-first routing for non-aggressive objective modes', () => {
@@ -2869,6 +3276,22 @@ describe('harness objective telemetry identity', () => {
     }, null)).toBe('nearest_opfor:enemy_7');
   });
 
+  it('keys current-target routes by combatant id', () => {
+    expect(routeTargetIdentityKey('current_target', {
+      id: 'enemy_7',
+      kind: 'current_target',
+      position: { x: 20, y: 0, z: 30 },
+    }, null)).toBe('current_target:enemy_7');
+  });
+
+  it('keys zone routes by zone id instead of bare zone kind', () => {
+    expect(routeTargetIdentityKey('zone', {
+      id: 'zone_bridge_north',
+      kind: 'zone',
+      position: { x: 100, y: 0, z: 200 },
+    }, 'zone_bridge_north')).toBe('zone:zone_bridge_north');
+  });
+
   it('falls back to objective kind when no stable id exists', () => {
     expect(objectiveTelemetryKey({
       kind: 'engagement_center',
@@ -2878,5 +3301,17 @@ describe('harness objective telemetry identity', () => {
 
   it('returns null for missing objectives', () => {
     expect(objectiveTelemetryKey(null, null)).toBeNull();
+  });
+
+  it('namespaces objective block keys away from combatant ids', () => {
+    expect(objectiveBlockKey('zone', 'valley')).toBe('zone:valley');
+    expect(objectiveBlockKey('zone', null)).toBeNull();
+  });
+
+  it('falls route identity back to semantic kind without a stable id', () => {
+    expect(routeTargetIdentityKey('engagement_center', {
+      kind: 'engagement_center',
+      position: { x: 0, y: 0, z: 0 },
+    }, null)).toBe('engagement_center');
   });
 });

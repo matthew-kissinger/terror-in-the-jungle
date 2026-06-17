@@ -36,6 +36,8 @@ export interface BotTarget {
   position: BotVec3;
   /** Optional rendered/on-screen anchor. Player hits use visual hit proxies. */
   aimPosition?: BotVec3;
+  /** Vertical visual scale used by the shared combat hit-proxy contract. */
+  scaleY?: number;
   lastKnownMs: number;
 }
 

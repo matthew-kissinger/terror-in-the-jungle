@@ -4,7 +4,10 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 
-function installObserverHarness(driverSnapshot: Record<string, unknown> = { botState: 'ENGAGE', firingHeld: true }) {
+function installObserverHarness(
+  driverSnapshot: Record<string, unknown> = { botState: 'ENGAGE', firingHeld: true },
+  options: { capturePresentationContext?: boolean } = {},
+) {
   const source = readFileSync(new URL('./perf-browser-observers.js', import.meta.url), 'utf8');
   const callbacksByType = new Map<string, (list: { getEntries: () => unknown[] }) => void>();
   let nowMs = 0;
@@ -27,6 +30,7 @@ function installObserverHarness(driverSnapshot: Record<string, unknown> = { botS
     __perfHarnessDriverState: {
       getDebugSnapshot: () => driverSnapshot,
     },
+    __TIJ_PERF_CAPTURE_PRESENTATION_CONTEXT__: options.capturePresentationContext ?? true,
     WebGLRenderingContext: FakeWebGLRenderingContext,
   };
   let rafCallback = null;
@@ -194,6 +198,27 @@ describe('perf-browser-observers presentation epochs', () => {
         losStatus: 'blocked',
       },
     });
+  });
+
+  it('can keep rAF gap counters while skipping rich presentation context cloning', () => {
+    const { observer, tick } = installObserverHarness(
+      { botState: 'ENGAGE', firingHeld: true },
+      { capturePresentationContext: false },
+    );
+
+    tick(0);
+    tick(50);
+
+    const latestEpoch = observer.getPresentationEpochs().at(-1);
+    expect(latestEpoch?.gapMs).toBe(50);
+    expect(latestEpoch?.presentationContext).toBeNull();
+    expect(latestEpoch?.harnessContext).toBeNull();
+
+    const drained = observer.drain();
+    expect(drained.totals.rafCadence.intervalCount).toBe(1);
+    expect(drained.totals.rafCadence.estimatedDropped60HzFrames).toBe(2);
+    expect(drained.recent.rafCadence.entries.at(-1).presentationContext).toBeNull();
+    expect(drained.recent.rafCadence.entries.at(-1).harnessContext).toBeNull();
   });
 
   it('retains bounded chronological recent observer entries for drain summaries', () => {

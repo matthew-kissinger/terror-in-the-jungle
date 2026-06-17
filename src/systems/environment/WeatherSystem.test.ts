@@ -560,6 +560,21 @@ describe('WeatherSystem', () => {
         count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
       });
     });
+
+    it('replaces rain matrix update ranges instead of accumulating one per frame', async () => {
+      const { system } = createSystemWithRainCount(10);
+      await system.init();
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.3);
+      const systemAny = system as WeatherSystemAny;
+
+      systemAny.updateRain(1);
+      systemAny.updateRain(1);
+
+      expect(systemAny.rainMesh?.instanceMatrix.updateRanges).toEqual([{
+        start: 0,
+        count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
+      }]);
+    });
   });
 
   describe('update', () => {

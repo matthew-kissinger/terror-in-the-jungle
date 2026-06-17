@@ -305,6 +305,9 @@ export type TailAttribution = {
     terrainAfterSimulationTileHash: string | null;
     terrainBeforeRenderTileHash: string | null;
     terrainStageTileHashChanged: boolean | null;
+    terrainStageIdentityHashChanged: boolean | null;
+    terrainStageMorphHashChanged: boolean | null;
+    terrainStageEdgeMaskHashChanged: boolean | null;
     terrainAfterSimulationTileCount: number | null;
     terrainBeforeRenderTileCount: number | null;
     cameraTerrainHeightAtCamera: number | null;
@@ -740,6 +743,9 @@ function presentationTerrainStageContext(entry: Record<string, unknown>): {
   terrainAfterSimulationTileHash: string | null;
   terrainBeforeRenderTileHash: string | null;
   terrainStageTileHashChanged: boolean | null;
+  terrainStageIdentityHashChanged: boolean | null;
+  terrainStageMorphHashChanged: boolean | null;
+  terrainStageEdgeMaskHashChanged: boolean | null;
   terrainAfterSimulationTileCount: number | null;
   terrainBeforeRenderTileCount: number | null;
 } {
@@ -749,11 +755,26 @@ function presentationTerrainStageContext(entry: Record<string, unknown>): {
   const beforeRender = objectOrNull(terrainByStage?.['before-render']);
   const afterSimulationHash = stringOrNull(afterSimulation?.tileHash);
   const beforeRenderHash = stringOrNull(beforeRender?.tileHash);
+  const afterIdentityHash = stringOrNull(afterSimulation?.tileIdentityHash);
+  const beforeIdentityHash = stringOrNull(beforeRender?.tileIdentityHash);
+  const afterMorphHash = stringOrNull(afterSimulation?.morphHash);
+  const beforeMorphHash = stringOrNull(beforeRender?.morphHash);
+  const afterEdgeMaskHash = stringOrNull(afterSimulation?.edgeMaskHash);
+  const beforeEdgeMaskHash = stringOrNull(beforeRender?.edgeMaskHash);
   return {
     terrainAfterSimulationTileHash: afterSimulationHash,
     terrainBeforeRenderTileHash: beforeRenderHash,
     terrainStageTileHashChanged: afterSimulationHash !== null && beforeRenderHash !== null
       ? afterSimulationHash !== beforeRenderHash
+      : null,
+    terrainStageIdentityHashChanged: afterIdentityHash !== null && beforeIdentityHash !== null
+      ? afterIdentityHash !== beforeIdentityHash
+      : null,
+    terrainStageMorphHashChanged: afterMorphHash !== null && beforeMorphHash !== null
+      ? afterMorphHash !== beforeMorphHash
+      : null,
+    terrainStageEdgeMaskHashChanged: afterEdgeMaskHash !== null && beforeEdgeMaskHash !== null
+      ? afterEdgeMaskHash !== beforeEdgeMaskHash
       : null,
     terrainAfterSimulationTileCount: numberOrNull(afterSimulation?.tileCount),
     terrainBeforeRenderTileCount: numberOrNull(beforeRender?.tileCount),
@@ -873,6 +894,9 @@ function summarizePresentationGapContext(
     terrainAfterSimulationTileHash: nearest.terrainAfterSimulationTileHash,
     terrainBeforeRenderTileHash: nearest.terrainBeforeRenderTileHash,
     terrainStageTileHashChanged: nearest.terrainStageTileHashChanged,
+    terrainStageIdentityHashChanged: nearest.terrainStageIdentityHashChanged,
+    terrainStageMorphHashChanged: nearest.terrainStageMorphHashChanged,
+    terrainStageEdgeMaskHashChanged: nearest.terrainStageEdgeMaskHashChanged,
     terrainAfterSimulationTileCount: nearest.terrainAfterSimulationTileCount,
     terrainBeforeRenderTileCount: nearest.terrainBeforeRenderTileCount,
     cameraTerrainHeightAtCamera: nearest.cameraTerrainHeightAtCamera,
@@ -1114,7 +1138,10 @@ export function computeTailAttribution(
       `/${gapValue(presentationGapContext.terrainAfterSimulationTileHash)} ` +
       `beforeRender=${gapValue(presentationGapContext.terrainBeforeRenderTileCount)}` +
       `/${gapValue(presentationGapContext.terrainBeforeRenderTileHash)} ` +
-      `changed=${gapValue(presentationGapContext.terrainStageTileHashChanged)}, ` +
+      `changed=${gapValue(presentationGapContext.terrainStageTileHashChanged)} ` +
+      `(identity=${gapValue(presentationGapContext.terrainStageIdentityHashChanged)} ` +
+      `morph=${gapValue(presentationGapContext.terrainStageMorphHashChanged)} ` +
+      `edgeMask=${gapValue(presentationGapContext.terrainStageEdgeMaskHashChanged)}), ` +
       `${cameraTerrainSummary}, ` +
       `${driverGapSummary})`
     : 'presentation gap context unavailable';

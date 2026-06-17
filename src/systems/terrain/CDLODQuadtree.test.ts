@@ -437,13 +437,16 @@ describe('CDLODQuadtree', () => {
       expect(tiles.some(t => t.edgeMorphMask !== 0)).toBe(true);
     });
 
-    // A Shau worldSize is 21000m (non-power-of-2). The base tile size
-    // worldSize / 2^maxLOD = 21000 / 256 is non-dyadic, so this keeps
-    // the edge-mask path covered at A Shau scale.
-    it('emits edge-morph masks correctly at A Shau worldSize (non-dyadic baseTileSize)', () => {
-      const ashauWorld = 21000;
-      const ashauLOD = 8;
-      const ashauRanges = computeDefaultLODRanges(ashauWorld, ashauLOD);
+    // A Shau's production render extent is non-dyadic: 21136m playable
+    // plus a 200m visual margin on each side, source-capped to 6 CDLOD
+    // levels by the 9m DEM spacing. Keep the edge-mask path covered at
+    // that exact shape instead of an older rounded 21000/8 diagnostic.
+    it('emits edge-morph masks correctly at A Shau visual extent', () => {
+      const ashauPlayableWorld = 21136;
+      const ashauVisualMargin = 200;
+      const ashauWorld = ashauPlayableWorld + ashauVisualMargin * 2;
+      const ashauLOD = 6;
+      const ashauRanges = computeDefaultLODRanges(ashauPlayableWorld, ashauLOD, ashauVisualMargin);
       const qt = new CDLODQuadtree(ashauWorld, ashauLOD, ashauRanges);
       // Ground-level camera near origin forces an LOD0/LOD1 boundary
       // close to the camera and guarantees T-junctions.
@@ -491,6 +494,37 @@ describe('CDLODQuadtree', () => {
       expect(southwest!.edgeMorphMask & 8).toBe(0);
     });
 
+    it('covers selected frustum boundaries with skirts without force-morphing them', () => {
+      const qt = new CDLODQuadtree(worldSize, maxLOD, lodRanges);
+      const tiles = qt.selectTiles(0, 50, 0, [
+        { nx: 1, ny: 0, nz: 0, d: 0 },
+        { nx: -1, ny: 0, nz: 0, d: 100000 },
+        { nx: 0, ny: 1, nz: 0, d: 100000 },
+        { nx: 0, ny: -1, nz: 0, d: 100000 },
+        { nx: 0, ny: 0, nz: 1, d: 100000 },
+        { nx: 0, ny: 0, nz: -1, d: 100000 },
+      ]);
+      const halfWorld = worldSize / 2;
+
+      let foundInteriorSelectionBoundary = false;
+      for (const tile of tiles) {
+        for (const bit of [1, 2, 4, 8]) {
+          const probe = edgeProbe(tile, bit);
+          if (probe.x < -halfWorld || probe.x > halfWorld || probe.z < -halfWorld || probe.z > halfWorld) {
+            continue;
+          }
+          const neighbour = findTileContaining(tiles, probe.x, probe.z, tile);
+          if (neighbour) continue;
+
+          expect(tile.edgeSkirtMask! & bit).toBe(bit);
+          expect(tile.edgeMorphMask & bit).toBe(0);
+          foundInteriorSelectionBoundary = true;
+        }
+      }
+
+      expect(foundInteriorSelectionBoundary).toBe(true);
+    });
+
     it('preserves sparse-skirt seam cover at representative and A Shau-scale camera positions', () => {
       const aggregate: SparseSkirtSeamInvariantStats = {
         checkedEdges: 0,
@@ -514,9 +548,23 @@ describe('CDLODQuadtree', () => {
         collect(expectSparseSkirtSeamInvariant(worldSize, representativeWorld.selectTiles(x, y, z, null)));
       }
 
-      const ashauWorld = 21000;
-      const ashauLOD = 8;
-      const ashauRanges = computeDefaultLODRanges(ashauWorld, ashauLOD);
+      const openFrontierWorld = 6400;
+      const openFrontierLOD = 6;
+      const openFrontierRanges = computeDefaultLODRanges(3200, openFrontierLOD, 1600);
+      const openFrontierQuadtree = new CDLODQuadtree(openFrontierWorld, openFrontierLOD, openFrontierRanges);
+      for (const [x, y, z] of [
+        [0, 3, -1200],
+        [640, 12, 840],
+        [-1260, 45, -520],
+      ]) {
+        collect(expectSparseSkirtSeamInvariant(openFrontierWorld, openFrontierQuadtree.selectTiles(x, y, z, null)));
+      }
+
+      const ashauPlayableWorld = 21136;
+      const ashauVisualMargin = 200;
+      const ashauWorld = ashauPlayableWorld + ashauVisualMargin * 2;
+      const ashauLOD = 6;
+      const ashauRanges = computeDefaultLODRanges(ashauPlayableWorld, ashauLOD, ashauVisualMargin);
       const ashauQuadtree = new CDLODQuadtree(ashauWorld, ashauLOD, ashauRanges);
       for (const [x, y, z] of [
         [0, 50, 0],

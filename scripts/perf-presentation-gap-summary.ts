@@ -63,6 +63,8 @@ export type PresentationGapTerrainSummary = {
   terrainStageMorphHashChangedCount: number;
   terrainStageEdgeMaskHashChangedCount: number;
   terrainStageTileCountChangedCount: number;
+  terrainStageBufferVisibleChangedCount: number;
+  terrainStageBufferVisibleChangedWithoutSubmissionCount: number;
   terrainSelectionSaturatedCount: number;
   terrainNotReadyCount: number;
   lowClearanceCount: number;
@@ -380,6 +382,8 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
   let terrainStageMorphHashChangedCount = 0;
   let terrainStageEdgeMaskHashChangedCount = 0;
   let terrainStageTileCountChangedCount = 0;
+  let terrainStageBufferVisibleChangedCount = 0;
+  let terrainStageBufferVisibleChangedWithoutSubmissionCount = 0;
   let terrainSelectionSaturatedCount = 0;
   let terrainNotReadyCount = 0;
   let lowClearanceCount = 0;
@@ -467,11 +471,13 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     }
     const afterIdentityHash = stringOrNull(afterSimulation?.tileIdentityHash);
     const beforeIdentityHash = stringOrNull(beforeRender?.tileIdentityHash);
+    let identityChanged = false;
     if (
       afterIdentityHash !== null
       && beforeIdentityHash !== null
       && afterIdentityHash !== beforeIdentityHash
     ) {
+      identityChanged = true;
       terrainStageIdentityHashChangedCount++;
     }
     const afterMorphHash = stringOrNull(afterSimulation?.morphHash);
@@ -481,17 +487,28 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     }
     const afterEdgeMaskHash = stringOrNull(afterSimulation?.edgeMaskHash);
     const beforeEdgeMaskHash = stringOrNull(beforeRender?.edgeMaskHash);
+    let edgeMaskChanged = false;
     if (
       afterEdgeMaskHash !== null
       && beforeEdgeMaskHash !== null
       && afterEdgeMaskHash !== beforeEdgeMaskHash
     ) {
+      edgeMaskChanged = true;
       terrainStageEdgeMaskHashChangedCount++;
     }
     const afterTileCount = finiteNumber(afterSimulation?.tileCount);
     const beforeTileCount = finiteNumber(beforeRender?.tileCount);
+    let tileCountChanged = false;
     if (afterTileCount !== null && beforeTileCount !== null && afterTileCount !== beforeTileCount) {
+      tileCountChanged = true;
       terrainStageTileCountChangedCount++;
+    }
+    const bufferVisibleChanged = identityChanged || edgeMaskChanged || tileCountChanged;
+    if (bufferVisibleChanged) {
+      terrainStageBufferVisibleChangedCount++;
+      if (terrainSync && !boolIsTrue(terrainSync.terrainBufferSubmitted)) {
+        terrainStageBufferVisibleChangedWithoutSubmissionCount++;
+      }
     }
 
     if (boolIsTrue(terrain?.tileSelectionSaturated)) terrainSelectionSaturatedCount++;
@@ -593,6 +610,8 @@ function summarizeTerrainGaps(gaps: PresentationGapContextEntry[]): Presentation
     terrainStageMorphHashChangedCount,
     terrainStageEdgeMaskHashChangedCount,
     terrainStageTileCountChangedCount,
+    terrainStageBufferVisibleChangedCount,
+    terrainStageBufferVisibleChangedWithoutSubmissionCount,
     terrainSelectionSaturatedCount,
     terrainNotReadyCount,
     lowClearanceCount,

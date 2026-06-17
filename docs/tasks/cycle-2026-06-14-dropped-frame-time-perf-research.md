@@ -78,7 +78,7 @@ need the same release shepherding before they are called shipped.
   terrain triangles about `311k` instead of the prior `695k` neighborhood.
   Remaining failures are render-time / presentation-time failures, not proof
   that the visual terrain artifact is fixed.
-- Sparse CDLOD edge-skirt correction:
+- Adaptive CDLOD edge-skirt correction:
   The first sparse-skirt pass was too narrow: it populated edge-only skirt
   meshes only from `edgeMorphMask`, so it preserved coarser-neighbor
   T-junction coverage but weakened the older full-perimeter skirt safety net
@@ -92,10 +92,13 @@ need the same release shepherding before they are called shipped.
   proof, not visual acceptance: focused terrain tests assert the seam-cover
   invariant across representative and A Shau-scale camera positions, including
   the owner-captured coordinate family near `x=1950,z=2649`. The old
-  full-perimeter skirt path is production default again after the owner saw the
-  intermittent terrain artifact return; sparse edge-only skirts are now an
-  explicit diagnostic A/B via `?terrainSparseTerrainSkirts=1` /
-  `--terrain-sparse-skirts`, and the no-skirt flag remains diagnostic-only.
+  adaptive edge-only path is production default now that the stronger
+  `edgeSkirtMask` contract covers same-LOD morph divergence, selected/frustum
+  and height-bound edges, world-boundary edges, and adjacent finer-child
+  coverage. The legacy full-perimeter skirt path is an explicit diagnostic A/B
+  via `?terrainFullTerrainSkirts=1` / `--terrain-full-skirts`, because drawing
+  vertical walls on every internal tile edge can create the sky-ribbon/backface
+  symptom. The no-skirt flag remains diagnostic-only.
 - Camera/aim structural inspection:
   The infantry camera path did not show a second position-clipping fix to make
   in this pass. `PlayerMovement` grounds the player at effective terrain height

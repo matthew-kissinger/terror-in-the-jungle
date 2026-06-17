@@ -28,11 +28,9 @@ import {
   PlayerBotStateStep,
   createIdlePlayerBotIntent,
 } from './types';
-import { NPC_PIXEL_FORGE_VISUAL_HEIGHT, NPC_Y_OFFSET } from '../../../config/CombatantConfig';
+import { NPC_Y_OFFSET } from '../../../config/CombatantConfig';
 import {
-  COMBATANT_HIT_PROXY_CHEST_END_RATIO,
-  COMBATANT_HIT_PROXY_CHEST_START_RATIO,
-  COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER,
+  getCombatantVisualChestAimYOffset,
 } from '../../../systems/combat/CombatantBodyMetrics';
 
 /** Horizontal distance between two 3D points. */
@@ -42,11 +40,7 @@ export function horizontalDistance(a: BotVec3, b: BotVec3): number {
   return Math.hypot(dx, dz);
 }
 
-const TARGET_ACTOR_AIM_Y_OFFSET =
-  NPC_PIXEL_FORGE_VISUAL_HEIGHT
-  * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
-  * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
-  - NPC_Y_OFFSET;
+const TARGET_ACTOR_AIM_Y_OFFSET = getCombatantVisualChestAimYOffset();
 const OBJECTIVE_LOOK_HEIGHT = NPC_Y_OFFSET + TARGET_ACTOR_AIM_Y_OFFSET;
 const OCCLUDED_TARGET_HOLD_DISTANCE = 6;
 
@@ -54,7 +48,7 @@ function aimPointForTarget(target: BotTarget): BotVec3 {
   const anchor = target.aimPosition ?? target.position;
   return {
     x: anchor.x,
-    y: anchor.y + TARGET_ACTOR_AIM_Y_OFFSET,
+    y: anchor.y + getCombatantVisualChestAimYOffset(target.scaleY),
     z: anchor.z,
   };
 }
@@ -75,10 +69,13 @@ function shouldInterruptObjectiveForTarget(
   if (!objective) return true;
   const dist = horizontalDistance(ctx.eyePos, target.position);
   const maxFireDistance = Math.max(0, ctx.config.maxFireDistance);
-  if (objective.kind === 'nearest_opfor' && dist <= maxFireDistance) return true;
+  const visible = ctx.canSeeTarget(target.position);
+  if (objective.kind === 'nearest_opfor') {
+    return dist <= maxFireDistance && visible;
+  }
   const acquisitionDistance = Math.max(0, ctx.config.targetAcquisitionDistance);
   const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
-  return dist <= interruptDistance && ctx.canSeeTarget(target.position);
+  return dist <= interruptDistance && visible;
 }
 
 function resolveUngatedCombatTarget(ctx: PlayerBotStateContext): BotTarget | null {
@@ -198,6 +195,10 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
     intent.reload = true;
   } else {
     intent.firePrimary = true;
+    // While firing, ask for the target angle directly and let the controller's
+    // per-tick slew cap do the humanization. Blending here made the bot shoot
+    // while still a few degrees off the visual hit proxy on steep terrain.
+    intent.aimLerpRate = 1;
   }
 
   // Player-dodge strafe.

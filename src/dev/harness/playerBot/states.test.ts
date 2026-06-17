@@ -23,18 +23,12 @@ import {
   PlayerBotStateContext,
   PlayerBotStateStep,
 } from './types';
-import { NPC_PIXEL_FORGE_VISUAL_HEIGHT, NPC_Y_OFFSET } from '../../../config/CombatantConfig';
+import { NPC_Y_OFFSET } from '../../../config/CombatantConfig';
 import {
-  COMBATANT_HIT_PROXY_CHEST_END_RATIO,
-  COMBATANT_HIT_PROXY_CHEST_START_RATIO,
-  COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER,
+  getCombatantVisualChestAimYOffset,
 } from '../../../systems/combat/CombatantBodyMetrics';
 
-const TARGET_VISUAL_CHEST_Y_OFFSET =
-  NPC_PIXEL_FORGE_VISUAL_HEIGHT
-  * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
-  * ((COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2)
-  - NPC_Y_OFFSET;
+const TARGET_VISUAL_CHEST_Y_OFFSET = getCombatantVisualChestAimYOffset();
 
 type CjsPerfDriverMirror = {
   profileForMode: (mode: string) => unknown;
@@ -242,9 +236,10 @@ describe('states — PATROL', () => {
       },
     }));
 
-    expect(step.nextState).toBe('ALERT');
+    expect(step.nextState).toBeNull();
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.aimTarget?.z).toBeCloseTo(-128, 5);
+    expect(step.intent.moveForward).toBe(1);
   });
 
   it('keeps routing toward a far occluded nearest-opfor objective outside weapon range', () => {
@@ -328,6 +323,20 @@ describe('states — ENGAGE', () => {
     }));
     expect(step.intent.firePrimary).toBe(true);
     expect(step.nextState).toBeNull();
+  });
+
+  it('requests capped direct aim while firing instead of slow-blending the shot ray', () => {
+    const target = makeTarget({ position: { x: 0, y: NPC_Y_OFFSET, z: -30 } });
+    const step = stepState('ENGAGE', makeCtx({
+      currentTarget: target,
+      canSeeTarget: () => true,
+      config: {
+        ...DEFAULT_PLAYER_BOT_CONFIG,
+        aimLerpRate: 0.2,
+      },
+    }));
+    expect(step.intent.firePrimary).toBe(true);
+    expect(step.intent.aimLerpRate).toBe(1);
   });
 
   it('emits reload intent when magazine is empty', () => {
@@ -450,6 +459,18 @@ describe('states — ENGAGE', () => {
     expect(step.intent.aimTarget!.x).toBeCloseTo(36, 5);
     expect(step.intent.aimTarget!.y).toBeCloseTo(NPC_Y_OFFSET + 0.5 + TARGET_VISUAL_CHEST_Y_OFFSET, 5);
     expect(step.intent.aimTarget!.z).toBeCloseTo(-4, 5);
+  });
+
+  it('scales aim height with the same visual body scale as hit proxies', () => {
+    const target = makeTarget({
+      position: { x: 30, y: NPC_Y_OFFSET, z: 0 },
+      scaleY: 1.25,
+    });
+    const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+    expect(step.intent.aimTarget!.y).toBeCloseTo(
+      NPC_Y_OFFSET + getCombatantVisualChestAimYOffset(1.25),
+      5,
+    );
   });
 });
 

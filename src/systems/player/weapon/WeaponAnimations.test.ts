@@ -299,6 +299,27 @@ describe('WeaponAnimations', () => {
       expect(peak).toBeGreaterThan(0.035)
       expect(peak).toBeCloseTo(0.04, 2)
     })
+
+    it('bounds horizontal recoil during long-frame sustained fire', () => {
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+      try {
+        let maxHorizontalOffset = 0
+        for (let frame = 0; frame < 80; frame++) {
+          if (frame % 2 === 0) {
+            animations.applyRecoilImpulse(1)
+          }
+          animations.update(0.15, false, new THREE.Vector3())
+          const offset = animations.getRecoilOffset()
+          expect(Number.isFinite(offset.x)).toBe(true)
+          maxHorizontalOffset = Math.max(maxHorizontalOffset, Math.abs(offset.x))
+        }
+
+        expect(maxHorizontalOffset).toBeLessThanOrEqual(0.046)
+      } finally {
+        randomSpy.mockRestore()
+      }
+    })
   })
 
   // Idle Bob & Sway

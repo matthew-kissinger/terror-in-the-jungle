@@ -366,10 +366,16 @@ describe('computeTailAttribution', () => {
             terrainByStage: {
               'after-simulation': {
                 tileHash: 'aaa11111',
+                tileIdentityHash: 'identity-a',
+                morphHash: 'morph-a',
+                edgeMaskHash: 'edge-a',
                 tileCount: 19,
               },
               'before-render': {
                 tileHash: 'bbb22222',
+                tileIdentityHash: 'identity-b',
+                morphHash: 'morph-b',
+                edgeMaskHash: 'edge-b',
                 tileCount: 21,
               },
             },
@@ -438,6 +444,9 @@ describe('computeTailAttribution', () => {
       terrainAfterSimulationTileHash: 'aaa11111',
       terrainBeforeRenderTileHash: 'bbb22222',
       terrainStageTileHashChanged: true,
+      terrainStageIdentityHashChanged: true,
+      terrainStageMorphHashChanged: true,
+      terrainStageEdgeMaskHashChanged: true,
       terrainAfterSimulationTileCount: 19,
       terrainBeforeRenderTileCount: 21,
       cameraTerrainHeightAtCamera: 125.25,
@@ -468,7 +477,7 @@ describe('computeTailAttribution', () => {
     expect(a.conclusion).toContain('terrain saturation terrain=true terrainSync=false');
     expect(a.conclusion).toContain('terrain sync rechecked=true poseStale=false projectionChanged=true');
     expect(a.conclusion).toContain('submitted=true class=dynamics-changed');
-    expect(a.conclusion).toContain('terrain stage afterSim=19/aaa11111 beforeRender=21/bbb22222 changed=true');
+    expect(a.conclusion).toContain('terrain stage afterSim=19/aaa11111 beforeRender=21/bbb22222 changed=true (identity=true morph=true edgeMask=true)');
     expect(a.conclusion).toContain('camera terrain clearance terrain=-0.75m effective=-2.00m');
     expect(a.conclusion).toContain('hasTerrain=true areaReady=false');
     expect(a.conclusion).toContain('driver view step 11.8/3.7deg');

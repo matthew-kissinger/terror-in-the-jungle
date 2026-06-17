@@ -135,6 +135,7 @@
   const RAF_HITCH_100_MS = 100;
   const MAX_PRESENTATION_EPOCHS = 4096;
   const presentationEpochs = createBoundedRing(MAX_PRESENTATION_EPOCHS);
+  const capturePresentationContext = globalWindow.__TIJ_PERF_CAPTURE_PRESENTATION_CONTEXT__ !== false;
   const TEXTURE_2D = 3553;
   const TEXTURE_CUBE_MAP = 34067;
   const TEXTURE_CUBE_MAP_POSITIVE_X = 34069;
@@ -285,8 +286,8 @@
     totals.rafCadence.estimatedDropped60HzFrames += estimatedDropped60HzFrames;
 
     if (stutter25 || estimatedDropped60HzFrames > 0) {
-      const presentationContext = readPresentationContext();
-      const harnessContext = readHarnessContext();
+      const presentationContext = capturePresentationContext ? readPresentationContext() : null;
+      const harnessContext = capturePresentationContext ? readHarnessContext() : null;
       const presentationEpoch = {
         seq: nextPresentationEpochSeq++,
         startAtMs: Number(timestamp - gapMs),
