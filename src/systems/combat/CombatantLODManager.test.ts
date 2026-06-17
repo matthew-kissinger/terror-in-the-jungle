@@ -300,11 +300,13 @@ describe('CombatantLODManager', () => {
     });
 
     it('should bucket combatants by distance thresholds', () => {
+      manager.setGameModeManager(createMockGameModeManager(2000));
+      manager.setLODRanges(200, 400, 600);
       // Create combatants at various distances
       const closeCombatant = createMockCombatant('close', new THREE.Vector3(50, 0, 0));
-      const mediumCombatant = createMockCombatant('medium', new THREE.Vector3(200, 0, 0));
-      const farCombatant = createMockCombatant('far', new THREE.Vector3(400, 0, 0));
-      const culledCombatant = createMockCombatant('culled', new THREE.Vector3(600, 0, 0));
+      const mediumCombatant = createMockCombatant('medium', new THREE.Vector3(250, 0, 0));
+      const farCombatant = createMockCombatant('far', new THREE.Vector3(450, 0, 0));
+      const culledCombatant = createMockCombatant('culled', new THREE.Vector3(650, 0, 0));
 
       combatants.set('close', closeCombatant);
       combatants.set('medium', mediumCombatant);
@@ -324,6 +326,54 @@ describe('CombatantLODManager', () => {
       expect(mediumCombatant.simLane).toBe('medium');
       expect(farCombatant.simLane).toBe('low');
       expect(culledCombatant.simLane).toBe('culled');
+    });
+
+    it('keeps combat sim lanes sticky around the high/medium boundary', () => {
+      manager.setGameModeManager(createMockGameModeManager(2000));
+      manager.setLODRanges(200, 400, 600);
+      const heldHigh = createMockCombatant('held-high', new THREE.Vector3(205, 0, 0));
+      heldHigh.simLane = 'high';
+      const heldMedium = createMockCombatant('held-medium', new THREE.Vector3(195, 0, 0));
+      heldMedium.simLane = 'medium';
+      const promoted = createMockCombatant('promoted', new THREE.Vector3(180, 0, 0));
+      promoted.simLane = 'medium';
+
+      combatants.set(heldHigh.id, heldHigh);
+      combatants.set(heldMedium.id, heldMedium);
+      combatants.set(promoted.id, promoted);
+
+      manager.updateCombatants(0.016);
+
+      expect(heldHigh.simLane).toBe('high');
+      expect(heldMedium.simLane).toBe('medium');
+      expect(promoted.simLane).toBe('high');
+      expect(manager.getFrameSchedulingStats().simLaneTransitions.byTransition).toMatchObject({
+        'medium->high': 1,
+      });
+    });
+
+    it('keeps combat sim lanes sticky around the low/culled boundary', () => {
+      manager.setGameModeManager(createMockGameModeManager(2000));
+      manager.setLODRanges(200, 400, 600);
+      const heldLow = createMockCombatant('held-low', new THREE.Vector3(610, 0, 0));
+      heldLow.simLane = 'low';
+      const heldCulled = createMockCombatant('held-culled', new THREE.Vector3(590, 0, 0));
+      heldCulled.simLane = 'culled';
+      const promoted = createMockCombatant('promoted', new THREE.Vector3(560, 0, 0));
+      promoted.simLane = 'culled';
+
+      combatants.set(heldLow.id, heldLow);
+      combatants.set(heldCulled.id, heldCulled);
+      combatants.set(promoted.id, promoted);
+
+      manager.updateCombatants(0.016);
+
+      expect(heldLow.simLane).toBe('low');
+      expect(heldCulled.simLane).toBe('culled');
+      expect(promoted.simLane).toBe('low');
+      expect(manager.getFrameSchedulingStats().simLaneTransitions.byTransition).toMatchObject({
+        'culled->low': 1,
+      });
     });
 
     it('should handle empty combatant map', () => {

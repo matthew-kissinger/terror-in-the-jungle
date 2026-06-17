@@ -93,3 +93,16 @@ draw consolidation, parked ground-vehicle draw consolidation, and fixed-wing
 GLB material/draw consolidation. Terrain should stay in the second-pass queue
 unless the next capture shows terrain sync dominating independently of those
 draw-submission spikes.
+
+## Follow-On Hysteresis Slice
+
+After the owner reported continued stutter when enemy LOD tiers changed,
+`CombatantSimLaneClassifier` added small sticky distance hysteresis around the
+combat sim-lane thresholds. The center ranges stay unchanged; the classifier
+only prevents actors hovering near a boundary from repeatedly flipping
+high/medium, medium/low, or low/culled lanes.
+
+This is a same-experience candidate, not completion proof. It should reduce
+transition chatter and make the new `simLaneTransitions` summary more useful,
+but it still needs a trusted Open Frontier and A Shau capture to prove reduced
+dropped-frame time under combat.

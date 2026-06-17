@@ -29,6 +29,7 @@ import {
   setCombatantSimLane,
   type CombatantFrameSchedulingStats,
 } from './CombatantSimLaneTelemetry';
+import { classifyCombatantSimLane } from './CombatantSimLaneClassifier';
 
 const DESTINATION_ARRIVAL_RADIUS_SQ = DESTINATION_ARRIVAL_RADIUS * DESTINATION_ARRIVAL_RADIUS;
 
@@ -343,9 +344,6 @@ export class CombatantLODManager {
     let now = 0;
     let worldSize = 4000;
     let isLargeWorldMode = true;
-    let highLODRangeSq = 0;
-    let mediumLODRangeSq = 0;
-    let lowLODRangeSq = 0;
 
     this.trackCombatAiPhase('Combat.AI.FrameSetup', () => {
       if (enableAI) {
@@ -388,10 +386,6 @@ export class CombatantLODManager {
       this.lodLowCount = 0;
       this.lodCulledCount = 0;
 
-      highLODRangeSq = this.highLODRange * this.highLODRange;
-      mediumLODRangeSq = this.mediumLODRange * this.mediumLODRange;
-      lowLODRangeSq = this.lowLODRange * this.lowLODRange;
-
       this.highBucket.length = 0;
       this.mediumBucket.length = 0;
       this.lowBucket.length = 0;
@@ -420,11 +414,18 @@ export class CombatantLODManager {
         const distSq = combatant.position.distanceToSquared(this.playerPosition);
         combatant.distanceSq = distSq;
 
-        if (distSq < highLODRangeSq) {
+        const simLane = classifyCombatantSimLane(
+          combatant,
+          distSq,
+          this.highLODRange,
+          this.mediumLODRange,
+          this.lowLODRange,
+        );
+        if (simLane === 'high') {
           this.highBucket.push(combatant);
-        } else if (distSq < mediumLODRangeSq) {
+        } else if (simLane === 'medium') {
           this.mediumBucket.push(combatant);
-        } else if (distSq < lowLODRangeSq) {
+        } else if (simLane === 'low') {
           this.lowBucket.push(combatant);
         } else {
           this.culledBucket.push(combatant);
