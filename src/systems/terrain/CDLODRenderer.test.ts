@@ -363,7 +363,7 @@ describe('CDLODRenderer', () => {
     expect(renderer.getMesh().receiveShadow).toBe(true);
   });
 
-  it('uses full perimeter skirts by default for production terrain seam cover', () => {
+  it('uses adaptive edge skirts by default for production terrain seam cover', () => {
     renderer.updateInstances([
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0 },
       { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5, edgeMorphMask: 3 },
@@ -371,37 +371,35 @@ describe('CDLODRenderer', () => {
     ]);
 
     const mesh: any = renderer.getMesh();
+    const edgeSkirtCounts = mesh.children.map((child: any) => child.count);
 
-    expect(mesh.children).toHaveLength(0);
-    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33 + 4 * 33 - 4);
+    expect(mesh.geometry.attributes.position.array.length / 3).toBe(33 * 33);
+    expect(edgeSkirtCounts).toEqual([1, 1, 0, 1]);
     expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
-      sparseEdgeSkirtsEnabled: false,
+      sparseEdgeSkirtsEnabled: true,
       lastMainPassInstances: 3,
-      lastMainPassEdgeSkirtInstances: 0,
+      lastMainPassEdgeSkirtInstances: 3,
       tileInteriorTriangles: 2048,
-      tileSkirtTriangles: 512,
+      tileSkirtTriangles: 0,
       tileSkirtTrianglesPerEdge: 128,
-      tileTotalTriangles: 2560,
+      tileTotalTriangles: 2048,
       tileFullSkirtTriangles: 512,
-      lastMainPassTriangleEstimate: 3 * 2560,
+      lastMainPassTriangleEstimate: (3 * 2048) + (3 * 128),
     });
   });
 
-  it('can opt into sparse edge skirts for diagnostics without changing shader morph bits', () => {
-    setRuntimeSearch('?terrainSparseTerrainSkirts=1');
-    const sparseRenderer = new CDLODRenderer({} as any, 33, 256);
-
-    sparseRenderer.updateInstances([
+  it('uses edgeSkirtMask for adaptive visual cover without changing shader morph bits', () => {
+    renderer.updateInstances([
       { x: 0, z: 0, size: 64, lodLevel: 0, morphFactor: 0, edgeMorphMask: 0, edgeSkirtMask: 5 },
     ]);
 
-    const mesh: any = sparseRenderer.getMesh();
+    const mesh: any = renderer.getMesh();
     const edgeSkirtCounts = mesh.children.map((child: any) => child.count);
     const params1 = mesh.geometry.attributes.tileParams1.array as Float32Array;
 
     expect(edgeSkirtCounts).toEqual([1, 0, 1, 0]);
     expect(params1[1]).toBe(0);
-    expect(sparseRenderer.getShadowPassStatsForDebug()).toMatchObject({
+    expect(renderer.getShadowPassStatsForDebug()).toMatchObject({
       sparseEdgeSkirtsEnabled: true,
       lastMainPassInstances: 1,
       lastMainPassEdgeSkirtInstances: 2,

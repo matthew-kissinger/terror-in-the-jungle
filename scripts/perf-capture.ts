@@ -1774,8 +1774,8 @@ Common options:
   --terrain-force-instance-upload
   --terrain-height-aware-frustum    Diagnostic A/B: opt into heuristic height-aware CDLOD frustum culling
   --disable-terrain-height-aware-frustum Legacy no-op; conservative CDLOD bounds are now the default
-  --terrain-full-skirts             Compatibility flag: production already uses full perimeter terrain skirts
-  --terrain-sparse-skirts           Diagnostic A/B: opt into sparse edge-only terrain skirts
+  --terrain-full-skirts             Diagnostic A/B: legacy full-perimeter terrain skirts
+  --terrain-sparse-skirts           Explicit adaptive edge-skirt request; default production path, rejected for completion artifacts when flag-driven
   --disable-terrain-skirts           Diagnostic A/B: interior terrain grid only; not a gameplay candidate
   --disable-terrain-far-canopy-tint
   --disable-terrain-low-sun-occlusion

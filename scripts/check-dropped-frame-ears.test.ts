@@ -150,13 +150,22 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.checks.some((check) => check.id === 'forbidden_frontline_compression_requested' && check.status === 'fail')).toBe(true);
   });
 
-  it('rejects sparse terrain-skirt diagnostic captures as non-production terrain coverage', () => {
+  it('rejects explicit adaptive terrain-skirt diagnostic captures as flag-driven coverage', () => {
     const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
       scenario: 'a_shau_valley',
       runtimeOverrides: { terrainSparseSkirtsRequested: true },
     }));
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_sparse_skirts_requested' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects legacy full terrain-skirt diagnostic captures as non-production terrain coverage', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: { terrainFullSkirtsRequested: true },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_full_skirts_requested' && check.status === 'fail')).toBe(true);
   });
 
   it('rejects heuristic height-aware terrain frustum diagnostic captures', () => {

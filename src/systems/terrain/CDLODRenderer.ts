@@ -66,7 +66,7 @@ function getTerrainSkirtMode(): TerrainSkirtMode {
   if (isTerrainSkirtPerfIsolationEnabled()) return 'none';
   if (readBooleanQueryFlag('terrainFullTerrainSkirts')) return 'full';
   if (readBooleanQueryFlag('terrainSparseTerrainSkirts')) return 'sparse-edge';
-  return 'full';
+  return 'sparse-edge';
 }
 
 export function isTerrainBoundedShadowPassEnabled(): boolean {
@@ -136,9 +136,10 @@ export class CDLODRenderer {
     this.maxInstances = maxInstances;
 
     // Shared base geometry: a flat XZ plane with 1x1 dimensions. Production
-    // keeps the legacy full perimeter skirt so every selected tile boundary has
-    // visual cover; the sparse edge-skirt path remains an explicit diagnostic
-    // opt-in while its finite-edge guarantees are evaluated.
+    // keeps seam-cover skirts adaptive and edge-only, driven by the quadtree's
+    // edgeSkirtMask contract. The legacy full-perimeter path is an explicit
+    // compatibility diagnostic because it draws interior vertical walls on
+    // every tile boundary, which can show up as sky/underside terrain ribbons.
     const skirtMode = getTerrainSkirtMode();
     const includeSkirts = skirtMode === 'full';
     this.sparseEdgeSkirtsEnabled = skirtMode === 'sparse-edge';

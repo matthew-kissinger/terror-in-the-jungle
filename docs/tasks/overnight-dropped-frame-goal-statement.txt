@@ -47,16 +47,18 @@ Completion evidence required:
 
 Latest static checkpoint:
 - Terrain skirt stability checkpoint:
-  `CDLODRenderer` now uses full perimeter skirts as the production default
-  again. The sparse edge-only skirt path weakened the old blanket seam-cover
-  guarantee and is now diagnostic-only via `?terrainSparseTerrainSkirts=1` /
-  `perf-capture --terrain-sparse-skirts`; the no-skirt diagnostic remains
-  `--disable-terrain-skirts` and is not a gameplay candidate. This restores the
-  proper terrain-continuity invariant for A Shau / Open Frontier size, draw
-  distance, heightmap sampling, CDLOD morph rules, selected/frustum/height-bound
-  edges, world/DEM edges, vegetation, wildlife, weather, war assets, combat
-  pressure, and player flow. Focused terrain tests and build proof are still
-  required before treating this checkpoint as source-stable.
+  `CDLODRenderer` now uses adaptive edge-only skirts as the production default,
+  driven by the quadtree `edgeSkirtMask` contract. This removes the legacy
+  full-perimeter interior skirt walls that can read as sky-ribbon/backface
+  terrain artifacts, while still preserving seam cover for same-LOD morph
+  divergence, selected/frustum/height-bound edges, world/DEM edges, adjacent
+  finer-child coverage, A Shau / Open Frontier size, draw distance, heightmap
+  sampling, CDLOD morph rules, vegetation, wildlife, weather, war assets,
+  combat pressure, and player flow. The legacy full-skirt diagnostic is
+  `?terrainFullTerrainSkirts=1` / `perf-capture --terrain-full-skirts`; the
+  no-skirt diagnostic remains `--disable-terrain-skirts` and is not a gameplay
+  candidate. Focused terrain tests and build proof are still required before
+  treating this checkpoint as source-stable.
 - Camera/aim inspection:
   Infantry movement still grounds the player at effective terrain height plus
   eye height, recoil and camera shake are angular only, and `setViewAngles`
