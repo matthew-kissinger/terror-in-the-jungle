@@ -440,6 +440,17 @@ function addForbiddenRuntimeChecks(
       : `Vegetation density scale is default-compatible: ${vegetationDensityScale ?? 'default'}`,
   });
 
+  const weatherStateOverride = getString(summary, ['perfRuntime', 'weatherStateOverride']);
+  const changedWeatherState = weatherStateOverride !== null && weatherStateOverride !== 'default';
+  checks.push({
+    id: 'forbidden_weather_state_override',
+    status: changedWeatherState ? 'fail' : 'pass',
+    value: weatherStateOverride,
+    message: changedWeatherState
+      ? `Rejected weather-state diagnostic override: ${weatherStateOverride}`
+      : `Weather state is scenario default-compatible: ${weatherStateOverride ?? 'default'}`,
+  });
+
   for (const queryFlag of FORBIDDEN_QUERY_FLAGS) {
     const enabled = searchParams?.get(queryFlag) === '1';
     checks.push({

@@ -137,6 +137,22 @@ type RuntimeVegetationStats = {
   byType: Record<string, RuntimeVegetationTypeStats>;
 };
 
+type RuntimeWeatherStats = {
+  configEnabled: boolean;
+  currentState: string;
+  targetState: string;
+  transitionProgress: number;
+  cycleTimer: number;
+  rainCount: number;
+  activeRainCount: number;
+  rainVisible: boolean;
+  rainOpacity: number;
+  rainInactive: boolean;
+  surfaceWetness: number;
+  rainMatrixElementsPerFrame: number;
+  rainMatrixBytesPerFrame: number;
+};
+
 type RuntimeSample = {
   ts: string;
   pagePerformanceNowMs?: number;
@@ -161,6 +177,7 @@ type RuntimeSample = {
   uiErrorPanelVisible?: boolean;
   closeModelStats?: RuntimeCloseModelStats;
   vegetation?: RuntimeVegetationStats;
+  weather?: RuntimeWeatherStats;
   terrainRecoveryEvents?: Record<string, unknown>[];
   materializationTierEvents?: Record<string, unknown>[];
   combatBreakdown?: {
@@ -862,6 +879,7 @@ type CaptureSummary = {
   perfRuntime?: {
     matchDurationSeconds?: number;
     presentationContextCapture: boolean;
+    weatherStateOverride?: string;
     frontlineCompressionRequested: boolean;
     victoryConditionsDisabled: boolean;
     npcCloseModelsDisabled: boolean;
@@ -1747,6 +1765,25 @@ function parseStringFlag(name: string, fallback: string): string {
   return fallback;
 }
 
+type WeatherStateOverride = 'default' | 'clear' | 'light_rain' | 'heavy_rain' | 'storm';
+
+function parseWeatherStateOverride(raw: string): WeatherStateOverride {
+  const normalized = raw.trim().toLowerCase();
+  if (
+    normalized === 'default' ||
+    normalized === 'clear' ||
+    normalized === 'light_rain' ||
+    normalized === 'heavy_rain' ||
+    normalized === 'storm'
+  ) {
+    return normalized;
+  }
+
+  throw new Error(
+    `Invalid --weather-state=${raw}. Expected default, clear, light_rain, heavy_rain, or storm.`
+  );
+}
+
 function printUsage(): void {
   console.log(`Usage: npx tsx scripts/perf-capture.ts [options]
 
@@ -1765,6 +1802,7 @@ Common options:
   --runtime-render-submission-every-samples <count>
   --runtime-render-submission-mode <full|summary>
   --presentation-context-capture <true|false> Diagnostic A/B: keep rAF counters but skip rich per-gap context cloning
+  --weather-state <default|clear|light_rain|heavy_rain|storm> Diagnostic A/B: force weather after mode start; rejected by dropped-frame EARS unless default
   --runtime-preflight <true|false>
   --renderer <webgpu-strict|webgpu|webgl>
   --compress-frontline <true|false> Diagnostic shortcut that repositions combatants near the player; default false
@@ -1892,6 +1930,15 @@ function computeRuntimeTrend(samples: RuntimeSample[]): {
   earlyTriangles: number | null;
   lateTriangles: number | null;
   triangleGrowthRatio: number | null;
+  earlyDrawCallsPerFrame: number | null;
+  lateDrawCallsPerFrame: number | null;
+  drawCallsPerFrameGrowthRatio: number | null;
+  earlyVegetationReserved: number | null;
+  lateVegetationReserved: number | null;
+  earlyVegetationFree: number | null;
+  lateVegetationFree: number | null;
+  earlyActiveRainCount: number | null;
+  lateActiveRainCount: number | null;
 } | null {
   if (samples.length < 8) return null;
 
@@ -1904,6 +1951,22 @@ function computeRuntimeTrend(samples: RuntimeSample[]): {
   const lateRenderMainMs = finiteAverage(late.map(s => latestLoopSegmentMs(s, 'RenderMain.renderer.render')));
   const earlyTriangles = finiteAverage(early.map(s => s.renderer ? Number(s.renderer.triangles ?? 0) : undefined));
   const lateTriangles = finiteAverage(late.map(s => s.renderer ? Number(s.renderer.triangles ?? 0) : undefined));
+  const earlyDrawCallsPerFrame = finiteAverage(early.map(s => (
+    typeof s.renderer?.drawCallsPerFrameSinceLastSample === 'number'
+      ? s.renderer.drawCallsPerFrameSinceLastSample
+      : undefined
+  )));
+  const lateDrawCallsPerFrame = finiteAverage(late.map(s => (
+    typeof s.renderer?.drawCallsPerFrameSinceLastSample === 'number'
+      ? s.renderer.drawCallsPerFrameSinceLastSample
+      : undefined
+  )));
+  const earlyVegetationReserved = finiteAverage(early.map(s => s.vegetation ? Number(s.vegetation.reservedTotal ?? 0) : undefined));
+  const lateVegetationReserved = finiteAverage(late.map(s => s.vegetation ? Number(s.vegetation.reservedTotal ?? 0) : undefined));
+  const earlyVegetationFree = finiteAverage(early.map(s => s.vegetation ? Number(s.vegetation.freeTotal ?? 0) : undefined));
+  const lateVegetationFree = finiteAverage(late.map(s => s.vegetation ? Number(s.vegetation.freeTotal ?? 0) : undefined));
+  const earlyActiveRainCount = finiteAverage(early.map(s => s.weather ? Number(s.weather.activeRainCount ?? 0) : undefined));
+  const lateActiveRainCount = finiteAverage(late.map(s => s.weather ? Number(s.weather.activeRainCount ?? 0) : undefined));
   const ratio = (lateValue: number | null, earlyValue: number | null): number | null => {
     if (lateValue === null || earlyValue === null || earlyValue <= 0) return null;
     return lateValue / earlyValue;
@@ -1920,6 +1983,15 @@ function computeRuntimeTrend(samples: RuntimeSample[]): {
     earlyTriangles,
     lateTriangles,
     triangleGrowthRatio: ratio(lateTriangles, earlyTriangles),
+    earlyDrawCallsPerFrame,
+    lateDrawCallsPerFrame,
+    drawCallsPerFrameGrowthRatio: ratio(lateDrawCallsPerFrame, earlyDrawCallsPerFrame),
+    earlyVegetationReserved,
+    lateVegetationReserved,
+    earlyVegetationFree,
+    lateVegetationFree,
+    earlyActiveRainCount,
+    lateActiveRainCount,
   };
 }
 
@@ -2827,7 +2899,7 @@ function validateRun(
         id: 'runtime_render_main_time_trend',
         status: renderTrendStatus,
         value: runtimeTrend.renderMainGrowthRatio,
-        message: `RenderMain.renderer.render trend early=${runtimeTrend.earlyRenderMainMs.toFixed(2)}ms late=${runtimeTrend.lateRenderMainMs.toFixed(2)}ms ratio=${runtimeTrend.renderMainGrowthRatio.toFixed(2)}x; triangles early=${runtimeTrend.earlyTriangles?.toFixed(0) ?? 'n/a'} late=${runtimeTrend.lateTriangles?.toFixed(0) ?? 'n/a'} ratio=${runtimeTrend.triangleGrowthRatio?.toFixed(2) ?? 'n/a'}x`
+        message: `RenderMain.renderer.render trend early=${runtimeTrend.earlyRenderMainMs.toFixed(2)}ms late=${runtimeTrend.lateRenderMainMs.toFixed(2)}ms ratio=${runtimeTrend.renderMainGrowthRatio.toFixed(2)}x; triangles early=${runtimeTrend.earlyTriangles?.toFixed(0) ?? 'n/a'} late=${runtimeTrend.lateTriangles?.toFixed(0) ?? 'n/a'} ratio=${runtimeTrend.triangleGrowthRatio?.toFixed(2) ?? 'n/a'}x; renderer.info draw/frame early=${runtimeTrend.earlyDrawCallsPerFrame?.toFixed(1) ?? 'n/a'} late=${runtimeTrend.lateDrawCallsPerFrame?.toFixed(1) ?? 'n/a'} ratio=${runtimeTrend.drawCallsPerFrameGrowthRatio?.toFixed(2) ?? 'n/a'}x; vegetation reserved/free early=${runtimeTrend.earlyVegetationReserved?.toFixed(0) ?? 'n/a'}/${runtimeTrend.earlyVegetationFree?.toFixed(0) ?? 'n/a'} late=${runtimeTrend.lateVegetationReserved?.toFixed(0) ?? 'n/a'}/${runtimeTrend.lateVegetationFree?.toFixed(0) ?? 'n/a'}; rain active early=${runtimeTrend.earlyActiveRainCount?.toFixed(0) ?? 'n/a'} late=${runtimeTrend.lateActiveRainCount?.toFixed(0) ?? 'n/a'}`
       });
     }
   }
@@ -3936,6 +4008,35 @@ async function warmupRuntime(page: Page, warmupSeconds: number): Promise<void> {
   }
 }
 
+async function applyWeatherStateOverride(
+  page: Page,
+  weatherStateOverride: WeatherStateOverride
+): Promise<void> {
+  if (weatherStateOverride === 'default') return;
+
+  const result = await withTimeout(
+    `apply weather override ${weatherStateOverride}`,
+    page.evaluate((state) => {
+      const weather = (window as any).__engine?.systemManager?.weatherSystem;
+      if (!weather || typeof weather.setWeatherState !== 'function') {
+        return { ok: false, reason: 'weatherSystem unavailable' };
+      }
+      weather.setWeatherState(state, true);
+      weather.update?.(0);
+      return {
+        ok: true,
+        debug: weather.getDebugInfo?.() ?? null,
+      };
+    }, weatherStateOverride),
+    5000
+  );
+
+  if (!result?.ok) {
+    throw new Error(`Failed to apply weather override ${weatherStateOverride}: ${result?.reason ?? 'unknown'}`);
+  }
+  logStep(`☔ Weather diagnostic override applied (${weatherStateOverride}, debug=${JSON.stringify(result.debug ?? null)})`);
+}
+
 async function dismissMissionBriefingIfPresent(page: Page): Promise<boolean> {
   const dismissed = await safeAwait(
     'dismiss mission briefing',
@@ -4401,6 +4502,7 @@ async function runCapture(): Promise<void> {
     ? 'summary'
     : 'full';
   const presentationContextCapture = parseBooleanFlag('presentation-context-capture', true);
+  const weatherStateOverride = parseWeatherStateOverride(parseStringFlag('weather-state', 'default'));
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
   const matchDurationArg = parseNumberFlag('match-duration', Number.NaN);
@@ -4480,9 +4582,12 @@ async function runCapture(): Promise<void> {
     seenKeys: new Set<string>(),
     lastCaptureElapsedMs: -1
   };
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} presentationContextCapture=${presentationContextCapture} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainShadowPassMode=${terrainShadowPassMode} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainFullShadowPass=${terrainFullShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainHeightAwareFrustum=${disableTerrainHeightAwareFrustum} terrainFullSkirts=${terrainFullSkirts} terrainSparseSkirts=${terrainSparseSkirts} disableTerrainSkirts=${disableTerrainSkirts} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} presentationContextCapture=${presentationContextCapture} weatherState=${weatherStateOverride} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainShadowPassMode=${terrainShadowPassMode} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainFullShadowPass=${terrainFullShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainHeightAwareFrustum=${disableTerrainHeightAwareFrustum} terrainFullSkirts=${terrainFullSkirts} terrainSparseSkirts=${terrainSparseSkirts} disableTerrainSkirts=${disableTerrainSkirts} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
   if (shotVisualCaptureState.enabled) {
     logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
+  }
+  if (weatherStateOverride !== 'default') {
+    logStep('Weather-state override is diagnostic-only and dropped-frame EARS will reject this artifact for completion.');
   }
   if (gpuTiming && !gpuTimingQueryEnabled) {
     logStep('GPU timing requested, but not injected because the runtime GPU query path only supports explicit --renderer webgl captures.');
@@ -4986,6 +5091,7 @@ async function runCapture(): Promise<void> {
       );
       throw new Error(`Startup did not stabilize: ${startupState.reason ?? 'unknown'}`);
     } else {
+      await applyWeatherStateOverride(page, weatherStateOverride);
       if (enableCombat) {
         await setupActiveScenarioDriver(page, {
           enabled: activePlayerScenario,
@@ -5160,6 +5266,9 @@ async function runCapture(): Promise<void> {
           const vegetationDebug = shouldIncludeDetails
             ? engine?.systemManager?.globalBillboardSystem?.getDebugInfo?.() ?? null
             : null;
+          const weatherDebug = shouldIncludeDetails
+            ? engine?.systemManager?.weatherSystem?.getDebugInfo?.() ?? null
+            : null;
           const terrainRecoveryEvents = shouldIncludeDetails
             ? engine?.systemManager?.combatantSystem?.getRecentTerrainRecoveryEvents?.() ?? null
             : null;
@@ -5298,6 +5407,24 @@ async function runCapture(): Promise<void> {
               byType
             };
           };
+          const normalizeWeatherDebug = (debug: any) => {
+            if (!debug || typeof debug !== 'object') return undefined;
+            return {
+              configEnabled: Boolean(debug.configEnabled),
+              currentState: String(debug.currentState ?? 'unknown'),
+              targetState: String(debug.targetState ?? 'unknown'),
+              transitionProgress: Number(debug.transitionProgress ?? 0),
+              cycleTimer: Number(debug.cycleTimer ?? 0),
+              rainCount: Number(debug.rainCount ?? 0),
+              activeRainCount: Number(debug.activeRainCount ?? 0),
+              rainVisible: Boolean(debug.rainVisible),
+              rainOpacity: Number(debug.rainOpacity ?? 0),
+              rainInactive: Boolean(debug.rainInactive),
+              surfaceWetness: Number(debug.surfaceWetness ?? 0),
+              rainMatrixElementsPerFrame: Number(debug.rainMatrixElementsPerFrame ?? 0),
+              rainMatrixBytesPerFrame: Number(debug.rainMatrixBytesPerFrame ?? 0)
+            };
+          };
           let sceneAttribution: any[] | null = null;
           let sceneAttributionError: string | null = null;
           let renderSubmissions: any | null = null;
@@ -5372,6 +5499,7 @@ async function runCapture(): Promise<void> {
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
             vegetation: normalizeVegetationDebug(vegetationDebug),
+            weather: normalizeWeatherDebug(weatherDebug),
             closeModelStats: closeModelStats && typeof closeModelStats === 'object'
               ? {
                   closeRadiusMeters: Number(closeModelStats.closeRadiusMeters ?? 0),
@@ -6150,6 +6278,10 @@ async function runCapture(): Promise<void> {
             .map(entry => `${entry.type}:${entry.active}`);
           vegetationSuffix = ` veg=${Number(vegetation.activeTotal ?? 0)}/${Number(vegetation.reservedTotal ?? 0)} chunks=${Number(vegetation.chunksTracked ?? 0)}${topVegetationTypes.length > 0 ? ` top=${topVegetationTypes.join(',')}` : ''}`;
         }
+        const weather = sample.weather;
+        const weatherSuffix = weather
+          ? ` weather=${weather.currentState}->${weather.targetState} rain=${Number(weather.activeRainCount ?? 0)}/${Number(weather.rainCount ?? 0)} opacity=${Number(weather.rainOpacity ?? 0).toFixed(2)} wet=${Number(weather.surfaceWetness ?? 0).toFixed(2)} upload=${(Number(weather.rainMatrixBytesPerFrame ?? 0) / 1024).toFixed(1)}KB`
+          : '';
         const rafStutter25Count = Number(rafCadence?.stutter25Count ?? 0);
         const rafHitch33Count = Number(rafCadence?.hitch33Count ?? 0);
         const rafDropped60HzFrames = Number(rafCadence?.estimatedDropped60HzFrames ?? 0);
@@ -6274,7 +6406,7 @@ async function runCapture(): Promise<void> {
         const fireTerrainBlockSuffix = fireTerrainBlockedFrame > 0 || fireTerrainBlockedTotal > 0
           ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}%`
           : '';
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${heightAwareTerrainSuffix}${vegetationSuffix}${closeModelSuffix}${driverSuffix}`);
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${heightAwareTerrainSuffix}${vegetationSuffix}${weatherSuffix}${closeModelSuffix}${driverSuffix}`);
         // harness-lifecycle-halt-on-match-end: latch the first match-end
         // observation, then break the loop after MATCH_END_TAIL_MS so we
         // finalize close to the moment the engine declared a winner instead
@@ -6647,6 +6779,7 @@ async function runCapture(): Promise<void> {
         perfRuntime: {
           matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
           presentationContextCapture,
+          weatherStateOverride: weatherStateOverride === 'default' ? undefined : weatherStateOverride,
           frontlineCompressionRequested: compressFrontline,
           victoryConditionsDisabled: disableVictory,
           npcCloseModelsDisabled: disableNpcCloseModels,

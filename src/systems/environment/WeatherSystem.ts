@@ -19,6 +19,9 @@ const MAX_RAIN_OPACITY = 0.6;
 const MIN_ACTIVE_RAIN_FRACTION = 0.5;
 
 function markActiveRainMatricesDirty(attribute: THREE.InstancedBufferAttribute, activeCount: number): void {
+  if (typeof attribute.clearUpdateRanges === 'function') {
+    attribute.clearUpdateRanges();
+  }
   if (typeof attribute.addUpdateRange === 'function') {
     attribute.addUpdateRange(0, activeCount * attribute.itemSize);
   }
@@ -267,6 +270,26 @@ export class WeatherSystem implements GameSystem {
     } else {
       this.transitionProgress = 0.0;
     }
+  }
+
+  getDebugInfo(): Record<string, string | number | boolean> {
+    const material = this.rainMesh?.material as THREE.MeshBasicMaterial | undefined;
+    const matrixElements = this.activeRainCount * 16;
+    return {
+      configEnabled: this.config?.enabled === true,
+      currentState: this.currentState,
+      targetState: this.targetState,
+      transitionProgress: this.transitionProgress,
+      cycleTimer: this.cycleTimer,
+      rainCount: this.rainCount,
+      activeRainCount: this.activeRainCount,
+      rainVisible: this.rainMesh?.visible === true,
+      rainOpacity: Number(material?.opacity ?? 0),
+      rainInactive: this.rainInactive,
+      surfaceWetness: Number.isFinite(this.lastSurfaceWetness) ? this.lastSurfaceWetness : 0,
+      rainMatrixElementsPerFrame: matrixElements,
+      rainMatrixBytesPerFrame: matrixElements * Float32Array.BYTES_PER_ELEMENT,
+    };
   }
 
   private updateTransition(deltaTime: number): void {

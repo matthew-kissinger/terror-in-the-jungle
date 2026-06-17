@@ -160,6 +160,15 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.checks.some((check) => check.id === 'forbidden_presentation_context_capture_disabled' && check.status === 'fail')).toBe(true);
   });
 
+  it('rejects forced weather-state diagnostic captures', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: { weatherStateOverride: 'clear' },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_weather_state_override' && check.status === 'fail')).toBe(true);
+  });
+
   it('rejects explicit adaptive terrain-skirt diagnostic captures as flag-driven coverage', () => {
     const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
       scenario: 'a_shau_valley',
