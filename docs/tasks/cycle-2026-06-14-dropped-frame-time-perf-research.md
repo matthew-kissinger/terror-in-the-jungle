@@ -1470,3 +1470,16 @@ Update 2026-06-17 14:05 UTC / 10:05 EDT:
   pressure (`792` submissions), and close GLBs (`581` submissions / `57k`
   triangles). This supports the owner's visible LOD-transition observation
   without absolving the broader render-tail stack.
+
+Update 2026-06-17 14:18 UTC / 10:18 EDT:
+
+- Harness correction: the first transition-window capture proved the counter
+  path but also showed warmup/startup transition pollution in the first measured
+  sample (`null->...` first observations and `impostor:pool-loading` carried
+  across the warmup boundary). `perf-capture` now drains
+  `combatantRenderer.getCloseModelRuntimeStats({ drainTransitionWindow: true })`
+  wherever it resets in-page metrics and `__materializationTierEvents`, so
+  future `transitionWindowTotalEvents` describe the measured runtime window.
+- Verification for the correction passed: `npm run typecheck`,
+  `npx vitest run scripts/check-dropped-frame-ears.test.ts scripts/perf-presentation-gap-summary.test.ts`,
+  and `npx eslint scripts/perf-capture.ts scripts/check-dropped-frame-ears.ts scripts/perf-presentation-gap-summary.ts`.

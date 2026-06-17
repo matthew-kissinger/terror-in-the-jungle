@@ -5238,6 +5238,8 @@ async function runCapture(): Promise<void> {
           (window as any).__perfHarnessObservers?.reset?.();
           (window as any).__gameLoopFrameBreakdown?.reset?.();
           (window as any).__materializationTierEvents?.({ clear: true, limit: 1 });
+          (window as any).__engine?.systemManager?.combatantSystem?.combatantRenderer
+            ?.getCloseModelRuntimeStats?.({ drainTransitionWindow: true });
           (window as any).__engine?.systemManager?.combatantSystem?.clearRecentTerrainRecoveryEvents?.();
         }),
         3000
@@ -5275,6 +5277,8 @@ async function runCapture(): Promise<void> {
           (window as any).__perfHarnessObservers?.reset?.();
           (window as any).__gameLoopFrameBreakdown?.reset?.();
           (window as any).__materializationTierEvents?.({ clear: true, limit: 1 });
+          (window as any).__engine?.systemManager?.combatantSystem?.combatantRenderer
+            ?.getCloseModelRuntimeStats?.({ drainTransitionWindow: true });
           (window as any).__engine?.systemManager?.combatantSystem?.clearRecentTerrainRecoveryEvents?.();
         }),
         3000
