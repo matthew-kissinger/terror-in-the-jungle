@@ -69,10 +69,12 @@ export const WILDLIFE_CONFIG = {
   fleeDespawnDistanceM: 90,
   /**
    * Ambient animals remain fully visible at all spawn/despawn distances, but
-   * only close animals cast into the shadow map. Distant animal shadows are
-   * below useful gameplay/visual readability and cost an extra shadow pass.
+   * only encounter-close animals cast into the shadow map. Spawn-ring animal
+   * shadows beyond the flee/despawn envelope are below useful gameplay/visual
+   * readability and cost an extra shadow pass during A Shau/Open Frontier
+   * perf captures.
    */
-  shadowCastDistanceM: 120,
+  shadowCastDistanceM: 90,
 
   /** Heading drift per second (radians) during idle wander. */
   wanderTurnRateRad: 0.6,

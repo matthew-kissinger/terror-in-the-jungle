@@ -1288,3 +1288,27 @@ Update 2026-06-17 12:25 UTC / 08:25 EDT:
   also show repeated shot-counter progression across runtime samples. This
   keeps low/no-combat and burst-only A Shau packets diagnostic even when raw
   timing numbers look cleaner.
+
+Update 2026-06-17 12:30 UTC / 08:30 EDT:
+
+- Started a preservation-friendly render-submission candidate from the latest
+  A Shau attribution: ambient wildlife remains enabled, visible, and moving,
+  but spawn-ring animals no longer cast into the shadow map unless they are
+  encounter-close. `WILDLIFE_CONFIG.shadowCastDistanceM` now matches the
+  90m flee/despawn envelope instead of extending shadow casting deeper into
+  the 80-220m ambient ring.
+- Rationale: the latest A Shau artifact showed recurring wildlife submissions
+  in both main and shadow passes, while Open Frontier also failed in clear
+  weather. This is not a rain-only fix or content reduction; it removes
+  low-readability shadow work from ambient animals and keeps wildlife present.
+- Focused verification: `npx vitest run
+  src\systems\wildlife\WildlifeSystem.test.ts` passed. Completion remains
+  open until paired default-content Open Frontier + A Shau EARS artifacts pass
+  with sustained combat, measurement trust, rAF gates, and owner visual
+  acceptance.
+- Sidecar analysis split the next owners this way: close-NPC artifacts look
+  like steady resident close-model submission cost, not promotion thrash
+  (`peakPromotionsThisFrame=0`, no materialization events in sampled rows);
+  rain upload remains a high-confidence A Shau-only target; full wildlife
+  batching is the stronger longer-term wildlife fix if the shadow cutoff does
+  not move paired EARS captures enough.
