@@ -26,9 +26,29 @@ vi.mock('../effects/TracerPool', () => ({
 function createMockAircraft(): THREE.Group {
   const group = new THREE.Group();
   group.name = 'mock-aircraft';
-  const prop = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+  const fuselage = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: 0x314f2a, roughness: 0.8, metalness: 0.1 }),
+  );
+  fuselage.name = 'Mesh_Fuselage';
+  fuselage.position.x = -1.2;
+  const wing = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: 0x8f7d4a, roughness: 0.8, metalness: 0.1 }),
+  );
+  wing.name = 'Mesh_Wing';
+  wing.position.x = 1.2;
+  const canopy = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.5, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x6688aa, transparent: true, opacity: 0.5 }),
+  );
+  canopy.name = 'Mesh_Canopy';
+  const prop = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshStandardMaterial({ color: 0x111111 }),
+  );
   prop.name = 'Joint_Propeller';
-  group.add(prop);
+  group.add(fuselage, wing, canopy, prop);
   return group;
 }
 
@@ -138,6 +158,42 @@ describe('FixedWingModel', () => {
       expect(display).not.toBeNull();
       expect(display!.displayName).toBe('F-4 Phantom');
       expect(display!.hasPropellers).toBe(false);
+    });
+
+    it('merges opaque painted aircraft parts with vertex colors while preserving the propeller node', async () => {
+      const pos = new THREE.Vector3(100, 10, -200);
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0);
+
+      const meshes: THREE.Mesh[] = [];
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          meshes.push(child);
+        }
+      });
+
+      const vertexColorMeshes = meshes.filter((mesh) => (
+        mesh.userData.generatedOptimizedMesh === true
+        && mesh.material instanceof THREE.MeshStandardMaterial
+        && mesh.material.vertexColors
+      ));
+      expect(vertexColorMeshes).toHaveLength(1);
+
+      const colors = vertexColorMeshes[0].geometry.getAttribute('color');
+      expect(colors).toBeDefined();
+      const uniquePaints = new Set<string>();
+      for (let i = 0; i < colors.count; i++) {
+        uniquePaints.add([
+          colors.getX(i).toFixed(3),
+          colors.getY(i).toFixed(3),
+          colors.getZ(i).toFixed(3),
+        ].join(','));
+      }
+      expect(uniquePaints.size).toBeGreaterThanOrEqual(2);
+
+      const propeller = meshes.find((mesh) => mesh.name === 'Joint_Propeller');
+      expect(propeller).toBeDefined();
+      expect(propeller?.userData.generatedOptimizedMesh).not.toBe(true);
+      expect(propeller?.userData.perfCategory).toBe('fixed_wing_aircraft');
     });
 
     it('stores cloned fixed-wing spawn metadata for runway helpers', async () => {

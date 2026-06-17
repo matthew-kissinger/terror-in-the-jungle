@@ -46,6 +46,20 @@ Completion evidence required:
    and shooting-path work in the suspect set until artifacts narrow it.
 
 Latest static checkpoint:
+- Fixed-wing opaque material consolidation checkpoint:
+  `FixedWingModel` now bakes per-mesh opaque paint colors into vertex colors
+  before running the existing static GLB draw-call optimizer, while leaving
+  transparent canopies and animated propeller nodes separate. This targets the
+  observed parked-aircraft draw/material fanout (`vehicles/aircraft/a1-skyraider.glb`
+  repeatedly appeared as a fixed-wing submission owner) without hiding aircraft,
+  deleting war assets, changing flight physics, changing aircraft availability,
+  reducing draw distance policy, weakening combat pressure, touching terrain,
+  vegetation, wildlife, weather, or player flow. Fixed-wing meshes are also
+  explicitly tagged as `fixed_wing_aircraft` for render-submission attribution.
+  Source-stable evidence on branch `task/dropped-frame-paired-evidence`:
+  focused FixedWingModel / ModelDrawCallOptimizer tests and targeted ESLint
+  passed. It is not a proven dropped-frame win until fresh paired EARS captures
+  pass on a quiet machine.
 - Scenario ground-vehicle render-culling checkpoint:
   `VehicleManager` now receives the runtime camera and render-culls only
   unoccupied scenario ground-vehicle roots that are far/offscreen, while

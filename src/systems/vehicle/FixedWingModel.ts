@@ -47,13 +47,13 @@ import {
 import type { FixedWingDisplayInfo } from './FixedWingConfigs';
 import type { VehicleExitOptions, VehicleExitPlan, VehicleExitResult } from './PlayerVehicleAdapter';
 import { modelLoader } from '../assets/ModelLoader';
-import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import { TracerPool } from '../effects/TracerPool';
 import { Logger } from '../../utils/Logger';
 import { computeFixedWingShot, getFixedWingWeaponConfig } from './FixedWingArmament';
 import type { FixedWingWeaponConfig } from './FixedWingArmament';
+import { optimizeFixedWingStaticDrawCalls } from './FixedWingRenderOptimization';
 
 const FIXED_WING_GUN_TRACER_RANGE = 500;
 
@@ -591,26 +591,7 @@ export class FixedWingModel implements GameSystem {
     const propellerNames = new Set(
       (display?.propellerNodes ?? []).map((name) => name.toLowerCase()),
     );
-
-    const result = optimizeStaticModelDrawCalls(innerModel, {
-      batchNamePrefix: `${configKey.toLowerCase()}_static`,
-      excludeMesh: (mesh) => {
-        let current: THREE.Object3D | null = mesh;
-        while (current) {
-          const nodeName = current.name.toLowerCase();
-          for (const propName of propellerNames) {
-            if (nodeName.includes(propName)) {
-              return true;
-            }
-          }
-          if (nodeName.includes('propeller') || nodeName.includes('prop')) {
-            return true;
-          }
-          current = current.parent;
-        }
-        return false;
-      },
-    });
+    const result = optimizeFixedWingStaticDrawCalls(innerModel, configKey, propellerNames);
 
     if (result.sourceMeshCount > 0) {
       Logger.info(
