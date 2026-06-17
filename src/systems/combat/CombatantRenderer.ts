@@ -612,11 +612,16 @@ export class CombatantRenderer {
     const primedAssetPaths = options.primeFactionAssets
       ? await this.preloadCloseModelFactionAssets()
       : 0;
+    const seededPoolTargets = options.seedFullFactionPools
+      ? await this.createCloseModelPools(PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION)
+      : {};
     const nowMs = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     this.refreshFrustum();
     const candidates = this.collectCloseModelCandidates(combatants, playerPosition, nowMs);
     if (candidates.length === 0) {
-      return emptySummary('no-candidates', 0, primedAssetPaths);
+      const summary = emptySummary('no-candidates', 0, primedAssetPaths);
+      summary.requestedPoolTargets = seededPoolTargets;
+      return summary;
     }
 
     const maxActive = resolveCloseModelActiveCap(candidates, options.maxActive);
@@ -625,6 +630,7 @@ export class CombatantRenderer {
     }
 
     const requestedPoolTargets: Record<string, number> = {};
+    Object.assign(requestedPoolTargets, seededPoolTargets);
     const requestedByPool = new Map<PixelForgeNpcPoolKey, number>();
     const preferredCandidates = selectPreferredCloseModelCandidates(
       candidates,
@@ -681,7 +687,13 @@ export class CombatantRenderer {
     return preloadPaths.length;
   }
 
-  private async createCloseModelPools(): Promise<void> {
+  private async createCloseModelPools(
+    targetSize = PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+  ): Promise<Record<string, number>> {
+    const target = Math.min(
+      PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      Math.max(0, Math.floor(targetSize)),
+    );
     const modelConfigs = [
       ...PIXEL_FORGE_NPC_RUNTIME_FACTIONS.map((config) => ({
         poolKey: config.runtimeFaction as PixelForgeNpcPoolKey,
@@ -693,13 +705,17 @@ export class CombatantRenderer {
       },
     ];
 
+    const requestedPoolTargets: Record<string, number> = {};
     for (const config of modelConfigs) {
+      this.closeModelPoolTargets.set(config.poolKey, target);
+      requestedPoolTargets[String(config.poolKey)] = target;
       await this.createCloseModelPool(
         config.poolKey,
         config.factionConfig,
-        PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
+        target,
       );
     }
+    return requestedPoolTargets;
   }
 
   private queueCloseModelPoolLoad(

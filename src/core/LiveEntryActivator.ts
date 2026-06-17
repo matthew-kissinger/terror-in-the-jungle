@@ -222,6 +222,7 @@ async function prewarmNearbyNpcCloseModels(engine: GameEngine): Promise<void> {
     .prewarmCloseModelsNearPlayer({
       maxActive: NPC_CLOSE_MODEL_PREWARM_MAX_ACTIVE,
       primeFactionAssets: true,
+      seedFullFactionPools: true,
     })
     .catch((error) => {
       Logger.warn('engine-init', 'NPC close-model prewarm failed:', error);

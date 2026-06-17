@@ -25,6 +25,7 @@ type ArtifactOptions = {
   burstyCombatContact?: boolean;
   thinMaterializationPressure?: boolean;
   burstyMaterializationContact?: boolean;
+  liveCloseModelPoolLoads?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -147,6 +148,12 @@ function tempArtifact(options: ArtifactOptions): string {
       engineShotsFired: shotsThisSession,
       engineShotsHit: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
     },
+    closeModelStats: {
+      candidatesWithinCloseRadius: materializationSamplesWithCandidates > index ? materializationPeakCandidates : 0,
+      renderedCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
+      activeCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
+      poolLoads: options.liveCloseModelPoolLoads && index === 2 ? 1 : 0,
+    },
     pagePerformanceNowMs: index * 1500,
   }))), 'utf-8');
   for (const file of REQUIRED_PLACEHOLDER_FILES) {
@@ -207,6 +214,21 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.checks.some((check) => (
       check.id === 'npc_materialization_sustained_contact'
       && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('keeps live close-model pool-load artifacts diagnostic even when materialization pressure passes', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      liveCloseModelPoolLoads: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.materializationQualified).toBe(false);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_close_model_runtime_pool_loads_clear'
+      && check.status === 'fail'
+      && check.value === 1
     ))).toBe(true);
   });
 

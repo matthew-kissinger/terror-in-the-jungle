@@ -512,6 +512,55 @@ function addMaterializationEnvelopeChecks(
   });
 }
 
+function addCloseModelRuntimePoolLoadChecks(
+  checks: DroppedFrameEarsCheck[],
+  runtimeSamples: readonly unknown[] | null
+): void {
+  if (runtimeSamples === null) {
+    checks.push({
+      id: 'npc_close_model_runtime_pool_loads_clear',
+      status: 'warn',
+      value: null,
+      message: 'Runtime samples are unavailable; cannot prove close-model pools stayed resident during measured play',
+    });
+    return;
+  }
+
+  let samplesWithCloseModelStats = 0;
+  let samplesWithPoolLoads = 0;
+  let maxPoolLoads = 0;
+  for (const sample of runtimeSamples) {
+    const sampleRecord = asRecord(sample);
+    const closeModelStats = asRecord(sampleRecord?.closeModelStats);
+    if (!closeModelStats) continue;
+    samplesWithCloseModelStats++;
+    const poolLoads = typeof closeModelStats.poolLoads === 'number' && Number.isFinite(closeModelStats.poolLoads)
+      ? closeModelStats.poolLoads
+      : 0;
+    maxPoolLoads = Math.max(maxPoolLoads, poolLoads);
+    if (poolLoads > 0) samplesWithPoolLoads++;
+  }
+
+  if (samplesWithCloseModelStats === 0) {
+    checks.push({
+      id: 'npc_close_model_runtime_pool_loads_clear',
+      status: 'warn',
+      value: null,
+      message: 'Runtime close-model stats are unavailable; cannot prove no live close-model pool loads occurred',
+    });
+    return;
+  }
+
+  checks.push({
+    id: 'npc_close_model_runtime_pool_loads_clear',
+    status: samplesWithPoolLoads === 0 ? 'pass' : 'fail',
+    value: samplesWithPoolLoads,
+    message: samplesWithPoolLoads === 0
+      ? `No live close-model pool loads during measured runtime (${samplesWithCloseModelStats} close-model samples, max poolLoads=${maxPoolLoads})`
+      : `Close-model pools were still loading during measured runtime (${samplesWithPoolLoads}/${samplesWithCloseModelStats} close-model samples, max poolLoads=${maxPoolLoads}); materialization evidence is diagnostic until pool residency is prepared before play`,
+  });
+}
+
 function addHarnessEquivalenceChecks(checks: DroppedFrameEarsCheck[], validationChecks: readonly ValidationCheck[]): void {
   for (const id of HARNESS_EQUIVALENCE_IDS) {
     const check = validationCheck(validationChecks, id);
@@ -810,6 +859,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addRafChecks(checks, validationChecks, summary);
   addCombatChecks(checks, validationChecks, runtimeSamples);
   addMaterializationEnvelopeChecks(checks, validationChecks, summary);
+  addCloseModelRuntimePoolLoadChecks(checks, runtimeSamples);
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
   addTerrainHeightBoundsTrustChecks(checks, summary);
@@ -835,7 +885,8 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
     && checkPassed(checks, 'active_combat_hits')
     && checkPassed(checks, 'active_combat_sustained_contact');
   const materializationQualified = checkPassed(checks, 'npc_materialization_pressure')
-    && checkPassed(checks, 'npc_materialization_sustained_contact');
+    && checkPassed(checks, 'npc_materialization_sustained_contact')
+    && checkPassed(checks, 'npc_close_model_runtime_pool_loads_clear');
   const completionLaneQualified = classification === 'proven'
     && contactQualified
     && materializationQualified;

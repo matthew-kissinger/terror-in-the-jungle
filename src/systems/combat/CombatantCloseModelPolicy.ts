@@ -115,6 +115,7 @@ export interface CombatantMaterializationRow {
 export interface CloseModelPrewarmOptions {
   maxActive?: number;
   primeFactionAssets?: boolean;
+  seedFullFactionPools?: boolean;
 }
 
 export interface CloseModelPrewarmSummary {

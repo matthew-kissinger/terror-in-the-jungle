@@ -724,6 +724,41 @@ describe('CombatantRenderer', () => {
       }
     });
 
+    it('seeds full faction pools during close-model prewarm without activating distant actors', async () => {
+      const lazyRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      try {
+        await lazyRenderer.createFactionBillboards();
+        const combatants = new Map<string, Combatant>();
+        combatants.set(
+          'far-us',
+          createMockCombatant('far-us', Faction.US, new THREE.Vector3(800, 0, 0)),
+        );
+
+        const summary = await lazyRenderer.prewarmCloseModelsForSpawn(
+          combatants,
+          new THREE.Vector3(0, 0, 0),
+          { maxActive: 3, primeFactionAssets: true, seedFullFactionPools: true },
+        );
+
+        const state = lazyRenderer as unknown as {
+          activeCloseModels: Map<string, unknown>;
+          closeModelPools: Map<string, unknown[]>;
+          closeModelPoolLoads: Map<string, Promise<void>>;
+        };
+        expect(summary.skippedReason).toBe('no-candidates');
+        expect(summary.candidatesWithinCloseRadius).toBe(0);
+        expect(summary.requestedPoolTargets[Faction.NVA]).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION);
+        expect(modelLoader.loadAnimatedModel).toHaveBeenCalledTimes(
+          PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION * (PIXEL_FORGE_NPC_RUNTIME_FACTIONS.length + 1),
+        );
+        expect(state.closeModelPools.get(Faction.NVA)).toHaveLength(PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION);
+        expect(state.activeCloseModels.size).toBe(0);
+        expect(state.closeModelPoolLoads.size).toBe(0);
+      } finally {
+        lazyRenderer.dispose();
+      }
+    });
+
     it('keeps overflow close actors as impostors while a demand pool can grow', () => {
       const combatants = new Map<string, Combatant>();
       for (let i = 0; i < 48; i++) {

@@ -1317,3 +1317,61 @@ Update 2026-06-17 12:30 UTC / 08:30 EDT:
   are already at the target fade state. This does not change close-model cap,
   distance, animation, or selection; the larger close-model target remains
   reducing resident body GLB mesh/material fanout.
+
+Update 2026-06-17 12:38 UTC / 08:38 EDT:
+
+- Fresh Open Frontier EARS capture
+  `artifacts/perf/2026-06-17T12-28-43-347Z` stayed failed but strengthened the
+  owner-observed LOD-transition hypothesis. It had real combat (`51` shots /
+  `51` hits), sustained close-model pressure (`37/58` detailed samples with
+  candidates, peak rendered close models `10`), and still missed rAF
+  dropped-frame gates (`1.19` estimated dropped 60Hz frames/s,
+  `16.17ms/s` dropped-frame time). The 289.9ms max rAF gap appeared in the same
+  early window where close-model pools were first loading/activating for
+  factions that were not prepared at insertion.
+- The current `materializationTierEvents` stream did not report those
+  close-model residency changes (`totalEvents=0`), so future attribution must
+  treat `closeModelStats.poolLoads`, pool targets/availability, and
+  `npc_close_glb` render submissions as first-class LOD-transition sensors.
+- Candidate fix: desktop live-entry close-model prewarm now seeds the steady
+  close-model pool target for every runtime faction before combat is enabled.
+  This does not lower LOD quality, active cap, combat pressure, map scale, or
+  selection priority; it moves normal-cap GLB/mixer/material setup out of the
+  active firefight so impostor-to-mesh transitions do not first-touch-load a
+  faction under the player's camera.
+
+Update 2026-06-17 12:49 UTC / 08:49 EDT:
+
+- First candidate Open Frontier EARS capture
+  `artifacts/perf/2026-06-17T12-43-11-060Z` was still failed, but materially
+  better than `2026-06-17T12-28-43-347Z`: estimated dropped 60Hz frames fell
+  from `1.19/s` to `0.71/s`, dropped-frame time fell from `16.17ms/s` to
+  `9.02ms/s`, and repeated faction first-loads collapsed to one early reserve
+  expansion. It still failed the rAF dropped-frame gates and had weak combat
+  coverage (`6` shots; min `30`), so this is directionally useful, not proof.
+- The live samples showed the initial fix seeded only the steady active cap
+  (`8`) while the hard-near reserve policy can legitimately lift the effective
+  cap to `14`. That mismatch left a runtime pool expansion when close-model
+  candidates reached `12`. The candidate now seeds the full per-faction close
+  model pool capacity on desktop live entry so the current materialization
+  policy's reserve envelope is prepared before combat, instead of demand-loaded
+  during an impostor-to-mesh transition.
+
+Update 2026-06-17 12:55 UTC / 08:55 EDT:
+
+- Reserve-cap Open Frontier EARS capture
+  `artifacts/perf/2026-06-17T12-49-21-146Z` confirms the runtime pool-load
+  class is gone for that run: `0/117` runtime samples reported close-model pool
+  loads, while close materialization still reached `21` candidates, `14`
+  rendered close models, and active cap `14`. Startup close-model prewarm
+  completed under the existing timeout (`~1.71s` from begin to summary marks),
+  so this did not visibly defer the same work into live play in that artifact.
+- The capture is still diagnostic, not proof: it had `0` shots / `0` hits,
+  failed the dropped-frame gates (`1.23/s`, `16.71ms/s`), and the tail was
+  still render/presentation-led (`RenderMain.renderer.render 34.4ms`,
+  terrain + vegetation-imposters dominant triangles). That says the first-touch
+  pool-load bug was a real contributor but not the whole remaining stutter.
+- Harness upgrade: `npm run check:dropped-frame-ears` now requires
+  `npc_close_model_runtime_pool_loads_clear` for materialization qualification.
+  Artifacts that still load close-model pools during measured runtime stay
+  diagnostic even if peak materialization pressure is present.
