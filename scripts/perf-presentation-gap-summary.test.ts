@@ -551,6 +551,16 @@ describe('summarizePresentationGapContexts', () => {
             activeCloseModels: 0,
             fallbackCount: 0,
             poolLoads: 0,
+            transitionWindow: {
+              total: 1,
+              firstObservation: 0,
+              toCloseGlb: 0,
+              toImpostor: 1,
+              toCulled: 0,
+              fromCloseGlb: 1,
+              byTransition: { 'close-glb->impostor': 1 },
+              byReason: { 'impostor:beyond-close-radius': 1 },
+            },
           },
           materializationTierEvents: [],
           combatBreakdown: {
@@ -606,11 +616,11 @@ describe('summarizePresentationGapContexts', () => {
       correlatedGapCount: 2,
       closeModelStatsObservedCount: 2,
       closeModelActiveGapCount: 1,
-      materializationEventGapCount: 1,
-      totalMaterializationEvents: 2,
+      materializationEventGapCount: 2,
+      totalMaterializationEvents: 3,
       renderSubmissionCorrelatedGapCount: 2,
       droppedFrameTimeWithCloseModels60HzMs: 17.3,
-      droppedFrameTimeWithMaterializationEvents60HzMs: 17.3,
+      droppedFrameTimeWithMaterializationEvents60HzMs: 28.6,
       droppedFrameTimeByCloseModelActivity: {
         active: 17.3,
         inactive: 11.3,
@@ -626,9 +636,9 @@ describe('summarizePresentationGapContexts', () => {
     });
     expect(summary?.materialization?.materializationEventsPerGap).toMatchObject({
       count: 2,
-      total: 2,
-      avg: 1,
-      min: 0,
+      total: 3,
+      avg: 1.5,
+      min: 1,
       max: 2,
     });
     expect(summary?.materialization?.closeModelMs?.total).toBeCloseTo(1.3, 5);

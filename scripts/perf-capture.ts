@@ -109,6 +109,17 @@ type LoopFrameBreakdownSample = {
   combatTiming?: Record<string, unknown>;
 };
 
+type RuntimeCloseModelTransitionWindow = {
+  total: number;
+  firstObservation: number;
+  toCloseGlb: number;
+  toImpostor: number;
+  toCulled: number;
+  fromCloseGlb: number;
+  byTransition: Record<string, number>;
+  byReason: Record<string, number>;
+};
+
 type RuntimeCloseModelStats = {
   closeRadiusMeters: number;
   closeModelActiveCap: number;
@@ -125,6 +136,7 @@ type RuntimeCloseModelStats = {
   poolLoads: number;
   poolTargets: Record<string, number>;
   poolAvailable: Record<string, number>;
+  transitionWindow?: RuntimeCloseModelTransitionWindow;
 };
 
 type RuntimeVegetationTypeStats = {
@@ -1016,7 +1028,17 @@ type MaterializationTierEventSummary = {
   byTransition: Record<string, number>;
   byReason: Record<string, number>;
   byToRender: Record<string, number>;
+  transitionWindowTotalEvents: number;
+  transitionWindowByTransition: Record<string, number>;
+  transitionWindowByReason: Record<string, number>;
   peakSample?: {
+    ts: string;
+    frameCount: number;
+    eventCount: number;
+    byTransition: Record<string, number>;
+    byReason: Record<string, number>;
+  };
+  peakTransitionWindowSample?: {
     ts: string;
     frameCount: number;
     eventCount: number;
@@ -2466,6 +2488,16 @@ function incrementCount(counts: Record<string, number>, key: string): void {
   counts[key] = (counts[key] ?? 0) + 1;
 }
 
+function mergeNumericRecordCounts(target: Record<string, number>, source: unknown): void {
+  const record = objectOrNull(source);
+  if (!record) return;
+  for (const [key, value] of Object.entries(record)) {
+    const n = Number(value ?? 0);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    target[key] = (target[key] ?? 0) + n;
+  }
+}
+
 function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): MaterializationTierEventSummary | undefined {
   const inspectedSamples = runtimeSamples
     .filter((sample) => Array.isArray(sample.materializationTierEvents))
@@ -2482,8 +2514,12 @@ function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): Ma
   const byTransition: Record<string, number> = {};
   const byReason: Record<string, number> = {};
   const byToRender: Record<string, number> = {};
+  const transitionWindowByTransition: Record<string, number> = {};
+  const transitionWindowByReason: Record<string, number> = {};
   let totalEvents = 0;
+  let transitionWindowTotalEvents = 0;
   let peakSample: MaterializationTierEventSummary['peakSample'];
+  let peakTransitionWindowSample: MaterializationTierEventSummary['peakTransitionWindowSample'];
 
   for (const sample of samplesWithEvents) {
     const sampleByTransition: Record<string, number> = {};
@@ -2512,13 +2548,36 @@ function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): Ma
     }
   }
 
+  for (const sample of runtimeSamples) {
+    const transitionWindow = sample.closeModelStats?.transitionWindow;
+    if (!transitionWindow) continue;
+    const eventCount = Number(transitionWindow.total ?? 0);
+    if (!Number.isFinite(eventCount) || eventCount <= 0) continue;
+    transitionWindowTotalEvents += eventCount;
+    mergeNumericRecordCounts(transitionWindowByTransition, transitionWindow.byTransition);
+    mergeNumericRecordCounts(transitionWindowByReason, transitionWindow.byReason);
+    if (!peakTransitionWindowSample || eventCount > peakTransitionWindowSample.eventCount) {
+      peakTransitionWindowSample = {
+        ts: sample.ts,
+        frameCount: sample.frameCount,
+        eventCount,
+        byTransition: { ...transitionWindow.byTransition },
+        byReason: { ...transitionWindow.byReason },
+      };
+    }
+  }
+
   return {
     sampleCount: inspectedSamples.length,
     totalEvents,
     byTransition,
     byReason,
     byToRender,
+    transitionWindowTotalEvents,
+    transitionWindowByTransition,
+    transitionWindowByReason,
     peakSample,
+    peakTransitionWindowSample,
   };
 }
 
@@ -5290,7 +5349,10 @@ async function runCapture(): Promise<void> {
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
           let closeModelStats: any = null;
           try {
-            closeModelStats = (window as any).npcMaterializationProfile?.(0)?.closeModelStats ?? null;
+            const combatantRenderer = engine?.systemManager?.combatantSystem?.combatantRenderer;
+            closeModelStats = combatantRenderer?.getCloseModelRuntimeStats?.({ drainTransitionWindow: true })
+              ?? (window as any).npcMaterializationProfile?.(0)?.closeModelStats
+              ?? null;
           } catch {
             closeModelStats = null;
           }
@@ -5586,7 +5648,33 @@ async function runCapture(): Promise<void> {
                         Number(value ?? 0)
                       ])
                     )
-                  : {}
+                  : {},
+                transitionWindow: closeModelStats.transitionWindow && typeof closeModelStats.transitionWindow === 'object'
+                  ? {
+                    total: Number(closeModelStats.transitionWindow.total ?? 0),
+                    firstObservation: Number(closeModelStats.transitionWindow.firstObservation ?? 0),
+                    toCloseGlb: Number(closeModelStats.transitionWindow.toCloseGlb ?? 0),
+                    toImpostor: Number(closeModelStats.transitionWindow.toImpostor ?? 0),
+                    toCulled: Number(closeModelStats.transitionWindow.toCulled ?? 0),
+                    fromCloseGlb: Number(closeModelStats.transitionWindow.fromCloseGlb ?? 0),
+                    byTransition: closeModelStats.transitionWindow.byTransition && typeof closeModelStats.transitionWindow.byTransition === 'object'
+                      ? Object.fromEntries(
+                          Object.entries(closeModelStats.transitionWindow.byTransition).map(([key, value]: [string, any]) => [
+                            String(key),
+                            Number(value ?? 0)
+                          ])
+                        )
+                      : {},
+                    byReason: closeModelStats.transitionWindow.byReason && typeof closeModelStats.transitionWindow.byReason === 'object'
+                      ? Object.fromEntries(
+                          Object.entries(closeModelStats.transitionWindow.byReason).map(([key, value]: [string, any]) => [
+                            String(key),
+                            Number(value ?? 0)
+                          ])
+                        )
+                      : {}
+                  }
+                  : undefined
               }
               : undefined,
             terrainRecoveryEvents: objectArray(terrainRecoveryEvents, 64),

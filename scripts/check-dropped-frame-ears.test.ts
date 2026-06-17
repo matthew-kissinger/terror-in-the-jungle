@@ -27,6 +27,7 @@ type ArtifactOptions = {
   burstyMaterializationContact?: boolean;
   liveCloseModelPoolLoads?: boolean;
   missingMaterializationEvents?: boolean;
+  transitionWindowMaterializationEvents?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -49,6 +50,9 @@ function tempArtifact(options: ArtifactOptions): string {
     : options.burstyMaterializationContact
       ? 2
       : 3;
+  const transitionWindowEvents = options.transitionWindowMaterializationEvents
+    ? Math.max(1, materializationSamplesWithCandidates)
+    : 0;
   const materializationStatus = options.thinMaterializationPressure ? 'warn' : 'pass';
   const combatStatus = options.lowCombat ? 'fail' : 'pass';
   const shotCount = options.lowCombat ? 0 : 80;
@@ -102,6 +106,9 @@ function tempArtifact(options: ArtifactOptions): string {
       byTransition: options.missingMaterializationEvents ? {} : { 'impostor->close-glb': 1 },
       byReason: options.missingMaterializationEvents ? {} : { 'close-glb:active': 1 },
       byToRender: options.missingMaterializationEvents ? {} : { 'close-glb': 1 },
+      transitionWindowTotalEvents: transitionWindowEvents,
+      transitionWindowByTransition: transitionWindowEvents > 0 ? { 'impostor->close-glb': transitionWindowEvents } : {},
+      transitionWindowByReason: transitionWindowEvents > 0 ? { 'close-glb:active': transitionWindowEvents } : {},
       peakSample: options.missingMaterializationEvents ? undefined : {
         ts: 'fixture',
         frameCount: 1,
@@ -109,6 +116,13 @@ function tempArtifact(options: ArtifactOptions): string {
         byTransition: { 'impostor->close-glb': 1 },
         byReason: { 'close-glb:active': 1 },
       },
+      peakTransitionWindowSample: transitionWindowEvents > 0 ? {
+        ts: 'fixture',
+        frameCount: 1,
+        eventCount: transitionWindowEvents,
+        byTransition: { 'impostor->close-glb': transitionWindowEvents },
+        byReason: { 'close-glb:active': transitionWindowEvents },
+      } : undefined,
     },
     perfRuntime: {
       presentationContextCapture: true,
@@ -168,6 +182,16 @@ function tempArtifact(options: ArtifactOptions): string {
       renderedCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
       activeCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
       poolLoads: options.liveCloseModelPoolLoads && index === 2 ? 1 : 0,
+      transitionWindow: {
+        total: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
+        firstObservation: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
+        toCloseGlb: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
+        toImpostor: 0,
+        toCulled: 0,
+        fromCloseGlb: 0,
+        byTransition: options.transitionWindowMaterializationEvents && index === 1 ? { 'impostor->close-glb': 1 } : {},
+        byReason: options.transitionWindowMaterializationEvents && index === 1 ? { 'close-glb:active': 1 } : {},
+      },
     },
     materializationTierEvents: options.missingMaterializationEvents || index !== 1
       ? []
@@ -268,6 +292,21 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       check.id === 'npc_materialization_transition_telemetry'
       && check.status === 'fail'
       && check.value === 0
+    ))).toBe(true);
+  });
+
+  it('accepts drained transition-window telemetry when the event ring is empty', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      missingMaterializationEvents: true,
+      transitionWindowMaterializationEvents: true,
+    }));
+
+    expect(artifact.materializationQualified).toBe(true);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_transition_telemetry'
+      && check.status === 'pass'
+      && Number(check.value) > 0
     ))).toBe(true);
   });
 

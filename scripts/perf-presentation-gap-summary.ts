@@ -458,9 +458,12 @@ function summarizeMaterializationGaps(
     const events = Array.isArray(sample.materializationTierEvents)
       ? sample.materializationTierEvents
       : [];
-    materializationEventsPerGap.push(events.length);
-    totalMaterializationEvents += events.length;
-    if (events.length > 0) {
+    const transitionWindow = objectOrNull(closeStats?.transitionWindow);
+    const transitionWindowEventCount = Math.max(0, numberOrZero(transitionWindow?.total));
+    const eventCount = Math.max(events.length, transitionWindowEventCount);
+    materializationEventsPerGap.push(eventCount);
+    totalMaterializationEvents += eventCount;
+    if (eventCount > 0) {
       materializationEventGapCount++;
       droppedFrameTimeWithMaterializationEvents60HzMs += gapDropped;
     }

@@ -1124,6 +1124,13 @@ describe('CombatantRenderer', () => {
           reason: 'close-glb:active',
         });
         expect(events[0].distanceMeters).toBeGreaterThan(11);
+        const firstWindow = renderer.getCloseModelRuntimeStats({ drainTransitionWindow: true }).transitionWindow;
+        expect(firstWindow).toMatchObject({
+          total: 1,
+          firstObservation: 1,
+          toCloseGlb: 1,
+        });
+        expect(renderer.getCloseModelRuntimeStats({ drainTransitionWindow: true }).transitionWindow.total).toBe(0);
         events.length = 0;
 
         // Frame 2: no change. No new events.
@@ -1141,6 +1148,14 @@ describe('CombatantRenderer', () => {
           fromRender: 'close-glb',
           toRender: 'impostor',
           reason: 'impostor:beyond-close-radius',
+        });
+        const demotionWindow = renderer.getCloseModelRuntimeStats({ drainTransitionWindow: true }).transitionWindow;
+        expect(demotionWindow).toMatchObject({
+          total: 1,
+          toImpostor: 1,
+          fromCloseGlb: 1,
+          byTransition: { 'close-glb->impostor': 1 },
+          byReason: { 'impostor:beyond-close-radius': 1 },
         });
         events.length = 0;
 

@@ -92,6 +92,18 @@ export interface CloseModelRuntimeStats {
   poolLoads: number;
   poolTargets: Record<string, number>;
   poolAvailable: Record<string, number>;
+  transitionWindow: CloseModelTransitionWindow;
+}
+
+export interface CloseModelTransitionWindow {
+  total: number;
+  firstObservation: number;
+  toCloseGlb: number;
+  toImpostor: number;
+  toCulled: number;
+  fromCloseGlb: number;
+  byTransition: Record<string, number>;
+  byReason: Record<string, number>;
 }
 
 export interface CombatantMaterializationRow {
@@ -164,6 +176,44 @@ export function createCloseModelFallbackCounts(): Record<CloseModelFallbackReaso
   };
 }
 
+export function createEmptyCloseModelTransitionWindow(): CloseModelTransitionWindow {
+  return {
+    total: 0,
+    firstObservation: 0,
+    toCloseGlb: 0,
+    toImpostor: 0,
+    toCulled: 0,
+    fromCloseGlb: 0,
+    byTransition: {},
+    byReason: {},
+  };
+}
+
+export function cloneCloseModelTransitionWindow(window: CloseModelTransitionWindow): CloseModelTransitionWindow {
+  return {
+    ...window,
+    byTransition: { ...window.byTransition },
+    byReason: { ...window.byReason },
+  };
+}
+
+export function recordCloseModelTransitionWindow(
+  window: CloseModelTransitionWindow,
+  fromRender: CombatantMaterializationRenderMode | null,
+  toRender: CombatantMaterializationRenderMode,
+  reason: string,
+): void {
+  const transition = `${fromRender ?? 'null'}->${toRender}`;
+  window.total++;
+  if (fromRender === null) window.firstObservation++;
+  if (fromRender === 'close-glb' && toRender !== 'close-glb') window.fromCloseGlb++;
+  if (toRender === 'close-glb') window.toCloseGlb++;
+  if (toRender === 'impostor') window.toImpostor++;
+  if (toRender === 'culled') window.toCulled++;
+  window.byTransition[transition] = (window.byTransition[transition] ?? 0) + 1;
+  window.byReason[reason] = (window.byReason[reason] ?? 0) + 1;
+}
+
 export function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
   return {
     closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
@@ -181,5 +231,6 @@ export function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
     poolLoads: 0,
     poolTargets: {},
     poolAvailable: {},
+    transitionWindow: createEmptyCloseModelTransitionWindow(),
   };
 }

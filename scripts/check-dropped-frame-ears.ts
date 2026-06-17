@@ -569,6 +569,7 @@ function addMaterializationTransitionTelemetryChecks(
   const peakActiveCloseModels = getNumber(summary, ['closeModelEnvelope', 'peakActiveCloseModels']);
   const samplesWithRenderedCloseModels = getNumber(summary, ['closeModelEnvelope', 'samplesWithRenderedCloseModels']);
   const summaryEventTotal = getNumber(summary, ['materializationTierMetrics', 'totalEvents']);
+  const transitionWindowTotal = getNumber(summary, ['materializationTierMetrics', 'transitionWindowTotalEvents']);
   const closeModelsWereActive = (peakActiveCloseModels ?? 0) > 0
     && (samplesWithRenderedCloseModels ?? 0) > 0;
 
@@ -578,13 +579,20 @@ function addMaterializationTransitionTelemetryChecks(
     for (const sample of runtimeSamples) {
       const sampleRecord = asRecord(sample);
       const events = sampleRecord?.materializationTierEvents;
-      if (!Array.isArray(events)) continue;
-      samplesWithEventArrays++;
-      runtimeEventTotal += events.length;
+      if (Array.isArray(events)) {
+        samplesWithEventArrays++;
+        runtimeEventTotal += events.length;
+      }
+      const closeModelStats = asRecord(sampleRecord?.closeModelStats);
+      const transitionWindow = asRecord(closeModelStats?.transitionWindow);
+      const transitionTotal = typeof transitionWindow?.total === 'number' && Number.isFinite(transitionWindow.total)
+        ? transitionWindow.total
+        : 0;
+      runtimeEventTotal += transitionTotal;
     }
   }
 
-  const eventTotal = Math.max(summaryEventTotal ?? 0, runtimeEventTotal);
+  const eventTotal = Math.max(summaryEventTotal ?? 0, transitionWindowTotal ?? 0, runtimeEventTotal);
   if (!closeModelsWereActive) {
     checks.push({
       id: 'npc_materialization_transition_telemetry',
@@ -610,7 +618,7 @@ function addMaterializationTransitionTelemetryChecks(
     status: eventTotal > 0 ? 'pass' : 'fail',
     value: eventTotal,
     message: eventTotal > 0
-      ? `Tier-transition telemetry was captured while close models were active (events=${eventTotal}, eventSamples=${samplesWithEventArrays})`
+      ? `Tier-transition telemetry was captured while close models were active (events=${eventTotal}, eventSamples=${samplesWithEventArrays}, transitionWindowEvents=${transitionWindowTotal ?? 0})`
       : `Close models were active (${peakActiveCloseModels ?? 'unknown'} peak, ${samplesWithRenderedCloseModels ?? 'unknown'} rendered samples) but no materialization tier events were captured; this artifact cannot be trusted for transition-stutter claims`,
   });
 }

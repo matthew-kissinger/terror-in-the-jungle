@@ -1421,3 +1421,29 @@ Update 2026-06-17 13:35 UTC / 09:35 EDT:
 - Next captures should use the new harness head, not this old artifact, so
   materialization event telemetry and close-model stats are present on every
   runtime sample.
+
+Update 2026-06-17 13:50 UTC / 09:50 EDT:
+
+- Fresh Open Frontier EARS artifact
+  `artifacts/perf/2026-06-17T13-32-02-320Z` stayed diagnostic: contact was low
+  (`9` shots), measurement trust warned, rAF dropped-frame gates still failed
+  (`0.89` estimated dropped 60Hz frames/s, `12.33ms/s` dropped-frame time),
+  and the owner still reports stutter as enemies cross NPC LOD/materialization
+  tiers.
+- The artifact's new gap correlation kept the hypothesis alive but split
+  ownership: close models were active in `44/100` correlated presentation gaps
+  and carried about `1191ms` of dropped-frame time, while terrain and
+  vegetation remained the largest adjacent render-triangle owners. Treat this
+  as a combined materialization + render-tail problem, not a pure Combat CPU
+  loop.
+- The event stream still recorded `0` tier events because promotions can happen
+  between runtime samples or before the trusted window. Runtime source now
+  records a drained `closeModelStats.transitionWindow` counter directly from
+  the renderer's render-lane diff (`null/impostor/close-glb/culled`
+  transitions plus reasons). `perf-capture` drains it every runtime sample,
+  `presentationGapContexts.materialization` counts it beside event-ring data,
+  and `check:dropped-frame-ears` accepts it as materialization-transition
+  telemetry when the queued event ring is empty.
+- Focused verification passed:
+  `npx vitest run src/systems/combat/CombatantRenderer.test.ts scripts/check-dropped-frame-ears.test.ts scripts/perf-presentation-gap-summary.test.ts`
+  plus `npm run typecheck`.

@@ -55,7 +55,10 @@ import {
   compareCloseModelCandidates,
   createCloseModelFallbackCounts,
   createEmptyBillboardUpdateProfile,
+  createEmptyCloseModelTransitionWindow,
   createEmptyCloseModelRuntimeStats,
+  cloneCloseModelTransitionWindow,
+  recordCloseModelTransitionWindow,
   selectPreferredCloseModelCandidates,
   type BillboardUpdateProfile,
   type CloseModelCandidate,
@@ -322,6 +325,7 @@ export class CombatantRenderer {
    */
   private readonly previousRenderModes = new Map<string, CombatantMaterializationRenderMode>();
   private readonly materializationSeenIds = new Set<string>();
+  private closeModelTransitionWindow = createEmptyCloseModelTransitionWindow();
   private disposed = false;
 
   // Walk animation state
@@ -496,13 +500,19 @@ export class CombatantRenderer {
     Logger.info('combat-renderer', ` Renderer: Player squad ID set to: ${squadId}`);
   }
 
-  getCloseModelRuntimeStats(): CloseModelRuntimeStats {
-    return {
+  getCloseModelRuntimeStats(options: { drainTransitionWindow?: boolean } = {}): CloseModelRuntimeStats {
+    const transitionWindow = cloneCloseModelTransitionWindow(this.closeModelTransitionWindow);
+    const stats = {
       ...this.closeModelRuntimeStats,
       fallbackCounts: { ...this.closeModelRuntimeStats.fallbackCounts },
       poolTargets: { ...this.closeModelRuntimeStats.poolTargets },
       poolAvailable: { ...this.closeModelRuntimeStats.poolAvailable },
+      transitionWindow,
     };
+    if (options.drainTransitionWindow) {
+      this.closeModelTransitionWindow = createEmptyCloseModelTransitionWindow();
+    }
+    return stats;
   }
 
   getCloseModelFallbackRecords(): CloseModelFallbackRecord[] {
@@ -1482,6 +1492,7 @@ export class CombatantRenderer {
       poolLoads: this.closeModelPoolLoads.size,
       poolTargets,
       poolAvailable,
+      transitionWindow: cloneCloseModelTransitionWindow(this.closeModelTransitionWindow),
     };
   }
 
@@ -2293,6 +2304,7 @@ export class CombatantRenderer {
         reason,
         distanceMeters,
       });
+      void recordCloseModelTransitionWindow(this.closeModelTransitionWindow, previous, currentRenderMode, reason);
       this.previousRenderModes.set(id, currentRenderMode);
     });
     // Prune entries for combatants no longer present this frame.
