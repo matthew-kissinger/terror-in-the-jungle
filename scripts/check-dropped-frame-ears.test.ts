@@ -26,6 +26,7 @@ type ArtifactOptions = {
   thinMaterializationPressure?: boolean;
   burstyMaterializationContact?: boolean;
   liveCloseModelPoolLoads?: boolean;
+  missingMaterializationEvents?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -95,6 +96,20 @@ function tempArtifact(options: ArtifactOptions): string {
       peakReplacementsThisFrame: 1,
       promotionBudgetPerFrame: 2,
     },
+    materializationTierMetrics: {
+      sampleCount: runtimeShotCounts.length,
+      totalEvents: options.missingMaterializationEvents ? 0 : Math.max(1, materializationSamplesWithCandidates),
+      byTransition: options.missingMaterializationEvents ? {} : { 'impostor->close-glb': 1 },
+      byReason: options.missingMaterializationEvents ? {} : { 'close-glb:active': 1 },
+      byToRender: options.missingMaterializationEvents ? {} : { 'close-glb': 1 },
+      peakSample: options.missingMaterializationEvents ? undefined : {
+        ts: 'fixture',
+        frameCount: 1,
+        eventCount: 1,
+        byTransition: { 'impostor->close-glb': 1 },
+        byReason: { 'close-glb:active': 1 },
+      },
+    },
     perfRuntime: {
       presentationContextCapture: true,
       frontlineCompressionRequested: false,
@@ -154,6 +169,15 @@ function tempArtifact(options: ArtifactOptions): string {
       activeCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
       poolLoads: options.liveCloseModelPoolLoads && index === 2 ? 1 : 0,
     },
+    materializationTierEvents: options.missingMaterializationEvents || index !== 1
+      ? []
+      : [{
+          combatantId: 'fixture-npc',
+          fromRender: 'impostor',
+          toRender: 'close-glb',
+          reason: 'close-glb:active',
+          distanceMeters: 20,
+        }],
     pagePerformanceNowMs: index * 1500,
   }))), 'utf-8');
   for (const file of REQUIRED_PLACEHOLDER_FILES) {
@@ -229,6 +253,21 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       check.id === 'npc_close_model_runtime_pool_loads_clear'
       && check.status === 'fail'
       && check.value === 1
+    ))).toBe(true);
+  });
+
+  it('keeps active close-model artifacts diagnostic when tier-transition telemetry is missing', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      missingMaterializationEvents: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.materializationQualified).toBe(false);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_transition_telemetry'
+      && check.status === 'fail'
+      && check.value === 0
     ))).toBe(true);
   });
 

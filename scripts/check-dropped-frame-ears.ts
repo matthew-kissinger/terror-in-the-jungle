@@ -561,6 +561,60 @@ function addCloseModelRuntimePoolLoadChecks(
   });
 }
 
+function addMaterializationTransitionTelemetryChecks(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null,
+  runtimeSamples: readonly unknown[] | null,
+): void {
+  const peakActiveCloseModels = getNumber(summary, ['closeModelEnvelope', 'peakActiveCloseModels']);
+  const samplesWithRenderedCloseModels = getNumber(summary, ['closeModelEnvelope', 'samplesWithRenderedCloseModels']);
+  const summaryEventTotal = getNumber(summary, ['materializationTierMetrics', 'totalEvents']);
+  const closeModelsWereActive = (peakActiveCloseModels ?? 0) > 0
+    && (samplesWithRenderedCloseModels ?? 0) > 0;
+
+  let samplesWithEventArrays = 0;
+  let runtimeEventTotal = 0;
+  if (runtimeSamples) {
+    for (const sample of runtimeSamples) {
+      const sampleRecord = asRecord(sample);
+      const events = sampleRecord?.materializationTierEvents;
+      if (!Array.isArray(events)) continue;
+      samplesWithEventArrays++;
+      runtimeEventTotal += events.length;
+    }
+  }
+
+  const eventTotal = Math.max(summaryEventTotal ?? 0, runtimeEventTotal);
+  if (!closeModelsWereActive) {
+    checks.push({
+      id: 'npc_materialization_transition_telemetry',
+      status: 'pass',
+      value: eventTotal,
+      message: 'No active close models were sampled; tier-transition telemetry is not required for this artifact',
+    });
+    return;
+  }
+
+  if (runtimeSamples === null && summaryEventTotal === null) {
+    checks.push({
+      id: 'npc_materialization_transition_telemetry',
+      status: 'warn',
+      value: null,
+      message: 'Runtime samples and materialization event summary are unavailable; cannot prove tier-transition telemetry was captured',
+    });
+    return;
+  }
+
+  checks.push({
+    id: 'npc_materialization_transition_telemetry',
+    status: eventTotal > 0 ? 'pass' : 'fail',
+    value: eventTotal,
+    message: eventTotal > 0
+      ? `Tier-transition telemetry was captured while close models were active (events=${eventTotal}, eventSamples=${samplesWithEventArrays})`
+      : `Close models were active (${peakActiveCloseModels ?? 'unknown'} peak, ${samplesWithRenderedCloseModels ?? 'unknown'} rendered samples) but no materialization tier events were captured; this artifact cannot be trusted for transition-stutter claims`,
+  });
+}
+
 function addHarnessEquivalenceChecks(checks: DroppedFrameEarsCheck[], validationChecks: readonly ValidationCheck[]): void {
   for (const id of HARNESS_EQUIVALENCE_IDS) {
     const check = validationCheck(validationChecks, id);
@@ -860,6 +914,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addCombatChecks(checks, validationChecks, runtimeSamples);
   addMaterializationEnvelopeChecks(checks, validationChecks, summary);
   addCloseModelRuntimePoolLoadChecks(checks, runtimeSamples);
+  addMaterializationTransitionTelemetryChecks(checks, summary, runtimeSamples);
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
   addTerrainHeightBoundsTrustChecks(checks, summary);
@@ -886,7 +941,8 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
     && checkPassed(checks, 'active_combat_sustained_contact');
   const materializationQualified = checkPassed(checks, 'npc_materialization_pressure')
     && checkPassed(checks, 'npc_materialization_sustained_contact')
-    && checkPassed(checks, 'npc_close_model_runtime_pool_loads_clear');
+    && checkPassed(checks, 'npc_close_model_runtime_pool_loads_clear')
+    && checkPassed(checks, 'npc_materialization_transition_telemetry');
   const completionLaneQualified = classification === 'proven'
     && contactQualified
     && materializationQualified;

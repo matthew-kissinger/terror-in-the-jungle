@@ -74,8 +74,9 @@ Executable scaffold:
 | ST4-PERF-014 | Complex | When a local candidate passes static validation while runtime proof is missing, the agent shall call it source-stable but unproven. | `validate:fast` and relevant focused checks pass, but STABILIZAT-4 remains open. | command output, `docs/DIRECTIVES.md` |
 | ST4-PERF-015 | Complex | When both required scenarios pass locally while default content is preserved, the agent shall run release proof before claiming production completion. | Exact-head CI, deploy, `check:live-release`, and owner playtest pass. | CI/deploy URLs, release proof JSON |
 | ST4-PERF-016 | Event-driven | When an agent evaluates saved dropped-frame artifacts, the repo shall provide an executable artifact classifier instead of relying on hand-scanned summaries. | `npm run check:dropped-frame-ears -- --dir <ashau> --dir <openfrontier> --strict` exits 0 only when both scenarios pass the EARS completion artifact gate. | `scripts/check-dropped-frame-ears.ts`, CLI output |
-| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 detailed samples and at least 10% of detailed close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when aggregate combat passes. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
+| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 runtime close-model samples and at least 10% of close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when aggregate combat passes. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 | ST4-PERF-018 | Unwanted behavior | If close-model pools load during the measured runtime of a materialization candidate, the harness shall keep the artifact diagnostic even when aggregate materialization pressure is present. | `npc_close_model_runtime_pool_loads_clear` passes: runtime samples include close-model stats and `poolLoads == 0` across measured play. | `runtime-samples.json`, `scripts/check-dropped-frame-ears.ts` |
+| ST4-PERF-019 | Unwanted behavior | If active close models are sampled but tier-transition events are missing, the harness shall not claim materialization-transition stutter is understood or fixed. | `npc_materialization_transition_telemetry` passes: when close models are active/rendered, `materializationTierEvents` or `summary.materializationTierMetrics.totalEvents` includes at least one transition. | `runtime-samples.json`, `summary.materializationTierMetrics`, `scripts/check-dropped-frame-ears.ts` |
 
 ## Candidate Classification
 
@@ -86,8 +87,9 @@ Executable scaffold:
   `validate:fast` pass, but trusted completion-lane captures are missing.
 - Diagnostic signal: a run or probe explains direction but fails trust, lacks
   combat, lacks close-model materialization pressure for a materialization
-  claim, uses a diagnostic flag, falls back renderer, or has material harness
-  equivalence warnings.
+  claim, has active close models but missing tier-transition telemetry, uses a
+  diagnostic flag, falls back renderer, or has material harness equivalence
+  warnings.
 - Rejected path: the change fails same-experience invariants, does not move
   trusted dropped-frame evidence, or relies on a harness bypass.
 

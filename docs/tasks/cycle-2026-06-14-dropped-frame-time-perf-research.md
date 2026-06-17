@@ -1375,3 +1375,26 @@ Update 2026-06-17 12:55 UTC / 08:55 EDT:
   `npc_close_model_runtime_pool_loads_clear` for materialization qualification.
   Artifacts that still load close-model pools during measured runtime stay
   diagnostic even if peak materialization pressure is present.
+
+Update 2026-06-17 13:20 UTC / 09:20 EDT:
+
+- Owner playtest still reports stutter and slow frames as enemy groups cross
+  NPC LOD/materialization tiers. The close-model pool-load fix removes one
+  first-touch loading class, but it does not prove the tier transition itself is
+  smooth.
+- Harness blind spot found and patched: `perf-capture` now samples
+  close-model stats and drains `materializationTierEvents` on every runtime
+  sample instead of only detail samples. `check:dropped-frame-ears` now fails
+  `npc_materialization_transition_telemetry` when active close models are
+  present but tier-transition telemetry is absent. The old Open Frontier
+  artifact `artifacts/perf/2026-06-17T12-49-21-146Z` is therefore explicitly
+  diagnostic for transition-stutter claims: it had peak active close models
+  `14` but `0` transition events.
+- Current weighting from local artifact + read-only subagent analysis:
+  first-touch close-model pool loads were real and are fixed in source; steady
+  close-model CPU update is modest (`~0.4-1.1ms` in sampled dense windows);
+  close GLBs still add draw/material submission pressure (`~7` submissions per
+  active close NPC); terrain/CDLOD render/presentation remains the strongest
+  tail owner, especially same-identity morph churn and terrain-heavy render
+  frames. The next trusted capture must correlate all three before changing
+  gameplay density, cap, radius, or vegetation.

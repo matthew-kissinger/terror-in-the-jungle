@@ -5289,12 +5289,10 @@ async function runCapture(): Promise<void> {
           const movement = perf?.getMovement?.() ?? report?.movement ?? null;
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
           let closeModelStats: any = null;
-          if (shouldIncludeDetails) {
-            try {
-              closeModelStats = (window as any).npcMaterializationProfile?.(0)?.closeModelStats ?? null;
-            } catch {
-              closeModelStats = null;
-            }
+          try {
+            closeModelStats = (window as any).npcMaterializationProfile?.(0)?.closeModelStats ?? null;
+          } catch {
+            closeModelStats = null;
           }
           const terrainStreams = shouldIncludeDetails
             ? engine?.systemManager?.terrainSystem?.getStreamingMetrics?.() ?? null
@@ -5308,9 +5306,7 @@ async function runCapture(): Promise<void> {
           const terrainRecoveryEvents = shouldIncludeDetails
             ? engine?.systemManager?.combatantSystem?.getRecentTerrainRecoveryEvents?.() ?? null
             : null;
-          const materializationTierEvents = shouldIncludeDetails
-            ? (window as any).__materializationTierEvents?.({ clear: true, limit: 128 }) ?? []
-            : [];
+          const materializationTierEvents = (window as any).__materializationTierEvents?.({ clear: true, limit: 256 }) ?? [];
           const harnessCounters =
             (window as any).__perfHarnessDriverState?.getCountersSnapshot?.()
             ?? (window as any).__perfHarnessDriver?.getCountersSnapshot?.()
