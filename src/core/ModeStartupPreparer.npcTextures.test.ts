@@ -93,10 +93,16 @@ describe('ModeStartupPreparer NPC texture telemetry', () => {
       },
     );
     const setGameMode = vi.fn();
+    const createFactionBillboards = vi.fn(async () => 25);
     const engine = {
       systemManager: {
         assetLoader: {
           ensurePixelForgeNpcImpostorTexturesLoaded,
+        },
+        combatantSystem: {
+          getRenderer: () => ({
+            createFactionBillboards,
+          }),
         },
         setGameMode,
       },
@@ -118,9 +124,13 @@ describe('ModeStartupPreparer NPC texture telemetry', () => {
       'engine-init.start-game.open_frontier.npc-textures.stats.batch-size-4',
       'engine-init.start-game.open_frontier.npc-textures.stats.batch-yields-2',
       'engine-init.start-game.open_frontier.npc-textures.end',
+      'engine-init.start-game.open_frontier.npc-impostor-buckets.created-25',
       'engine-init.start-game.open_frontier.set-game-mode.begin',
     ]));
+    expect(createFactionBillboards).toHaveBeenCalledWith({ prewarmRemainingImpostorBuckets: true });
     expect(mocks.startupMarks.indexOf('engine-init.start-game.open_frontier.npc-textures.end'))
+      .toBeLessThan(mocks.startupMarks.indexOf('engine-init.start-game.open_frontier.set-game-mode.begin'));
+    expect(mocks.startupMarks.indexOf('engine-init.start-game.open_frontier.npc-impostor-buckets.created-25'))
       .toBeLessThan(mocks.startupMarks.indexOf('engine-init.start-game.open_frontier.set-game-mode.begin'));
     expect(setGameMode).toHaveBeenCalledWith(GameMode.OPEN_FRONTIER, { createPlayerSquad: true });
   });

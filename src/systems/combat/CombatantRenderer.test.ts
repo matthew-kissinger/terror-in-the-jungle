@@ -49,20 +49,20 @@ function createMockShaderMaterial(): THREE.ShaderMaterial {
   });
 }
 
-function buildFactionMeshMap(): Map<string, THREE.InstancedMesh> {
+function buildFactionMeshMap(clips: readonly string[] = CLIPS): Map<string, THREE.InstancedMesh> {
   const map = new Map<string, THREE.InstancedMesh>();
   for (const prefix of ['US', 'ARVN', 'NVA', 'VC', 'SQUAD']) {
-    for (const clip of CLIPS) {
+    for (const clip of clips) {
       map.set(`${prefix}_${clip}`, createMockInstancedMesh());
     }
   }
   return map;
 }
 
-function buildFactionMaterialMap(): Map<string, THREE.ShaderMaterial> {
+function buildFactionMaterialMap(clips: readonly string[] = CLIPS): Map<string, THREE.ShaderMaterial> {
   const map = new Map<string, THREE.ShaderMaterial>();
   for (const prefix of ['US', 'ARVN', 'NVA', 'VC', 'SQUAD']) {
-    for (const clip of CLIPS) {
+    for (const clip of clips) {
       map.set(`${prefix}_${clip}`, createMockShaderMaterial());
     }
   }
@@ -143,13 +143,13 @@ function createMockAnimatedScene(): THREE.Group {
 
 vi.mock('./CombatantMeshFactory', () => ({
   CombatantMeshFactory: class MockCombatantMeshFactory {
-    createFactionBillboards() {
+    createFactionBillboards(initialClipIds: readonly string[] = CLIPS) {
       return {
-        factionMeshes: buildFactionMeshMap(),
-        factionAuraMeshes: buildFactionMeshMap(),
-        factionGroundMarkers: buildFactionMeshMap(),
+        factionMeshes: buildFactionMeshMap(initialClipIds),
+        factionAuraMeshes: buildFactionMeshMap(initialClipIds),
+        factionGroundMarkers: buildFactionMeshMap(initialClipIds),
         soldierTextures: new Map(),
-        factionMaterials: buildFactionMaterialMap(),
+        factionMaterials: buildFactionMaterialMap(initialClipIds),
         walkFrameTextures: new Map(),
       };
     }
@@ -694,6 +694,28 @@ describe('CombatantRenderer', () => {
       lazyRenderer.dispose();
       await vi.runOnlyPendingTimersAsync();
       vi.useRealTimers();
+    });
+
+    it('prewarms deferred NPC impostor buckets before combat clips first render', async () => {
+      const lazyRenderer = new CombatantRenderer(scene, camera, assetLoader);
+      try {
+        await lazyRenderer.createFactionBillboards();
+        const state = lazyRenderer as unknown as {
+          factionMeshes: Map<string, THREE.InstancedMesh>;
+        };
+
+        expect(state.factionMeshes.has('NVA_walk_fight_forward')).toBe(false);
+
+        const created = await lazyRenderer.createFactionBillboards({ prewarmRemainingImpostorBuckets: true });
+
+        expect(created).toBe(25);
+        expect(state.factionMeshes.has('NVA_walk_fight_forward')).toBe(true);
+        expect(state.factionMeshes.has('VC_death_fall_back')).toBe(true);
+        expect(state.factionMeshes.has('SQUAD_advance_fire')).toBe(true);
+        await expect(lazyRenderer.createFactionBillboards({ prewarmRemainingImpostorBuckets: true })).resolves.toBe(0);
+      } finally {
+        lazyRenderer.dispose();
+      }
     });
 
     it('prewarms spawn-adjacent close models before the lazy-load gate opens', async () => {

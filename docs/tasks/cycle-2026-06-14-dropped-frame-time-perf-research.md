@@ -1491,9 +1491,9 @@ Update 2026-06-17 14:35 UTC / 10:35 EDT:
   open. `simLaneTransitions` telemetry now emits and is summarized; smoke
   artifact `2026-06-17T14-30-31-527Z` proves schema/runtime emission only.
 
-Update 2026-06-17 15:55 UTC / 11:55 EDT:
-- `task/dropped-frame-paired-evidence` aligns the snapping harness path:
-  `ENGAGE` firing uses configured humanized `aimLerpRate` in TS+CJS instead of
-  forcing instant target-angle requests, and `perf-capture
-  --quiet-machine-attested` records quiet-machine attestation. Focused harness
-  tests passed; next paired EARS captures still need quiet conditions.
+Update 2026-06-17 15:55-16:30 UTC / 11:55-12:30 EDT: source-stable candidates
+now align firing aim to humanized `aimLerpRate`, add quiet-machine attestation,
+and prewarm deferred NPC impostor buckets after full texture load before spawn.
+Latest readout says materialization stutter is real but not sufficient by
+itself; A Shau remains broader render pressure. Focused tests/typecheck/
+targeted ESLint passed; no completion capture ran because evidence was dirty.

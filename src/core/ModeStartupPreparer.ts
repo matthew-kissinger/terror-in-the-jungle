@@ -124,6 +124,10 @@ export async function prepareModeStartup(
   markStartup(`engine-init.start-game.${mode}.npc-textures.stats.batch-yields-${npcTextureBatchYields}`);
   markStartup(`engine-init.start-game.${mode}.npc-textures.end`);
   emitProgress('npc_textures', 1, 'NPC textures ready');
+  const npcBucketsCreated = await engine.systemManager.combatantSystem
+    .getRenderer()
+    .createFactionBillboards({ prewarmRemainingImpostorBuckets: true });
+  markStartup(`engine-init.start-game.${mode}.npc-impostor-buckets.created-${npcBucketsCreated}`);
   await yieldToRenderer();
 
   emitProgress('spawning', 0, 'Spawning combatants...');

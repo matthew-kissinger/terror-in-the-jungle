@@ -207,6 +207,7 @@ interface WeaponPoseAxes {
 
 interface CombatantRendererBillboardOptions {
   eagerCloseModelPools?: boolean;
+  prewarmRemainingImpostorBuckets?: boolean;
 }
 
 function queueCloseModelPoolGrowthForDeferredDemand(
@@ -516,17 +517,38 @@ export class CombatantRenderer {
     return stableHash;
   }
 
-  async createFactionBillboards(options: CombatantRendererBillboardOptions = {}): Promise<void> {
-    const assets = this.meshFactory.createFactionBillboards(PIXEL_FORGE_NPC_STARTUP_CLIP_IDS);
-    this.factionMeshes = assets.factionMeshes;
-    this.factionAuraMeshes = assets.factionAuraMeshes;
-    this.factionGroundMarkers = assets.factionGroundMarkers;
-    this.soldierTextures = assets.soldierTextures;
-    this.factionMaterials = assets.factionMaterials;
-    this.walkFrameTextures = assets.walkFrameTextures;
+  async createFactionBillboards(options: CombatantRendererBillboardOptions = {}): Promise<number> {
+    if (this.factionMeshes.size === 0) {
+      const assets = this.meshFactory.createFactionBillboards(PIXEL_FORGE_NPC_STARTUP_CLIP_IDS);
+      this.factionMeshes = assets.factionMeshes;
+      this.factionAuraMeshes = assets.factionAuraMeshes;
+      this.factionGroundMarkers = assets.factionGroundMarkers;
+      this.soldierTextures = assets.soldierTextures;
+      this.factionMaterials = assets.factionMaterials;
+      this.walkFrameTextures = assets.walkFrameTextures;
+    }
+    let created = 0;
+    if (options.prewarmRemainingImpostorBuckets) {
+      for (const faction of PIXEL_FORGE_NPC_RUNTIME_FACTIONS) {
+        for (const clip of PIXEL_FORGE_NPC_CLIPS) {
+          const before = this.factionMeshes.size;
+          this.ensureImpostorBucket(faction.runtimeFaction, clip.id);
+          if (this.factionMeshes.size > before) created++;
+        }
+      }
+      for (const clip of PIXEL_FORGE_NPC_CLIPS) {
+        const before = this.factionMeshes.size;
+        this.ensureImpostorBucket('SQUAD', clip.id);
+        if (this.factionMeshes.size > before) created++;
+      }
+      if (created > 0) {
+        Logger.info('combat-renderer', `Prewarmed ${created} deferred Pixel Forge NPC impostor buckets`);
+      }
+    }
     if (options.eagerCloseModelPools && !this.closeModelPerfIsolationEnabled) {
       await this.createCloseModelPools();
     }
+    return created;
   }
 
   private ensureImpostorBucket(
