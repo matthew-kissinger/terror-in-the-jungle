@@ -1880,10 +1880,11 @@
       intent.reload = true;
     } else {
       intent.firePrimary = true;
-      // While firing, ask for the target angle directly and let the per-tick
-      // slew cap do the humanization. Blending here made the bot shoot while
-      // still a few degrees off the visual hit proxy on steep terrain.
-      intent.aimLerpRate = 1;
+      // Keep firing aim on the same humanized request path as movement/advance.
+      // The aim-dot gate suppresses the trigger until the capped slew reaches
+      // the visual hit proxy, so the driver does not need to request instant
+      // target-angle jumps just because it intends to fire.
+      intent.aimLerpRate = ctx.config.aimLerpRate;
     }
     intent.moveStrafe = engageStrafeIntent(ctx.timeInStateMs, ctx.config.engageStrafePeriodMs, ctx.config.engageStrafeAmplitude);
     // Push into firing range, then plant and shoot. Continuing to hold forward

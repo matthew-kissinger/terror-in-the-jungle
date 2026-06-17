@@ -35,9 +35,11 @@ Executable scaffold:
 - Run `npm run check:dropped-frame-ears -- --dir artifacts/perf/<a-shau-capture> --dir artifacts/perf/<open-frontier-capture> --strict`
   before calling a dropped-frame candidate complete.
 - Preferred local capture commands for the completion lane are
-  `npm run perf:capture:ashau:ears` and
-  `npm run perf:capture:openfrontier:ears`. They force headed strict WebGPU,
-  render-submission attribution, and `--compress-frontline false`.
+  `npm run perf:capture:ashau:ears -- --quiet-machine-attested` and
+  `npm run perf:capture:openfrontier:ears -- --quiet-machine-attested`.
+  Only pass `--quiet-machine-attested` when the machine is actually reserved
+  for the run. The scripts force headed strict WebGPU, render-submission
+  attribution, and `--compress-frontline false`.
 - Without `--dir`, the checker evaluates the latest `artifacts/perf/*`
   capture only. That is useful for triage but cannot pass the completion lane
   unless the required Open Frontier + A Shau artifact pair is supplied.

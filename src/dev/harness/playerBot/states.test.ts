@@ -325,7 +325,7 @@ describe('states — ENGAGE', () => {
     expect(step.nextState).toBeNull();
   });
 
-  it('requests capped direct aim while firing instead of slow-blending the shot ray', () => {
+  it('keeps firing aim on the configured humanized blend path', () => {
     const target = makeTarget({ position: { x: 0, y: NPC_Y_OFFSET, z: -30 } });
     const step = stepState('ENGAGE', makeCtx({
       currentTarget: target,
@@ -336,7 +336,7 @@ describe('states — ENGAGE', () => {
       },
     }));
     expect(step.intent.firePrimary).toBe(true);
-    expect(step.intent.aimLerpRate).toBe(1);
+    expect(step.intent.aimLerpRate).toBeCloseTo(0.2, 5);
   });
 
   it('emits reload intent when magazine is empty', () => {

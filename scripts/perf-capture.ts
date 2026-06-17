@@ -1902,6 +1902,7 @@ Common options:
   --runtime-render-submission-mode <full|summary>
   --presentation-context-capture <true|false> Diagnostic A/B: keep rAF counters but skip rich per-gap context cloning
   --weather-state <default|clear|light_rain|heavy_rain|storm> Diagnostic A/B: force weather after mode start; rejected by dropped-frame EARS unless default
+  --quiet-machine-attested       Assert the machine was reserved for this capture; also accepted via TIJ_QUIET_MACHINE=1
   --runtime-preflight <true|false>
   --renderer <webgpu-strict|webgpu|webgl>
   --compress-frontline <true|false> Diagnostic shortcut that repositions combatants near the player; default false
@@ -4830,10 +4831,16 @@ async function runCapture(): Promise<void> {
   const startedAt = nowIso();
   const sourceGitSha = currentGitSha();
   const sourceGitStatus = gitStatus();
-  const quietMachineAttested = process.env.TIJ_QUIET_MACHINE === '1';
+  const quietMachineAttested =
+    process.env.TIJ_QUIET_MACHINE === '1'
+    || parseBooleanFlag('quiet-machine-attested', false);
   const captureEnvironment = {
     quietMachineAttested,
-    quietMachineAttestationSource: quietMachineAttested ? 'TIJ_QUIET_MACHINE=1' : undefined,
+    quietMachineAttestationSource: quietMachineAttested
+      ? process.env.TIJ_QUIET_MACHINE === '1'
+        ? 'TIJ_QUIET_MACHINE=1'
+        : '--quiet-machine-attested'
+      : undefined,
   };
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';

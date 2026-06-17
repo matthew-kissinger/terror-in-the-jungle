@@ -1486,14 +1486,14 @@ Update 2026-06-17 14:18 UTC / 10:18 EDT:
 
 Update 2026-06-17 14:35 UTC / 10:35 EDT:
 
-- Owner still sees stutter and slow frames as enemies cross LOD /
-  materialization tiers. We kept the close-model replacement hysteresis patch,
-  but the goal is still open because the same run worsened overall and remained
-  render-bound.
-- Harness blind spot patched: `CombatantLODManager` now emits read-only
-  `simLaneTransitions` telemetry and `perf-capture` serializes, logs, and
-  summarizes it. Short built-bundle smoke
-  `artifacts/perf/2026-06-17T14-30-31-527Z` proves schema/runtime emission only.
-- Detailed evidence, caveats, and next optimization targets are in
-  `docs/perf/lod-materialization-transition-telemetry-2026-06-17.md`. Next
-  trusted capture should correlate stutter with sim-lane transitions first.
+- Owner still sees LOD/materialization stutter; close-model hysteresis is kept
+  but the run worsened overall and stayed render-bound, so the goal remains
+  open. `simLaneTransitions` telemetry now emits and is summarized; smoke
+  artifact `2026-06-17T14-30-31-527Z` proves schema/runtime emission only.
+
+Update 2026-06-17 15:55 UTC / 11:55 EDT:
+- `task/dropped-frame-paired-evidence` aligns the snapping harness path:
+  `ENGAGE` firing uses configured humanized `aimLerpRate` in TS+CJS instead of
+  forcing instant target-angle requests, and `perf-capture
+  --quiet-machine-attested` records quiet-machine attestation. Focused harness
+  tests passed; next paired EARS captures still need quiet conditions.
