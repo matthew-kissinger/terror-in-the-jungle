@@ -4729,9 +4729,6 @@ async function waitForPressureReadyWarmup(
         } else if (botState === 'ENGAGE' && currentTargetDistance !== null && currentTargetDistance <= 220) {
           ready = true;
           reason = 'engage-target-distance';
-        } else if (nearestPerceivedEnemyDistance !== null && nearestPerceivedEnemyDistance <= 180) {
-          ready = true;
-          reason = 'near-perceived-enemy';
         }
 
         return {
