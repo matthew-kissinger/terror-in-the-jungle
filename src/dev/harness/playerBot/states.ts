@@ -71,7 +71,9 @@ function shouldInterruptObjectiveForTarget(
   const maxFireDistance = Math.max(0, ctx.config.maxFireDistance);
   const visible = ctx.canSeeTarget(target.position);
   if (objective.kind === 'nearest_opfor') {
-    return dist <= maxFireDistance && visible;
+    // Treat close occluded nearest-opfor objectives as combat recovery, not
+    // patrol travel; ALERT/ADVANCE can regain LOS while firing remains gated.
+    return dist <= maxFireDistance;
   }
   const acquisitionDistance = Math.max(0, ctx.config.targetAcquisitionDistance);
   const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);

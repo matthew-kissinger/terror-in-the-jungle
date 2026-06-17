@@ -292,6 +292,17 @@ describe('computeTailAttribution', () => {
               materials: 6,
               geometries: 6,
               passTypes: { main: 24, shadow: 24 },
+              topOwners: [
+                {
+                  ownerKey: 'world-feature-placement:aluoi_village_hut_0',
+                  ownerLabel: 'village:aluoi_village/hut_0',
+                  ownerType: 'world_feature_placement',
+                  drawSubmissions: 24,
+                  triangles: 8_000,
+                  instances: 12,
+                  meshes: 12,
+                },
+              ],
             },
           ],
         },
@@ -411,6 +422,11 @@ describe('computeTailAttribution', () => {
       category: 'wildlife',
       drawSubmissions: 48,
     });
+    expect(a.renderSubmissionContext?.nearestFrame?.topCategories[0]?.topOwners?.[0]).toMatchObject({
+      ownerKey: 'world-feature-placement:aluoi_village_hut_0',
+      ownerLabel: 'village:aluoi_village/hut_0',
+      drawSubmissions: 24,
+    });
     expect(a.renderSubmissionContext?.nearestFrame?.topCategories[1]).toMatchObject({
       category: 'terrain',
       triangles: 1_580_000,
@@ -470,6 +486,7 @@ describe('computeTailAttribution', () => {
     });
     expect(a.conclusion).toContain('tail render frame 5002');
     expect(a.conclusion).toContain('top render triangles: terrain 1580000 tris/3 submissions');
+    expect(a.conclusion).toContain('top render owners: village:aluoi_village/hut_0 24 submissions/8000 tris');
     expect(a.conclusion).toContain('visible scene categories: wildlife 48 visible draw-like');
     expect(a.conclusion).toContain('nearest presentation gap 55.0ms');
     expect(a.conclusion).toContain('dropped-frame time 38.3ms');

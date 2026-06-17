@@ -22,6 +22,9 @@ export interface DroppedFrameEarsArtifactEvaluation {
   artifactRelPath: string;
   scenario: string | null;
   classification: DroppedFrameEarsClassification;
+  contactQualified: boolean;
+  materializationQualified: boolean;
+  completionLaneQualified: boolean;
   criticalPass: boolean;
   failCount: number;
   warnCount: number;
@@ -67,6 +70,9 @@ const REQUIRED_FILES = [
   'runtime-render-submission-samples.json',
   'final-frame.png',
 ] as const;
+
+const MIN_SUSTAINED_MATERIALIZATION_SAMPLES = 3;
+const MIN_SUSTAINED_MATERIALIZATION_RATIO = 0.1;
 
 const RAF_THRESHOLDS: readonly ThresholdCheck[] = [
   {
@@ -264,6 +270,10 @@ function validationCheck(checks: readonly ValidationCheck[], id: string): Valida
   return checks.find((check) => check.id === id) ?? null;
 }
 
+function checkPassed(checks: readonly DroppedFrameEarsCheck[], id: string): boolean {
+  return checks.some((check) => check.id === id && check.status === 'pass');
+}
+
 function checkStatus(status: boolean, id: string, passMessage: string, failMessage: string, value?: DroppedFrameEarsCheck['value']): DroppedFrameEarsCheck {
   return {
     id,
@@ -279,6 +289,10 @@ function closeEnough(actual: number | null, expected: number | null): boolean {
   }
   const tolerance = Math.max(0.01, Math.abs(expected) * 0.000001);
   return Math.abs(actual - expected) <= tolerance;
+}
+
+function formatPercent(value: number | null): string {
+  return value === null ? 'missing' : `${(value * 100).toFixed(1)}%`;
 }
 
 function rel(path: string): string {
@@ -388,6 +402,11 @@ function addMaterializationEnvelopeChecks(
     : getNumber(summary, ['closeModelEnvelope', 'peakCandidatesWithinCloseRadius']);
   const peakRendered = getNumber(summary, ['closeModelEnvelope', 'peakRenderedCloseModels']);
   const samplesWithCandidates = getNumber(summary, ['closeModelEnvelope', 'samplesWithCandidates']);
+  const sampleCount = getNumber(summary, ['closeModelEnvelope', 'sampleCount']);
+  const samplesWithRenderedCloseModels = getNumber(summary, ['closeModelEnvelope', 'samplesWithRenderedCloseModels']);
+  const candidateSampleRatio = sampleCount !== null && sampleCount > 0 && samplesWithCandidates !== null
+    ? samplesWithCandidates / sampleCount
+    : null;
   const fallbackPassed = peakCandidates !== null
     && peakRendered !== null
     && samplesWithCandidates !== null
@@ -403,8 +422,24 @@ function addMaterializationEnvelopeChecks(
     status: passed ? 'pass' : 'fail',
     value: peakCandidates,
     message: passed
-      ? `NPC materialization pressure was represented (peak candidates=${peakCandidates ?? 'unknown'}, peak rendered=${peakRendered ?? 'unknown'}, samplesWithCandidates=${samplesWithCandidates ?? 'unknown'})`
-      : `NPC materialization pressure is missing or thin (peak candidates=${peakCandidates ?? 'missing'}, peak rendered=${peakRendered ?? 'missing'}, samplesWithCandidates=${samplesWithCandidates ?? 'missing'}); completion evidence must not close a materialization fix from low-contact route variance`,
+      ? `NPC materialization pressure was represented (peak candidates=${peakCandidates ?? 'unknown'}, peak rendered=${peakRendered ?? 'unknown'}, samplesWithCandidates=${samplesWithCandidates ?? 'unknown'}/${sampleCount ?? 'unknown'})`
+      : `NPC materialization pressure is missing or thin (peak candidates=${peakCandidates ?? 'missing'}, peak rendered=${peakRendered ?? 'missing'}, samplesWithCandidates=${samplesWithCandidates ?? 'missing'}/${sampleCount ?? 'missing'}); completion evidence must not close a materialization fix from low-contact route variance`,
+  });
+
+  const sustained = sampleCount !== null
+    && samplesWithCandidates !== null
+    && samplesWithRenderedCloseModels !== null
+    && samplesWithCandidates >= MIN_SUSTAINED_MATERIALIZATION_SAMPLES
+    && samplesWithRenderedCloseModels >= MIN_SUSTAINED_MATERIALIZATION_SAMPLES
+    && candidateSampleRatio !== null
+    && candidateSampleRatio >= MIN_SUSTAINED_MATERIALIZATION_RATIO;
+  checks.push({
+    id: 'npc_materialization_sustained_contact',
+    status: sustained ? 'pass' : 'fail',
+    value: candidateSampleRatio,
+    message: sustained
+      ? `NPC materialization contact was sustained across detailed samples (${samplesWithCandidates}/${sampleCount}, ${formatPercent(candidateSampleRatio)}; rendered=${samplesWithRenderedCloseModels})`
+      : `NPC materialization contact was too bursty for completion comparison (${samplesWithCandidates ?? 'missing'}/${sampleCount ?? 'missing'}, ${formatPercent(candidateSampleRatio)}; rendered=${samplesWithRenderedCloseModels ?? 'missing'}; min samples=${MIN_SUSTAINED_MATERIALIZATION_SAMPLES}, min ratio=${formatPercent(MIN_SUSTAINED_MATERIALIZATION_RATIO)})`,
   });
 }
 
@@ -726,13 +761,23 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
     : failCount === 0
       ? 'proven'
       : 'diagnostic';
+  const contactQualified = checkPassed(checks, 'active_combat_shots')
+    && checkPassed(checks, 'active_combat_hits');
+  const materializationQualified = checkPassed(checks, 'npc_materialization_pressure')
+    && checkPassed(checks, 'npc_materialization_sustained_contact');
+  const completionLaneQualified = classification === 'proven'
+    && contactQualified
+    && materializationQualified;
 
   return {
     artifactDir: absoluteArtifactDir,
     artifactRelPath: rel(absoluteArtifactDir),
     scenario,
     classification,
-    criticalPass: classification === 'proven',
+    contactQualified,
+    materializationQualified,
+    completionLaneQualified,
+    criticalPass: completionLaneQualified,
     failCount,
     warnCount,
     checks,
@@ -820,7 +865,7 @@ function printHumanReport(evaluation: DroppedFrameEarsEvaluation): void {
   ].join(' '));
 
   for (const artifact of evaluation.artifacts) {
-    console.log(`[ST4-EARS] ${artifact.artifactRelPath} scenario=${artifact.scenario ?? 'unknown'} classification=${artifact.classification} fail=${artifact.failCount} warn=${artifact.warnCount}`);
+    console.log(`[ST4-EARS] ${artifact.artifactRelPath} scenario=${artifact.scenario ?? 'unknown'} classification=${artifact.classification} contact=${artifact.contactQualified ? 'qualified' : 'low'} materialization=${artifact.materializationQualified ? 'qualified' : 'thin'} fail=${artifact.failCount} warn=${artifact.warnCount}`);
     for (const check of artifact.checks.filter((entry) => entry.status !== 'pass')) {
       console.log(`  ${check.status.toUpperCase()} ${check.id}: ${check.message}`);
     }

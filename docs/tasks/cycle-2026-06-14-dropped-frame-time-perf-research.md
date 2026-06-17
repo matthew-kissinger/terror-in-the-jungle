@@ -56,6 +56,35 @@ need the same release shepherding before they are called shipped.
 
 ## Latest Static Sidecar Findings
 
+- 2026-06-17 A Shau EARS rerun:
+  `artifacts/perf/2026-06-17T10-36-26-323Z` ran on clean local
+  `90a314f5`, headed strict WebGPU with real A Shau contact. It is diagnostic,
+  not completion proof: `check:dropped-frame-ears --strict` reports contact
+  and materialization qualified, but capture status, validation,
+  measurement trust, rAF gates, and view-slew equivalence still fail. The run
+  had 85 sim shots / 85 hits, close-model pressure across 22 of 57 detailed
+  samples, `rAF >25ms 2.30%`, `rAF >33ms 0.54%`, estimated dropped frames
+  `2.79/s`, and dropped-frame time `40.53ms/s`. The tail remains render /
+  presentation-led: the slowest loop callback was about `303.6ms`, with
+  `RenderMain.renderer.render` about `293.2ms`. Tail render submissions showed
+  terrain as the triangle owner (`300,544` triangles / 10 submissions),
+  vegetation imposters next (`60,386` triangles / 6 submissions), and
+  world-static features as the draw-submission owner (`45` submissions).
+  Browser observers recorded 54 Long Animation Frames, including one around
+  `314ms`, so treat this as a render/presentation stall problem before
+  simulation micro-optimization.
+- A Shau route/contact variance is now enforced in the artifact gate, not just
+  noted in prose. `check:dropped-frame-ears` requires both peak
+  `npc_materialization_pressure` and sustained
+  `npc_materialization_sustained_contact` before materialization-sensitive
+  evidence can be completion-qualified; burst-only or low-contact A Shau runs
+  remain diagnostic even if shots/hits pass.
+- Render-submission owner attribution now preserves source-owner summaries on
+  generated static-model batch meshes. This does not change runtime content or
+  draw policy; it fixes the blind spot where generated world-static batches
+  collapsed into `world-feature-sector:*` and hid which feature placements were
+  represented in a hot sector. The next capture should show source-feature
+  owners for world-static batch tails instead of only sector labels.
 - Source-aware CDLOD resolution correction:
   A Shau's renderer was still choosing near CDLOD depth from the default
   procedural 4 m target even though its authoritative DEM source is 9 m per
@@ -1191,3 +1220,55 @@ Update 2026-06-16 20:05 UTC / 16:05 EDT:
 - Added TS and CJS tests that keep the default aim request below `1.0`.
   Runtime proof is still required: the next EARS captures must show large
   requested view turns gone while shots/hits and route progress remain real.
+
+Update 2026-06-17 09:45 UTC / 05:45 EDT:
+
+- A Shau capture variance is now explicit in the working evidence model:
+  A Shau EARS artifacts must be contact-qualified and materialization-qualified
+  before they can say anything useful about combat stutter. Low/no-combat
+  route runs can still diagnose terrain, weather, vegetation, startup, or
+  measurement trust, but they must not be used as proof that firefight
+  dropped-frame time improved.
+- The perf driver now exposes a compact counter snapshot, and `perf-capture`
+  uses it for top-level `shotsThisSession`, `hitsThisSession`, and `hitRate`
+  even on non-detail samples. This fixed the stale alternating zero-shot rows
+  in A Shau capture logs while preserving the full debug snapshot cadence.
+- Source-stable close-NPC CPU cleanup: `CombatantRenderer.solveArmToTarget`
+  no longer forces three redundant root `updateMatrixWorld(true)` calls inside
+  each arm solve; the caller already updates the root once before weapon-socket
+  refresh and `setBoneDirectionWorld()` updates the changed branch.
+- A Shau now uses an explicit `ashauJungle` default biome instead of reusing
+  Open Frontier's `denseJungle` palette. It keeps the same vegetation families
+  but lowers ground-cover/canopy multipliers so A Shau no longer inherits the
+  fern-heavy dense-ring look. Open Frontier remains on `denseJungle`.
+- Diagnostic A Shau captures after these changes remain failures, not proof:
+  `artifacts/perf/2026-06-17T09-29-51-947Z` was contact/materialization
+  qualified (`121` shots/hits, peak close candidates `27`) and improved to
+  about `34.3ms/s` dropped-frame time, but measurement trust failed
+  (`probeAvg=75.2ms`, `probeP95=170ms`). The stronger A Shau palette in
+  `artifacts/perf/2026-06-17T09-38-36-176Z` reduced active vegetation into the
+  roughly `20k-30k` range and tail vegetation triangles to about `59k`, but
+  the route had a heavier late render/world-static tail and still failed at
+  about `38.3ms/s`; harness view-slew and shot-presentation warnings also
+  remained. These are useful diagnostics, not completion evidence.
+
+Update 2026-06-17 10:15 UTC / 06:15 EDT:
+
+- Fixed a shot-presentation terrain classifier blind spot: shot-level
+  `unsyncedBufferVisible` now reads the recorder's current hyphenated
+  `terrainByStage['after-simulation']` / `['before-render']` keys through a
+  shared classifier, while still accepting legacy camelCase keys for old
+  artifacts. Previously the shot classifier could undercount visible
+  identity/edge-mask/tile-count churn even when the presentation-gap summary
+  had the correct stage data.
+- Render-submission attribution now preserves `topOwners` per category, and
+  world feature groups/placements carry stable `perfOwnerKey` /
+  `perfOwnerLabel` / `perfOwnerType` metadata. The next A Shau/Open Frontier
+  EARS captures should be able to break a `world_static_features` tail down to
+  at least sector/feature/placement ownership instead of treating the whole
+  static world layer as one opaque bucket.
+- Verification passed: focused tests for terrain-stage classification,
+  presentation-gap summary, tail attribution, and world-feature metadata;
+  source `npm run typecheck`; and targeted ESLint on all touched source and
+  harness files. This is a harness/diagnostic improvement, not dropped-frame
+  completion evidence.

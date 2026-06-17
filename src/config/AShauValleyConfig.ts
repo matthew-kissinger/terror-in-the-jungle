@@ -101,7 +101,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   navmeshAsset: '/data/navmesh/a_shau_valley.bin',
 
   terrain: {
-    defaultBiome: 'denseJungle',
+    defaultBiome: 'ashauJungle',
     biomeRules: [
       // Base rules stay dry-terrain only; wet/channel biomes are not assigned
       // (the hydrology mask that drove them was removed in the water rework).

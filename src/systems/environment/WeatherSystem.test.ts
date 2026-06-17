@@ -29,6 +29,9 @@ type WeatherSystemAny = WeatherSystem & {
   activeRainCount: number;
   rainVelocities: Float32Array;
   rainPositions: Float32Array;
+  rainMatrixUploadPhase: number;
+  lastRainMatrixUploadStart: number;
+  lastRainMatrixUploadCount: number;
   lastSurfaceWetness: number;
   rainInactive: boolean;
   rainMesh?: THREE.InstancedMesh;
@@ -461,8 +464,8 @@ describe('WeatherSystem', () => {
       const systemAny = system as WeatherSystemAny;
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.visible).toBe(true);
-      expect(systemAny.rainMesh?.count).toBe(5);
-      expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.36, 5);
+      expect(systemAny.rainMesh?.count).toBe(3);
+      expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.6, 5);
       expect(systemAny.rainMesh!.count * (systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity)
         .toBeCloseTo(10 * 0.6 * 0.3, 5);
       expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0.3);
@@ -554,10 +557,10 @@ describe('WeatherSystem', () => {
 
       systemAny.updateRain(1);
 
-      expect(systemAny.rainMesh?.count).toBe(5);
+      expect(systemAny.rainMesh?.count).toBe(3);
       expect(systemAny.rainMesh?.instanceMatrix.updateRanges.at(-1)).toEqual({
         start: 0,
-        count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
+        count: 3 * systemAny.rainMesh!.instanceMatrix.itemSize,
       });
     });
 
@@ -572,8 +575,46 @@ describe('WeatherSystem', () => {
 
       expect(systemAny.rainMesh?.instanceMatrix.updateRanges).toEqual([{
         start: 0,
-        count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
+        count: 3 * systemAny.rainMesh!.instanceMatrix.itemSize,
       }]);
+    });
+
+    it('stagger-uploads large steady rain matrix ranges after activation', async () => {
+      const { system } = createSystemWithRainCount(2000);
+      await system.init();
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.3);
+      const systemAny = system as WeatherSystemAny;
+      const itemSize = systemAny.rainMesh!.instanceMatrix.itemSize;
+
+      systemAny.updateRain(1);
+      expect(systemAny.rainMesh?.count).toBe(600);
+      expect(systemAny.rainMesh?.instanceMatrix.updateRanges).toEqual([{
+        start: 0,
+        count: 600 * itemSize,
+      }]);
+
+      systemAny.updateRain(1);
+      expect(systemAny.rainMesh?.instanceMatrix.updateRanges).toEqual([{
+        start: 0,
+        count: 300 * itemSize,
+      }]);
+      expect(system.getDebugInfo()).toMatchObject({
+        rainMatrixUploadStart: 0,
+        rainMatrixUploadCount: 300,
+        rainMatrixActiveElements: 600 * itemSize,
+        rainMatrixElementsPerFrame: 300 * itemSize,
+        rainMatrixBytesPerFrame: 300 * itemSize * Float32Array.BYTES_PER_ELEMENT,
+      });
+
+      systemAny.updateRain(1);
+      expect(systemAny.rainMesh?.instanceMatrix.updateRanges).toEqual([{
+        start: 300 * itemSize,
+        count: 300 * itemSize,
+      }]);
+      expect(system.getDebugInfo()).toMatchObject({
+        rainMatrixUploadStart: 300,
+        rainMatrixUploadCount: 300,
+      });
     });
   });
 

@@ -81,6 +81,7 @@ describe('VEGETATION_TYPES production imposter policy', () => {
   it('keeps the retired small palm out of runtime vegetation and biome palettes', () => {
     const runtimeIds = VEGETATION_TYPES.map((type) => type.id);
     const biomeIds = [
+      'ashauJungle',
       'denseJungle',
       'highland',
       'ricePaddy',
@@ -220,6 +221,24 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(bamboo?.poissonMinDistance).toBeLessThan(8);
     expect(bamboo?.cluster?.scale).toBeGreaterThan(200);
     expect(bamboo?.cluster?.threshold).toBeGreaterThan(0.7);
+  });
+
+  it('keeps the A Shau jungle palette lighter than the default dense jungle palette', () => {
+    const ashauJungle = getBiome('ashauJungle');
+    const denseJungle = getBiome('denseJungle');
+    const ashauIds = ashauJungle.vegetationPalette.map((entry) => entry.typeId).sort();
+    const denseIds = denseJungle.vegetationPalette.map((entry) => entry.typeId).sort();
+    const ashauGroundCoverMultiplier = ashauJungle.vegetationPalette
+      .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
+      .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
+    const denseGroundCoverMultiplier = denseJungle.vegetationPalette
+      .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
+      .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
+
+    expect(ashauIds).toEqual(denseIds);
+    expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier);
+    expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier * 0.5);
+    expect(ashauGroundCoverMultiplier).toBeGreaterThan(0.9);
   });
 
   it('quarantines the broken low-angle coconut atlas row and trunk cross-fade', () => {

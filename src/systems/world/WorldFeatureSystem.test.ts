@@ -103,6 +103,45 @@ describe('WorldFeatureSystem', () => {
     expect(scene.children.length).toBeGreaterThan(0);
   });
 
+  it('tags world features with stable perf owner metadata for render attribution', async () => {
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'metadata_village',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              id: 'hut_a',
+              modelPath: BuildingModels.STILT_HOUSE,
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
+    const sector = root.children.find((child) => child.name.startsWith('WorldFeatureSector_')) as THREE.Group;
+    const meshes = collectMeshes(root);
+
+    expect(root.userData.perfCategory).toBe('world_static_features');
+    expect(sector.userData.perfOwnerType).toBe('world_feature_sector');
+    expect(meshes.length).toBeGreaterThan(0);
+    expect(meshes.every((mesh) => {
+      let current: THREE.Object3D | null = mesh;
+      while (current) {
+        if (typeof current.userData.perfOwnerKey === 'string') return true;
+        current = current.parent;
+      }
+      return false;
+    })).toBe(true);
+  });
+
   it('spawns generator-backed airfield placements for airfield features', async () => {
     currentConfig = {
       id: GameMode.A_SHAU_VALLEY,

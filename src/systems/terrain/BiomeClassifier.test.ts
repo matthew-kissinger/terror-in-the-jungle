@@ -18,7 +18,7 @@ describe('BiomeClassifier', () => {
       terrainConfig?.defaultBiome ?? 'denseJungle',
     );
 
-    expect(biomeId).toBe('denseJungle');
+    expect(biomeId).toBe('ashauJungle');
   });
 
   it('keeps A Shau upper ridges jungle as the primary biome instead of brown caps', () => {
@@ -32,7 +32,7 @@ describe('BiomeClassifier', () => {
       terrainConfig?.defaultBiome ?? 'denseJungle',
     );
 
-    expect(biomeId).toBe('denseJungle');
+    expect(biomeId).toBe('ashauJungle');
   });
 
   it('does not use a broad A Shau bamboo belt as the primary terrain biome', () => {
@@ -46,7 +46,7 @@ describe('BiomeClassifier', () => {
       terrainConfig?.defaultBiome ?? 'denseJungle',
     );
 
-    expect(biomeId).toBe('denseJungle');
+    expect(biomeId).toBe('ashauJungle');
   });
 
   it('uses A Shau dry low flats as ground-cover pockets outside hydrology masks', () => {
@@ -72,7 +72,7 @@ describe('BiomeClassifier', () => {
       terrainConfig?.defaultBiome ?? 'denseJungle',
     );
 
-    expect(biomeId).toBe('denseJungle');
+    expect(biomeId).toBe('ashauJungle');
   });
 
   it('keeps A Shau bamboo pockets limited to low flat benches', () => {
@@ -92,7 +92,7 @@ describe('BiomeClassifier', () => {
     );
 
     expect(grove).toBe('bambooGrove');
-    expect(slopeRejected).toBe('denseJungle');
+    expect(slopeRejected).toBe('ashauJungle');
   });
 
   it('keeps procedural mid-elevation ground in jungle instead of broad rocky highland', () => {

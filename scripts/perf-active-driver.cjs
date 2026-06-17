@@ -1470,6 +1470,7 @@
 
     if (objectiveKind === 'nearest_opfor') {
       if (canSeeTarget) return true;
+      if (targetDistance <= maxFireDistance) return true;
       if (!sameLockedTarget) return false;
       if (botState !== 'ALERT' && botState !== 'ENGAGE' && botState !== 'ADVANCE') return false;
       return targetDistance <= maxFireDistance;
@@ -1798,7 +1799,7 @@
       const dist = botHorizontalDistance(ctx.eyePos, enemy.position);
       const maxFireDistance = Math.max(0, Number(ctx.config.maxFireDistance || 0));
       const targetVisible = !!ctx.canSeeTarget(enemy.position);
-      const advancesCombatObjective = objective && String(objective.kind || '') === 'nearest_opfor' && dist <= maxFireDistance && targetVisible;
+      const advancesCombatObjective = objective && String(objective.kind || '') === 'nearest_opfor' && dist <= maxFireDistance;
       const acquisitionDistance = Math.max(0, Number(ctx.config.targetAcquisitionDistance || ctx.config.maxFireDistance || 0));
       const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
       const interruptsObjective = !objective || advancesCombatObjective || (dist <= interruptDistance && targetVisible);
@@ -4691,10 +4692,28 @@
       };
     }
 
+    function getCountersSnapshot() {
+      return {
+        shotsFired: state.shotsFired,
+        reloadsIssued: state.reloadsIssued,
+        damageDealt: state.damageDealt,
+        damageTaken: state.damageTaken,
+        kills: state.kills,
+        accuracy: computeAccuracy(state.shotsFiredEngine, state.shotsHitEngine),
+        engineShotsFired: state.shotsFiredEngine,
+        engineShotsHit: state.shotsHitEngine,
+        botState: state.botState,
+        movementState: state.botState,
+        matchEndedAtMs: typeof state.matchEndedAtMs === 'number' ? state.matchEndedAtMs : undefined,
+        matchOutcome: state.matchOutcome,
+      };
+    }
+
     start();
     return {
       stop: stop,
       getDebugSnapshot: getDebugSnapshot,
+      getCountersSnapshot: getCountersSnapshot,
       movementPatternCount: 5, // PATROL/ALERT/ENGAGE/ADVANCE/RESPAWN_WAIT — informative only
       compressFrontline: enableFrontlineCompression,
       mode: opts.mode,
@@ -4734,6 +4753,31 @@
       getDebugSnapshot: function () {
         if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.getDebugSnapshot) return null;
         return globalWindow.__perfHarnessDriverState.getDebugSnapshot();
+      },
+      getCountersSnapshot: function () {
+        if (!globalWindow.__perfHarnessDriverState) return null;
+        if (globalWindow.__perfHarnessDriverState.getCountersSnapshot) {
+          return globalWindow.__perfHarnessDriverState.getCountersSnapshot();
+        }
+        if (globalWindow.__perfHarnessDriverState.getDebugSnapshot) {
+          const state = globalWindow.__perfHarnessDriverState.getDebugSnapshot();
+          if (!state || typeof state !== 'object') return null;
+          return {
+            shotsFired: Number(state.shotsFired ?? 0),
+            reloadsIssued: Number(state.reloadsIssued ?? 0),
+            damageDealt: Number(state.damageDealt ?? 0),
+            damageTaken: Number(state.damageTaken ?? 0),
+            kills: Number(state.kills ?? 0),
+            accuracy: Number(state.accuracy ?? 0),
+            engineShotsFired: Number(state.engineShotsFired ?? 0),
+            engineShotsHit: Number(state.engineShotsHit ?? 0),
+            botState: state.botState,
+            movementState: state.movementState,
+            matchEndedAtMs: state.matchEndedAtMs,
+            matchOutcome: state.matchOutcome,
+          };
+        }
+        return null;
       },
     };
   }

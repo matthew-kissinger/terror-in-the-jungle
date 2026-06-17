@@ -64,6 +64,38 @@ describe('optimizeStaticModelDrawCalls', () => {
     expect((root.children[0] as THREE.BatchedMesh).isBatchedMesh).toBe(true);
   });
 
+  it('carries source owner summaries onto generated batch meshes', () => {
+    const root = new THREE.Group();
+    const first = makeMesh(0x4a5a2a, -2);
+    first.userData.perfOwnerKey = 'world-feature-placement:first';
+    first.userData.perfOwnerLabel = 'village:first';
+    first.userData.perfOwnerType = 'world_feature_placement';
+    const second = makeMesh(0x4a5a2a, 2);
+    second.userData.perfOwnerKey = 'world-feature-placement:second';
+    second.userData.perfOwnerLabel = 'village:second';
+    second.userData.perfOwnerType = 'world_feature_placement';
+    root.add(first, second);
+
+    optimizeStaticModelDrawCalls(root, { strategy: 'batch' });
+
+    const batched = root.children[0] as THREE.BatchedMesh;
+    expect(batched.userData.generatedOptimizedMesh).toBe(true);
+    expect(batched.userData.perfOwnerSummary).toEqual([
+      expect.objectContaining({
+        ownerKey: 'world-feature-placement:first',
+        ownerLabel: 'village:first',
+        ownerType: 'world_feature_placement',
+        sourceMeshCount: 1,
+      }),
+      expect.objectContaining({
+        ownerKey: 'world-feature-placement:second',
+        ownerLabel: 'village:second',
+        ownerType: 'world_feature_placement',
+        sourceMeshCount: 1,
+      }),
+    ]);
+  });
+
   it('deinterleaves GLTFLoader-style attributes before static merging', () => {
     const root = new THREE.Group();
     const material = new THREE.MeshStandardMaterial({ color: 0x4a5a2a });

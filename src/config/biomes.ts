@@ -70,6 +70,22 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
   ],
 };
 
+const BIOME_ASHAU_JUNGLE: BiomeConfig = {
+  id: 'ashauJungle',
+  name: 'A Shau Jungle',
+  groundTexture: 'jungle-floor',
+  groundTileScale: 0.14,
+  groundRoughness: 0.85,
+  vegetationPalette: [
+    { typeId: 'fern',          densityMultiplier: 0.45 },
+    { typeId: 'elephantEar',   densityMultiplier: 0.58 },
+    { typeId: 'fanPalm',      densityMultiplier: 0.78 },
+    { typeId: 'coconut',      densityMultiplier: 0.55 },
+    { typeId: 'bambooGrove',  densityMultiplier: 0.14 },
+    { typeId: 'bananaPlant',  densityMultiplier: 0.28 },
+  ],
+};
+
 const BIOME_HIGHLAND: BiomeConfig = {
   id: 'highland',
   name: 'Highland',
@@ -188,6 +204,7 @@ const BIOME_DEFOLIATED: BiomeConfig = {
 /** All built-in biomes keyed by id for fast lookup. */
 const BIOMES: Record<string, BiomeConfig> = {
   [BIOME_DENSE_JUNGLE.id]: BIOME_DENSE_JUNGLE,
+  [BIOME_ASHAU_JUNGLE.id]: BIOME_ASHAU_JUNGLE,
   [BIOME_HIGHLAND.id]:     BIOME_HIGHLAND,
   [BIOME_RICE_PADDY.id]:   BIOME_RICE_PADDY,
   [BIOME_RIVERBANK.id]:    BIOME_RIVERBANK,

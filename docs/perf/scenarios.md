@@ -23,6 +23,14 @@ Gated scenarios (when a baseline is tracked): `combat120`,
 dropped-frame completion, use the paired `openfrontier:ears` and `ashau:ears`
 artifacts with `check:dropped-frame-ears`; other scenarios are diagnostic only.
 
+Open Frontier and A Shau are large-map scenarios, so contact density can vary
+between captures even when code is unchanged. A low-contact run is useful
+diagnostic evidence for route, terrain, loading, and baseline render pressure,
+but it is not comparable completion evidence for STABILIZAT-4. Treat a run as
+completion-lane only when the dropped-frame EARS checker also passes active
+combat shot/hit thresholds and NPC materialization pressure; otherwise call out
+the route/contact variance instead of averaging it into a win or regression.
+
 ## Scenario-specific overrides
 
 `frontier30m` uses perf-harness-only URL overrides from

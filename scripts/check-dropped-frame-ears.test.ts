@@ -21,7 +21,9 @@ type ArtifactOptions = {
   presentationTerrainOverrides?: Record<string, unknown>;
   presentationGapCount?: number;
   harnessWarnings?: boolean;
+  lowCombat?: boolean;
   thinMaterializationPressure?: boolean;
+  burstyMaterializationContact?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -38,15 +40,23 @@ function tempArtifact(options: ArtifactOptions): string {
   const harnessWarningStatus = options.harnessWarnings ? 'warn' : 'pass';
   const materializationPeakCandidates = options.thinMaterializationPressure ? 1 : 5;
   const materializationPeakRendered = options.thinMaterializationPressure ? 1 : 4;
-  const materializationSamplesWithCandidates = options.thinMaterializationPressure ? 1 : 3;
+  const materializationSampleCount = options.burstyMaterializationContact ? 40 : 8;
+  const materializationSamplesWithCandidates = options.thinMaterializationPressure
+    ? 1
+    : options.burstyMaterializationContact
+      ? 2
+      : 3;
   const materializationStatus = options.thinMaterializationPressure ? 'warn' : 'pass';
+  const combatStatus = options.lowCombat ? 'fail' : 'pass';
+  const shotCount = options.lowCombat ? 0 : 80;
+  const hitCount = options.lowCombat ? 0 : 9;
   const checks = [
     { id: 'raf_stutter_25ms_percent', status: 'pass', value: 0.1, message: 'ok' },
     { id: 'raf_hitch_33ms_percent', status: 'pass', value: 0.1, message: 'ok' },
     { id: 'raf_estimated_dropped_60hz_frames_per_second', status: 'pass', value: 0.01, message: 'ok' },
     { id: 'raf_dropped_frame_time_60hz_ms_per_second', status: 'pass', value: 0.2, message: 'ok' },
-    { id: 'harness_min_shots_fired', status: 'pass', value: 80, message: 'ok' },
-    { id: 'harness_min_hits_recorded', status: 'pass', value: 9, message: 'ok' },
+    { id: 'harness_min_shots_fired', status: combatStatus, value: shotCount, message: 'ok' },
+    { id: 'harness_min_hits_recorded', status: combatStatus, value: hitCount, message: 'ok' },
     { id: 'npc_materialization_pressure', status: materializationStatus, value: materializationPeakCandidates, message: 'ok' },
     { id: 'harness_route_snap_trust', status: harnessWarningStatus, value: 0, message: 'ok' },
     { id: 'harness_frontline_compression_equivalence', status: harnessWarningStatus, value: 0, message: 'ok' },
@@ -67,7 +77,7 @@ function tempArtifact(options: ArtifactOptions): string {
     },
     rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
     closeModelEnvelope: {
-      sampleCount: 8,
+      sampleCount: materializationSampleCount,
       samplesWithCandidates: materializationSamplesWithCandidates,
       samplesWithRenderedCloseModels: materializationSamplesWithCandidates,
       peakCandidatesWithinCloseRadius: materializationPeakCandidates,
@@ -134,6 +144,9 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
   it('classifies a trusted same-experience artifact as proven', () => {
     const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({ scenario: 'a_shau_valley' }));
     expect(artifact.classification).toBe('proven');
+    expect(artifact.contactQualified).toBe(true);
+    expect(artifact.materializationQualified).toBe(true);
+    expect(artifact.completionLaneQualified).toBe(true);
     expect(artifact.failCount).toBe(0);
     expect(artifact.warnCount).toBe(1);
   });
@@ -161,6 +174,40 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.checks.some((check) => (
       check.id === 'npc_materialization_pressure'
       && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('keeps burst-only materialization artifacts diagnostic even when peak pressure passes', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      burstyMaterializationContact: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.materializationQualified).toBe(false);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_pressure'
+      && check.status === 'pass'
+    ))).toBe(true);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_sustained_contact'
+      && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('marks low-combat artifacts as contact-unqualified diagnostics', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      lowCombat: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.contactQualified).toBe(false);
+    expect(artifact.completionLaneQualified).toBe(false);
+    expect(artifact.checks.some((check) => (
+      check.id === 'active_combat_shots'
+      && check.status === 'fail'
+      && check.value === 0
     ))).toBe(true);
   });
 
