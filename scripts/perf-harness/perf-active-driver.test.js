@@ -85,6 +85,7 @@ const {
   shouldCooldownCombatTargetAfterRouteFailure,
   shouldCooldownObjectiveAfterRouteFailure,
   createDirectCombatFallbackPath,
+  computeCombatApproachCandidates,
   isRouteSnapTrusted,
   shouldReloadMagazine,
   shouldIssueFireStart,
@@ -2487,6 +2488,23 @@ describe('route objective-progress recovery', () => {
       targetDistance: 180,
       maxDistance: 700,
       targetVisible: true,
+    })).toBe(true);
+  });
+
+  it('builds combat approach candidates short of an occluded target endpoint', () => {
+    const player = { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 };
+    const target = { x: 0, y: PLAYER_EYE_HEIGHT, z: -220 };
+    const candidates = computeCombatApproachCandidates(player, target);
+
+    expect(candidates.length).toBeGreaterThan(1);
+    expect(candidates[0].z).toBeGreaterThan(target.z);
+    expect(candidates[0].z).toBeLessThan(player.z);
+    expect(Math.abs(candidates[0].x)).toBeLessThan(0.001);
+    expect(candidates.some(candidate => Math.abs(candidate.x) > 1)).toBe(true);
+    expect(candidates.every(candidate => {
+      const playerDistance = Math.hypot(candidate.x - player.x, candidate.z - player.z);
+      const targetDistance = Math.hypot(target.x - player.x, target.z - player.z);
+      return playerDistance < targetDistance;
     })).toBe(true);
   });
 

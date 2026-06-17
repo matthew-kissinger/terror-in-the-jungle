@@ -460,6 +460,13 @@ describe('HosekWilkieSkyBackend dev-flag back-out', () => {
     const mat = mesh.material as THREE.Material & { isNodeMaterial?: boolean };
     expect(mat.isNodeMaterial).toBe(true);
   });
+
+  it('tags the visual dome as atmosphere for render-submission attribution', () => {
+    const backend = new HosekWilkieSkyBackend({ mode: 'tsl' });
+    const mesh = backend.getMesh();
+    expect(mesh.name).toBe('HosekWilkieSkyDome');
+    expect(mesh.userData.perfCategory).toBe('atmosphere');
+  });
 });
 
 describe('HosekWilkieSkyBackend night-red fix on sunColor', () => {

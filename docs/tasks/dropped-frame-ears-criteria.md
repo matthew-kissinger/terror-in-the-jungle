@@ -48,6 +48,9 @@ Unless the owner explicitly changes this, a completion candidate means all of:
   valid optimization can simplify or replace those paths when evidence shows a
   frame-pacing win, but it must not hide terrain/CDLOD cracks, weaken target or
   vehicle readability, or change culling semantics without explicit proof.
+  Current harness support tags the sky dome under the `atmosphere` render
+  category and records sky-refresh diagnostic stats in runtime samples; this
+  still does not isolate every shader/material fog path inside `RenderMain`.
 - Local sky references to check before inventing a new path:
   `pixel-forge/examples/three-js/examples/jsm/objects/SkyMesh.js`,
   `pixel-forge/examples/three-js/examples/webgpu_sky.html`,
@@ -116,9 +119,10 @@ Executable scaffold:
 | ST4-PERF-019 | Unwanted behavior | If active close models are sampled but tier-transition telemetry is missing, the harness shall not claim materialization-transition stutter is understood or fixed. | `npc_materialization_transition_telemetry` passes: when close models are active/rendered, `materializationTierEvents`, `summary.materializationTierMetrics.totalEvents`, or drained `closeModelStats.transitionWindow` / `summary.materializationTierMetrics.transitionWindowTotalEvents` includes at least one transition. | `runtime-samples.json`, `summary.materializationTierMetrics`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-020 | Event-driven | When sky, cloud, sun, fog, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | `atmosphere_cpu_sync_tail` stays below warning threshold, or candidate notes show the new path improves or preserves scenario mood, terrain readability, NPC/vehicle readability, and owner-visible quality while reducing measured render/presentation cost. Shader-side fog/sky cost can still hide inside `RenderMain.renderer.render`, so a low CPU-sync value is not proof that fog is free. | render attribution, `runtime-samples.json`, final frame/screenshot evidence, owner playtest |
 | ST4-PERF-021 | Unwanted behavior | If a `RenderMain.renderer.render` tail coincides with sudden renderer-memory growth, the agent shall treat asset or material GPU residency as unproven even when CPU-side pool-load counters are zero. | Candidate evidence shows no large texture/geometry/program jump around render-tail epochs, or the resources are intentionally warmed during pre-reveal startup with startup marks naming the warmup path. | `runtime-samples.json`, renderer memory counters, startup marks |
-| ST4-PERF-022 | Event-driven | When the owner suspects fog or atmosphere is hurting performance, the harness shall surface the measured atmosphere CPU-sync path before changing visuals. | `check:dropped-frame-ears` reports `atmosphere_cpu_sync_tail`; values `>=4ms` are warning-band suspects and values `>=16ms` keep the artifact diagnostic until the atmosphere/fog authority chain is measured or simplified. | `scripts/check-dropped-frame-ears.ts`, `runtime-samples.json` |
+| ST4-PERF-022 | Event-driven | When the owner suspects fog or atmosphere is hurting performance, the harness shall surface measured atmosphere CPU-sync, sky-refresh, and render-category evidence before changing visuals. | `check:dropped-frame-ears` reports `atmosphere_cpu_sync_tail`; values `>=4ms` are warning-band suspects and values `>=16ms` keep the artifact diagnostic until the atmosphere/fog authority chain is measured or simplified. Runtime samples include `atmosphereSkyRefresh`, and render-submission attribution can see the sky dome under category `atmosphere`. | `scripts/check-dropped-frame-ears.ts`, `scripts/perf-capture.ts`, `runtime-samples.json`, render-submission samples |
 | ST4-PERF-023 | Complex | A Shau and Open Frontier EARS captures shall not start the measured completion window while the active driver is still in a low-contact route-only approach. | Packaged EARS captures use `--pressure-ready-warmup true --pressure-ready-timeout 120`; `pressure_ready_measurement_window` passes only when the timed window begins after live fire or an active runtime-shot-preview hit, with pre-window driver shots/hits subtracted from measured counters. Timeout artifacts remain diagnostic for routing/contact, not perf completion. This is not frontline compression and does not reduce NPC count, vegetation, map size, or default gameplay content. | `package.json`, `summary.perfRuntime`, `validation.json`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-024 | Unwanted behavior | If combat fire is mostly terrain-blocked during a claimed pressure window, the artifact shall stay diagnostic because it is not sampling valid combat pressure. | `combat_fire_terrain_block_rate` passes below 25%, warns from 25-50%, and fails at 50% or higher once at least 10 combat-fire terrain checks were requested. High blocked rates point to target/route/LOS geometry that must be fixed before trusting dropped-frame completion evidence. | `runtime-samples.json`, `validation.json`, `scripts/check-dropped-frame-ears.ts` |
+| ST4-PERF-025 | Unwanted behavior | If occluded combat-front routing repeatedly snaps exact enemy endpoints far off the navmesh, the harness shall route movement to trusted approach anchors instead of hiding the mismatch by loosening snap limits. | `harness_route_snap_trust` remains pass/warn based on the 24m trusted snap limit, and artifacts surface `combatApproachRouteCount` so a candidate can prove the driver used approach routing without frontline compression, enemy teleporting, or direct terrain pursuit through hills. | `validation.json`, `runtime-samples.json`, driver final state |
 
 ## Candidate Classification
 
@@ -146,17 +150,17 @@ places where future loops should replace judgement with numbers:
 - A fog/material-family A/B sensor that distinguishes scene fog, terrain
   far-canopy tint/haze, billboard fog, NPC-impostor fog, and aircraft
   fog-distance culling before accepting a shader-side fog simplification. The
-  current `atmosphere_cpu_sync_tail` check only covers the CPU-side
-  `World.atmosphereSync` segment; it does not isolate fragment/material fog
-  work inside `RenderMain.renderer.render`.
+  current `atmosphere_cpu_sync_tail`, sky-refresh stats, and sky-dome
+  `atmosphere` render category narrow attribution, but they still do not
+  isolate every fragment/material fog path inside `RenderMain.renderer.render`.
 - A sky/cloud/sun/fog replacement spike against Three.js/WebGPU examples or
   local reference code if atmosphere or fog shows up in render tails or remains
   visually unacceptable after the rain burn.
 - Pressure-ready warmup tells us whether the measured window started under
-  active live fire or runtime-shot-preview-ready combat pressure; it does not by
-  itself prove sustained pressure across the full measured window. Keep the
-  sustained combat, combat-fire terrain-block, and close-model EARS gates
-  active.
+  active current live fire or runtime-shot-preview-ready combat pressure; it
+  does not by itself prove sustained pressure across the full measured window.
+  Keep the sustained combat, combat-fire terrain-block, route-snap, and
+  close-model EARS gates active.
 - Promotion of `presentationGapContexts.materialization` and drained
   `closeModelStats.transitionWindow` from diagnostic summary into pass/fail
   budgets once a trusted paired capture establishes acceptable close-GLB

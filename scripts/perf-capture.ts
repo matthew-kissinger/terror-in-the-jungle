@@ -196,6 +196,7 @@ type RuntimeSample = {
   closeModelStats?: RuntimeCloseModelStats;
   vegetation?: RuntimeVegetationStats;
   weather?: RuntimeWeatherStats;
+  atmosphereSkyRefresh?: AtmosphereSkyRefreshStats;
   terrainRecoveryEvents?: Record<string, unknown>[];
   materializationTierEvents?: Record<string, unknown>[];
   combatBreakdown?: {
@@ -665,6 +666,7 @@ type RuntimeSample = {
     maxPathStartSnapDistance?: number | null;
     maxPathEndSnapDistance?: number | null;
     untrustedPathSnapCount?: number | null;
+    combatApproachRouteCount?: number | null;
     routeSnapEpochs?: Record<string, unknown>[];
     routeProgressDistance?: number | null;
     routeProgressAgeMs?: number | null;
@@ -833,6 +835,7 @@ type HarnessDriverFinal = {
   maxPathStartSnapDistance?: number | null;
   maxPathEndSnapDistance?: number | null;
   untrustedPathSnapCount?: number | null;
+  combatApproachRouteCount?: number | null;
   routeSnapEpochs?: Record<string, unknown>[];
   routeProgressDistance?: number | null;
   routeProgressAgeMs?: number | null;
@@ -895,6 +898,7 @@ type CaptureSummary = {
   rendererBackend?: RuntimeSample['rendererBackend'];
   gpuTiming?: GpuTimingSummary;
   droppedFrameMetrics?: DroppedFrameSummary;
+  atmosphereSkyRefresh?: AtmosphereSkyRefreshSummary;
   renderSubmissionMetrics?: RenderSubmissionSummary;
   materializationTierMetrics?: MaterializationTierEventSummary;
   simLaneTransitionMetrics?: SimLaneTransitionSummary;
@@ -971,6 +975,23 @@ type CaptureSummary = {
   // capture. Undefined when no sample carried a combatBreakdown. Type +
   // implementation live in ./perf-tail-attribution.
   tailAttribution?: TailAttribution;
+};
+
+type AtmosphereSkyRefreshStats = {
+  available: boolean;
+  fireCount: number;
+  totalMs: number;
+  lastMs: number;
+  avgMs: number;
+};
+
+type AtmosphereSkyRefreshSummary = {
+  availableSamples: number;
+  maxFireCount: number;
+  maxTotalMs: number;
+  maxLastMs: number;
+  maxAvgMs: number;
+  latest?: AtmosphereSkyRefreshStats;
 };
 
 type QuietMachineSnapshot = {
@@ -2603,6 +2624,29 @@ function summarizeDroppedFrames(runtimeSamples: RuntimeSample[], durationSeconds
   };
 }
 
+function summarizeAtmosphereSkyRefresh(runtimeSamples: RuntimeSample[]): AtmosphereSkyRefreshSummary | undefined {
+  const samples = runtimeSamples
+    .map(sample => sample.atmosphereSkyRefresh)
+    .filter((sample): sample is AtmosphereSkyRefreshStats => !!sample);
+  if (samples.length === 0) {
+    return undefined;
+  }
+
+  const finiteMax = (values: number[]): number => {
+    const finite = values.filter(Number.isFinite);
+    return finite.length > 0 ? Math.max(0, ...finite) : 0;
+  };
+  const availableSamples = samples.filter(sample => sample.available).length;
+  return {
+    availableSamples,
+    maxFireCount: finiteMax(samples.map(sample => Number(sample.fireCount))),
+    maxTotalMs: finiteMax(samples.map(sample => Number(sample.totalMs))),
+    maxLastMs: finiteMax(samples.map(sample => Number(sample.lastMs))),
+    maxAvgMs: finiteMax(samples.map(sample => Number(sample.avgMs))),
+    latest: samples[samples.length - 1],
+  };
+}
+
 function compactRenderSubmissionCategory(
   category: RuntimeRenderSubmissionCategory | undefined
 ): RuntimeRenderSubmissionCategory | undefined {
@@ -3807,6 +3851,15 @@ function validateRun(
     sampleUntrustedSnapCount,
     Number.isFinite(finalUntrustedSnapCount) ? finalUntrustedSnapCount : 0
   );
+  const combatApproachRouteCount = Math.max(
+    0,
+    ...runtimeSamples
+      .map(s => Number(s.harnessDriver?.combatApproachRouteCount))
+      .filter(Number.isFinite),
+    Number.isFinite(Number(options?.harnessDriverFinal?.combatApproachRouteCount))
+      ? Number(options?.harnessDriverFinal?.combatApproachRouteCount)
+      : 0
+  );
   const harnessRouteSnapObserved = !!options?.harnessDriverFinal
     || runtimeSamples.some(s => !!s.harnessDriver);
   if (harnessRouteSnapObserved || maxRouteSnapDistance > 0 || untrustedSnapCount > 0) {
@@ -3814,7 +3867,7 @@ function validateRun(
       id: 'harness_route_snap_trust',
       status: untrustedSnapCount === 0 && maxRouteSnapDistance <= 24 ? 'pass' : 'warn',
       value: maxRouteSnapDistance,
-      message: `Harness max navmesh route snap ${maxRouteSnapDistance.toFixed(1)}m; untrusted snapped paths rejected=${untrustedSnapCount}`
+      message: `Harness max navmesh route snap ${maxRouteSnapDistance.toFixed(1)}m; untrusted snapped paths rejected=${untrustedSnapCount}; combat approach routes=${combatApproachRouteCount}`
     });
   }
 
@@ -4628,6 +4681,8 @@ type PressureReadyWarmupSnapshot = {
   activeCloseModels: number;
   engineShotsFired: number;
   engineShotsHit: number;
+  engineShotDelta: number;
+  engineHitDelta: number;
   botState: string | null;
   currentTargetDistance: number | null;
   nearestPerceivedEnemyDistance: number | null;
@@ -4722,6 +4777,8 @@ async function waitForPressureReadyWarmup(
   let samples = 0;
   let consecutiveReadySamples = 0;
   let lastSnapshot: PressureReadyWarmupSnapshot | null = null;
+  let previousEngineShotsFired: number | null = null;
+  let previousEngineShotsHit: number | null = null;
 
   while (Date.now() <= deadline) {
     const snapshot = await safeAwait(
@@ -4762,29 +4819,16 @@ async function waitForPressureReadyWarmup(
           ? driverState.lastRuntimeShotPreviewReason
           : null;
 
-        let reason = 'not-ready';
-        let ready = false;
-        if (engineShotsFired > 0) {
-          ready = true;
-          reason = 'live-fire';
-        } else if (
-          botState === 'ENGAGE'
-          && currentTargetDistance !== null
-          && currentTargetDistance <= 220
-          && lastRuntimeShotPreviewStatus === 'hit'
-        ) {
-          ready = true;
-          reason = 'runtime-shot-preview-hit';
-        }
-
         return {
-          ready,
-          reason,
+          ready: false,
+          reason: 'not-ready',
           closeCandidates,
           renderedCloseModels,
           activeCloseModels,
           engineShotsFired,
           engineShotsHit,
+          engineShotDelta: 0,
+          engineHitDelta: 0,
           botState,
           currentTargetDistance,
           nearestPerceivedEnemyDistance,
@@ -4799,6 +4843,33 @@ async function waitForPressureReadyWarmup(
     );
 
     samples++;
+    if (snapshot) {
+      const engineShotsFired = Number(snapshot.engineShotsFired);
+      const engineShotsHit = Number(snapshot.engineShotsHit);
+      const shotDelta = previousEngineShotsFired !== null && Number.isFinite(engineShotsFired)
+        ? Math.max(0, engineShotsFired - previousEngineShotsFired)
+        : 0;
+      const hitDelta = previousEngineShotsHit !== null && Number.isFinite(engineShotsHit)
+        ? Math.max(0, engineShotsHit - previousEngineShotsHit)
+        : 0;
+      snapshot.engineShotDelta = shotDelta;
+      snapshot.engineHitDelta = hitDelta;
+      const runtimePreviewHit = snapshot.lastRuntimeShotPreviewStatus === 'hit';
+      if (shotDelta > 0 && (hitDelta > 0 || runtimePreviewHit)) {
+        snapshot.ready = true;
+        snapshot.reason = hitDelta > 0 ? 'live-fire-hit-delta' : 'live-fire-preview-hit';
+      } else if (
+        snapshot.botState === 'ENGAGE'
+        && snapshot.currentTargetDistance !== null
+        && snapshot.currentTargetDistance <= 220
+        && runtimePreviewHit
+      ) {
+        snapshot.ready = true;
+        snapshot.reason = 'runtime-shot-preview-hit';
+      }
+      if (Number.isFinite(engineShotsFired)) previousEngineShotsFired = engineShotsFired;
+      if (Number.isFinite(engineShotsHit)) previousEngineShotsHit = engineShotsHit;
+    }
     lastSnapshot = snapshot;
     if (snapshot?.ready) {
       consecutiveReadySamples++;
@@ -4811,7 +4882,7 @@ async function waitForPressureReadyWarmup(
       logStep(
         `🎯 Pressure-ready warmup passed after ${(elapsedMs / 1000).toFixed(1)}s ` +
         `(reason=${snapshot?.reason ?? 'unknown'}, close=${snapshot?.renderedCloseModels ?? 0}/${snapshot?.closeCandidates ?? 0}, ` +
-        `shots=${snapshot?.engineShotsFired ?? 0}, state=${snapshot?.botState ?? 'unknown'}, ` +
+        `shots=${snapshot?.engineShotsFired ?? 0}(+${snapshot?.engineShotDelta ?? 0}), state=${snapshot?.botState ?? 'unknown'}, ` +
         `preview=${snapshot?.lastRuntimeShotPreviewStatus ?? 'n/a'}/${snapshot?.lastRuntimeShotPreviewReason ?? 'n/a'})`
       );
       return {
@@ -4834,7 +4905,7 @@ async function waitForPressureReadyWarmup(
   logStep(
     `⚠ Pressure-ready warmup timed out after ${(elapsedMs / 1000).toFixed(1)}s ` +
     `(lastReason=${lastSnapshot?.reason ?? 'none'}, close=${lastSnapshot?.renderedCloseModels ?? 0}/${lastSnapshot?.closeCandidates ?? 0}, ` +
-    `shots=${lastSnapshot?.engineShotsFired ?? 0}, state=${lastSnapshot?.botState ?? 'unknown'}, ` +
+    `shots=${lastSnapshot?.engineShotsFired ?? 0}(+${lastSnapshot?.engineShotDelta ?? 0}), state=${lastSnapshot?.botState ?? 'unknown'}, ` +
     `objective=${lastSnapshot?.objectiveKind ?? 'unknown'}:${lastSnapshot?.objectiveDistance ?? 'n/a'}m, ` +
     `preview=${lastSnapshot?.lastRuntimeShotPreviewStatus ?? 'n/a'}/${lastSnapshot?.lastRuntimeShotPreviewReason ?? 'n/a'})`
   );
@@ -5019,6 +5090,7 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
     maxPathStartSnapDistance: nullableNumber(result.maxPathStartSnapDistance),
     maxPathEndSnapDistance: nullableNumber(result.maxPathEndSnapDistance),
     untrustedPathSnapCount: nullableNumber(result.untrustedPathSnapCount),
+    combatApproachRouteCount: nullableNumber(result.combatApproachRouteCount),
     routeSnapEpochs: objectArray(result.routeSnapEpochs),
     routeProgressDistance: nullableNumber(result.routeProgressDistance),
     routeProgressAgeMs: nullableNumber(result.routeProgressAgeMs),
@@ -6131,6 +6203,7 @@ async function runCapture(): Promise<void> {
           (window as any).perf?.reset?.();
           (window as any).__perfHarnessObservers?.reset?.();
           (window as any).__gameLoopFrameBreakdown?.reset?.();
+          (window as any).__atmosphereSkyRefreshStats?.({ reset: true });
           (window as any).__materializationTierEvents?.({ clear: true, limit: 1 });
           (window as any).__engine?.systemManager?.combatantSystem?.combatantRenderer
             ?.getCloseModelRuntimeStats?.({ drainTransitionWindow: true });
@@ -6425,6 +6498,24 @@ async function runCapture(): Promise<void> {
               rainMatrixBytesPerFrame: Number(debug.rainMatrixBytesPerFrame ?? 0)
             };
           };
+          const atmosphereSkyRefresh = (() => {
+            try {
+              const accessor = (window as any).__atmosphereSkyRefreshStats;
+              if (typeof accessor !== 'function') {
+                return { available: false, fireCount: 0, totalMs: 0, lastMs: 0, avgMs: 0 };
+              }
+              const stats = accessor();
+              return {
+                available: true,
+                fireCount: Number(stats?.fireCount ?? 0),
+                totalMs: Number(stats?.totalMs ?? 0),
+                lastMs: Number(stats?.lastMs ?? 0),
+                avgMs: Number(stats?.avgMs ?? 0)
+              };
+            } catch {
+              return { available: false, fireCount: 0, totalMs: 0, lastMs: 0, avgMs: 0 };
+            }
+          })();
           const rawHarnessEngineShots = Number(harnessCounters?.engineShotsFired ?? harnessDriver?.engineShotsFired);
           const rawHarnessEngineHits = Number(harnessCounters?.engineShotsHit ?? harnessDriver?.engineShotsHit);
           const harnessEngineShots = Number.isFinite(rawHarnessEngineShots)
@@ -6522,6 +6613,7 @@ async function runCapture(): Promise<void> {
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
             vegetation: normalizeVegetationDebug(vegetationDebug),
             weather: normalizeWeatherDebug(weatherDebug),
+            atmosphereSkyRefresh,
             closeModelStats: closeModelStats && typeof closeModelStats === 'object'
               ? {
                 closeRadiusMeters: Number(closeModelStats.closeRadiusMeters ?? 0),
@@ -7226,6 +7318,7 @@ async function runCapture(): Promise<void> {
               maxPathStartSnapDistance: nullableNumber(harnessDriver.maxPathStartSnapDistance),
               maxPathEndSnapDistance: nullableNumber(harnessDriver.maxPathEndSnapDistance),
               untrustedPathSnapCount: nullableNumber(harnessDriver.untrustedPathSnapCount),
+              combatApproachRouteCount: nullableNumber(harnessDriver.combatApproachRouteCount),
               routeSnapEpochs: compactDiagnosticArray(
                 harnessDriver.routeSnapEpochs,
                 8,
@@ -7864,10 +7957,11 @@ async function runCapture(): Promise<void> {
           missedSampleErrors: Object.keys(missedSampleErrors).length > 0 ? missedSampleErrors : undefined
         },
         measurementTrust,
-        rendererBackend: latestRendererBackend(runtimeSamples),
-        gpuTiming: summarizeGpuTiming(runtimeSamples, gpuTiming, gpuTimingQueryEnabled),
-        droppedFrameMetrics: summarizeDroppedFrames(runtimeSamples, durationSeconds),
-        renderSubmissionMetrics: summarizeRenderSubmissions(runtimeSamples),
+    rendererBackend: latestRendererBackend(runtimeSamples),
+    gpuTiming: summarizeGpuTiming(runtimeSamples, gpuTiming, gpuTimingQueryEnabled),
+    droppedFrameMetrics: summarizeDroppedFrames(runtimeSamples, durationSeconds),
+    atmosphereSkyRefresh: summarizeAtmosphereSkyRefresh(runtimeSamples),
+    renderSubmissionMetrics: summarizeRenderSubmissions(runtimeSamples),
         materializationTierMetrics: summarizeMaterializationTierEvents(runtimeSamples),
         simLaneTransitionMetrics: summarizeSimLaneTransitions(runtimeSamples),
         closeModelEnvelope: summarizeCloseModelEnvelope(runtimeSamples),

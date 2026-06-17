@@ -212,6 +212,10 @@
   const NAVMESH_START_SNAP_RADIUS = 80;
   const NAVMESH_TARGET_SNAP_RADIUS = 80;
   const NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE = 24;
+  const COMBAT_APPROACH_MIN_HOLD_DISTANCE = 45;
+  const COMBAT_APPROACH_MAX_HOLD_DISTANCE = 170;
+  const COMBAT_APPROACH_LATERAL_MIN = 24;
+  const COMBAT_APPROACH_LATERAL_MAX = 90;
   // Humanized synthetic-camera slew cap. The driver used to allow 24 deg yaw /
   // 8 deg pitch in one tick, which made route-to-fire handoffs look unlike a
   // player mouse sweep and could perturb terrain/CDLOD presentation.
@@ -1633,6 +1637,45 @@
     ];
   }
 
+  function computeCombatApproachCandidates(playerPos, target) {
+    if (!playerPos || !target) return [];
+    const distance = botHorizontalDistance(playerPos, target);
+    if (!Number.isFinite(distance) || distance < 1) return [];
+    const dx = Number(target.x || 0) - Number(playerPos.x || 0);
+    const dz = Number(target.z || 0) - Number(playerPos.z || 0);
+    const len = Math.hypot(dx, dz);
+    if (!Number.isFinite(len) || len < 1e-6) return [];
+    const ux = dx / len;
+    const uz = dz / len;
+    const lateralX = -uz;
+    const lateralZ = ux;
+    const holdDistance = Math.min(
+      COMBAT_APPROACH_MAX_HOLD_DISTANCE,
+      Math.max(COMBAT_APPROACH_MIN_HOLD_DISTANCE, distance * 0.22),
+    );
+    const lateralDistance = Math.min(
+      COMBAT_APPROACH_LATERAL_MAX,
+      Math.max(COMBAT_APPROACH_LATERAL_MIN, holdDistance * 0.5),
+    );
+    const targetY = Number.isFinite(Number(target.y)) ? Number(target.y) : Number(playerPos.y || 0);
+    const baseHold = Math.min(holdDistance, Math.max(0, distance - 8));
+    const pushCandidate = (items, backoff, lateral) => {
+      if (!Number.isFinite(backoff) || backoff <= 0 || backoff >= distance) return;
+      const x = Number(target.x || 0) - ux * backoff + lateralX * lateral;
+      const z = Number(target.z || 0) - uz * backoff + lateralZ * lateral;
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+      items.push({ x, y: targetY, z });
+    };
+    const candidates = [];
+    pushCandidate(candidates, baseHold, 0);
+    pushCandidate(candidates, Math.min(distance - 4, baseHold * 1.45), 0);
+    pushCandidate(candidates, baseHold, lateralDistance);
+    pushCandidate(candidates, baseHold, -lateralDistance);
+    pushCandidate(candidates, Math.min(distance - 4, baseHold * 0.75), lateralDistance * 0.5);
+    pushCandidate(candidates, Math.min(distance - 4, baseHold * 0.75), -lateralDistance * 0.5);
+    return candidates;
+  }
+
   function shouldIssueFireStart(firingHeld, weaponFiringActive) {
     if (weaponFiringActive === false) return true;
     return !firingHeld;
@@ -2183,6 +2226,7 @@
       maxPathStartSnapDistance: 0,
       maxPathEndSnapDistance: 0,
       untrustedPathSnapCount: 0,
+      combatApproachRouteCount: 0,
       routeSnapEpochs: [],
       firstObjectiveDistance: null,
       minObjectiveDistance: null,
@@ -2950,6 +2994,31 @@
       }
     }
 
+    function resolveCombatApproachRouteTarget(systems, playerPos, target, targetKindName) {
+      if (targetKindName !== 'current_target' && targetKindName !== 'nearest_opfor') return null;
+      const candidates = computeCombatApproachCandidates(playerPos, target);
+      for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        const snapped = snapOntoNavmeshDetailed(systems, candidate, NAVMESH_TARGET_SNAP_RADIUS);
+        if (!isRouteSnapTrusted({
+          startFound: true,
+          endFound: snapped.found,
+          startDistance: 0,
+          endDistance: snapped.distance,
+        })) {
+          continue;
+        }
+        return {
+          x: Number(snapped.point.x),
+          y: Number.isFinite(Number(snapped.point.y)) ? Number(snapped.point.y) : Number(candidate.y || 0),
+          z: Number(snapped.point.z),
+          routeSnapTrustDistance: NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE,
+          sourceTargetKind: targetKindName,
+        };
+      }
+      return null;
+    }
+
     function sampleHeight(systems, x, z) {
       const terrain = systems && systems.terrainSystem;
       if (!terrain || typeof terrain.getHeightAt !== 'function') return 0;
@@ -3483,6 +3552,11 @@
       if (needsReplan) {
         const combatRoute = targetKindName === 'current_target' || targetKindName === 'nearest_opfor';
         const prePathLos = combatRoute ? queryTargetLineOfSight(systems, playerPos, target) : null;
+        const combatApproachTarget = combatRoute && !(prePathLos && prePathLos.clear)
+          ? resolveCombatApproachRouteTarget(systems, playerPos, target, targetKindName)
+          : null;
+        const pathTarget = combatApproachTarget || target;
+        const usingCombatApproachRoute = !!combatApproachTarget;
         const useDirectCombatRoute = shouldUseDirectCombatRouteBypass({
           targetKind: targetKindName,
           targetDistance: targetDistance,
@@ -3497,12 +3571,19 @@
         });
         const path = useTerrainDirectRoute
           ? createDirectCombatFallbackPath(playerPos, target)
-          : queryPath(systems, playerPos, target);
+          : queryPath(systems, playerPos, pathTarget);
         state.lastWaypointReplanAt = now;
         if (path && path.length > 0) {
           state.waypoints = path;
           state.waypointIdx = 0;
-          state.lastPathQueryStatus = useDirectCombatRoute ? 'direct_combat_fallback' : useTerrainDirectRoute ? 'terrain_direct' : 'ok';
+          if (usingCombatApproachRoute) state.combatApproachRouteCount++;
+          state.lastPathQueryStatus = useDirectCombatRoute
+            ? 'direct_combat_fallback'
+            : useTerrainDirectRoute
+              ? 'terrain_direct'
+              : usingCombatApproachRoute
+                ? 'combat_approach'
+                : 'ok';
           state.lastPathLength = path.length;
           state.lastPathFailureReason = null;
         } else {
@@ -4549,6 +4630,7 @@
         maxPathStartSnapDistance: state.maxPathStartSnapDistance,
         maxPathEndSnapDistance: state.maxPathEndSnapDistance,
         untrustedPathSnapCount: state.untrustedPathSnapCount,
+        combatApproachRouteCount: state.combatApproachRouteCount,
         routeSnapEpochs: state.routeSnapEpochs.slice(),
         firstObjectiveDistance: state.firstObjectiveDistance,
         minObjectiveDistance: state.minObjectiveDistance,
@@ -4694,6 +4776,7 @@
         maxPathStartSnapDistance: state.maxPathStartSnapDistance,
         maxPathEndSnapDistance: state.maxPathEndSnapDistance,
         untrustedPathSnapCount: state.untrustedPathSnapCount,
+        combatApproachRouteCount: state.combatApproachRouteCount,
         routeSnapEpochs: state.routeSnapEpochs.slice(),
         firstObjectiveDistance: state.firstObjectiveDistance,
         minObjectiveDistance: state.minObjectiveDistance,
@@ -4889,6 +4972,7 @@
       shouldCooldownCombatTargetAfterRouteFailure: shouldCooldownCombatTargetAfterRouteFailure,
       shouldCooldownObjectiveAfterRouteFailure: shouldCooldownObjectiveAfterRouteFailure,
       createDirectCombatFallbackPath: createDirectCombatFallbackPath,
+      computeCombatApproachCandidates: computeCombatApproachCandidates,
       isRouteSnapTrusted: isRouteSnapTrusted,
       shouldReloadMagazine: shouldReloadMagazine,
       shouldIssueFireStart: shouldIssueFireStart,

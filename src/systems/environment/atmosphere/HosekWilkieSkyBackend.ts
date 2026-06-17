@@ -348,6 +348,7 @@ export class HosekWilkieSkyBackend implements ISkyBackend {
     this.mesh.frustumCulled = false;
     this.mesh.matrixAutoUpdate = true;
     this.mesh.name = 'HosekWilkieSkyDome';
+    this.mesh.userData.perfCategory = 'atmosphere';
     this.bakeLUT();
     this.lutDirty = false;
     this.refreshSkyTexture();
