@@ -32,6 +32,16 @@ type SceneAttributionCategory = {
   visibleMeshes: number;
 };
 
+type RenderSubmissionCategory = {
+  category: string;
+  drawSubmissions: number;
+  triangles: number;
+  instances: number;
+  materials: number;
+  geometries: number;
+  samples: number;
+};
+
 export type NumericStats = {
   count: number;
   total: number;
@@ -50,6 +60,32 @@ export type PresentationGapSceneSummary = {
   visibleInstancesTotal: number;
   topVisibleDrawCallLike: SceneAttributionCategory[];
   topVisibleTriangles: SceneAttributionCategory[];
+};
+
+export type PresentationGapMaterializationSummary = {
+  gapCount: number;
+  correlatedGapCount: number;
+  closeModelStatsObservedCount: number;
+  closeModelActiveGapCount: number;
+  materializationEventGapCount: number;
+  totalMaterializationEvents: number;
+  renderSubmissionCorrelatedGapCount: number;
+  droppedFrameTimeWithCloseModels60HzMs: number;
+  droppedFrameTimeWithMaterializationEvents60HzMs: number;
+  droppedFrameTimeByCloseModelActivity: Record<'active' | 'inactive' | 'missing', number>;
+  nearestSampleDeltaMs?: NumericStats;
+  candidatesWithinCloseRadius?: NumericStats;
+  renderedCloseModels?: NumericStats;
+  activeCloseModels?: NumericStats;
+  fallbackCount?: NumericStats;
+  poolLoads?: NumericStats;
+  closeModelMs?: NumericStats;
+  materializationEventsMs?: NumericStats;
+  materializationEventsPerGap?: NumericStats;
+  renderFrameDrawSubmissions?: NumericStats;
+  renderFrameTriangles?: NumericStats;
+  topRenderCategoriesByDrawSubmissions: RenderSubmissionCategory[];
+  topRenderCategoriesByTriangles: RenderSubmissionCategory[];
 };
 
 export type PresentationGapTerrainSummary = {
@@ -114,6 +150,7 @@ export type PresentationGapContextSummary = {
   totalOverBudget60HzMs: number;
   terrain?: PresentationGapTerrainSummary;
   scene?: PresentationGapSceneSummary;
+  materialization?: PresentationGapMaterializationSummary;
   latest: PresentationGapContextEntry[];
 };
 
@@ -201,6 +238,46 @@ function normalizeSceneAttributionCategories(value: unknown): SceneAttributionCa
     );
 }
 
+function normalizeRenderSubmissionCategories(value: unknown): RenderSubmissionCategory[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => objectOrNull(entry))
+    .filter((entry): entry is Record<string, unknown> => entry !== null)
+    .map((entry) => ({
+      category: stringOrNull(entry.category) ?? 'unattributed',
+      drawSubmissions: numberOrZero(entry.drawSubmissions),
+      triangles: numberOrZero(entry.triangles),
+      instances: numberOrZero(entry.instances),
+      materials: numberOrZero(entry.materials),
+      geometries: numberOrZero(entry.geometries),
+      samples: 1,
+    }))
+    .filter((entry) =>
+      entry.drawSubmissions > 0
+      || entry.triangles > 0
+      || entry.instances > 0
+      || entry.materials > 0
+      || entry.geometries > 0
+    );
+}
+
+function mergeRenderSubmissionCategory(
+  totals: Map<string, RenderSubmissionCategory>,
+  category: RenderSubmissionCategory,
+): void {
+  const existing = totals.get(category.category);
+  if (!existing) {
+    totals.set(category.category, { ...category });
+    return;
+  }
+  existing.drawSubmissions += category.drawSubmissions;
+  existing.triangles += category.triangles;
+  existing.instances += category.instances;
+  existing.materials += category.materials;
+  existing.geometries += category.geometries;
+  existing.samples += category.samples;
+}
+
 function summarizeSceneCategories(
   categories: SceneAttributionCategory[],
   source: PresentationGapSceneSummary['source'],
@@ -258,6 +335,187 @@ function summarizeSceneContext(
     'run-final-uncorrelated',
     Array.isArray(options?.finalSceneAttribution) ? 1 : 0,
   );
+}
+
+function gapAnchorMs(gap: PresentationGapContextEntry): number | null {
+  return finiteNumber(gap.endAtMs)
+    ?? finiteNumber(gap.atMs)
+    ?? finiteNumber(gap.startAtMs);
+}
+
+function runtimeSampleMs(sample: Record<string, unknown>): number | null {
+  return finiteNumber(sample.pagePerformanceNowMs);
+}
+
+function closestRuntimeSample(
+  runtimeSamples: Record<string, unknown>[],
+  anchorMs: number | null,
+): { sample: Record<string, unknown>; deltaMs: number } | null {
+  if (anchorMs === null) return null;
+  let best: { sample: Record<string, unknown>; deltaMs: number } | null = null;
+  for (const sample of runtimeSamples) {
+    const sampleMs = runtimeSampleMs(sample);
+    if (sampleMs === null) continue;
+    const deltaMs = Math.abs(sampleMs - anchorMs);
+    if (!best || deltaMs < best.deltaMs) {
+      best = { sample, deltaMs };
+    }
+  }
+  return best;
+}
+
+function renderFrameAnchorMs(frame: Record<string, unknown>): number | null {
+  const first = finiteNumber(frame.firstAtMs);
+  const last = finiteNumber(frame.lastAtMs);
+  if (first !== null && last !== null) return (first + last) / 2;
+  return last ?? first;
+}
+
+function closestRenderSubmissionFrame(
+  renderSubmissions: Record<string, unknown> | null,
+  anchorMs: number | null,
+): Record<string, unknown> | null {
+  const frames = Array.isArray(renderSubmissions?.frames) ? renderSubmissions.frames : [];
+  if (frames.length === 0) return null;
+  let best: { frame: Record<string, unknown>; deltaMs: number } | null = null;
+  for (const frameValue of frames) {
+    const frame = objectOrNull(frameValue);
+    if (!frame) continue;
+    const frameMs = renderFrameAnchorMs(frame);
+    const deltaMs = anchorMs !== null && frameMs !== null ? Math.abs(frameMs - anchorMs) : 0;
+    if (!best || deltaMs < best.deltaMs) {
+      best = { frame, deltaMs };
+    }
+  }
+  return best?.frame ?? null;
+}
+
+function summarizeMaterializationGaps(
+  gaps: PresentationGapContextEntry[],
+  runtimeSamples: unknown[],
+): PresentationGapMaterializationSummary | undefined {
+  const samples = runtimeSamples
+    .map((sample) => objectOrNull(sample))
+    .filter((sample): sample is Record<string, unknown> =>
+      sample !== null && runtimeSampleMs(sample) !== null
+    );
+  if (gaps.length === 0 || samples.length === 0) return undefined;
+
+  let correlatedGapCount = 0;
+  let closeModelStatsObservedCount = 0;
+  let closeModelActiveGapCount = 0;
+  let materializationEventGapCount = 0;
+  let totalMaterializationEvents = 0;
+  let renderSubmissionCorrelatedGapCount = 0;
+  let droppedFrameTimeWithCloseModels60HzMs = 0;
+  let droppedFrameTimeWithMaterializationEvents60HzMs = 0;
+  const droppedFrameTimeByCloseModelActivity: Record<'active' | 'inactive' | 'missing', number> = {
+    active: 0,
+    inactive: 0,
+    missing: 0,
+  };
+  const nearestSampleDeltas: number[] = [];
+  const candidatesWithinCloseRadius: number[] = [];
+  const renderedCloseModels: number[] = [];
+  const activeCloseModels: number[] = [];
+  const fallbackCounts: number[] = [];
+  const poolLoads: number[] = [];
+  const closeModelMs: number[] = [];
+  const materializationEventsMs: number[] = [];
+  const materializationEventsPerGap: number[] = [];
+  const renderFrameDrawSubmissions: number[] = [];
+  const renderFrameTriangles: number[] = [];
+  const renderCategoryTotals = new Map<string, RenderSubmissionCategory>();
+
+  for (const gap of gaps) {
+    const anchorMs = gapAnchorMs(gap);
+    const nearest = closestRuntimeSample(samples, anchorMs);
+    if (!nearest) continue;
+    correlatedGapCount++;
+    nearestSampleDeltas.push(nearest.deltaMs);
+    const sample = nearest.sample;
+    const gapDropped = numberOrZero(gap.droppedFrameTime60HzMs);
+
+    const closeStats = objectOrNull(sample.closeModelStats);
+    if (closeStats) {
+      closeModelStatsObservedCount++;
+      const active = pushFinite(activeCloseModels, closeStats.activeCloseModels) ?? 0;
+      pushFinite(candidatesWithinCloseRadius, closeStats.candidatesWithinCloseRadius);
+      pushFinite(renderedCloseModels, closeStats.renderedCloseModels);
+      pushFinite(fallbackCounts, closeStats.fallbackCount);
+      pushFinite(poolLoads, closeStats.poolLoads);
+      if (active > 0) {
+        closeModelActiveGapCount++;
+        droppedFrameTimeWithCloseModels60HzMs += gapDropped;
+        droppedFrameTimeByCloseModelActivity.active += gapDropped;
+      } else {
+        droppedFrameTimeByCloseModelActivity.inactive += gapDropped;
+      }
+    } else {
+      droppedFrameTimeByCloseModelActivity.missing += gapDropped;
+    }
+
+    const events = Array.isArray(sample.materializationTierEvents)
+      ? sample.materializationTierEvents
+      : [];
+    materializationEventsPerGap.push(events.length);
+    totalMaterializationEvents += events.length;
+    if (events.length > 0) {
+      materializationEventGapCount++;
+      droppedFrameTimeWithMaterializationEvents60HzMs += gapDropped;
+    }
+
+    const combatBreakdown = objectOrNull(sample.combatBreakdown);
+    const billboardProfile = objectOrNull(combatBreakdown?.billboardProfile);
+    pushFinite(closeModelMs, billboardProfile?.closeModelMs);
+    pushFinite(materializationEventsMs, billboardProfile?.materializationEventsMs);
+
+    const renderSubmissions = objectOrNull(sample.renderSubmissions);
+    const renderFrame = closestRenderSubmissionFrame(renderSubmissions, anchorMs);
+    if (renderFrame) {
+      renderSubmissionCorrelatedGapCount++;
+      pushFinite(renderFrameDrawSubmissions, renderFrame.drawSubmissions);
+      pushFinite(renderFrameTriangles, renderFrame.triangles);
+      for (const category of normalizeRenderSubmissionCategories(renderFrame.categories)) {
+        mergeRenderSubmissionCategory(renderCategoryTotals, category);
+      }
+    }
+  }
+
+  if (correlatedGapCount === 0) return undefined;
+
+  const categories = Array.from(renderCategoryTotals.values());
+  return {
+    gapCount: gaps.length,
+    correlatedGapCount,
+    closeModelStatsObservedCount,
+    closeModelActiveGapCount,
+    materializationEventGapCount,
+    totalMaterializationEvents,
+    renderSubmissionCorrelatedGapCount,
+    droppedFrameTimeWithCloseModels60HzMs,
+    droppedFrameTimeWithMaterializationEvents60HzMs,
+    droppedFrameTimeByCloseModelActivity,
+    nearestSampleDeltaMs: numericStats(nearestSampleDeltas),
+    candidatesWithinCloseRadius: numericStats(candidatesWithinCloseRadius),
+    renderedCloseModels: numericStats(renderedCloseModels),
+    activeCloseModels: numericStats(activeCloseModels),
+    fallbackCount: numericStats(fallbackCounts),
+    poolLoads: numericStats(poolLoads),
+    closeModelMs: numericStats(closeModelMs),
+    materializationEventsMs: numericStats(materializationEventsMs),
+    materializationEventsPerGap: numericStats(materializationEventsPerGap),
+    renderFrameDrawSubmissions: numericStats(renderFrameDrawSubmissions),
+    renderFrameTriangles: numericStats(renderFrameTriangles),
+    topRenderCategoriesByDrawSubmissions: categories
+      .slice()
+      .sort((a, b) => b.drawSubmissions - a.drawSubmissions || b.triangles - a.triangles)
+      .slice(0, 8),
+    topRenderCategoriesByTriangles: categories
+      .slice()
+      .sort((a, b) => b.triangles - a.triangles || b.drawSubmissions - a.drawSubmissions)
+      .slice(0, 8),
+  };
 }
 
 function normalizeFinalPresentationGap(entry: Record<string, unknown>): PresentationGapContextEntry | null {
@@ -708,6 +966,7 @@ export function summarizePresentationGapContexts(
     ),
     terrain: summarizeTerrainGaps(gaps),
     scene: summarizeSceneContext(runtimeSamples, options),
+    materialization: summarizeMaterializationGaps(gaps, runtimeSamples),
     latest,
   };
 }

@@ -1398,3 +1398,26 @@ Update 2026-06-17 13:20 UTC / 09:20 EDT:
   tail owner, especially same-identity morph churn and terrain-heavy render
   frames. The next trusted capture must correlate all three before changing
   gameplay density, cap, radius, or vegetation.
+
+Update 2026-06-17 13:35 UTC / 09:35 EDT:
+
+- Added `presentationGapContexts.materialization`, a nearest-runtime-sample
+  correlation surface for dropped-frame epochs. It records close-model active /
+  rendered / candidate counts, materialization event counts, close-model CPU
+  timing, and adjacent render-submission categories beside the existing terrain
+  gap summary.
+- Recomputed locally against the old diagnostic Open Frontier artifact
+  `artifacts/perf/2026-06-17T12-49-21-146Z` (without rewriting the artifact).
+  Directional readout: `159/159` gaps correlated to runtime samples; `54` gaps
+  had active close models; dropped-frame time near active close models was
+  `~958ms`, inactive close-model samples were `~887ms`, and `~1193ms` had no
+  close-model stats because the older capture only sampled them on detail
+  ticks. Adjacent render submissions show terrain as the triangle owner
+  (`34.1M` triangles across correlated frames), vegetation next (`4.35M`), and
+  world-static plus close GLB as draw/material pressure (`2064` world-static
+  draws, `1427` close-GLB draws, plus `199` weapon draws). This keeps both
+  hypotheses alive: close-model transitions are a real visible-pressure lane,
+  but terrain/CDLOD/render presentation still owns the largest tail surface.
+- Next captures should use the new harness head, not this old artifact, so
+  materialization event telemetry and close-model stats are present on every
+  runtime sample.

@@ -489,4 +489,157 @@ describe('summarizePresentationGapContexts', () => {
     });
     expect(summary?.scene?.topVisibleDrawCallLike[0]?.category).toBe('vegetation_imposters');
   });
+
+  it('correlates presentation gaps with close-model and render-submission pressure', () => {
+    const summary = summarizePresentationGapContexts(
+      [
+        {
+          pagePerformanceNowMs: 1010,
+          frameCount: 120,
+          closeModelStats: {
+            candidatesWithinCloseRadius: 18,
+            renderedCloseModels: 12,
+            activeCloseModels: 12,
+            fallbackCount: 6,
+            poolLoads: 0,
+          },
+          materializationTierEvents: [
+            { fromRender: 'impostor', toRender: 'close-glb' },
+            { fromRender: 'culled', toRender: 'impostor' },
+          ],
+          combatBreakdown: {
+            billboardProfile: {
+              closeModelMs: 1.2,
+              materializationEventsMs: 0.06,
+            },
+          },
+          renderSubmissions: {
+            frames: [
+              {
+                firstAtMs: 1008,
+                lastAtMs: 1012,
+                drawSubmissions: 150,
+                triangles: 410000,
+                categories: [
+                  {
+                    category: 'npc_close_glb',
+                    drawSubmissions: 84,
+                    triangles: 9800,
+                    instances: 12,
+                    materials: 84,
+                    geometries: 12,
+                  },
+                  {
+                    category: 'terrain',
+                    drawSubmissions: 10,
+                    triangles: 300000,
+                    instances: 140,
+                    materials: 10,
+                    geometries: 2,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          pagePerformanceNowMs: 2605,
+          frameCount: 240,
+          closeModelStats: {
+            candidatesWithinCloseRadius: 0,
+            renderedCloseModels: 0,
+            activeCloseModels: 0,
+            fallbackCount: 0,
+            poolLoads: 0,
+          },
+          materializationTierEvents: [],
+          combatBreakdown: {
+            billboardProfile: {
+              closeModelMs: 0.1,
+              materializationEventsMs: 0.02,
+            },
+          },
+          renderSubmissions: {
+            frames: [
+              {
+                firstAtMs: 2603,
+                lastAtMs: 2607,
+                drawSubmissions: 72,
+                triangles: 320000,
+                categories: [
+                  {
+                    category: 'terrain',
+                    drawSubmissions: 10,
+                    triangles: 310000,
+                    instances: 130,
+                    materials: 10,
+                    geometries: 2,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+      [
+        {
+          seq: 1,
+          endAtMs: 1000,
+          gapMs: 34,
+          estimatedDropped60HzFrames: 1,
+          droppedFrameTime60HzMs: 17.3,
+          presentationContext: {},
+        },
+        {
+          seq: 2,
+          endAtMs: 2600,
+          gapMs: 28,
+          estimatedDropped60HzFrames: 1,
+          droppedFrameTime60HzMs: 11.3,
+          presentationContext: {},
+        },
+      ],
+    );
+
+    expect(summary?.materialization).toMatchObject({
+      gapCount: 2,
+      correlatedGapCount: 2,
+      closeModelStatsObservedCount: 2,
+      closeModelActiveGapCount: 1,
+      materializationEventGapCount: 1,
+      totalMaterializationEvents: 2,
+      renderSubmissionCorrelatedGapCount: 2,
+      droppedFrameTimeWithCloseModels60HzMs: 17.3,
+      droppedFrameTimeWithMaterializationEvents60HzMs: 17.3,
+      droppedFrameTimeByCloseModelActivity: {
+        active: 17.3,
+        inactive: 11.3,
+        missing: 0,
+      },
+    });
+    expect(summary?.materialization?.activeCloseModels).toMatchObject({
+      count: 2,
+      total: 12,
+      avg: 6,
+      min: 0,
+      max: 12,
+    });
+    expect(summary?.materialization?.materializationEventsPerGap).toMatchObject({
+      count: 2,
+      total: 2,
+      avg: 1,
+      min: 0,
+      max: 2,
+    });
+    expect(summary?.materialization?.closeModelMs?.total).toBeCloseTo(1.3, 5);
+    expect(summary?.materialization?.renderFrameDrawSubmissions?.total).toBe(222);
+    expect(summary?.materialization?.topRenderCategoriesByDrawSubmissions[0]).toMatchObject({
+      category: 'npc_close_glb',
+      drawSubmissions: 84,
+    });
+    expect(summary?.materialization?.topRenderCategoriesByTriangles[0]).toMatchObject({
+      category: 'terrain',
+      triangles: 610000,
+    });
+  });
 });

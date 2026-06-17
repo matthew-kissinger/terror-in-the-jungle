@@ -101,6 +101,9 @@ places where future loops should replace judgement with numbers:
 - Same-experience content counters for vegetation, wildlife, static world
   features, terrain draw distance, and combatant representation per scenario.
 - A WebGPU CPU/GPU/presentation split around failing rAF epochs.
+- Promotion of `presentationGapContexts.materialization` from diagnostic
+  summary into a pass/fail budget once a trusted paired capture establishes
+  acceptable close-GLB draw/material pressure.
 - Pixel Forge texture residency/upload timing that works for WebGPU, not only
   WebGL-style upload observers.
 - A screenshot or pixel-stability regression lane for the terrain/camera
