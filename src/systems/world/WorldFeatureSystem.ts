@@ -145,6 +145,7 @@ export class WorldFeatureSystem implements GameSystem {
   private vehicleManager?: VehicleManager;
   private losAccelerator?: LOSAccelerator;
   private spawnedObjects: SpawnedFeatureObject[] = [];
+  private dynamicGroundVehicleObjects: SpawnedFeatureObject[] = [];
   private featureGroups: WorldFeatureRenderSector[] = [];
   private detailCullObjects: WorldFeatureDetailCullObject[] = [];
   private staticFeatureRoot: THREE.Group | null = null;
@@ -155,7 +156,6 @@ export class WorldFeatureSystem implements GameSystem {
   private readonly lastStaticVisibilityProjectionMatrix = new THREE.Matrix4();
   private staticVisibilityPoseInitialized = false;
   private staticVisibilityFramesSinceRefresh = 0;
-  private dynamicGroundVehicleCount = 0;
 
   constructor(scene: THREE.Scene, camera?: THREE.Camera) {
     this.scene = scene;
@@ -426,17 +426,17 @@ export class WorldFeatureSystem implements GameSystem {
 
       const losObstacleIds = isDynamicGroundVehicle ? [] : this.registerPlacementWithLOS(objectId, object);
       const vehicleId = this.registerGroundVehiclePlacement(objectId, placement, object);
-      if (vehicleId) {
-        this.dynamicGroundVehicleCount++;
-      }
-
-      this.spawnedObjects.push({
+      const spawnedObject = {
         id: objectId,
         object,
         collisionRegistered,
         losObstacleIds,
         vehicleId,
-      });
+      };
+      this.spawnedObjects.push(spawnedObject);
+      if (vehicleId) {
+        this.dynamicGroundVehicleObjects.push(spawnedObject);
+      }
     }
   }
 
@@ -489,8 +489,8 @@ export class WorldFeatureSystem implements GameSystem {
 
     const cameraX = this.camera.position.x;
     const cameraZ = this.camera.position.z;
-    if (this.dynamicGroundVehicleCount > 0) {
-      updateDynamicGroundVehicleVisibility(this.spawnedObjects, this.camera, { renderDistanceM: WORLD_FEATURE_RENDER_DISTANCE_M, hysteresisM: WORLD_FEATURE_RENDER_HYSTERESIS_M, alwaysVisibleM: WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M });
+    if (this.dynamicGroundVehicleObjects.length > 0) {
+      updateDynamicGroundVehicleVisibility(this.dynamicGroundVehicleObjects, this.camera, { renderDistanceM: WORLD_FEATURE_RENDER_DISTANCE_M, hysteresisM: WORLD_FEATURE_RENDER_HYSTERESIS_M, alwaysVisibleM: WORLD_FEATURE_FRUSTUM_ALWAYS_VISIBLE_M });
     }
     if (!this.shouldRefreshStaticFeatureVisibility()) {
       return;
@@ -785,9 +785,9 @@ export class WorldFeatureSystem implements GameSystem {
       }
     }
     this.spawnedObjects = [];
+    this.dynamicGroundVehicleObjects = [];
     this.featureGroups = [];
     this.detailCullObjects = [];
-    this.dynamicGroundVehicleCount = 0;
     this.staticVisibilityPoseInitialized = false;
     this.staticVisibilityFramesSinceRefresh = 0;
     this.clearStaticFeatureRoot();

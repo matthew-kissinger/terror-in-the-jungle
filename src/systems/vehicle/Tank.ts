@@ -247,6 +247,10 @@ export class Tank implements IVehicle {
     return this.physics;
   }
 
+  getRenderRoot(): THREE.Object3D {
+    return this.object;
+  }
+
   /** Turret rig (cycle #9 R1). Owned by this Tank; mounted on the chassis. */
   getTurret(): TankTurret {
     return this.turret;

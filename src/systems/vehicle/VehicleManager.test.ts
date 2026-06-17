@@ -56,6 +56,30 @@ function createMockVehicle(id: string, opts: {
   };
 }
 
+function makeCamera(): THREE.PerspectiveCamera {
+  const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 2000);
+  camera.position.set(0, 5, 0);
+  camera.lookAt(0, 5, -100);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  return camera;
+}
+
+function createRenderableGroundVehicle(id: string, position: THREE.Vector3, seats?: VehicleSeat[]): IVehicle {
+  const root = new THREE.Object3D();
+  root.position.copy(position);
+  root.visible = true;
+  root.updateMatrixWorld(true);
+  return {
+    ...createMockVehicle(id, { category: 'ground', position, seats }),
+    getRenderRoot: () => root,
+  } as IVehicle & { getRenderRoot(): THREE.Object3D };
+}
+
+function renderRootFor(vehicle: IVehicle): THREE.Object3D {
+  return (vehicle as IVehicle & { getRenderRoot(): THREE.Object3D }).getRenderRoot();
+}
+
 describe('VehicleManager', () => {
   let manager: VehicleManager;
 
@@ -185,6 +209,66 @@ describe('VehicleManager', () => {
 
     expect(visited).toEqual(['heli_1', 'jeep_1']);
     expect(manager.getVehicleCount()).toBe(2);
+  });
+
+  it('does not render-cull ground vehicles until a camera is wired', () => {
+    const vehicle = createRenderableGroundVehicle('jeep_1', new THREE.Vector3(0, 0, 250));
+    const root = renderRootFor(vehicle);
+    manager.register(vehicle);
+
+    manager.update(0.016);
+
+    expect(root.visible).toBe(true);
+    expect(vehicle.update).toHaveBeenCalled();
+  });
+
+  it('frustum-culls far offscreen unoccupied ground vehicle render roots while keeping simulation active', () => {
+    manager.setCamera(makeCamera());
+    const vehicle = createRenderableGroundVehicle('tank_1', new THREE.Vector3(0, 0, 250));
+    const root = renderRootFor(vehicle);
+    manager.register(vehicle);
+
+    manager.update(0.016);
+
+    expect(root.visible).toBe(false);
+    expect(vehicle.update).toHaveBeenCalled();
+  });
+
+  it('keeps close unoccupied ground vehicles visible even outside the view cone', () => {
+    manager.setCamera(makeCamera());
+    const vehicle = createRenderableGroundVehicle('jeep_1', new THREE.Vector3(0, 0, 50));
+    const root = renderRootFor(vehicle);
+    manager.register(vehicle);
+
+    manager.update(0.016);
+
+    expect(root.visible).toBe(true);
+  });
+
+  it('keeps occupied ground vehicles visible regardless of frustum culling', () => {
+    manager.setCamera(makeCamera());
+    const vehicle = createRenderableGroundVehicle('tank_1', new THREE.Vector3(0, 0, 250), [
+      { index: 0, role: 'pilot', occupantId: 'player', localOffset: new THREE.Vector3(), exitOffset: new THREE.Vector3() },
+    ]);
+    const root = renderRootFor(vehicle);
+    manager.register(vehicle);
+
+    manager.update(0.016);
+
+    expect(root.visible).toBe(true);
+  });
+
+  it('leaves world-feature ground vehicle roots to the world-feature visibility owner', () => {
+    manager.setCamera(makeCamera());
+    const vehicle = createRenderableGroundVehicle('m35_world_feature_1', new THREE.Vector3(0, 0, 250));
+    const root = renderRootFor(vehicle);
+    root.userData.worldFeatureGroundVehicleId = 'm35_world_feature_1';
+    manager.register(vehicle);
+
+    manager.update(0.016);
+
+    expect(root.visible).toBe(true);
+    expect(vehicle.update).toHaveBeenCalled();
   });
 
   it('finds vehicle by occupant', () => {

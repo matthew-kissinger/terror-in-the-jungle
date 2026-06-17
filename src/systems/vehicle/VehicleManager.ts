@@ -34,9 +34,29 @@ import { Sampan } from './Sampan';
 
 // Scratch vector for distance calculations
 const _diff = new THREE.Vector3();
+const _groundVehicleCameraInverse = new THREE.Matrix4();
+const _groundVehicleViewProjection = new THREE.Matrix4();
+const _groundVehicleFrustum = new THREE.Frustum();
+const _groundVehicleSphere = new THREE.Sphere();
+
+const GROUND_VEHICLE_RENDER_DISTANCE_M = 900;
+const GROUND_VEHICLE_RENDER_HYSTERESIS_M = 80;
+const GROUND_VEHICLE_FRUSTUM_ALWAYS_VISIBLE_M = 180;
+const GROUND_VEHICLE_BOUNDS_RADIUS_M = 18;
+const WORLD_FEATURE_GROUND_VEHICLE_ID_KEY = 'worldFeatureGroundVehicleId';
+
+interface RenderableGroundVehicle extends IVehicle {
+  getRenderRoot(): THREE.Object3D;
+}
 
 export class VehicleManager implements GameSystem {
   private vehicles: Map<string, IVehicle> = new Map();
+
+  constructor(private camera?: THREE.Camera) {}
+
+  setCamera(camera: THREE.Camera | undefined): void {
+    this.camera = camera;
+  }
 
   async init(): Promise<void> {
     Logger.debug('vehicle', 'Initializing Vehicle Manager...');
@@ -343,9 +363,72 @@ export class VehicleManager implements GameSystem {
     for (const vehicle of this.vehicles.values()) {
       vehicle.update(deltaTime);
     }
+    this.updateGroundVehicleRenderVisibility();
   }
 
   dispose(): void {
     this.vehicles.clear();
+  }
+
+  private updateGroundVehicleRenderVisibility(): void {
+    const camera = this.camera;
+    if (!camera) {
+      for (const vehicle of this.vehicles.values()) {
+        const root = this.getGroundVehicleRenderRoot(vehicle);
+        if (root) root.visible = true;
+      }
+      return;
+    }
+
+    camera.updateMatrixWorld(true);
+    _groundVehicleCameraInverse.copy(camera.matrixWorld).invert();
+    _groundVehicleViewProjection.multiplyMatrices(camera.projectionMatrix, _groundVehicleCameraInverse);
+    _groundVehicleFrustum.setFromProjectionMatrix(_groundVehicleViewProjection);
+
+    for (const vehicle of this.vehicles.values()) {
+      const root = this.getGroundVehicleRenderRoot(vehicle);
+      if (!root) continue;
+      if (this.hasOccupant(vehicle)) {
+        root.visible = true;
+        continue;
+      }
+
+      const shouldRender = this.shouldRenderUnoccupiedGroundVehicle(root, camera);
+      if (root.visible !== shouldRender) {
+        root.visible = shouldRender;
+      }
+    }
+  }
+
+  private getGroundVehicleRenderRoot(vehicle: IVehicle): THREE.Object3D | null {
+    if (vehicle.category !== 'ground') return null;
+    const maybeRenderable = vehicle as Partial<RenderableGroundVehicle>;
+    if (typeof maybeRenderable.getRenderRoot !== 'function') return null;
+    const root = maybeRenderable.getRenderRoot();
+    if (typeof root.userData[WORLD_FEATURE_GROUND_VEHICLE_ID_KEY] === 'string') {
+      return null;
+    }
+    return root;
+  }
+
+  private hasOccupant(vehicle: IVehicle): boolean {
+    return vehicle.getSeats().some(seat => seat.occupantId !== null);
+  }
+
+  private shouldRenderUnoccupiedGroundVehicle(root: THREE.Object3D, camera: THREE.Camera): boolean {
+    const position = root.getWorldPosition(_diff);
+    const radius = GROUND_VEHICLE_BOUNDS_RADIUS_M;
+    const visibleDistance = GROUND_VEHICLE_RENDER_DISTANCE_M + (root.visible ? GROUND_VEHICLE_RENDER_HYSTERESIS_M : 0);
+    if (camera.position.distanceToSquared(position) > (visibleDistance + radius) ** 2) {
+      return false;
+    }
+
+    if (camera.position.distanceToSquared(position) <= (GROUND_VEHICLE_FRUSTUM_ALWAYS_VISIBLE_M + radius) ** 2) {
+      return true;
+    }
+
+    _groundVehicleSphere.center.copy(position);
+    _groundVehicleSphere.radius = radius;
+    return _groundVehicleFrustum.intersectsSphere(_groundVehicleSphere);
   }
 }

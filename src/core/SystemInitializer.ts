@@ -178,7 +178,7 @@ export class SystemInitializer {
     refs.navmeshSystem.init().catch(() => {});
     refs.airSupportManager = new AirSupportManager(scene);
     refs.aaEmplacementSystem = new AAEmplacementSystem(scene);
-    refs.vehicleManager = new VehicleManager();
+    refs.vehicleManager = new VehicleManager(camera);
     refs.npcVehicleController = new NPCVehicleController();
     // M2HB emplacement system owns weapon bindings + fire routing for the
     // scenario-spawned tripod guns (Open Frontier US base, A Shau NVA

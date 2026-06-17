@@ -228,6 +228,10 @@ export class GroundVehicle implements IVehicle {
     return this.physics;
   }
 
+  getRenderRoot(): THREE.Object3D {
+    return this.object;
+  }
+
   setEngineActive(active: boolean): void {
     this.physics.setEngineActive(active);
   }
