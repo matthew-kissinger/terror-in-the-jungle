@@ -861,6 +861,7 @@ type CaptureSummary = {
   };
   perfRuntime?: {
     matchDurationSeconds?: number;
+    presentationContextCapture: boolean;
     frontlineCompressionRequested: boolean;
     victoryConditionsDisabled: boolean;
     npcCloseModelsDisabled: boolean;
@@ -1763,6 +1764,7 @@ Common options:
   --runtime-render-submission-attribution <true|false>
   --runtime-render-submission-every-samples <count>
   --runtime-render-submission-mode <full|summary>
+  --presentation-context-capture <true|false> Diagnostic A/B: keep rAF counters but skip rich per-gap context cloning
   --runtime-preflight <true|false>
   --renderer <webgpu-strict|webgpu|webgl>
   --compress-frontline <true|false> Diagnostic shortcut that repositions combatants near the player; default false
@@ -1861,6 +1863,64 @@ function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * p)));
   return sorted[idx];
+}
+
+function finiteAverage(values: Array<number | undefined>): number | null {
+  const finite = values.filter((value): value is number => Number.isFinite(value));
+  return finite.length > 0 ? average(finite) : null;
+}
+
+function latestLoopSegmentMs(sample: RuntimeSample, segmentName: string): number | undefined {
+  const breakdown = sample.loopFrameBreakdown;
+  if (!Array.isArray(breakdown) || breakdown.length === 0) return undefined;
+
+  for (let i = breakdown.length - 1; i >= 0; i--) {
+    const segmentMs = Number(breakdown[i]?.segments?.[segmentName]);
+    if (Number.isFinite(segmentMs)) return segmentMs;
+  }
+  return undefined;
+}
+
+function computeRuntimeTrend(samples: RuntimeSample[]): {
+  windowSize: number;
+  earlyAvgFrameMs: number;
+  lateAvgFrameMs: number;
+  frameGrowthRatio: number;
+  earlyRenderMainMs: number | null;
+  lateRenderMainMs: number | null;
+  renderMainGrowthRatio: number | null;
+  earlyTriangles: number | null;
+  lateTriangles: number | null;
+  triangleGrowthRatio: number | null;
+} | null {
+  if (samples.length < 8) return null;
+
+  const windowSize = Math.max(3, Math.min(8, Math.floor(samples.length * 0.2)));
+  const early = samples.slice(0, windowSize);
+  const late = samples.slice(-windowSize);
+  const earlyAvgFrameMs = average(early.map(s => Number(s.avgFrameMs ?? 0)));
+  const lateAvgFrameMs = average(late.map(s => Number(s.avgFrameMs ?? 0)));
+  const earlyRenderMainMs = finiteAverage(early.map(s => latestLoopSegmentMs(s, 'RenderMain.renderer.render')));
+  const lateRenderMainMs = finiteAverage(late.map(s => latestLoopSegmentMs(s, 'RenderMain.renderer.render')));
+  const earlyTriangles = finiteAverage(early.map(s => s.renderer ? Number(s.renderer.triangles ?? 0) : undefined));
+  const lateTriangles = finiteAverage(late.map(s => s.renderer ? Number(s.renderer.triangles ?? 0) : undefined));
+  const ratio = (lateValue: number | null, earlyValue: number | null): number | null => {
+    if (lateValue === null || earlyValue === null || earlyValue <= 0) return null;
+    return lateValue / earlyValue;
+  };
+
+  return {
+    windowSize,
+    earlyAvgFrameMs,
+    lateAvgFrameMs,
+    frameGrowthRatio: earlyAvgFrameMs > 0 ? lateAvgFrameMs / earlyAvgFrameMs : 0,
+    earlyRenderMainMs,
+    lateRenderMainMs,
+    renderMainGrowthRatio: ratio(lateRenderMainMs, earlyRenderMainMs),
+    earlyTriangles,
+    lateTriangles,
+    triangleGrowthRatio: ratio(lateTriangles, earlyTriangles),
+  };
 }
 
 function computeMeasurementTrust(options: {
@@ -2739,6 +2799,38 @@ function validateRun(
     value: avgFrameMs,
     message: `Average frame time ${avgFrameMs.toFixed(2)}ms`
   });
+
+  const runtimeTrend = computeRuntimeTrend(runtimeSamples);
+  if (runtimeTrend) {
+    const frameTrendStatus: ValidationCheckStatus =
+      runtimeTrend.frameGrowthRatio >= 1.6 && runtimeTrend.lateAvgFrameMs >= 45
+        ? 'fail'
+        : runtimeTrend.frameGrowthRatio >= 1.25 && runtimeTrend.lateAvgFrameMs >= 30
+          ? 'warn'
+          : 'pass';
+    checks.push({
+      id: 'runtime_frame_time_trend',
+      status: frameTrendStatus,
+      value: runtimeTrend.frameGrowthRatio,
+      message: `Frame-time trend early=${runtimeTrend.earlyAvgFrameMs.toFixed(2)}ms late=${runtimeTrend.lateAvgFrameMs.toFixed(2)}ms ratio=${runtimeTrend.frameGrowthRatio.toFixed(2)}x over ${runtimeTrend.windowSize}-sample windows`
+    });
+
+    if (runtimeTrend.renderMainGrowthRatio !== null && runtimeTrend.earlyRenderMainMs !== null && runtimeTrend.lateRenderMainMs !== null) {
+      const trianglesStable = runtimeTrend.triangleGrowthRatio === null || runtimeTrend.triangleGrowthRatio <= 1.15;
+      const renderTrendStatus: ValidationCheckStatus =
+        trianglesStable && runtimeTrend.renderMainGrowthRatio >= 1.8 && runtimeTrend.lateRenderMainMs >= 35
+          ? 'fail'
+          : runtimeTrend.renderMainGrowthRatio >= 1.35 && runtimeTrend.lateRenderMainMs >= 25
+            ? 'warn'
+            : 'pass';
+      checks.push({
+        id: 'runtime_render_main_time_trend',
+        status: renderTrendStatus,
+        value: runtimeTrend.renderMainGrowthRatio,
+        message: `RenderMain.renderer.render trend early=${runtimeTrend.earlyRenderMainMs.toFixed(2)}ms late=${runtimeTrend.lateRenderMainMs.toFixed(2)}ms ratio=${runtimeTrend.renderMainGrowthRatio.toFixed(2)}x; triangles early=${runtimeTrend.earlyTriangles?.toFixed(0) ?? 'n/a'} late=${runtimeTrend.lateTriangles?.toFixed(0) ?? 'n/a'} ratio=${runtimeTrend.triangleGrowthRatio?.toFixed(2) ?? 'n/a'}x`
+      });
+    }
+  }
 
   const peakP99FrameMs = runtimeSamples.length > 0
     ? Math.max(...runtimeSamples.map(s => Number(s.p99FrameMs ?? 0)))
@@ -4308,6 +4400,7 @@ async function runCapture(): Promise<void> {
   const runtimeRenderSubmissionMode = parseStringFlag('runtime-render-submission-mode', 'full').toLowerCase() === 'summary'
     ? 'summary'
     : 'full';
+  const presentationContextCapture = parseBooleanFlag('presentation-context-capture', true);
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
   const matchDurationArg = parseNumberFlag('match-duration', Number.NaN);
@@ -4387,7 +4480,7 @@ async function runCapture(): Promise<void> {
     seenKeys: new Set<string>(),
     lastCaptureElapsedMs: -1
   };
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainShadowPassMode=${terrainShadowPassMode} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainFullShadowPass=${terrainFullShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainHeightAwareFrustum=${disableTerrainHeightAwareFrustum} terrainFullSkirts=${terrainFullSkirts} terrainSparseSkirts=${terrainSparseSkirts} disableTerrainSkirts=${disableTerrainSkirts} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} presentationContextCapture=${presentationContextCapture} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainShadowPassMode=${terrainShadowPassMode} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainFullShadowPass=${terrainFullShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainHeightAwareFrustum=${disableTerrainHeightAwareFrustum} terrainFullSkirts=${terrainFullSkirts} terrainSparseSkirts=${terrainSparseSkirts} disableTerrainSkirts=${disableTerrainSkirts} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
   if (shotVisualCaptureState.enabled) {
     logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
   }
@@ -4649,6 +4742,13 @@ async function runCapture(): Promise<void> {
     page.setDefaultTimeout(STEP_TIMEOUT_MS);
     page.setDefaultNavigationTimeout(navTimeoutMs);
     await ensurePageEvaluateHelperShim(page);
+    await withTimeout(
+      'configure browser perf observers',
+      page.addInitScript({
+        content: `window.__TIJ_PERF_CAPTURE_PRESENTATION_CONTEXT__ = ${presentationContextCapture ? 'true' : 'false'};`
+      }),
+      STEP_TIMEOUT_MS
+    );
     await withTimeout(
       'install browser perf observers',
       page.addInitScript({ path: join(process.cwd(), 'scripts', 'perf-browser-observers.js') }),
@@ -6546,6 +6646,7 @@ async function runCapture(): Promise<void> {
         },
         perfRuntime: {
           matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
+          presentationContextCapture,
           frontlineCompressionRequested: compressFrontline,
           victoryConditionsDisabled: disableVictory,
           npcCloseModelsDisabled: disableNpcCloseModels,

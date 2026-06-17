@@ -105,6 +105,12 @@ const HARNESS_EQUIVALENCE_IDS = [
 
 const FORBIDDEN_RUNTIME_FLAGS: readonly BooleanRuntimeFlag[] = [
   {
+    id: 'presentation_context_capture_disabled',
+    path: ['perfRuntime', 'presentationContextCapture'],
+    equals: false,
+    message: 'rich presentation context capture is disabled',
+  },
+  {
     id: 'frontline_compression_requested',
     path: ['perfRuntime', 'frontlineCompressionRequested'],
     message: 'frontline compression was requested',

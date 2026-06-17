@@ -28,6 +28,9 @@ export class WeaponAnimations {
   private readonly RECOIL_MAX_Y = 0.055     // up offset ceiling (world units)
   private readonly RECOIL_MAX_ROTX = 0.018  // pitch-rotation ceiling (radians)
   private readonly RECOIL_MAX_Z = 0.11      // backward offset ceiling (world units)
+  private readonly RECOIL_MAX_X = 0.045     // horizontal offset ceiling (world units)
+  private readonly RECOIL_MAX_RECOVERY_STEP = 1 / 60
+  private readonly RECOIL_MAX_RECOVERY_DT = 0.12
 
   // Idle motion
   private idleTime = 0
@@ -138,13 +141,14 @@ export class WeaponAnimations {
     const headroomZ = THREE.MathUtils.clamp(1 - -this.weaponRecoilOffset.z / this.RECOIL_MAX_Z, 0, 1)
     const headroomY = THREE.MathUtils.clamp(1 - this.weaponRecoilOffset.y / this.RECOIL_MAX_Y, 0, 1)
     const headroomRotX = THREE.MathUtils.clamp(1 - this.weaponRecoilOffset.rotX / this.RECOIL_MAX_ROTX, 0, 1)
+    const headroomX = THREE.MathUtils.clamp(1 - Math.abs(this.weaponRecoilOffset.x) / this.RECOIL_MAX_X, 0, 1)
 
     this.weaponRecoilVelocity.z -= 2.2 * recoilMultiplier * headroomZ // Backward kick
     this.weaponRecoilVelocity.y += 1.2 * recoilMultiplier * headroomY // Upward kick
     this.weaponRecoilVelocity.rotX += 0.12 * recoilMultiplier * headroomRotX // Rotation kick
 
     // Small random horizontal kick for variety
-    this.weaponRecoilVelocity.x += (Math.random() - 0.5) * 0.4
+    this.weaponRecoilVelocity.x += (Math.random() - 0.5) * 0.4 * headroomX
   }
 
   getRecoilOffset(): { x: number; y: number; z: number; rotX: number } {
@@ -185,6 +189,17 @@ export class WeaponAnimations {
   }
 
   private updateRecoilRecovery(deltaTime: number): void {
+    const recoveryDt = THREE.MathUtils.clamp(deltaTime, 0, this.RECOIL_MAX_RECOVERY_DT)
+    if (recoveryDt <= 0) return
+
+    const steps = Math.max(1, Math.ceil(recoveryDt / this.RECOIL_MAX_RECOVERY_STEP))
+    const stepDt = recoveryDt / steps
+    for (let i = 0; i < steps; i++) {
+      this.integrateRecoilRecoveryStep(stepDt)
+    }
+  }
+
+  private integrateRecoilRecoveryStep(deltaTime: number): void {
     // Spring physics for smooth recoil recovery
     const springForceX = -this.weaponRecoilOffset.x * this.RECOIL_SPRING_STIFFNESS
     const springForceY = -this.weaponRecoilOffset.y * this.RECOIL_SPRING_STIFFNESS
@@ -212,9 +227,42 @@ export class WeaponAnimations {
     // Saturate the viewmodel offset so sustained fire holds a believable height
     // instead of riding ever higher in the frame. The headroom-scaled impulse
     // normally keeps us below these; this is the hard backstop.
-    this.weaponRecoilOffset.y = THREE.MathUtils.clamp(this.weaponRecoilOffset.y, -this.RECOIL_MAX_Y, this.RECOIL_MAX_Y)
-    this.weaponRecoilOffset.z = THREE.MathUtils.clamp(this.weaponRecoilOffset.z, -this.RECOIL_MAX_Z, this.RECOIL_MAX_Z)
-    this.weaponRecoilOffset.rotX = THREE.MathUtils.clamp(this.weaponRecoilOffset.rotX, -this.RECOIL_MAX_ROTX, this.RECOIL_MAX_ROTX)
+    this.saturateRecoilOffset()
+  }
+
+  private saturateRecoilOffset(): void {
+    this.weaponRecoilOffset.x = this.saturateRecoilComponent(
+      this.weaponRecoilOffset.x,
+      'x',
+      this.RECOIL_MAX_X
+    )
+    this.weaponRecoilOffset.y = this.saturateRecoilComponent(
+      this.weaponRecoilOffset.y,
+      'y',
+      this.RECOIL_MAX_Y
+    )
+    this.weaponRecoilOffset.z = this.saturateRecoilComponent(
+      this.weaponRecoilOffset.z,
+      'z',
+      this.RECOIL_MAX_Z
+    )
+    this.weaponRecoilOffset.rotX = this.saturateRecoilComponent(
+      this.weaponRecoilOffset.rotX,
+      'rotX',
+      this.RECOIL_MAX_ROTX
+    )
+  }
+
+  private saturateRecoilComponent(
+    value: number,
+    axis: keyof typeof this.weaponRecoilVelocity,
+    limit: number
+  ): number {
+    const clamped = THREE.MathUtils.clamp(value, -limit, limit)
+    if (clamped !== value && Math.sign(this.weaponRecoilVelocity[axis]) === Math.sign(value)) {
+      this.weaponRecoilVelocity[axis] = 0
+    }
+    return clamped
   }
 
   private updatePumpAnimation(deltaTime: number): void {

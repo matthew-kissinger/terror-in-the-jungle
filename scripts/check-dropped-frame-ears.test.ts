@@ -61,6 +61,7 @@ function tempArtifact(options: ArtifactOptions): string {
     },
     rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
     perfRuntime: {
+      presentationContextCapture: true,
       frontlineCompressionRequested: false,
       victoryConditionsDisabled: false,
       npcCloseModelsDisabled: false,
@@ -148,6 +149,15 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     }));
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_frontline_compression_requested' && check.status === 'fail')).toBe(true);
+  });
+
+  it('rejects thin presentation-context diagnostic captures', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      runtimeOverrides: { presentationContextCapture: false },
+    }));
+    expect(artifact.classification).toBe('rejected');
+    expect(artifact.checks.some((check) => check.id === 'forbidden_presentation_context_capture_disabled' && check.status === 'fail')).toBe(true);
   });
 
   it('rejects explicit adaptive terrain-skirt diagnostic captures as flag-driven coverage', () => {
