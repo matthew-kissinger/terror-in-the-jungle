@@ -1334,6 +1334,9 @@ const DEFAULT_FRONTLINE_TRIGGER_DISTANCE = 500;
 const DEFAULT_MAX_COMPRESSED_PER_FACTION = 28;
 const DEFAULT_SAMPLE_INTERVAL_MS = 1000;
 const DEFAULT_DETAIL_EVERY_SAMPLES = 1;
+const DEFAULT_PRESSURE_READY_TIMEOUT_SECONDS = 120;
+const PRESSURE_READY_POLL_MS = 1000;
+const PRESSURE_READY_CONSECUTIVE_SAMPLES = 2;
 const SHOT_VISUAL_CORRELATION_WINDOW_MS = 3000;
 const SHOT_VISUAL_PRESENTATION_GAP_WINDOW_MS = 500;
 const SHOT_VISUAL_ROUTE_SNAP_THRESHOLD_M = 12;
@@ -2045,6 +2048,8 @@ Common options:
   --runtime-render-submission-every-samples <count>
   --runtime-render-submission-mode <full|summary>
   --presentation-context-capture <true|false> Diagnostic A/B: keep rAF counters but skip rich per-gap context cloning
+  --pressure-ready-warmup <true|false> Wait for contact/materialization pressure before measured window
+  --pressure-ready-timeout <seconds>
   --weather-state <default|clear|light_rain|heavy_rain|storm> Diagnostic A/B: force weather after mode start; rejected by dropped-frame EARS unless default
   --quiet-machine-attested       Assert the machine was reserved for this capture; also accepted via TIJ_QUIET_MACHINE=1
   --runtime-preflight <true|false>
@@ -3150,6 +3155,37 @@ function scaleModeThresholdsForDuration(
     minMovementTransitions: Math.round(base.minMovementTransitions * scale),
     referenceDurationSeconds
   };
+}
+
+function pressureReadyWarmupValidationCheck(result: PressureReadyWarmupResult): ValidationCheck {
+  const elapsedSeconds = result.elapsedMs / 1000;
+  if (result.status === 'ready') {
+    return {
+      id: 'pressure_ready_warmup',
+      status: 'pass',
+      value: elapsedSeconds,
+      message: `Pressure-ready warmup passed in ${elapsedSeconds.toFixed(1)}s (${result.reason}, samples=${result.samples})`
+    };
+  }
+
+  const status: ValidationCheckStatus = result.status === 'timeout' || result.status === 'unavailable'
+    ? 'fail'
+    : 'warn';
+  return {
+    id: 'pressure_ready_warmup',
+    status,
+    value: elapsedSeconds,
+    message: `Pressure-ready warmup ${result.status} after ${elapsedSeconds.toFixed(1)}s (${result.reason}, samples=${result.samples}); measured window may not represent combat/materialization pressure`
+  };
+}
+
+function addPressureReadyWarmupValidation(
+  validation: ValidationReport,
+  result: PressureReadyWarmupResult
+): void {
+  if (!result.requested) return;
+  validation.checks.push(pressureReadyWarmupValidationCheck(result));
+  validation.overall = getOverallStatus(validation.checks);
 }
 
 function validateRun(
@@ -4546,6 +4582,35 @@ type ActiveScenarioOptions = {
   maxCompressedPerFaction: number;
 };
 
+type PressureReadyWarmupStatus = 'disabled' | 'ready' | 'timeout' | 'unavailable';
+
+type PressureReadyWarmupSnapshot = {
+  ready: boolean;
+  reason: string;
+  closeCandidates: number;
+  renderedCloseModels: number;
+  activeCloseModels: number;
+  engineShotsFired: number;
+  engineShotsHit: number;
+  botState: string | null;
+  currentTargetDistance: number | null;
+  nearestPerceivedEnemyDistance: number | null;
+  nearestOpforDistance: number | null;
+  objectiveKind: string | null;
+  objectiveDistance: number | null;
+};
+
+type PressureReadyWarmupResult = {
+  requested: boolean;
+  status: PressureReadyWarmupStatus;
+  timeoutSeconds: number;
+  elapsedMs: number;
+  samples: number;
+  consecutiveReadySamples: number;
+  reason: string;
+  lastSnapshot: PressureReadyWarmupSnapshot | null;
+};
+
 async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOptions): Promise<void> {
   if (!options.enabled) return;
 
@@ -4571,6 +4636,171 @@ async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOpti
   logStep(
     `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, mode=${String(setupResult?.mode ?? options.mode)}, driverSeed=${setupResult?.driverSeed ?? options.driverSeed ?? 'none'}, driverIntervalMs=${Number(setupResult?.movementDecisionIntervalMs ?? options.movementDecisionIntervalMs)}, compressFrontline=${Boolean(setupResult?.compressFrontline)}, allowWarpRecovery=${Boolean(setupResult?.allowWarpRecovery)}, topUpHealth=${Boolean(setupResult?.topUpHealth)}, autoRespawn=${Boolean(setupResult?.autoRespawn)})`
   );
+}
+
+async function waitForPressureReadyWarmup(
+  page: Page,
+  options: {
+    requested: boolean;
+    timeoutSeconds: number;
+    activePlayerScenario: boolean;
+    enableCombat: boolean;
+  }
+): Promise<PressureReadyWarmupResult> {
+  const timeoutSeconds = Math.max(0, Number(options.timeoutSeconds ?? 0));
+  if (!options.requested) {
+    return {
+      requested: false,
+      status: 'disabled',
+      timeoutSeconds,
+      elapsedMs: 0,
+      samples: 0,
+      consecutiveReadySamples: 0,
+      reason: 'disabled',
+      lastSnapshot: null,
+    };
+  }
+
+  if (!options.enableCombat || !options.activePlayerScenario) {
+    return {
+      requested: true,
+      status: 'unavailable',
+      timeoutSeconds,
+      elapsedMs: 0,
+      samples: 0,
+      consecutiveReadySamples: 0,
+      reason: 'requires active combat driver',
+      lastSnapshot: null,
+    };
+  }
+
+  logStep(
+    `🎯 Pressure-ready warmup waiting up to ${timeoutSeconds}s ` +
+    `for ${PRESSURE_READY_CONSECUTIVE_SAMPLES} consecutive contact/materialization samples`
+  );
+
+  const startedAt = Date.now();
+  const deadline = startedAt + timeoutSeconds * 1000;
+  let samples = 0;
+  let consecutiveReadySamples = 0;
+  let lastSnapshot: PressureReadyWarmupSnapshot | null = null;
+
+  while (Date.now() <= deadline) {
+    const snapshot = await safeAwait(
+      'pressure-ready warmup probe',
+      page.evaluate(() => {
+        const nullableNumber = (value: unknown): number | null => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : null;
+        };
+        const engine = (window as any).__engine;
+        const combatantRenderer = engine?.systemManager?.combatantSystem?.combatantRenderer;
+        const closeModelStats = combatantRenderer?.getCloseModelRuntimeStats?.({ drainTransitionWindow: false }) ?? null;
+        const driverState = (window as any).__perfHarnessDriverState?.getDebugSnapshot?.() ?? null;
+        const driverCounters =
+          (window as any).__perfHarnessDriverState?.getCountersSnapshot?.()
+          ?? (window as any).__perfHarnessDriver?.getCountersSnapshot?.()
+          ?? null;
+
+        const closeCandidates = Number(closeModelStats?.candidatesWithinCloseRadius ?? 0);
+        const renderedCloseModels = Number(closeModelStats?.renderedCloseModels ?? 0);
+        const activeCloseModels = Number(closeModelStats?.activeCloseModels ?? 0);
+        const engineShotsFired = Number(driverState?.engineShotsFired ?? driverCounters?.engineShotsFired ?? 0);
+        const engineShotsHit = Number(driverState?.engineShotsHit ?? driverCounters?.engineShotsHit ?? 0);
+        const botState = typeof driverState?.botState === 'string'
+          ? driverState.botState
+          : typeof driverState?.movementState === 'string'
+            ? driverState.movementState
+            : null;
+        const currentTargetDistance = nullableNumber(driverState?.currentTargetDistance);
+        const nearestPerceivedEnemyDistance = nullableNumber(driverState?.nearestPerceivedEnemyDistance);
+        const nearestOpforDistance = nullableNumber(driverState?.nearestOpforDistance);
+        const objectiveKind = typeof driverState?.objectiveKind === 'string' ? driverState.objectiveKind : null;
+        const objectiveDistance = nullableNumber(driverState?.objectiveDistance);
+
+        let reason = 'not-ready';
+        let ready = false;
+        if (closeCandidates >= 2 && renderedCloseModels >= 1) {
+          ready = true;
+          reason = 'close-model-pressure';
+        } else if (engineShotsFired > 0) {
+          ready = true;
+          reason = 'live-fire';
+        } else if (botState === 'ENGAGE' && currentTargetDistance !== null && currentTargetDistance <= 220) {
+          ready = true;
+          reason = 'engage-target-distance';
+        } else if (nearestPerceivedEnemyDistance !== null && nearestPerceivedEnemyDistance <= 180) {
+          ready = true;
+          reason = 'near-perceived-enemy';
+        }
+
+        return {
+          ready,
+          reason,
+          closeCandidates,
+          renderedCloseModels,
+          activeCloseModels,
+          engineShotsFired,
+          engineShotsHit,
+          botState,
+          currentTargetDistance,
+          nearestPerceivedEnemyDistance,
+          nearestOpforDistance,
+          objectiveKind,
+          objectiveDistance,
+        } satisfies PressureReadyWarmupSnapshot;
+      }),
+      3000
+    );
+
+    samples++;
+    lastSnapshot = snapshot;
+    if (snapshot?.ready) {
+      consecutiveReadySamples++;
+    } else {
+      consecutiveReadySamples = 0;
+    }
+
+    if (consecutiveReadySamples >= PRESSURE_READY_CONSECUTIVE_SAMPLES) {
+      const elapsedMs = Date.now() - startedAt;
+      logStep(
+        `🎯 Pressure-ready warmup passed after ${(elapsedMs / 1000).toFixed(1)}s ` +
+        `(reason=${snapshot?.reason ?? 'unknown'}, close=${snapshot?.renderedCloseModels ?? 0}/${snapshot?.closeCandidates ?? 0}, ` +
+        `shots=${snapshot?.engineShotsFired ?? 0}, state=${snapshot?.botState ?? 'unknown'})`
+      );
+      return {
+        requested: true,
+        status: 'ready',
+        timeoutSeconds,
+        elapsedMs,
+        samples,
+        consecutiveReadySamples,
+        reason: snapshot?.reason ?? 'ready',
+        lastSnapshot,
+      };
+    }
+
+    if (Date.now() >= deadline) break;
+    await page.waitForTimeout(PRESSURE_READY_POLL_MS);
+  }
+
+  const elapsedMs = Date.now() - startedAt;
+  logStep(
+    `⚠ Pressure-ready warmup timed out after ${(elapsedMs / 1000).toFixed(1)}s ` +
+    `(lastReason=${lastSnapshot?.reason ?? 'none'}, close=${lastSnapshot?.renderedCloseModels ?? 0}/${lastSnapshot?.closeCandidates ?? 0}, ` +
+    `shots=${lastSnapshot?.engineShotsFired ?? 0}, state=${lastSnapshot?.botState ?? 'unknown'}, ` +
+    `objective=${lastSnapshot?.objectiveKind ?? 'unknown'}:${lastSnapshot?.objectiveDistance ?? 'n/a'}m)`
+  );
+  return {
+    requested: true,
+    status: 'timeout',
+    timeoutSeconds,
+    elapsedMs,
+    samples,
+    consecutiveReadySamples,
+    reason: lastSnapshot?.reason ?? 'timeout',
+    lastSnapshot,
+  };
 }
 
 async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal | null> {
@@ -4863,6 +5093,11 @@ async function runCapture(): Promise<void> {
     ? 'summary'
     : 'full';
   const presentationContextCapture = parseBooleanFlag('presentation-context-capture', true);
+  const pressureReadyWarmup = parseBooleanFlag('pressure-ready-warmup', false);
+  const pressureReadyTimeoutSeconds = Math.max(
+    0,
+    parseNumberFlag('pressure-ready-timeout', DEFAULT_PRESSURE_READY_TIMEOUT_SECONDS)
+  );
   const weatherStateOverride = parseWeatherStateOverride(parseStringFlag('weather-state', 'default'));
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
@@ -4943,7 +5178,7 @@ async function runCapture(): Promise<void> {
     seenKeys: new Set<string>(),
     lastCaptureElapsedMs: -1
   };
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} presentationContextCapture=${presentationContextCapture} weatherState=${weatherStateOverride} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainShadowPassMode=${terrainShadowPassMode} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainFullShadowPass=${terrainFullShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainHeightAwareFrustum=${disableTerrainHeightAwareFrustum} terrainFullSkirts=${terrainFullSkirts} terrainSparseSkirts=${terrainSparseSkirts} disableTerrainSkirts=${disableTerrainSkirts} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} driverSeed=${driverSeed ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} deepDiagnostics=${deepDiagnostics} shotVisualCapture=${shotVisualCapture} shotVisualCaptureMax=${shotVisualCaptureMax} shotVisualCaptureCooldownMs=${shotVisualCaptureCooldownMs} gpuTiming=${gpuTiming} gpuTimingQuery=${gpuTimingQueryEnabled} cdpProfiler=${cdpProfiler} cdpHeapSampling=${cdpHeapSampling} traceWindow=${traceWindowLabel} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} runtimeSceneAttribution=${runtimeSceneAttribution} runtimeSceneAttributionEverySamples=${runtimeSceneAttributionEverySamples} runtimeRenderSubmissionAttribution=${runtimeRenderSubmissionAttribution} runtimeRenderSubmissionEverySamples=${runtimeRenderSubmissionEverySamples} runtimeRenderSubmissionMode=${runtimeRenderSubmissionMode} presentationContextCapture=${presentationContextCapture} pressureReadyWarmup=${pressureReadyWarmup} pressureReadyTimeout=${pressureReadyTimeoutSeconds}s weatherState=${weatherStateOverride} prewarm=${prewarm} runtimePreflight=${runtimePreflight} matchDurationOverride=${perfMatchDurationSeconds ?? 'none'} renderer=${rendererMode || 'default'} disableVictory=${disableVictory} disableNpcCloseModels=${disableNpcCloseModels} disableTerrainShadows=${disableTerrainShadows} terrainShadowPassMode=${terrainShadowPassMode} boundedTerrainShadowPass=${boundedTerrainShadowPass} terrainFullShadowPass=${terrainFullShadowPass} terrainForceInstanceUpload=${terrainForceInstanceUpload} terrainHeightAwareFrustum=${terrainHeightAwareFrustum} disableTerrainHeightAwareFrustum=${disableTerrainHeightAwareFrustum} terrainFullSkirts=${terrainFullSkirts} terrainSparseSkirts=${terrainSparseSkirts} disableTerrainSkirts=${disableTerrainSkirts} disableTerrainFarCanopyTint=${disableTerrainFarCanopyTint} disableTerrainLowSunOcclusion=${disableTerrainLowSunOcclusion} disableWildlife=${disableWildlife} vegetationDensityScale=${vegetationDensityScale ?? 'default'} reuseServer=${reuseServer} serverMode=${serverMode} forceServerBuild=${forceServerBuild}`);
   if (shotVisualCaptureState.enabled) {
     logStep('Shot visual capture is diagnostic-only and will perturb timing; do not use this run as a baseline.');
   }
@@ -5042,7 +5277,13 @@ async function runCapture(): Promise<void> {
     : [`/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}${gpuTimingQuery}`, primaryPath];
   const runHardTimeoutMs = Math.max(
     MIN_RUN_HARD_TIMEOUT_MS,
-    (startupTimeoutSeconds + warmupSeconds + durationSeconds + 90) * 1000
+    (
+      startupTimeoutSeconds
+      + warmupSeconds
+      + (pressureReadyWarmup ? pressureReadyTimeoutSeconds : 0)
+      + durationSeconds
+      + 90
+    ) * 1000
   );
   const navTimeoutMs = Math.max(STEP_TIMEOUT_MS, startupTimeoutSeconds * 1000 + 5000);
   let failureReason: string | undefined;
@@ -5061,6 +5302,16 @@ async function runCapture(): Promise<void> {
   let runtimePreflightResult: { totalMs: number; ok: boolean; reason?: string } = { totalMs: 0, ok: true };
   let startupDiagnostics: StartupDiagnostics | null = null;
   let startupTimeline: any = null;
+  let pressureReadyWarmupResult: PressureReadyWarmupResult = {
+    requested: pressureReadyWarmup,
+    status: pressureReadyWarmup ? 'unavailable' : 'disabled',
+    timeoutSeconds: pressureReadyTimeoutSeconds,
+    elapsedMs: 0,
+    samples: 0,
+    consecutiveReadySamples: 0,
+    reason: pressureReadyWarmup ? 'not-started' : 'disabled',
+    lastSnapshot: null,
+  };
   // harness-lifecycle-halt-on-match-end: hoisted out of the sample loop so the
   // finally-block summary writer can pick them up even on early failure.
   let matchEndedAtRelMs: number | null = null;
@@ -5764,6 +6015,12 @@ async function runCapture(): Promise<void> {
         logStep(`🎯 Render submission attribution installed (${JSON.stringify(installResult)})`);
       }
       await warmupRuntime(page, warmupSeconds);
+      pressureReadyWarmupResult = await waitForPressureReadyWarmup(page, {
+        requested: pressureReadyWarmup,
+        timeoutSeconds: pressureReadyTimeoutSeconds,
+        activePlayerScenario,
+        enableCombat,
+      });
       if (activePlayerScenario) {
         await stopActiveScenarioDriver(page);
         await setupActiveScenarioDriver(page, {
@@ -7274,6 +7531,7 @@ async function runCapture(): Promise<void> {
       }
       validation.overall = getOverallStatus(validation.checks);
     }
+    addPressureReadyWarmupValidation(validation, pressureReadyWarmupResult);
     measurementTrust = computeMeasurementTrust({
       probeRoundTripMs,
       runtimeSampleCount: runtimeSamples.length,
@@ -7531,6 +7789,14 @@ async function runCapture(): Promise<void> {
         perfRuntime: {
           matchDurationSeconds: perfMatchDurationSeconds ?? undefined,
           presentationContextCapture,
+          pressureReadyWarmupRequested: pressureReadyWarmupResult.requested,
+          pressureReadyWarmupStatus: pressureReadyWarmupResult.status,
+          pressureReadyWarmupTimeoutSeconds: pressureReadyWarmupResult.timeoutSeconds,
+          pressureReadyWarmupElapsedMs: pressureReadyWarmupResult.elapsedMs,
+          pressureReadyWarmupSamples: pressureReadyWarmupResult.samples,
+          pressureReadyWarmupConsecutiveReadySamples: pressureReadyWarmupResult.consecutiveReadySamples,
+          pressureReadyWarmupReason: pressureReadyWarmupResult.reason,
+          pressureReadyWarmupLastSnapshot: pressureReadyWarmupResult.lastSnapshot ?? undefined,
           weatherStateOverride: weatherStateOverride === 'default' ? undefined : weatherStateOverride,
           frontlineCompressionRequested: compressFrontline,
           victoryConditionsDisabled: disableVictory,

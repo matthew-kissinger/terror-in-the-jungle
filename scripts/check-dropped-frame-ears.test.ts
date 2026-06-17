@@ -31,6 +31,8 @@ type ArtifactOptions = {
   quietSnapshotStatus?: 'pass' | 'warn' | 'fail';
   renderMainTailMs?: number;
   missingRenderTail?: boolean;
+  atmosphereSyncTailMs?: number;
+  pressureReadyStatus?: 'ready' | 'timeout' | 'unavailable';
   resourceJumpAtRenderTail?: {
     textures?: number;
     geometries?: number;
@@ -167,6 +169,28 @@ function tempArtifact(options: ArtifactOptions): string {
     },
     perfRuntime: {
       presentationContextCapture: true,
+      pressureReadyWarmupRequested: true,
+      pressureReadyWarmupStatus: options.pressureReadyStatus ?? 'ready',
+      pressureReadyWarmupTimeoutSeconds: 120,
+      pressureReadyWarmupElapsedMs: options.pressureReadyStatus === 'timeout' ? 120_000 : 24_000,
+      pressureReadyWarmupSamples: options.pressureReadyStatus === 'timeout' ? 120 : 24,
+      pressureReadyWarmupConsecutiveReadySamples: options.pressureReadyStatus === 'timeout' ? 0 : 2,
+      pressureReadyWarmupReason: options.pressureReadyStatus === 'timeout' ? 'not-ready' : 'close-model-pressure',
+      pressureReadyWarmupLastSnapshot: {
+        ready: options.pressureReadyStatus !== 'timeout',
+        reason: options.pressureReadyStatus === 'timeout' ? 'not-ready' : 'close-model-pressure',
+        closeCandidates: options.pressureReadyStatus === 'timeout' ? 0 : 4,
+        renderedCloseModels: options.pressureReadyStatus === 'timeout' ? 0 : 3,
+        activeCloseModels: options.pressureReadyStatus === 'timeout' ? 0 : 3,
+        engineShotsFired: options.pressureReadyStatus === 'timeout' ? 0 : 2,
+        engineShotsHit: options.pressureReadyStatus === 'timeout' ? 0 : 1,
+        botState: options.pressureReadyStatus === 'timeout' ? 'PATROL' : 'ENGAGE',
+        currentTargetDistance: options.pressureReadyStatus === 'timeout' ? null : 140,
+        nearestPerceivedEnemyDistance: options.pressureReadyStatus === 'timeout' ? null : 120,
+        nearestOpforDistance: options.pressureReadyStatus === 'timeout' ? 900 : 120,
+        objectiveKind: options.pressureReadyStatus === 'timeout' ? 'zone' : 'nearest_opfor',
+        objectiveDistance: options.pressureReadyStatus === 'timeout' ? 1500 : 120,
+      },
       frontlineCompressionRequested: false,
       victoryConditionsDisabled: false,
       npcCloseModelsDisabled: false,
@@ -215,6 +239,9 @@ function tempArtifact(options: ArtifactOptions): string {
     const renderMainMs = index === 2
       ? options.renderMainTailMs ?? 12
       : 10;
+    const atmosphereSyncMs = index === 3
+      ? options.atmosphereSyncTailMs ?? 0.1
+      : 0.1;
     const resourceJump = index >= 2 ? options.resourceJumpAtRenderTail : undefined;
     return {
       frameCount: index * 120,
@@ -262,6 +289,7 @@ function tempArtifact(options: ArtifactOptions): string {
               segments: {
                 'RenderMain.renderer.render': renderMainMs,
                 'Simulation.updateSystems': 4,
+                'World.atmosphereSync': atmosphereSyncMs,
                 'RenderOverlay.weapon': 1,
               },
             }],
@@ -315,6 +343,36 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       && check.status === 'fail'
       && check.value === 'textures+64 geometries+65 programs+2'
       && check.message.includes('GPU residency/material warmup as unproven')
+    ))).toBe(true);
+  });
+
+  it('surfaces expensive atmosphere/fog CPU sync as a measured suspect', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      atmosphereSyncTailMs: 18.4,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'atmosphere_cpu_sync_tail'
+      && check.status === 'fail'
+      && check.value === 18.4
+      && check.message.includes('Evaluate sky/fog/atmosphere authority')
+    ))).toBe(true);
+  });
+
+  it('keeps pressure-ready timeout artifacts diagnostic instead of perf-complete', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      pressureReadyStatus: 'timeout',
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'pressure_ready_measurement_window'
+      && check.status === 'fail'
+      && check.value === 'timeout'
+      && check.message.includes('contact/routing')
     ))).toBe(true);
   });
 

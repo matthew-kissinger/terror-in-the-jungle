@@ -502,15 +502,19 @@ export class GameRenderer {
     textures: number;
     programs: number;
   } {
-    const memory = this.renderer.info.memory as { geometries: number; textures: number; programs?: number };
+    const info = this.renderer.info as typeof this.renderer.info & { programs?: unknown[] };
+    const memory = info.memory as { geometries: number; textures: number; programs?: number };
     const render = this.renderer.info.render;
+    const programs = Array.isArray(info.programs)
+      ? info.programs.length
+      : memory.programs ?? 0;
     return {
       fps: 0, // Will be calculated externally with clock
       drawCalls: render.calls,
       triangles: render.triangles,
       geometries: memory.geometries,
       textures: memory.textures,
-      programs: memory.programs ?? 0
+      programs
     };
   }
 

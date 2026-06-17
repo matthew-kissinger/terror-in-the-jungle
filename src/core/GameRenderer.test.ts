@@ -18,7 +18,7 @@
 
 import * as THREE from 'three';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_TONE_MAPPING, INITIAL_FOG_COLOR, shouldPreserveDrawingBuffer } from './GameRenderer';
+import { DEFAULT_TONE_MAPPING, GameRenderer, INITIAL_FOG_COLOR, shouldPreserveDrawingBuffer } from './GameRenderer';
 
 const originalHref = window.location.href;
 
@@ -95,5 +95,34 @@ describe('INITIAL_FOG_COLOR', () => {
       expect(c).toBeGreaterThanOrEqual(0x40);
       expect(c).toBeLessThanOrEqual(0xc0);
     }
+  });
+});
+
+describe('GameRenderer performance stats', () => {
+  it('reports shader programs from renderer.info.programs when available', () => {
+    const stats = GameRenderer.prototype.getPerformanceStats.call({
+      renderer: {
+        info: {
+          memory: {
+            geometries: 12,
+            textures: 34,
+            programs: 99,
+          },
+          programs: [{}, {}],
+          render: {
+            calls: 56,
+            triangles: 78,
+          },
+        },
+      },
+    } as unknown as GameRenderer);
+
+    expect(stats).toMatchObject({
+      drawCalls: 56,
+      triangles: 78,
+      geometries: 12,
+      textures: 34,
+      programs: 2,
+    });
   });
 });

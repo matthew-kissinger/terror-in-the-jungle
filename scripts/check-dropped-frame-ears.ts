@@ -77,6 +77,8 @@ const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES = 3;
 const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_RATIO = 0.05;
 const RENDER_MAIN_RENDER_WARN_MS = 33;
 const RENDER_MAIN_RENDER_FAIL_MS = 100;
+const ATMOSPHERE_SYNC_WARN_MS = 4;
+const ATMOSPHERE_SYNC_FAIL_MS = 16;
 const RENDERER_RESOURCE_TEXTURE_JUMP_WARN = 16;
 const RENDERER_RESOURCE_GEOMETRY_JUMP_WARN = 16;
 const RENDERER_RESOURCE_PROGRAM_JUMP_WARN = 2;
@@ -751,6 +753,41 @@ function addForbiddenRuntimeChecks(
   }
 }
 
+function addPressureReadyWarmupChecks(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null
+): void {
+  const requested = getBoolean(summary, ['perfRuntime', 'pressureReadyWarmupRequested']);
+  const status = getString(summary, ['perfRuntime', 'pressureReadyWarmupStatus']);
+  const reason = getString(summary, ['perfRuntime', 'pressureReadyWarmupReason']);
+  const elapsedMs = getNumber(summary, ['perfRuntime', 'pressureReadyWarmupElapsedMs']);
+  const samples = getNumber(summary, ['perfRuntime', 'pressureReadyWarmupSamples']);
+  const snapshot = asRecord(getPath(summary, ['perfRuntime', 'pressureReadyWarmupLastSnapshot']));
+  const closeCandidates = getNumber(snapshot, ['closeCandidates']);
+  const renderedCloseModels = getNumber(snapshot, ['renderedCloseModels']);
+  const engineShotsFired = getNumber(snapshot, ['engineShotsFired']);
+  const botState = getString(snapshot, ['botState']);
+
+  if (requested !== true) {
+    checks.push({
+      id: 'pressure_ready_measurement_window',
+      status: 'fail',
+      value: requested,
+      message: 'Pressure-ready warmup was not requested; cannot prove the measured window began under contact/materialization pressure.',
+    });
+    return;
+  }
+
+  checks.push({
+    id: 'pressure_ready_measurement_window',
+    status: status === 'ready' ? 'pass' : 'fail',
+    value: status,
+    message: status === 'ready'
+      ? `Measured window started after pressure-ready warmup (${reason ?? 'unknown'}, elapsed=${elapsedMs ?? 'n/a'}ms, samples=${samples ?? 'n/a'}, close=${renderedCloseModels ?? 'n/a'}/${closeCandidates ?? 'n/a'}, shots=${engineShotsFired ?? 'n/a'}, state=${botState ?? 'unknown'}).`
+      : `Pressure-ready warmup did not pass (status=${status ?? 'unknown'}, reason=${reason ?? 'unknown'}, elapsed=${elapsedMs ?? 'n/a'}ms, samples=${samples ?? 'n/a'}, close=${renderedCloseModels ?? 'n/a'}/${closeCandidates ?? 'n/a'}, shots=${engineShotsFired ?? 'n/a'}, state=${botState ?? 'unknown'}); keep this artifact diagnostic for contact/routing, not perf completion.`,
+  });
+}
+
 function addTerrainHeightBoundsTrustChecks(
   checks: DroppedFrameEarsCheck[],
   summary: Record<string, unknown> | null
@@ -1047,6 +1084,86 @@ function addRenderTailAttributionChecks(
   });
 }
 
+function addAtmosphereTailChecks(
+  checks: DroppedFrameEarsCheck[],
+  runtimeSamples: readonly unknown[] | null
+): void {
+  if (runtimeSamples === null) {
+    checks.push({
+      id: 'atmosphere_cpu_sync_tail',
+      status: 'warn',
+      value: null,
+      message: 'Runtime samples are unavailable; cannot classify atmosphere/fog CPU sync cost',
+    });
+    return;
+  }
+
+  let observedFrames = 0;
+  let warnFrames = 0;
+  let failFrames = 0;
+  let peakAtmosphereMs = -1;
+  let peakFrame: number | null = null;
+  let peakSampleFrame: number | null = null;
+
+  runtimeSamples.forEach((sample) => {
+    const sampleRecord = asRecord(sample);
+    const sampleFrame = typeof sampleRecord?.frameCount === 'number' && Number.isFinite(sampleRecord.frameCount)
+      ? sampleRecord.frameCount
+      : null;
+    for (const frame of asArray(sampleRecord?.loopFrameBreakdown)) {
+      const frameRecord = asRecord(frame);
+      const segments = asRecord(frameRecord?.segments);
+      const atmosphereMs = typeof segments?.['World.atmosphereSync'] === 'number'
+        && Number.isFinite(segments['World.atmosphereSync'])
+        ? segments['World.atmosphereSync']
+        : null;
+      if (atmosphereMs === null) continue;
+
+      observedFrames++;
+      if (atmosphereMs >= ATMOSPHERE_SYNC_WARN_MS) warnFrames++;
+      if (atmosphereMs >= ATMOSPHERE_SYNC_FAIL_MS) failFrames++;
+      if (atmosphereMs > peakAtmosphereMs) {
+        peakAtmosphereMs = atmosphereMs;
+        peakFrame = typeof frameRecord?.frameCount === 'number' && Number.isFinite(frameRecord.frameCount)
+          ? frameRecord.frameCount
+          : null;
+        peakSampleFrame = sampleFrame;
+      }
+    }
+  });
+
+  if (observedFrames === 0) {
+    checks.push({
+      id: 'atmosphere_cpu_sync_tail',
+      status: 'warn',
+      value: null,
+      message: 'No World.atmosphereSync loop-frame attribution was found; cannot classify atmosphere/fog CPU sync cost',
+    });
+    return;
+  }
+
+  const status: CheckStatus = peakAtmosphereMs >= ATMOSPHERE_SYNC_FAIL_MS
+    ? 'fail'
+    : peakAtmosphereMs >= ATMOSPHERE_SYNC_WARN_MS
+      ? 'warn'
+      : 'pass';
+  const peakFrameText = peakFrame !== null
+    ? `frame ${peakFrame}`
+    : 'unknown frame';
+  const sampleFrameText = peakSampleFrame !== null
+    ? `sampleFrame=${peakSampleFrame}`
+    : 'sampleFrame=unknown';
+
+  checks.push({
+    id: 'atmosphere_cpu_sync_tail',
+    status,
+    value: peakAtmosphereMs,
+    message: status === 'pass'
+      ? `Atmosphere/fog CPU sync attribution is below warning threshold (peak World.atmosphereSync=${peakAtmosphereMs.toFixed(1)}ms across ${observedFrames} loop frames); shader-side fog cost may still be inside RenderMain.renderer.render.`
+      : `Atmosphere/fog CPU sync tail detected: peak World.atmosphereSync=${peakAtmosphereMs.toFixed(1)}ms at ${peakFrameText} (${sampleFrameText}); frames >=${ATMOSPHERE_SYNC_WARN_MS}ms=${warnFrames}, >=${ATMOSPHERE_SYNC_FAIL_MS}ms=${failFrames}. Evaluate sky/fog/atmosphere authority before preserving the current visual path.`,
+  });
+}
+
 export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFrameEarsArtifactEvaluation {
   const absoluteArtifactDir = resolve(artifactDir);
   const summary = readJsonObject(join(absoluteArtifactDir, 'summary.json'));
@@ -1124,10 +1241,12 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addMaterializationTransitionTelemetryChecks(checks, summary, runtimeSamples);
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
+  addPressureReadyWarmupChecks(checks, summary);
   addTerrainHeightBoundsTrustChecks(checks, summary);
   addTerrainVisualDomainTrustChecks(checks, summary);
   addTerrainPresentationIntegrityChecks(checks, summary);
   addRenderTailAttributionChecks(checks, runtimeSamples);
+  addAtmosphereTailChecks(checks, runtimeSamples);
 
   checks.push({
     id: 'owner_visual_acceptance_required',

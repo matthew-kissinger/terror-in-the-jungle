@@ -114,8 +114,10 @@ Executable scaffold:
 | ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 runtime close-model samples and at least 10% of close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when aggregate combat passes. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 | ST4-PERF-018 | Unwanted behavior | If close-model pools load during the measured runtime of a materialization candidate, the harness shall keep the artifact diagnostic even when aggregate materialization pressure is present. | `npc_close_model_runtime_pool_loads_clear` passes: runtime samples include close-model stats and `poolLoads == 0` across measured play. | `runtime-samples.json`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-019 | Unwanted behavior | If active close models are sampled but tier-transition telemetry is missing, the harness shall not claim materialization-transition stutter is understood or fixed. | `npc_materialization_transition_telemetry` passes: when close models are active/rendered, `materializationTierEvents`, `summary.materializationTierMetrics.totalEvents`, or drained `closeModelStats.transitionWindow` / `summary.materializationTierMetrics.transitionWindowTotalEvents` includes at least one transition. | `runtime-samples.json`, `summary.materializationTierMetrics`, `scripts/check-dropped-frame-ears.ts` |
-| ST4-PERF-020 | Event-driven | When sky, cloud, sun, fog, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | Candidate notes must show the new path improves or preserves scenario mood, terrain readability, NPC/vehicle readability, and owner-visible quality while reducing measured render/presentation cost. | render attribution, final frame/screenshot evidence, owner playtest |
+| ST4-PERF-020 | Event-driven | When sky, cloud, sun, fog, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | `atmosphere_cpu_sync_tail` stays below warning threshold, or candidate notes show the new path improves or preserves scenario mood, terrain readability, NPC/vehicle readability, and owner-visible quality while reducing measured render/presentation cost. Shader-side fog/sky cost can still hide inside `RenderMain.renderer.render`, so a low CPU-sync value is not proof that fog is free. | render attribution, `runtime-samples.json`, final frame/screenshot evidence, owner playtest |
 | ST4-PERF-021 | Unwanted behavior | If a `RenderMain.renderer.render` tail coincides with sudden renderer-memory growth, the agent shall treat asset or material GPU residency as unproven even when CPU-side pool-load counters are zero. | Candidate evidence shows no large texture/geometry/program jump around render-tail epochs, or the resources are intentionally warmed during pre-reveal startup with startup marks naming the warmup path. | `runtime-samples.json`, renderer memory counters, startup marks |
+| ST4-PERF-022 | Event-driven | When the owner suspects fog or atmosphere is hurting performance, the harness shall surface the measured atmosphere CPU-sync path before changing visuals. | `check:dropped-frame-ears` reports `atmosphere_cpu_sync_tail`; values `>=4ms` are warning-band suspects and values `>=16ms` keep the artifact diagnostic until the atmosphere/fog authority chain is measured or simplified. | `scripts/check-dropped-frame-ears.ts`, `runtime-samples.json` |
+| ST4-PERF-023 | Complex | A Shau and Open Frontier EARS captures shall not start the measured completion window while the active driver is still in a low-contact route-only approach. | Packaged EARS captures use `--pressure-ready-warmup true --pressure-ready-timeout 120`; `pressure_ready_measurement_window` passes only when the timed window begins after contact/materialization pressure is observed. Timeout artifacts remain diagnostic for routing/contact, not perf completion. This is not frontline compression and does not reduce NPC count, vegetation, map size, or default gameplay content. | `package.json`, `summary.perfRuntime`, `validation.json`, `scripts/check-dropped-frame-ears.ts` |
 
 ## Candidate Classification
 
@@ -142,10 +144,17 @@ places where future loops should replace judgement with numbers:
 - A WebGPU CPU/GPU/presentation split around failing rAF epochs.
 - A fog/material-family A/B sensor that distinguishes scene fog, terrain
   far-canopy tint/haze, billboard fog, NPC-impostor fog, and aircraft
-  fog-distance culling before accepting a fog simplification.
+  fog-distance culling before accepting a shader-side fog simplification. The
+  current `atmosphere_cpu_sync_tail` check only covers the CPU-side
+  `World.atmosphereSync` segment; it does not isolate fragment/material fog
+  work inside `RenderMain.renderer.render`.
 - A sky/cloud/sun/fog replacement spike against Three.js/WebGPU examples or
   local reference code if atmosphere or fog shows up in render tails or remains
   visually unacceptable after the rain burn.
+- Pressure-ready warmup tells us whether the measured window started under
+  contact/materialization pressure; it does not by itself prove sustained
+  pressure across the full measured window. Keep the sustained combat and
+  close-model EARS gates active.
 - Promotion of `presentationGapContexts.materialization` and drained
   `closeModelStats.transitionWindow` from diagnostic summary into pass/fail
   budgets once a trusted paired capture establishes acceptable close-GLB
