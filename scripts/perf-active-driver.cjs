@@ -1489,11 +1489,7 @@
       : false;
 
     if (objectiveKind === 'nearest_opfor') {
-      if (canSeeTarget) return true;
-      if (targetDistance <= maxFireDistance) return true;
-      if (!sameLockedTarget) return false;
-      if (botState !== 'ALERT' && botState !== 'ENGAGE' && botState !== 'ADVANCE') return false;
-      return targetDistance <= maxFireDistance;
+      return canSeeTarget && targetDistance <= maxFireDistance;
     }
 
     const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
@@ -1572,6 +1568,9 @@
     }
     const targetDistance = Number(opts.targetDistance);
     if (!Number.isFinite(targetDistance) || targetDistance <= 0) return false;
+    if ((targetKind === 'nearest_opfor' || targetKind === 'current_target') && opts.targetVisible !== true) {
+      return false;
+    }
     return true;
   }
 
@@ -1819,10 +1818,15 @@
       const dist = botHorizontalDistance(ctx.eyePos, enemy.position);
       const maxFireDistance = Math.max(0, Number(ctx.config.maxFireDistance || 0));
       const targetVisible = !!ctx.canSeeTarget(enemy.position);
-      const advancesCombatObjective = objective && String(objective.kind || '') === 'nearest_opfor' && dist <= maxFireDistance;
+      const advancesCombatObjective = objective
+        && String(objective.kind || '') === 'nearest_opfor'
+        && targetVisible
+        && dist <= maxFireDistance;
       const acquisitionDistance = Math.max(0, Number(ctx.config.targetAcquisitionDistance || ctx.config.maxFireDistance || 0));
       const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
-      const interruptsObjective = !objective || advancesCombatObjective || (dist <= interruptDistance && targetVisible);
+      const interruptsObjective = (!objective && targetVisible)
+        || advancesCombatObjective
+        || (dist <= interruptDistance && targetVisible);
       if (interruptsObjective) {
         intent.aimTarget = botAimPoint(enemy);
         return { intent, nextState: 'ALERT', resetTimeInState: true };

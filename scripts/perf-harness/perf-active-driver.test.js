@@ -1099,7 +1099,7 @@ describe('PlayerBot driver mirror — PATROL and ALERT', () => {
     expect(step.nextState).toBe('ALERT');
   });
 
-  it('advances toward an occluded nearest-opfor objective inside weapon range', () => {
+  it('routes toward an occluded nearest-opfor objective without acquiring it as a combat target', () => {
     const config = botConfigForProfile(profileForMode('a_shau_valley'));
     const target = makeBotTarget({ position: { x: 0, y: 0, z: -128 } });
     const step = stepBotState('PATROL', makeBotCtx({
@@ -1108,8 +1108,8 @@ describe('PlayerBot driver mirror — PATROL and ALERT', () => {
       getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
       canSeeTarget: () => false,
     }));
-    expect(step.nextState).toBe('ALERT');
-    expect(step.intent.moveForward).toBe(0);
+    expect(step.nextState).toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.aimTarget.z).toBeCloseTo(-128, 5);
   });
@@ -2408,7 +2408,7 @@ describe('route objective-progress recovery', () => {
     })).toBe(false);
   });
 
-  it('uses terrain-direct objective routing for large-map patrol objectives', () => {
+  it('uses terrain-direct objective routing for non-combat large-map patrol objectives', () => {
     expect(shouldUseTerrainDirectObjectiveRoute({
       allowTerrainDirect: true,
       targetKind: 'zone',
@@ -2424,16 +2424,16 @@ describe('route objective-progress recovery', () => {
       targetKind: 'nearest_opfor',
       targetDistance: 650,
       targetVisible: false,
-    })).toBe(true);
+    })).toBe(false);
   });
 
-  it('terrain-directs current target movement on large maps without changing fire visibility gates', () => {
+  it('terrain-directs visible current target movement on large maps', () => {
     expect(shouldUseTerrainDirectObjectiveRoute({
       allowTerrainDirect: true,
       targetKind: 'current_target',
       targetDistance: 80,
       targetVisible: false,
-    })).toBe(true);
+    })).toBe(false);
     expect(shouldUseTerrainDirectObjectiveRoute({
       allowTerrainDirect: true,
       targetKind: 'current_target',
@@ -2613,7 +2613,7 @@ describe('route objective-progress recovery', () => {
     })).toBe(true);
   });
 
-  it('allows an occluded nearest-opfor objective inside weapon range to become a recovery target', () => {
+  it('keeps an occluded nearest-opfor objective inside weapon range in route travel', () => {
     const config = botConfigForProfile(profileForMode('open_frontier'));
     const target = makeBotTarget({ position: { x: 0, y: 0, z: -180 } });
     expect(shouldUseTargetForCurrentObjective({
@@ -2625,7 +2625,7 @@ describe('route objective-progress recovery', () => {
       acquisitionDistance: config.targetAcquisitionDistance,
       maxFireDistance: config.maxFireDistance,
       canSeeTarget: () => false,
-    })).toBe(true);
+    })).toBe(false);
   });
 
   it('keeps a far occluded nearest-opfor objective in route travel', () => {
