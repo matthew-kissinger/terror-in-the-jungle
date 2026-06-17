@@ -382,6 +382,32 @@ function addRafChecks(
   }
 }
 
+function addQuietMachineSnapshotCheck(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null,
+  quietMachineAttested: boolean | null
+): void {
+  if (quietMachineAttested !== true) return;
+
+  const snapshotStatus = getString(summary, ['captureEnvironment', 'quietMachineSnapshot', 'status']);
+  const cpuAvg = getNumber(summary, ['captureEnvironment', 'quietMachineSnapshot', 'cpu', 'avgPercent']);
+  const cpuMax = getNumber(summary, ['captureEnvironment', 'quietMachineSnapshot', 'cpu', 'maxPercent']);
+  const gpuUtil = getNumber(summary, ['captureEnvironment', 'quietMachineSnapshot', 'gpu', 'utilizationPercent']);
+
+  checks.push({
+    id: 'quiet_machine_snapshot_idle',
+    status: snapshotStatus === 'pass' || snapshotStatus === 'warn'
+      ? snapshotStatus
+      : 'fail',
+    value: snapshotStatus,
+    message: snapshotStatus === 'pass'
+      ? `Quiet-machine snapshot passed (cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%)`
+      : snapshotStatus === 'warn'
+        ? `Quiet-machine snapshot had incomplete sensors but no recorded busy failure (cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%)`
+        : `Quiet-machine snapshot is missing or busy (status=${snapshotStatus ?? 'missing'}, cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%)`,
+  });
+}
+
 function runtimeSampleShotCount(sample: unknown): number | null {
   const record = asRecord(sample);
   if (!record) return null;
@@ -880,6 +906,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
     'Quiet-machine attestation is missing or false',
     quietMachineAttested
   ));
+  addQuietMachineSnapshotCheck(checks, summary, quietMachineAttested);
 
   const status = getString(summary, ['status']);
   checks.push(checkStatus(

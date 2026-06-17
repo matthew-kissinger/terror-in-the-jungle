@@ -28,6 +28,7 @@ type ArtifactOptions = {
   liveCloseModelPoolLoads?: boolean;
   missingMaterializationEvents?: boolean;
   transitionWindowMaterializationEvents?: boolean;
+  quietSnapshotStatus?: 'pass' | 'warn' | 'fail';
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -80,7 +81,29 @@ function tempArtifact(options: ArtifactOptions): string {
   const summary = {
     status,
     scenario: { mode: options.scenario, requestedMode: options.scenario },
-    captureEnvironment: { quietMachineAttested: true },
+    captureEnvironment: {
+      quietMachineAttested: true,
+      quietMachineSnapshot: {
+        checkedAt: 'fixture',
+        status: options.quietSnapshotStatus ?? 'pass',
+        cpu: {
+          source: 'fixture',
+          avgPercent: 3,
+          maxPercent: 8,
+          samples: [2, 3, 4, 8],
+        },
+        gpu: {
+          source: 'fixture',
+          available: true,
+          utilizationPercent: options.quietSnapshotStatus === 'fail' ? 24 : 2,
+          memoryUtilizationPercent: 1,
+          memoryUsedMiB: 512,
+        },
+        warnings: options.quietSnapshotStatus === 'fail'
+          ? ['GPU was busy during quiet snapshot: utilization=24%']
+          : [],
+      },
+    },
     url: 'http://127.0.0.1:9100/?perf=1&renderer=webgpu-strict',
     validation,
     measurementTrust: {
@@ -232,6 +255,20 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.classification).toBe('diagnostic');
     expect(artifact.checks.some((check) => check.id === 'measurement_trust_pass' && check.status === 'fail')).toBe(true);
     expect(artifact.checks.some((check) => check.id === 'harness_route_snap_trust' && check.status === 'fail')).toBe(true);
+  });
+
+  it('keeps busy quiet-machine snapshots diagnostic even when attested', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      quietSnapshotStatus: 'fail',
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'quiet_machine_snapshot_idle'
+      && check.status === 'fail'
+      && check.value === 'fail'
+    ))).toBe(true);
   });
 
   it('keeps low-contact artifacts diagnostic for materialization claims', () => {

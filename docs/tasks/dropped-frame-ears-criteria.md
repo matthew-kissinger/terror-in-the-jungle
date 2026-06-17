@@ -45,8 +45,8 @@ Executable scaffold:
   unless the required Open Frontier + A Shau artifact pair is supplied.
 - The checker intentionally rejects content-reduction flags and classifies
   failed trust, WebGPU fallback, missing real combat, missing required files,
-  failed rAF gates, and harness-equivalence warnings as diagnostic rather than
-  completion evidence.
+  failed rAF gates, busy quiet-machine snapshots, and harness-equivalence
+  warnings as diagnostic rather than completion evidence.
 - A Shau captures can vary naturally because the driver does not always reach
   sustained combat or close-model pressure on every run. Materialization and
   combat-frame claims require sustained pressure evidence from runtime samples,
@@ -61,7 +61,7 @@ Executable scaffold:
 | id | kind | EARS statement | Quantitative pass signal | Evidence |
 |---|---|---|---|---|
 | ST4-PERF-001 | Ubiquitous | The game shall reduce player-visible dropped-frame time without making Open Frontier or A Shau smaller, emptier, less alive, less visible, or less stressful. | Both required scenarios pass the rAF and dropped-frame gates with default representative content. | `summary.json`, `validation.json`, final frame, owner playtest |
-| ST4-PERF-002 | Complex | When running a completion-lane capture while the machine is quiet, the harness shall accept the run only if measurement trust passes. | `measurementTrust.status == "pass"` and quiet-machine attestation is recorded. | `summary.json`, measurement trust section |
+| ST4-PERF-002 | Complex | When running a completion-lane capture while the machine is quiet, the harness shall accept the run only if measurement trust passes. | `measurementTrust.status == "pass"`, quiet-machine attestation is recorded, and the ambient CPU/GPU snapshot does not report a busy machine. | `summary.json`, measurement trust section |
 | ST4-PERF-003 | Complex | When running a completion-lane capture while WebGPU is expected, the harness shall reject silent fallback as completion evidence. | Renderer backend resolves to the accepted WebGPU path; fallback captures are diagnostic unless explicitly scoped. | `summary.json`, `perfRuntime`, validation warnings |
 | ST4-PERF-004 | Complex | When running a completion-lane capture while active combat is required, the driver shall produce real fire, hits, and enemy-state progression across the sampled window. | Mode-scaled shot/hit thresholds pass and `active_combat_sustained_contact` passes: runtime samples show at least 3 shot-increase samples and at least 5% of shot-counter samples include new shots. Zero-shot, no-contact, or burst-only runs are diagnostic only. | `summary.json`, `runtime-samples.json`, driver final state, validation |
 | ST4-PERF-005 | Ubiquitous | The harness shall fail completion if the capture uses a content-reduction or visual-degradation flag. | No forbidden flag is present in `perfRuntime` or URL params. | `summary.json`, `perfRuntime`, capture command |

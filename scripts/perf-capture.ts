@@ -863,6 +863,7 @@ type CaptureSummary = {
   captureEnvironment: {
     quietMachineAttested: boolean;
     quietMachineAttestationSource?: string;
+    quietMachineSnapshot?: QuietMachineSnapshot;
   };
   durationSeconds: number;
   npcs: number;
@@ -968,6 +969,25 @@ type CaptureSummary = {
   // capture. Undefined when no sample carried a combatBreakdown. Type +
   // implementation live in ./perf-tail-attribution.
   tailAttribution?: TailAttribution;
+};
+
+type QuietMachineSnapshot = {
+  checkedAt: string;
+  status: 'pass' | 'warn' | 'fail';
+  cpu?: {
+    source: string;
+    avgPercent: number;
+    maxPercent: number;
+    samples: number[];
+  };
+  gpu?: {
+    source: string;
+    available: boolean;
+    utilizationPercent?: number;
+    memoryUtilizationPercent?: number;
+    memoryUsedMiB?: number;
+  };
+  warnings: string[];
 };
 
 type DroppedFrameSummary = {
@@ -1839,6 +1859,94 @@ function parseBooleanFlag(name: string, fallback: boolean): boolean {
 
 function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
+}
+
+function roundQuietMetric(value: number): number {
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : 0;
+}
+
+function captureQuietMachineSnapshot(): QuietMachineSnapshot {
+  const warnings: string[] = [];
+  let cpu: QuietMachineSnapshot['cpu'];
+  let gpu: QuietMachineSnapshot['gpu'];
+
+  try {
+    const cpuJson = execFileSync('powershell.exe', [
+      '-NoProfile',
+      '-Command',
+      "$samples = Get-Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 1 -MaxSamples 5; " +
+        "$values = @($samples.CounterSamples | ForEach-Object { [double]$_.CookedValue }); " +
+        "$avg = ($values | Measure-Object -Average).Average; " +
+        "$max = ($values | Measure-Object -Maximum).Maximum; " +
+        "[pscustomobject]@{ avg=$avg; max=$max; samples=$values } | ConvertTo-Json -Compress",
+    ], { encoding: 'utf-8', timeout: 8000 }).trim();
+    const parsed = JSON.parse(cpuJson) as { avg?: number; max?: number; samples?: number[] | number };
+    const samples = Array.isArray(parsed.samples)
+      ? parsed.samples
+      : typeof parsed.samples === 'number'
+        ? [parsed.samples]
+        : [];
+    cpu = {
+      source: 'powershell:Get-Counter Processor(_Total) % Processor Time',
+      avgPercent: roundQuietMetric(Number(parsed.avg ?? 0)),
+      maxPercent: roundQuietMetric(Number(parsed.max ?? 0)),
+      samples: samples.map((value) => roundQuietMetric(Number(value))),
+    };
+  } catch (error) {
+    warnings.push(`CPU quiet snapshot unavailable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  try {
+    const gpuCsv = execFileSync('nvidia-smi', [
+      '--query-gpu=utilization.gpu,utilization.memory,memory.used',
+      '--format=csv,noheader,nounits',
+    ], { encoding: 'utf-8', timeout: 5000 }).trim();
+    const firstLine = gpuCsv.split(/\r?\n/).find((line) => line.trim().length > 0) ?? '';
+    const [utilizationRaw, memoryUtilRaw, memoryUsedRaw] = firstLine.split(',').map((part) => part.trim());
+    gpu = {
+      source: 'nvidia-smi utilization.gpu,utilization.memory,memory.used',
+      available: true,
+      utilizationPercent: roundQuietMetric(Number(utilizationRaw)),
+      memoryUtilizationPercent: roundQuietMetric(Number(memoryUtilRaw)),
+      memoryUsedMiB: roundQuietMetric(Number(memoryUsedRaw)),
+    };
+  } catch {
+    gpu = {
+      source: 'nvidia-smi',
+      available: false,
+    };
+    warnings.push('GPU quiet snapshot unavailable: nvidia-smi failed or is not installed');
+  }
+
+  if (!cpu) {
+    return {
+      checkedAt: nowIso(),
+      status: 'warn',
+      gpu,
+      warnings,
+    };
+  }
+
+  if (cpu.avgPercent > 15 || cpu.maxPercent > 35) {
+    warnings.push(`CPU was busy during quiet snapshot: avg=${cpu.avgPercent}% max=${cpu.maxPercent}%`);
+  }
+  if (gpu?.available && Number(gpu.utilizationPercent ?? 0) > 10) {
+    warnings.push(`GPU was busy during quiet snapshot: utilization=${gpu.utilizationPercent}%`);
+  }
+
+  const hasBusyWarning = warnings.some((warning) => warning.includes('was busy'));
+  const status: QuietMachineSnapshot['status'] = hasBusyWarning
+    ? 'fail'
+    : warnings.length > 0
+      ? 'warn'
+      : 'pass';
+  return {
+    checkedAt: nowIso(),
+    status,
+    cpu,
+    gpu,
+    warnings,
+  };
 }
 
 function parseStringFlag(name: string, fallback: string): string {
@@ -4834,6 +4942,9 @@ async function runCapture(): Promise<void> {
   const quietMachineAttested =
     process.env.TIJ_QUIET_MACHINE === '1'
     || parseBooleanFlag('quiet-machine-attested', false);
+  const quietMachineSnapshot = quietMachineAttested
+    ? captureQuietMachineSnapshot()
+    : undefined;
   const captureEnvironment = {
     quietMachineAttested,
     quietMachineAttestationSource: quietMachineAttested
@@ -4841,7 +4952,16 @@ async function runCapture(): Promise<void> {
         ? 'TIJ_QUIET_MACHINE=1'
         : '--quiet-machine-attested'
       : undefined,
+    quietMachineSnapshot,
   };
+  if (quietMachineSnapshot) {
+    logStep(
+      `Quiet-machine snapshot ${quietMachineSnapshot.status}` +
+      ` cpuAvg=${quietMachineSnapshot.cpu?.avgPercent ?? 'n/a'}%` +
+      ` cpuMax=${quietMachineSnapshot.cpu?.maxPercent ?? 'n/a'}%` +
+      ` gpu=${quietMachineSnapshot.gpu?.available ? `${quietMachineSnapshot.gpu.utilizationPercent}%` : 'n/a'}`
+    );
+  }
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
