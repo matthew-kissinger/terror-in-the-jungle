@@ -33,6 +33,7 @@ type ArtifactOptions = {
   missingRenderTail?: boolean;
   atmosphereSyncTailMs?: number;
   pressureReadyStatus?: 'ready' | 'timeout' | 'unavailable';
+  combatFireTerrainBlockRate?: number;
   resourceJumpAtRenderTail?: {
     textures?: number;
     geometries?: number;
@@ -243,10 +244,30 @@ function tempArtifact(options: ArtifactOptions): string {
       ? options.atmosphereSyncTailMs ?? 0.1
       : 0.1;
     const resourceJump = index >= 2 ? options.resourceJumpAtRenderTail : undefined;
+    const combatFireRequested = (index + 1) * 20;
+    const combatFireTerrainBlockRate = options.combatFireTerrainBlockRate ?? 0.03;
+    const combatFireTerrainBlocked = Math.round(combatFireRequested * combatFireTerrainBlockRate);
     return {
       frameCount: index * 120,
       shotsThisSession,
       hitsThisSession: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
+      combatBreakdown: {
+        combatFireRaycastBudget: {
+          maxPerFrame: 16,
+          usedThisFrame: 1,
+          deniedThisFrame: 0,
+          terrainBlockedThisFrame: 0,
+          totalExhaustedFrames: 0,
+          totalRequested: combatFireRequested,
+          totalDenied: 0,
+          totalTerrainBlocked: combatFireTerrainBlocked,
+          saturationRate: 0.0625,
+          denialRate: 0,
+          terrainBlockRate: combatFireRequested > 0
+            ? combatFireTerrainBlocked / combatFireRequested
+            : 0,
+        },
+      },
       renderer: {
         textures: 42 + (resourceJump?.textures ?? 0),
         geometries: 478 + (resourceJump?.geometries ?? 0),
@@ -373,6 +394,22 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       && check.status === 'fail'
       && check.value === 'timeout'
       && check.message.includes('contact/routing')
+    ))).toBe(true);
+  });
+
+  it('keeps high terrain-blocked fire artifacts diagnostic', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'open_frontier',
+      combatFireTerrainBlockRate: 0.8,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'combat_fire_terrain_block_rate'
+      && check.status === 'fail'
+      && typeof check.value === 'number'
+      && check.value >= 0.8
+      && check.message.includes('contact geometry/LOS')
     ))).toBe(true);
   });
 

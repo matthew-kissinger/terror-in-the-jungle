@@ -82,6 +82,9 @@ const ATMOSPHERE_SYNC_FAIL_MS = 16;
 const RENDERER_RESOURCE_TEXTURE_JUMP_WARN = 16;
 const RENDERER_RESOURCE_GEOMETRY_JUMP_WARN = 16;
 const RENDERER_RESOURCE_PROGRAM_JUMP_WARN = 2;
+const COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS = 10;
+const COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE = 0.25;
+const COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE = 0.5;
 
 const RAF_THRESHOLDS: readonly ThresholdCheck[] = [
   {
@@ -433,6 +436,78 @@ function runtimeSampleShotCount(sample: unknown): number | null {
   if (typeof driverShots === 'number' && Number.isFinite(driverShots)) return driverShots;
   const sessionShots = record.shotsThisSession;
   return typeof sessionShots === 'number' && Number.isFinite(sessionShots) ? sessionShots : null;
+}
+
+function addCombatFireTerrainBlockChecks(
+  checks: DroppedFrameEarsCheck[],
+  validationChecks: readonly ValidationCheck[],
+  runtimeSamples: readonly unknown[] | null
+): void {
+  const validationTerrainBlock = validationCheck(validationChecks, 'combat_fire_terrain_block_rate');
+  if (runtimeSamples === null) {
+    checks.push({
+      id: 'combat_fire_terrain_block_rate',
+      status: validationTerrainBlock?.status ?? 'warn',
+      value: typeof validationTerrainBlock?.value === 'number' ? validationTerrainBlock.value : null,
+      message: validationTerrainBlock?.message
+        ?? 'Runtime samples are unavailable; cannot prove combat-fire terrain blocking stayed low',
+    });
+    return;
+  }
+
+  let bestBudget: Record<string, unknown> | null = null;
+  let bestTotalRequested = -1;
+  for (const sample of runtimeSamples) {
+    const sampleRecord = asRecord(sample);
+    const combatBreakdown = asRecord(sampleRecord?.combatBreakdown);
+    const budget = asRecord(combatBreakdown?.combatFireRaycastBudget);
+    if (!budget) continue;
+    const totalRequested = typeof budget.totalRequested === 'number' && Number.isFinite(budget.totalRequested)
+      ? budget.totalRequested
+      : -1;
+    if (totalRequested >= bestTotalRequested) {
+      bestTotalRequested = totalRequested;
+      bestBudget = budget;
+    }
+  }
+
+  if (!bestBudget) {
+    checks.push({
+      id: 'combat_fire_terrain_block_rate',
+      status: validationTerrainBlock?.status ?? 'warn',
+      value: typeof validationTerrainBlock?.value === 'number' ? validationTerrainBlock.value : null,
+      message: validationTerrainBlock?.message
+        ?? 'Combat-fire terrain-block telemetry is missing; cannot prove the measured fight had valid fire geometry',
+    });
+    return;
+  }
+
+  const totalRequested = Math.max(0, Number(bestBudget.totalRequested ?? 0));
+  const totalTerrainBlocked = Math.max(0, Number(bestBudget.totalTerrainBlocked ?? 0));
+  const reportedRate = Number(bestBudget.terrainBlockRate);
+  const blockRate = Number.isFinite(reportedRate)
+    ? reportedRate
+    : totalRequested > 0
+      ? totalTerrainBlocked / totalRequested
+      : 0;
+  const status: CheckStatus = totalRequested < COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS
+    ? 'warn'
+    : blockRate < COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE
+      ? 'pass'
+      : blockRate < COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE
+        ? 'warn'
+        : 'fail';
+
+  checks.push({
+    id: 'combat_fire_terrain_block_rate',
+    status,
+    value: blockRate,
+    message: totalRequested < COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS
+      ? `Combat-fire terrain-block sample is too thin (${totalTerrainBlocked}/${totalRequested}); keep contact geometry diagnostic`
+      : status === 'pass'
+        ? `Combat-fire terrain blocking stayed low (${formatPercent(blockRate)}, ${totalTerrainBlocked}/${totalRequested})`
+        : `Combat-fire terrain blocking is high (${formatPercent(blockRate)}, ${totalTerrainBlocked}/${totalRequested}; warn>=${formatPercent(COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE)}, fail>=${formatPercent(COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE)}); contact geometry/LOS must be fixed before trusting dropped-frame completion evidence`,
+  });
 }
 
 function addCombatChecks(
@@ -1236,6 +1311,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
 
   addRafChecks(checks, validationChecks, summary);
   addCombatChecks(checks, validationChecks, runtimeSamples);
+  addCombatFireTerrainBlockChecks(checks, validationChecks, runtimeSamples);
   addMaterializationEnvelopeChecks(checks, validationChecks, summary);
   addCloseModelRuntimePoolLoadChecks(checks, runtimeSamples);
   addMaterializationTransitionTelemetryChecks(checks, summary, runtimeSamples);

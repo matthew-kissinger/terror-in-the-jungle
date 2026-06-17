@@ -1337,6 +1337,9 @@ const DEFAULT_DETAIL_EVERY_SAMPLES = 1;
 const DEFAULT_PRESSURE_READY_TIMEOUT_SECONDS = 120;
 const PRESSURE_READY_POLL_MS = 1000;
 const PRESSURE_READY_CONSECUTIVE_SAMPLES = 2;
+const COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS = 10;
+const COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE = 0.25;
+const COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE = 0.5;
 const SHOT_VISUAL_CORRELATION_WINDOW_MS = 3000;
 const SHOT_VISUAL_PRESENTATION_GAP_WINDOW_MS = 500;
 const SHOT_VISUAL_ROUTE_SNAP_THRESHOLD_M = 12;
@@ -3424,6 +3427,39 @@ function validateRun(
     });
   }
 
+  const withCombatFireRaycastStats = runtimeSamples.filter(s => s.combatBreakdown?.combatFireRaycastBudget);
+  if (withCombatFireRaycastStats.length > 0) {
+    const latestByRequests = withCombatFireRaycastStats.reduce((best, sample) => {
+      const bestRequested = Number(best.combatBreakdown?.combatFireRaycastBudget?.totalRequested ?? -1);
+      const sampleRequested = Number(sample.combatBreakdown?.combatFireRaycastBudget?.totalRequested ?? -1);
+      return sampleRequested >= bestRequested ? sample : best;
+    });
+    const budget = latestByRequests.combatBreakdown?.combatFireRaycastBudget;
+    const totalRequested = Math.max(0, Number(budget?.totalRequested ?? 0));
+    const totalBlocked = Math.max(0, Number(budget?.totalTerrainBlocked ?? 0));
+    const reportedRate = Number(budget?.terrainBlockRate);
+    const blockRate = Number.isFinite(reportedRate)
+      ? reportedRate
+      : totalRequested > 0
+        ? totalBlocked / totalRequested
+        : 0;
+    const status: ValidationCheckStatus = totalRequested < COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS
+      ? 'warn'
+      : blockRate < COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE
+        ? 'pass'
+        : blockRate < COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE
+          ? 'warn'
+          : 'fail';
+    checks.push({
+      id: 'combat_fire_terrain_block_rate',
+      status,
+      value: blockRate,
+      message: totalRequested < COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS
+        ? `Combat fire terrain-block sample is too thin (${totalBlocked}/${totalRequested}); cannot prove fight geometry is representative`
+        : `Combat fire terrain-block rate ${(blockRate * 100).toFixed(1)}% (${totalBlocked}/${totalRequested}; warn>=${(COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE * 100).toFixed(0)}%, fail>=${(COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE * 100).toFixed(0)}%)`
+    });
+  }
+
   const withAiSchedulingStats = runtimeSamples.filter(s => s.combatBreakdown?.aiScheduling);
   if (withAiSchedulingStats.length > 0) {
     const avgAIBudgetExceededEvents = average(withAiSchedulingStats.map(s => Number(s.combatBreakdown?.aiScheduling?.aiBudgetExceededEvents ?? 0)));
@@ -4598,6 +4634,8 @@ type PressureReadyWarmupSnapshot = {
   nearestOpforDistance: number | null;
   objectiveKind: string | null;
   objectiveDistance: number | null;
+  lastRuntimeShotPreviewStatus: string | null;
+  lastRuntimeShotPreviewReason: string | null;
 };
 
 type PressureReadyWarmupResult = {
@@ -4676,7 +4714,7 @@ async function waitForPressureReadyWarmup(
 
   logStep(
     `🎯 Pressure-ready warmup waiting up to ${timeoutSeconds}s ` +
-    `for ${PRESSURE_READY_CONSECUTIVE_SAMPLES} consecutive live-fire or active-ENGAGE samples`
+    `for ${PRESSURE_READY_CONSECUTIVE_SAMPLES} consecutive live-fire or shot-preview-ready samples`
   );
 
   const startedAt = Date.now();
@@ -4717,15 +4755,26 @@ async function waitForPressureReadyWarmup(
         const nearestOpforDistance = nullableNumber(driverState?.nearestOpforDistance);
         const objectiveKind = typeof driverState?.objectiveKind === 'string' ? driverState.objectiveKind : null;
         const objectiveDistance = nullableNumber(driverState?.objectiveDistance);
+        const lastRuntimeShotPreviewStatus = typeof driverState?.lastRuntimeShotPreviewStatus === 'string'
+          ? driverState.lastRuntimeShotPreviewStatus
+          : null;
+        const lastRuntimeShotPreviewReason = typeof driverState?.lastRuntimeShotPreviewReason === 'string'
+          ? driverState.lastRuntimeShotPreviewReason
+          : null;
 
         let reason = 'not-ready';
         let ready = false;
         if (engineShotsFired > 0) {
           ready = true;
           reason = 'live-fire';
-        } else if (botState === 'ENGAGE' && currentTargetDistance !== null && currentTargetDistance <= 220) {
+        } else if (
+          botState === 'ENGAGE'
+          && currentTargetDistance !== null
+          && currentTargetDistance <= 220
+          && lastRuntimeShotPreviewStatus === 'hit'
+        ) {
           ready = true;
-          reason = 'engage-target-distance';
+          reason = 'runtime-shot-preview-hit';
         }
 
         return {
@@ -4742,6 +4791,8 @@ async function waitForPressureReadyWarmup(
           nearestOpforDistance,
           objectiveKind,
           objectiveDistance,
+          lastRuntimeShotPreviewStatus,
+          lastRuntimeShotPreviewReason,
         } satisfies PressureReadyWarmupSnapshot;
       }),
       3000
@@ -4760,7 +4811,8 @@ async function waitForPressureReadyWarmup(
       logStep(
         `🎯 Pressure-ready warmup passed after ${(elapsedMs / 1000).toFixed(1)}s ` +
         `(reason=${snapshot?.reason ?? 'unknown'}, close=${snapshot?.renderedCloseModels ?? 0}/${snapshot?.closeCandidates ?? 0}, ` +
-        `shots=${snapshot?.engineShotsFired ?? 0}, state=${snapshot?.botState ?? 'unknown'})`
+        `shots=${snapshot?.engineShotsFired ?? 0}, state=${snapshot?.botState ?? 'unknown'}, ` +
+        `preview=${snapshot?.lastRuntimeShotPreviewStatus ?? 'n/a'}/${snapshot?.lastRuntimeShotPreviewReason ?? 'n/a'})`
       );
       return {
         requested: true,
@@ -4783,7 +4835,8 @@ async function waitForPressureReadyWarmup(
     `⚠ Pressure-ready warmup timed out after ${(elapsedMs / 1000).toFixed(1)}s ` +
     `(lastReason=${lastSnapshot?.reason ?? 'none'}, close=${lastSnapshot?.renderedCloseModels ?? 0}/${lastSnapshot?.closeCandidates ?? 0}, ` +
     `shots=${lastSnapshot?.engineShotsFired ?? 0}, state=${lastSnapshot?.botState ?? 'unknown'}, ` +
-    `objective=${lastSnapshot?.objectiveKind ?? 'unknown'}:${lastSnapshot?.objectiveDistance ?? 'n/a'}m)`
+    `objective=${lastSnapshot?.objectiveKind ?? 'unknown'}:${lastSnapshot?.objectiveDistance ?? 'n/a'}m, ` +
+    `preview=${lastSnapshot?.lastRuntimeShotPreviewStatus ?? 'n/a'}/${lastSnapshot?.lastRuntimeShotPreviewReason ?? 'n/a'})`
   );
   return {
     requested: true,
