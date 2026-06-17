@@ -257,6 +257,7 @@ interface ModeCropResult {
 interface CropProbeReport {
   createdAt: string;
   sourceGitSha: string;
+  sourceGitStatus: string[];
   mode: 'asset-crop-probe';
   status: ProbeStatus;
   options: {
@@ -297,6 +298,17 @@ function gitSha(): string {
     return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: process.cwd(), encoding: 'utf8' }).trim();
   } catch {
     return 'unknown';
+  }
+}
+
+function gitStatus(): string[] {
+  try {
+    return execFileSync('git', ['status', '--short'], { cwd: process.cwd(), encoding: 'utf8' })
+      .split(/\r?\n/)
+      .map(line => line.trimEnd())
+      .filter(Boolean);
+  } catch {
+    return ['unknown'];
   }
 }
 
@@ -1385,11 +1397,8 @@ async function captureMaterializationPerfWindow(
       skyRefresh: (() => {
         try {
           const engine = (window as any).__engine;
-          const hasEngine = engine != null;
           const sm = engine?.systemManager;
-          const hasSm = sm != null;
           const atmosphere = sm?.atmosphereSystem;
-          const hasAtmosphere = atmosphere != null;
           const hasMethod = atmosphere && typeof atmosphere.getSkyRefreshStatsForDebug === 'function';
           if (!hasMethod) {
             // The diagnostic accessor is missing — most commonly means the
@@ -1942,6 +1951,8 @@ function writeMarkdown(report: CropProbeReport): string {
     '# Asset Crop Probe',
     '',
     `Created: ${report.createdAt}`,
+    `Source: ${report.sourceGitSha}`,
+    `Workspace status: ${report.sourceGitStatus.length === 0 ? 'clean' : `${report.sourceGitStatus.length} dirty entries`}`,
     `Status: ${report.status}`,
     `Renderer: ${report.options.renderer}`,
     '',
@@ -2016,6 +2027,7 @@ async function main(): Promise<void> {
     const report: CropProbeReport = {
       createdAt: new Date().toISOString(),
       sourceGitSha: gitSha(),
+      sourceGitStatus: gitStatus(),
       mode: OUTPUT_NAME,
       status: reportStatus(results),
       options: { modes, renderer, headed, port, closeModelWaitMs },

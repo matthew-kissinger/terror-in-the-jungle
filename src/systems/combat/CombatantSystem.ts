@@ -22,14 +22,14 @@ import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
 import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { CombatantMovement, type TerrainRecoveryEvent } from './CombatantMovement';
-import {
-  CombatantRenderer,
-  type BillboardUpdateProfile,
-  type CombatantMaterializationRow,
-  type CloseModelPrewarmOptions,
-  type CloseModelPrewarmSummary,
-  type CloseModelRuntimeStats,
-} from './CombatantRenderer';
+import { CombatantRenderer } from './CombatantRenderer';
+import type {
+  BillboardUpdateProfile,
+  CombatantMaterializationRow,
+  CloseModelPrewarmOptions,
+  CloseModelPrewarmSummary,
+  CloseModelRuntimeStats,
+} from './CombatantCloseModelPolicy';
 import { SquadManager } from './SquadManager';
 import { SpatialGridManager, spatialGridManager as defaultSpatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';

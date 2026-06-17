@@ -415,10 +415,17 @@ describe('CombatantMeshFactory Pixel Forge impostor readability material', () =>
 
     markPixelForgeNpcImpostorAttributesDirty(mesh, 2);
 
-    expect(phaseAttribute.updateRanges.at(-1)).toEqual({ start: 0, count: 2 });
-    expect(opacityAttribute.updateRanges.at(-1)).toEqual({ start: 0, count: 2 });
+    expect(phaseAttribute.updateRanges).toEqual([{ start: 0, count: 2 }]);
+    expect(opacityAttribute.updateRanges).toEqual([{ start: 0, count: 2 }]);
     expect(phaseAttribute.version).toBe(1);
     expect(opacityAttribute.version).toBe(1);
+
+    markPixelForgeNpcImpostorAttributesDirty(mesh, 2);
+
+    expect(phaseAttribute.updateRanges).toEqual([{ start: 0, count: 2 }]);
+    expect(opacityAttribute.updateRanges).toEqual([{ start: 0, count: 2 }]);
+    expect(phaseAttribute.version).toBe(2);
+    expect(opacityAttribute.version).toBe(2);
 
     geometry.dispose();
     material.dispose();

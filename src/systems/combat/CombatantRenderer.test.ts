@@ -249,6 +249,10 @@ function createMockCombatant(
 }
 
 type CloseModelStatsProbe = {
+  closeModelActiveCap: number;
+  promotionBudgetPerFrame: number;
+  promotionsThisFrame: number;
+  replacementsThisFrame: number;
   candidatesWithinCloseRadius: number;
   renderedCloseModels: number;
   fallbackCount: number;
@@ -276,6 +280,21 @@ function readCloseModelTelemetry(target: CombatantRenderer): {
     stats: probe.getCloseModelRuntimeStats(),
     records: probe.getCloseModelFallbackRecords(),
   };
+}
+
+function activeCloseModelsFor(target: CombatantRenderer): Map<string, unknown> {
+  return (target as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+}
+
+function advanceCloseModelPromotionFrames(
+  target: CombatantRenderer,
+  combatants: Map<string, Combatant>,
+  playerPosition: THREE.Vector3,
+  expectedActive: number,
+): void {
+  for (let i = 0; i < 24 && activeCloseModelsFor(target).size < expectedActive; i++) {
+    target.updateBillboards(combatants, playerPosition);
+  }
 }
 
 describe('CombatantRenderer', () => {
@@ -444,7 +463,12 @@ describe('CombatantRenderer', () => {
         combatants.set(combatant.id, combatant);
       }
 
-      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+      advanceCloseModelPromotionFrames(
+        renderer,
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        hardNearReserveCap,
+      );
       const rows = renderer.getNearestCombatantMaterializationRows(combatants, new THREE.Vector3(0, 0, 0), overflow);
 
       const closeGlbRows = rows.filter((row) => row.renderMode === 'close-glb');
@@ -645,7 +669,8 @@ describe('CombatantRenderer', () => {
         expect(summary.candidatesWithinCloseRadius).toBe(6);
         expect(summary.requestedPoolTargets[Faction.NVA]).toBe(3);
         expect(summary.renderedCloseModels).toBe(3);
-        expect(summary.fallbackCounts['pool-loading']).toBe(3);
+        expect(summary.fallbackCounts['pool-loading']).toBe(0);
+        expect(summary.fallbackCounts['promotion-budget']).toBe(3);
         expect(state.activeCloseModels.size).toBe(3);
         expect(state.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
         expect(modelLoader.loadAnimatedModel).toHaveBeenCalledTimes(3);
@@ -714,21 +739,23 @@ describe('CombatantRenderer', () => {
       };
       const activeCloseModels = state.activeCloseModels;
       expect(activeCloseModels.has('nva-0')).toBe(true);
-      expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION - 1}`)).toBe(true);
-      expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION}`)).toBe(false);
+      const { stats, records } = readCloseModelTelemetry(renderer);
+      expect(activeCloseModels.size).toBe(stats.promotionBudgetPerFrame);
+      expect(activeCloseModels.has(`nva-${stats.promotionBudgetPerFrame - 1}`)).toBe(true);
+      expect(activeCloseModels.has(`nva-${stats.promotionBudgetPerFrame}`)).toBe(false);
       expect(activeCloseModels.has('nva-47')).toBe(false);
       expect(state.closeModelPoolLoads.has(Faction.NVA)).toBe(true);
       expect(combatants.get('nva-47')?.billboardIndex).toBeGreaterThanOrEqual(0);
 
-      const { stats, records } = readCloseModelTelemetry(renderer);
       expect(stats.candidatesWithinCloseRadius).toBe(48);
-      expect(stats.renderedCloseModels).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION);
-      expect(stats.fallbackCounts['pool-loading']).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION);
-      expect(stats.fallbackCount).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION);
+      expect(stats.renderedCloseModels).toBe(stats.promotionBudgetPerFrame);
+      expect(stats.fallbackCounts['pool-loading']).toBe(0);
+      expect(stats.fallbackCounts['promotion-budget']).toBeGreaterThan(0);
+      expect(stats.fallbackCount).toBe(48 - stats.promotionBudgetPerFrame);
       expect(stats.poolLoads).toBe(1);
       expect(records).toContainEqual(expect.objectContaining({
         combatantId: 'nva-47',
-        reason: 'pool-loading',
+        reason: 'total-cap',
       }));
     });
 
@@ -753,14 +780,27 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
-      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      let activeCloseModels = activeCloseModelsFor(renderer);
       expect(activeCloseModels.has('nva-0')).toBe(true);
+      let { stats } = readCloseModelTelemetry(renderer);
+      expect(activeCloseModels.size).toBe(stats.promotionBudgetPerFrame);
+      expect(stats.fallbackCounts['promotion-budget']).toBeGreaterThan(0);
+
+      advanceCloseModelPromotionFrames(
+        renderer,
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      activeCloseModels = activeCloseModelsFor(renderer);
       expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP - 1}`)).toBe(true);
       expect(activeCloseModels.has(`nva-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP}`)).toBe(false);
       expect(activeCloseModels.has('nva-47')).toBe(false);
       expect(combatants.get('nva-47')?.billboardIndex).toBeGreaterThanOrEqual(0);
 
-      const { stats, records } = readCloseModelTelemetry(renderer);
+      const telemetry = readCloseModelTelemetry(renderer);
+      stats = telemetry.stats;
+      const records = telemetry.records;
       expect(stats.candidatesWithinCloseRadius).toBe(48);
       expect(stats.renderedCloseModels).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
       expect(stats.fallbackCounts['total-cap']).toBe(48 - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
@@ -796,11 +836,23 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
-      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      let activeCloseModels = activeCloseModelsFor(renderer);
+      let { stats } = readCloseModelTelemetry(renderer);
+      expect(activeCloseModels.size).toBe(stats.promotionBudgetPerFrame);
+      expect(stats.closeModelActiveCap).toBe(hardNearReserveCap);
+      expect(stats.fallbackCounts['promotion-budget']).toBe(hardNearReserveCap - stats.promotionBudgetPerFrame);
+
+      advanceCloseModelPromotionFrames(
+        renderer,
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        hardNearReserveCap,
+      );
+      activeCloseModels = activeCloseModelsFor(renderer);
       expect(activeCloseModels.size).toBe(hardNearReserveCap);
       expect(activeCloseModels.has(`hard-near-${hardNearReserveCap - 1}`)).toBe(true);
 
-      const { stats } = readCloseModelTelemetry(renderer);
+      stats = readCloseModelTelemetry(renderer).stats;
       expect(stats.closeModelActiveCap).toBe(hardNearReserveCap);
       expect(stats.renderedCloseModels).toBe(hardNearReserveCap);
       expect(stats.fallbackCount).toBe(0);
@@ -827,9 +879,14 @@ describe('CombatantRenderer', () => {
         combatants.set(combatant.id, combatant);
       }
 
-      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+      advanceCloseModelPromotionFrames(
+        renderer,
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        hardNearReserveCap,
+      );
 
-      const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      const activeCloseModels = activeCloseModelsFor(renderer);
       expect(activeCloseModels.size).toBe(hardNearReserveCap);
       expect(activeCloseModels.has(`hard-near-crowd-${hardNearReserveCap - 1}`)).toBe(true);
       expect(activeCloseModels.has(`hard-near-crowd-${hardNearReserveCap}`)).toBe(false);
@@ -869,8 +926,13 @@ describe('CombatantRenderer', () => {
         const combatant = createMockCombatant(`nva-a-${i}`, Faction.NVA, new THREE.Vector3(18 + i * 0.5, 0, 0));
         frame1.set(combatant.id, combatant);
       }
-      renderer.updateBillboards(frame1, new THREE.Vector3(0, 0, 0));
-      const activeAfterFrame1 = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      advanceCloseModelPromotionFrames(
+        renderer,
+        frame1,
+        new THREE.Vector3(0, 0, 0),
+        hardNearReserveCap,
+      );
+      const activeAfterFrame1 = activeCloseModelsFor(renderer);
       expect(activeAfterFrame1.size).toBe(hardNearReserveCap);
 
       // Frame 2: a new, higher-priority NVA cluster (cluster B, closer) appears
@@ -882,9 +944,30 @@ describe('CombatantRenderer', () => {
       }
       renderer.updateBillboards(frame2, new THREE.Vector3(0, 0, 0));
 
-      const activeAfterFrame2 = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+      let activeAfterFrame2 = activeCloseModelsFor(renderer);
       expect(activeAfterFrame2.size).toBe(hardNearReserveCap);
-      // The closer cluster B should fully displace cluster A as close-GLBs.
+      // The closer cluster B should begin displacing cluster A, but only
+      // through the promotion budget so the LOD transition cannot spike.
+      let promotedClusterB = 0;
+      for (let i = 0; i < hardNearReserveCap; i++) {
+        if (activeAfterFrame2.has(`nva-b-${i}`)) promotedClusterB++;
+      }
+      const firstFrameStats = readCloseModelTelemetry(renderer).stats;
+      expect(promotedClusterB).toBe(firstFrameStats.replacementsThisFrame);
+      expect(promotedClusterB).toBeLessThanOrEqual(firstFrameStats.promotionBudgetPerFrame);
+
+      for (let frame = 0; frame < 24; frame++) {
+        let allClusterBActive = true;
+        for (let i = 0; i < hardNearReserveCap; i++) {
+          if (!activeCloseModelsFor(renderer).has(`nva-b-${i}`)) {
+            allClusterBActive = false;
+            break;
+          }
+        }
+        if (allClusterBActive) break;
+        renderer.updateBillboards(frame2, new THREE.Vector3(0, 0, 0));
+      }
+      activeAfterFrame2 = activeCloseModelsFor(renderer);
       for (let i = 0; i < hardNearReserveCap; i++) {
         expect(activeAfterFrame2.has(`nva-b-${i}`)).toBe(true);
       }
@@ -1176,10 +1259,17 @@ describe('CombatantRenderer', () => {
         .factionMeshes.get('NVA_patrol_walk')!;
       expect(markDirty.mock.calls[0][0]).toBe(mesh);
       expect(markDirty.mock.calls[0][1]).toBe(2);
-      expect(mesh.instanceMatrix.updateRanges.at(-1)).toEqual({
+      expect(mesh.instanceMatrix.updateRanges).toEqual([{
         start: 0,
         count: 2 * mesh.instanceMatrix.itemSize,
-      });
+      }]);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      expect(mesh.instanceMatrix.updateRanges).toEqual([{
+        start: 0,
+        count: 2 * mesh.instanceMatrix.itemSize,
+      }]);
     });
 
     it('culls combatants beyond render distance', () => {
@@ -1465,6 +1555,20 @@ describe('CombatantRenderer', () => {
       camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
     }
 
+    function activeCloseModels(): Map<string, unknown> {
+      return (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
+    }
+
+    function advanceCloseModelPromotionFrames(
+      combatants: Map<string, Combatant>,
+      playerPosition: THREE.Vector3,
+      expectedActive: number,
+    ): void {
+      for (let i = 0; i < 24 && activeCloseModels().size < expectedActive; i++) {
+        renderer.updateBillboards(combatants, playerPosition);
+      }
+    }
+
     it('caps active close models at the GPU budget when more candidates lie within radius', async () => {
       await growPool(Faction.NVA);
       configureCameraTowardPlusX();
@@ -1483,9 +1587,17 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
-      const active = (renderer as unknown as {
-        activeCloseModels: Map<string, unknown>;
-      }).activeCloseModels;
+      let active = activeCloseModels();
+      const { stats } = readCloseModelTelemetry(renderer);
+      expect(active.size).toBe(stats.promotionBudgetPerFrame);
+      expect(stats.fallbackCounts['promotion-budget']).toBeGreaterThan(0);
+
+      advanceCloseModelPromotionFrames(
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      active = activeCloseModels();
       expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
     });
 
@@ -1508,9 +1620,12 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
-      const active = (renderer as unknown as {
-        activeCloseModels: Map<string, unknown>;
-      }).activeCloseModels;
+      advanceCloseModelPromotionFrames(
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      const active = activeCloseModels();
       // Every on-screen NPC must win a slot; the 8th slot goes to the closest
       // off-screen candidate.
       for (let i = 0; i < 7; i++) expect(active.has(`front-${i}`)).toBe(true);
@@ -1533,9 +1648,12 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
-      const active = (renderer as unknown as {
-        activeCloseModels: Map<string, unknown>;
-      }).activeCloseModels;
+      advanceCloseModelPromotionFrames(
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      const active = activeCloseModels();
       for (let i = 0; i < 4; i++) expect(active.has(`hard-near-${i}`)).toBe(true);
       expect(active.size).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
     });
@@ -1570,9 +1688,12 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
 
-      const active = (renderer as unknown as {
-        activeCloseModels: Map<string, unknown>;
-      }).activeCloseModels;
+      advanceCloseModelPromotionFrames(
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      const active = activeCloseModels();
       expect(active.has('squad-mate')).toBe(true);
       expect(active.has('closer-back')).toBe(false);
     });
@@ -1588,10 +1709,12 @@ describe('CombatantRenderer', () => {
       }
 
       // First update: front-0..front-7 on-screen take all 8 slots.
-      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
-      let active = (renderer as unknown as {
-        activeCloseModels: Map<string, unknown>;
-      }).activeCloseModels;
+      advanceCloseModelPromotionFrames(
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      let active = activeCloseModels();
       for (let i = 0; i < 8; i++) expect(active.has(`front-${i}`)).toBe(true);
 
       // Turn the camera away so all front-i drop off-screen, and add a single
@@ -1608,9 +1731,7 @@ describe('CombatantRenderer', () => {
       combatants.set('newcomer', newcomer);
 
       renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
-      active = (renderer as unknown as {
-        activeCloseModels: Map<string, unknown>;
-      }).activeCloseModels;
+      active = activeCloseModels();
       let survivors = 0;
       for (let i = 0; i < 8; i++) if (active.has(`front-${i}`)) survivors++;
       expect(survivors).toBeGreaterThanOrEqual(7);
