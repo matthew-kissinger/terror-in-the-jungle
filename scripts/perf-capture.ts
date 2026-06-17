@@ -534,6 +534,16 @@ type RuntimeSample = {
     shotEpochs?: Record<string, unknown>[];
     aimDotGateRejectedShots?: number;
     fireStartRejected?: number;
+    runtimeShotPreviewRejectedShots?: number;
+    runtimeShotPreviewAimSettlingShots?: number;
+    runtimeShotPreviewTerrainBlockedShots?: number;
+    runtimeShotPreviewUnavailableShots?: number;
+    runtimeShotPreviewMissShots?: number;
+    runtimeShotPreviewWrongTargetShots?: number;
+    lastRuntimeShotPreviewStatus?: string | null;
+    lastRuntimeShotPreviewReason?: string | null;
+    lastRuntimeShotPreviewHitTargetId?: string | null;
+    lastRuntimeShotPreviewExpectedInSpatialCandidates?: boolean | null;
     droppedDeadTargetLocks?: number;
     firingRetargets?: number;
     firingRetargetFireStops?: number;
@@ -685,6 +695,16 @@ type HarnessDriverFinal = {
   shotEpochs?: Record<string, unknown>[];
   aimDotGateRejectedShots: number;
   fireStartRejected: number;
+  runtimeShotPreviewRejectedShots?: number;
+  runtimeShotPreviewAimSettlingShots?: number;
+  runtimeShotPreviewTerrainBlockedShots?: number;
+  runtimeShotPreviewUnavailableShots?: number;
+  runtimeShotPreviewMissShots?: number;
+  runtimeShotPreviewWrongTargetShots?: number;
+  lastRuntimeShotPreviewStatus?: string | null;
+  lastRuntimeShotPreviewReason?: string | null;
+  lastRuntimeShotPreviewHitTargetId?: string | null;
+  lastRuntimeShotPreviewExpectedInSpatialCandidates?: boolean | null;
   droppedDeadTargetLocks: number;
   firingRetargets: number;
   firingRetargetFireStops: number;
@@ -990,6 +1010,10 @@ type ShotPresentationContextStats = {
   minClearanceMeters: number | null;
   minEffectiveClearanceMeters: number | null;
   terrainHashChurnEvents: number;
+  terrainIdentityChurnEvents: number;
+  terrainEdgeMaskChurnEvents: number;
+  terrainMorphOnlyChurnEvents: number;
+  terrainUnsyncedBufferVisibleChurnEvents: number;
   terrainNotReadyEvents: number;
 };
 
@@ -1158,7 +1182,7 @@ const DEFAULT_COMPRESS_FRONTLINE = false;
 const DEFAULT_ALLOW_WARP_RECOVERY = false;
 const DEFAULT_ACTIVE_TOP_UP_HEALTH = true;
 const DEFAULT_ACTIVE_AUTO_RESPAWN = true;
-const DEFAULT_MOVEMENT_DECISION_INTERVAL_MS = 450;
+const DEFAULT_MOVEMENT_DECISION_INTERVAL_MS = 250;
 const DEFAULT_PREWARM = true;
 const DEFAULT_RUNTIME_PREFLIGHT = false;
 const DEFAULT_RUNTIME_PREFLIGHT_TIMEOUT_SECONDS = 8;
@@ -1390,6 +1414,15 @@ function objectArray(value: unknown, limit = 32): Record<string, unknown>[] {
 function latestObject(value: unknown): Record<string, unknown> | null {
   if (!Array.isArray(value) || value.length === 0) return null;
   return objectOrNull(value[value.length - 1]);
+}
+
+function latestString(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const entry = value[index];
+    if (typeof entry === 'string') return entry;
+  }
+  return null;
 }
 
 function eventNumber(event: Record<string, unknown> | null, key: string): number | null {
@@ -2359,6 +2392,47 @@ function collectShotTerrainEpochs(context: Record<string, unknown>): Record<stri
   return terrainEpochs;
 }
 
+function shotTerrainStageBufferVisibleChanged(context: Record<string, unknown>): boolean {
+  const terrainByStage = objectOrNull(context.terrainByStage);
+  const afterSimulation = objectOrNull(terrainByStage?.afterSimulation);
+  const beforeRender = objectOrNull(terrainByStage?.beforeRender);
+  if (!afterSimulation || !beforeRender) return false;
+
+  const afterIdentityHash = typeof afterSimulation.tileIdentityHash === 'string'
+    ? afterSimulation.tileIdentityHash
+    : null;
+  const beforeIdentityHash = typeof beforeRender.tileIdentityHash === 'string'
+    ? beforeRender.tileIdentityHash
+    : null;
+  if (
+    afterIdentityHash !== null
+    && beforeIdentityHash !== null
+    && afterIdentityHash !== beforeIdentityHash
+  ) {
+    return true;
+  }
+
+  const afterEdgeMaskHash = typeof afterSimulation.edgeMaskHash === 'string'
+    ? afterSimulation.edgeMaskHash
+    : null;
+  const beforeEdgeMaskHash = typeof beforeRender.edgeMaskHash === 'string'
+    ? beforeRender.edgeMaskHash
+    : null;
+  if (
+    afterEdgeMaskHash !== null
+    && beforeEdgeMaskHash !== null
+    && afterEdgeMaskHash !== beforeEdgeMaskHash
+  ) {
+    return true;
+  }
+
+  const afterTileCount = nullableNumber(afterSimulation.tileCount);
+  const beforeTileCount = nullableNumber(beforeRender.tileCount);
+  return afterTileCount !== null
+    && beforeTileCount !== null
+    && afterTileCount !== beforeTileCount;
+}
+
 function summarizeShotPresentationContexts(
   shotEpochs: Record<string, unknown>[],
 ): ShotPresentationContextStats | null {
@@ -2370,6 +2444,10 @@ function summarizeShotPresentationContexts(
   let minClearanceMeters: number | null = null;
   let minEffectiveClearanceMeters: number | null = null;
   let terrainHashChurnEvents = 0;
+  let terrainIdentityChurnEvents = 0;
+  let terrainEdgeMaskChurnEvents = 0;
+  let terrainMorphOnlyChurnEvents = 0;
+  let terrainUnsyncedBufferVisibleChurnEvents = 0;
   let terrainNotReadyEvents = 0;
 
   for (const epoch of shotEpochs) {
@@ -2393,9 +2471,27 @@ function summarizeShotPresentationContexts(
     }
 
     const terrainHashes = new Set<string>();
+    const terrainIdentityHashes = new Set<string>();
+    const terrainMorphHashes = new Set<string>();
+    const terrainEdgeMaskHashes = new Set<string>();
+    if (shotTerrainStageBufferVisibleChanged(context)) {
+      const terrainSync = objectOrNull(context.terrainSync);
+      if (terrainSync?.terrainBufferSubmitted !== true) {
+        terrainUnsyncedBufferVisibleChurnEvents++;
+      }
+    }
     for (const terrain of collectShotTerrainEpochs(context)) {
       if (typeof terrain.tileHash === 'string' && terrain.tileHash.length > 0) {
         terrainHashes.add(terrain.tileHash);
+      }
+      if (typeof terrain.tileIdentityHash === 'string' && terrain.tileIdentityHash.length > 0) {
+        terrainIdentityHashes.add(terrain.tileIdentityHash);
+      }
+      if (typeof terrain.morphHash === 'string' && terrain.morphHash.length > 0) {
+        terrainMorphHashes.add(terrain.morphHash);
+      }
+      if (typeof terrain.edgeMaskHash === 'string' && terrain.edgeMaskHash.length > 0) {
+        terrainEdgeMaskHashes.add(terrain.edgeMaskHash);
       }
       const sample = objectOrNull(terrain.cameraSample);
       if (!sample) continue;
@@ -2417,6 +2513,13 @@ function summarizeShotPresentationContexts(
     }
     if (terrainHashes.size > 1) {
       terrainHashChurnEvents++;
+      const identityChanged = terrainIdentityHashes.size > 1;
+      const edgeMaskChanged = terrainEdgeMaskHashes.size > 1;
+      if (identityChanged) terrainIdentityChurnEvents++;
+      if (edgeMaskChanged) terrainEdgeMaskChurnEvents++;
+      if (!identityChanged && !edgeMaskChanged && terrainMorphHashes.size > 1) {
+        terrainMorphOnlyChurnEvents++;
+      }
     }
   }
 
@@ -2429,6 +2532,10 @@ function summarizeShotPresentationContexts(
     minClearanceMeters,
     minEffectiveClearanceMeters,
     terrainHashChurnEvents,
+    terrainIdentityChurnEvents,
+    terrainEdgeMaskChurnEvents,
+    terrainMorphOnlyChurnEvents,
+    terrainUnsyncedBufferVisibleChurnEvents,
     terrainNotReadyEvents,
   };
 }
@@ -2495,6 +2602,7 @@ type HarnessModeThresholds = {
   minHitsRecorded: number;
   maxStuckSeconds: number;
   minMovementTransitions: number;
+  referenceDurationSeconds?: number;
 };
 
 /**
@@ -2508,19 +2616,22 @@ const HARNESS_MODE_THRESHOLDS: Record<string, HarnessModeThresholds> = {
     minShotsFired: 50,
     minHitsRecorded: 5,
     maxStuckSeconds: 5,
-    minMovementTransitions: 3
+    minMovementTransitions: 3,
+    referenceDurationSeconds: 90
   },
   open_frontier: {
     minShotsFired: 30,
     minHitsRecorded: 2,
     maxStuckSeconds: 8,
-    minMovementTransitions: 3
+    minMovementTransitions: 3,
+    referenceDurationSeconds: 180
   },
   a_shau_valley: {
     minShotsFired: 30,
     minHitsRecorded: 2,
     maxStuckSeconds: 8,
-    minMovementTransitions: 3
+    minMovementTransitions: 3,
+    referenceDurationSeconds: 180
   },
   // zone_control and team_deathmatch exercise capture-point behaviour (player
   // often inside an LOS-limited objective or moving between zones), so shot
@@ -2531,13 +2642,15 @@ const HARNESS_MODE_THRESHOLDS: Record<string, HarnessModeThresholds> = {
     minShotsFired: 15,
     minHitsRecorded: 1,
     maxStuckSeconds: 8,
-    minMovementTransitions: 3
+    minMovementTransitions: 3,
+    referenceDurationSeconds: 120
   },
   team_deathmatch: {
     minShotsFired: 15,
     minHitsRecorded: 1,
     maxStuckSeconds: 8,
-    minMovementTransitions: 3
+    minMovementTransitions: 3,
+    referenceDurationSeconds: 120
   }
 };
 
@@ -2549,14 +2662,20 @@ function scaleModeThresholdsForDuration(
   base: HarnessModeThresholds,
   durationSeconds: number
 ): HarnessModeThresholds {
-  // Scale off a 90s reference (combat120 cadence). Clamp so short runs don't
-  // drop the floor below the base value.
-  const scale = Math.max(1, durationSeconds / 90);
+  // Scale off each mode's stock capture duration. Open Frontier and A Shau
+  // use 180s completion-lane captures; scaling them from combat120's 90s
+  // cadence doubled the shot floor and turned route-heavy same-experience
+  // captures into false harness failures.
+  const referenceDurationSeconds = Number.isFinite(Number(base.referenceDurationSeconds)) && Number(base.referenceDurationSeconds) > 0
+    ? Number(base.referenceDurationSeconds)
+    : 90;
+  const scale = Math.max(1, durationSeconds / referenceDurationSeconds);
   return {
     minShotsFired: Math.round(base.minShotsFired * scale),
     minHitsRecorded: Math.round(base.minHitsRecorded * scale),
     maxStuckSeconds: base.maxStuckSeconds,
-    minMovementTransitions: Math.round(base.minMovementTransitions * scale)
+    minMovementTransitions: Math.round(base.minMovementTransitions * scale),
+    referenceDurationSeconds
   };
 }
 
@@ -2966,6 +3085,81 @@ function validateRun(
       value: finalHits,
       message: `Harness player hits=${finalHits} (min=${modeThresholds.minHitsRecorded})`
     });
+    const runtimePreviewRejectedSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.runtimeShotPreviewRejectedShots))
+      .filter(Number.isFinite);
+    const runtimePreviewAimSettlingSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.runtimeShotPreviewAimSettlingShots))
+      .filter(Number.isFinite);
+    const runtimePreviewTerrainBlockedSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.runtimeShotPreviewTerrainBlockedShots))
+      .filter(Number.isFinite);
+    const runtimePreviewMissSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.runtimeShotPreviewMissShots))
+      .filter(Number.isFinite);
+    const runtimePreviewUnavailableSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.runtimeShotPreviewUnavailableShots))
+      .filter(Number.isFinite);
+    const runtimePreviewWrongTargetSamples = runtimeSamples
+      .map(s => Number(s.harnessDriver?.runtimeShotPreviewWrongTargetShots))
+      .filter(Number.isFinite);
+    const finalPreviewRejected = Number(options?.harnessDriverFinal?.runtimeShotPreviewRejectedShots);
+    const finalPreviewAimSettling = Number(options?.harnessDriverFinal?.runtimeShotPreviewAimSettlingShots);
+    const finalPreviewTerrainBlocked = Number(options?.harnessDriverFinal?.runtimeShotPreviewTerrainBlockedShots);
+    const finalPreviewMiss = Number(options?.harnessDriverFinal?.runtimeShotPreviewMissShots);
+    const finalPreviewUnavailable = Number(options?.harnessDriverFinal?.runtimeShotPreviewUnavailableShots);
+    const finalPreviewWrongTarget = Number(options?.harnessDriverFinal?.runtimeShotPreviewWrongTargetShots);
+    const runtimePreviewRejected = Math.max(
+      runtimePreviewRejectedSamples.length > 0 ? Math.max(...runtimePreviewRejectedSamples) : 0,
+      Number.isFinite(finalPreviewRejected) ? finalPreviewRejected : 0,
+    );
+    const runtimePreviewAimSettling = Math.max(
+      runtimePreviewAimSettlingSamples.length > 0 ? Math.max(...runtimePreviewAimSettlingSamples) : 0,
+      Number.isFinite(finalPreviewAimSettling) ? finalPreviewAimSettling : 0,
+    );
+    const runtimePreviewTerrainBlocked = Math.max(
+      runtimePreviewTerrainBlockedSamples.length > 0 ? Math.max(...runtimePreviewTerrainBlockedSamples) : 0,
+      Number.isFinite(finalPreviewTerrainBlocked) ? finalPreviewTerrainBlocked : 0,
+    );
+    const runtimePreviewMiss = Math.max(
+      runtimePreviewMissSamples.length > 0 ? Math.max(...runtimePreviewMissSamples) : 0,
+      Number.isFinite(finalPreviewMiss) ? finalPreviewMiss : 0,
+    );
+    const runtimePreviewUnavailable = Math.max(
+      runtimePreviewUnavailableSamples.length > 0 ? Math.max(...runtimePreviewUnavailableSamples) : 0,
+      Number.isFinite(finalPreviewUnavailable) ? finalPreviewUnavailable : 0,
+    );
+    const runtimePreviewWrongTarget = Math.max(
+      runtimePreviewWrongTargetSamples.length > 0 ? Math.max(...runtimePreviewWrongTargetSamples) : 0,
+      Number.isFinite(finalPreviewWrongTarget) ? finalPreviewWrongTarget : 0,
+    );
+    const lastRuntimePreviewStatus = typeof options?.harnessDriverFinal?.lastRuntimeShotPreviewStatus === 'string'
+      ? options.harnessDriverFinal.lastRuntimeShotPreviewStatus
+      : latestString(runtimeSamples.map(s => s.harnessDriver?.lastRuntimeShotPreviewStatus));
+    const lastRuntimePreviewReason = typeof options?.harnessDriverFinal?.lastRuntimeShotPreviewReason === 'string'
+      ? options.harnessDriverFinal.lastRuntimeShotPreviewReason
+      : latestString(runtimeSamples.map(s => s.harnessDriver?.lastRuntimeShotPreviewReason));
+    const runtimePreviewObserved = runtimePreviewRejectedSamples.length > 0
+      || Number.isFinite(finalPreviewRejected)
+      || runtimePreviewAimSettlingSamples.length > 0
+      || Number.isFinite(finalPreviewAimSettling)
+      || runtimePreviewTerrainBlockedSamples.length > 0
+      || Number.isFinite(finalPreviewTerrainBlocked)
+      || runtimeSamples.some(s => s.harnessDriver?.lastRuntimeShotPreviewStatus !== undefined);
+    checks.push({
+      id: 'harness_runtime_shot_preview_trust',
+      status: !runtimePreviewObserved
+        ? 'warn'
+        : runtimePreviewRejected === 0
+          ? 'pass'
+          : finalShots < modeThresholds.minShotsFired
+            ? 'fail'
+            : 'warn',
+      value: runtimePreviewRejected,
+      message: runtimePreviewObserved
+        ? `Runtime shot preview rejected ${runtimePreviewRejected} fire intents (aimSettling=${runtimePreviewAimSettling}, terrainBlocked=${runtimePreviewTerrainBlocked}, miss=${runtimePreviewMiss}, unavailable=${runtimePreviewUnavailable}, wrongTarget=${runtimePreviewWrongTarget}); last=${lastRuntimePreviewStatus ?? 'n/a'}/${lastRuntimePreviewReason ?? 'n/a'}`
+        : 'Runtime shot preview counters missing; cannot prove the driver fires only when the player-shot resolver can hit',
+    });
     checks.push({
       id: 'harness_max_stuck_seconds',
       status: maxStuckSeconds <= modeThresholds.maxStuckSeconds
@@ -3016,7 +3210,9 @@ function validateRun(
     sampleUntrustedSnapCount,
     Number.isFinite(finalUntrustedSnapCount) ? finalUntrustedSnapCount : 0
   );
-  if (maxRouteSnapDistance > 0 || untrustedSnapCount > 0) {
+  const harnessRouteSnapObserved = !!options?.harnessDriverFinal
+    || runtimeSamples.some(s => !!s.harnessDriver);
+  if (harnessRouteSnapObserved || maxRouteSnapDistance > 0 || untrustedSnapCount > 0) {
     checks.push({
       id: 'harness_route_snap_trust',
       status: untrustedSnapCount === 0 && maxRouteSnapDistance <= 24 ? 'pass' : 'warn',
@@ -3268,13 +3464,13 @@ function validateRun(
       || shotPresentationStats.maxCameraPitchDeltaDeg > 15
       || shotPresentationStats.maxCameraPositionDeltaMeters > 2
       || (minShotClearance !== null && minShotClearance < 0.75)
-      || shotPresentationStats.terrainHashChurnEvents > 0
+      || shotPresentationStats.terrainUnsyncedBufferVisibleChurnEvents > 0
       || shotPresentationStats.terrainNotReadyEvents > 0;
     checks.push({
       id: 'harness_shot_presentation_context_equivalence',
       status: shotContextAnomaly ? 'warn' : 'pass',
       value: shotPresentationStats.contextCount,
-      message: `Shot presentation contexts=${shotPresentationStats.contextCount}/${shotPresentationStats.shotEpochCount}; cameraDelta yaw=${shotPresentationStats.maxCameraYawDeltaDeg.toFixed(1)}deg pitch=${shotPresentationStats.maxCameraPitchDeltaDeg.toFixed(1)}deg pos=${shotPresentationStats.maxCameraPositionDeltaMeters.toFixed(2)}m; minClearance=${formatNullableMeters(shotPresentationStats.minClearanceMeters)} effective=${formatNullableMeters(shotPresentationStats.minEffectiveClearanceMeters)}; terrainHashChurn=${shotPresentationStats.terrainHashChurnEvents}; terrainNotReady=${shotPresentationStats.terrainNotReadyEvents}`
+      message: `Shot presentation contexts=${shotPresentationStats.contextCount}/${shotPresentationStats.shotEpochCount}; cameraDelta yaw=${shotPresentationStats.maxCameraYawDeltaDeg.toFixed(1)}deg pitch=${shotPresentationStats.maxCameraPitchDeltaDeg.toFixed(1)}deg pos=${shotPresentationStats.maxCameraPositionDeltaMeters.toFixed(2)}m; minClearance=${formatNullableMeters(shotPresentationStats.minClearanceMeters)} effective=${formatNullableMeters(shotPresentationStats.minEffectiveClearanceMeters)}; terrainHashChurn=${shotPresentationStats.terrainHashChurnEvents} identity=${shotPresentationStats.terrainIdentityChurnEvents} edgeMask=${shotPresentationStats.terrainEdgeMaskChurnEvents} morphOnly=${shotPresentationStats.terrainMorphOnlyChurnEvents} unsyncedBufferVisible=${shotPresentationStats.terrainUnsyncedBufferVisibleChurnEvents}; terrainNotReady=${shotPresentationStats.terrainNotReadyEvents}`
     });
   }
 
@@ -3860,6 +4056,24 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
     shotEpochs: objectArray(result.shotEpochs),
     aimDotGateRejectedShots: Number(result.aimDotGateRejectedShots ?? 0),
     fireStartRejected: Number(result.fireStartRejected ?? 0),
+    runtimeShotPreviewRejectedShots: Number(result.runtimeShotPreviewRejectedShots ?? 0),
+    runtimeShotPreviewAimSettlingShots: Number(result.runtimeShotPreviewAimSettlingShots ?? 0),
+    runtimeShotPreviewTerrainBlockedShots: Number(result.runtimeShotPreviewTerrainBlockedShots ?? 0),
+    runtimeShotPreviewUnavailableShots: Number(result.runtimeShotPreviewUnavailableShots ?? 0),
+    runtimeShotPreviewMissShots: Number(result.runtimeShotPreviewMissShots ?? 0),
+    runtimeShotPreviewWrongTargetShots: Number(result.runtimeShotPreviewWrongTargetShots ?? 0),
+    lastRuntimeShotPreviewStatus: typeof result.lastRuntimeShotPreviewStatus === 'string'
+      ? result.lastRuntimeShotPreviewStatus
+      : null,
+    lastRuntimeShotPreviewReason: typeof result.lastRuntimeShotPreviewReason === 'string'
+      ? result.lastRuntimeShotPreviewReason
+      : null,
+    lastRuntimeShotPreviewHitTargetId: typeof result.lastRuntimeShotPreviewHitTargetId === 'string'
+      ? result.lastRuntimeShotPreviewHitTargetId
+      : null,
+    lastRuntimeShotPreviewExpectedInSpatialCandidates: typeof result.lastRuntimeShotPreviewExpectedInSpatialCandidates === 'boolean'
+      ? result.lastRuntimeShotPreviewExpectedInSpatialCandidates
+      : null,
     droppedDeadTargetLocks: Number(result.droppedDeadTargetLocks ?? 0),
     firingRetargets: Number(result.firingRetargets ?? 0),
     firingRetargetFireStops: Number(result.firingRetargetFireStops ?? 0),
@@ -5591,6 +5805,24 @@ async function runCapture(): Promise<void> {
               shotEpochs: objectArray(harnessDriver.shotEpochs),
               aimDotGateRejectedShots: Number(harnessDriver.aimDotGateRejectedShots ?? 0),
               fireStartRejected: Number(harnessDriver.fireStartRejected ?? 0),
+              runtimeShotPreviewRejectedShots: Number(harnessDriver.runtimeShotPreviewRejectedShots ?? 0),
+              runtimeShotPreviewAimSettlingShots: Number(harnessDriver.runtimeShotPreviewAimSettlingShots ?? 0),
+              runtimeShotPreviewTerrainBlockedShots: Number(harnessDriver.runtimeShotPreviewTerrainBlockedShots ?? 0),
+              runtimeShotPreviewUnavailableShots: Number(harnessDriver.runtimeShotPreviewUnavailableShots ?? 0),
+              runtimeShotPreviewMissShots: Number(harnessDriver.runtimeShotPreviewMissShots ?? 0),
+              runtimeShotPreviewWrongTargetShots: Number(harnessDriver.runtimeShotPreviewWrongTargetShots ?? 0),
+              lastRuntimeShotPreviewStatus: typeof harnessDriver.lastRuntimeShotPreviewStatus === 'string'
+                ? harnessDriver.lastRuntimeShotPreviewStatus
+                : null,
+              lastRuntimeShotPreviewReason: typeof harnessDriver.lastRuntimeShotPreviewReason === 'string'
+                ? harnessDriver.lastRuntimeShotPreviewReason
+                : null,
+              lastRuntimeShotPreviewHitTargetId: typeof harnessDriver.lastRuntimeShotPreviewHitTargetId === 'string'
+                ? harnessDriver.lastRuntimeShotPreviewHitTargetId
+                : null,
+              lastRuntimeShotPreviewExpectedInSpatialCandidates: typeof harnessDriver.lastRuntimeShotPreviewExpectedInSpatialCandidates === 'boolean'
+                ? harnessDriver.lastRuntimeShotPreviewExpectedInSpatialCandidates
+                : null,
               droppedDeadTargetLocks: Number(harnessDriver.droppedDeadTargetLocks ?? 0),
               firingRetargets: Number(harnessDriver.firingRetargets ?? 0),
               firingRetargetFireStops: Number(harnessDriver.firingRetargetFireStops ?? 0),

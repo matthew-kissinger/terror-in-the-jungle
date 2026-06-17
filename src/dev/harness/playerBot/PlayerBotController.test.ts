@@ -205,6 +205,18 @@ describe('PlayerBotController — aim-dot gate (REGRESSION 2)', () => {
     expect(result.fired).toBe(true);
     expect(target.fireCalls).toContain('start');
   });
+
+  it('allows fire at a steep downhill grounded target once aimed', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = { x: 0, y: -24, z: -18 };
+    intent.firePrimary = true;
+    intent.aimLerpRate = 1;
+    const result = applyUntilFired(controller, intent);
+    expect(result.fired).toBe(true);
+    expect(target.fireCalls).toContain('start');
+  });
 });
 
 describe('PlayerBotController — aim translation', () => {

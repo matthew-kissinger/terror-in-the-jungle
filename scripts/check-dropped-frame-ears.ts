@@ -518,6 +518,68 @@ function addTerrainVisualDomainTrustChecks(
   });
 }
 
+function addTerrainPresentationIntegrityChecks(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null
+): void {
+  const presentationGapCount = getNumber(summary, ['presentationGapContexts', 'gapCount']);
+  const noPresentationGaps = presentationGapCount === 0;
+  const unsyncedBufferVisibleChanges = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainStageBufferVisibleChangedWithoutSubmissionCount']
+  );
+  const bufferVisibleChanges = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainStageBufferVisibleChangedCount']
+  );
+  const morphChanges = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainStageMorphHashChangedCount']
+  );
+  const terrainGapCount = getNumber(summary, ['presentationGapContexts', 'terrain', 'gapCount']);
+  const terrainSelectionSaturatedCount = getNumber(
+    summary,
+    ['presentationGapContexts', 'terrain', 'terrainSelectionSaturatedCount']
+  );
+
+  const hasTerrainGapSummary = terrainGapCount !== null;
+  const coherent = noPresentationGaps || (
+    hasTerrainGapSummary
+    && unsyncedBufferVisibleChanges !== null
+    && unsyncedBufferVisibleChanges === 0
+  );
+  checks.push({
+    id: 'terrain_stage_buffer_submission_integrity',
+    status: coherent ? 'pass' : 'fail',
+    value: unsyncedBufferVisibleChanges,
+    message: noPresentationGaps
+      ? 'No presentation gaps were captured; no dropped-frame CDLOD stage mismatch to classify'
+      : coherent
+        ? `CDLOD buffer-visible terrain stage changes were submitted (${bufferVisibleChanges ?? 0} buffer-visible changes; ${morphChanges ?? 0} morph-only changes may use shader uniforms)`
+      : hasTerrainGapSummary
+        ? `CDLOD buffer-visible terrain stage changed without terrain buffer submission (${unsyncedBufferVisibleChanges ?? 'missing'} unsynced of ${bufferVisibleChanges ?? 'missing'} changes)`
+        : 'Presentation gap terrain summary is missing; cannot prove CDLOD buffer submission integrity',
+  });
+
+  const selectionCapacityTrusted = noPresentationGaps || (
+    hasTerrainGapSummary
+    && terrainSelectionSaturatedCount !== null
+    && terrainSelectionSaturatedCount === 0
+  );
+  checks.push({
+    id: 'terrain_cdlod_selection_capacity',
+    status: selectionCapacityTrusted ? 'pass' : 'fail',
+    value: terrainSelectionSaturatedCount,
+    message: noPresentationGaps
+      ? 'No presentation gaps were captured; CDLOD selection capacity did not coincide with a dropped-frame context'
+      : selectionCapacityTrusted
+        ? 'CDLOD selection did not hit the tile cap in dropped-frame contexts'
+        : hasTerrainGapSummary
+          ? `CDLOD selection hit the tile cap in ${terrainSelectionSaturatedCount ?? 'missing'} dropped-frame contexts`
+          : 'Presentation gap terrain summary is missing; cannot prove CDLOD selection capacity',
+  });
+}
+
 export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFrameEarsArtifactEvaluation {
   const absoluteArtifactDir = resolve(artifactDir);
   const summary = readJsonObject(join(absoluteArtifactDir, 'summary.json'));
@@ -592,6 +654,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addForbiddenRuntimeChecks(checks, summary, searchParams);
   addTerrainHeightBoundsTrustChecks(checks, summary);
   addTerrainVisualDomainTrustChecks(checks, summary);
+  addTerrainPresentationIntegrityChecks(checks, summary);
 
   checks.push({
     id: 'owner_visual_acceptance_required',

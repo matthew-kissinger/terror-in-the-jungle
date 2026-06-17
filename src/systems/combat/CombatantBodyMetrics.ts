@@ -37,6 +37,8 @@ export const COMBATANT_HIT_PROXY_HEAD_CENTER_RATIO = 0.84;
 export const COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO = 0.115;
 export const COMBATANT_HIT_PROXY_CHEST_START_RATIO = 0.46;
 export const COMBATANT_HIT_PROXY_CHEST_END_RATIO = 0.72;
+export const COMBATANT_HIT_PROXY_CHEST_CENTER_RATIO =
+  (COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2;
 export const COMBATANT_HIT_PROXY_CHEST_RADIUS_RATIO = 0.18;
 export const COMBATANT_HIT_PROXY_PELVIS_CENTER_RATIO = 0.34;
 export const COMBATANT_HIT_PROXY_PELVIS_RADIUS_RATIO = 0.17;
@@ -67,6 +69,21 @@ export function copyNpcCenterMassPosition(out: THREE.Vector3, npcAnchor: THREE.V
   out.copy(npcAnchor);
   out.y += NPC_CENTER_MASS_Y_OFFSET;
   return out;
+}
+
+export function getCombatantVisualChestAimYOffset(scaleY = 1): number {
+  const visualHeight =
+    NPC_PIXEL_FORGE_VISUAL_HEIGHT
+    * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
+    * scaleY;
+  return visualHeight * COMBATANT_HIT_PROXY_CHEST_CENTER_RATIO - NPC_Y_OFFSET;
+}
+
+export function getCombatantVisualChestProxyRadius(scaleY = 1): number {
+  return NPC_PIXEL_FORGE_VISUAL_HEIGHT
+    * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
+    * scaleY
+    * COMBATANT_HIT_PROXY_CHEST_RADIUS_RATIO;
 }
 
 export function copyPlayerCenterMassPosition(out: THREE.Vector3, playerEyeAnchor: THREE.Vector3): THREE.Vector3 {

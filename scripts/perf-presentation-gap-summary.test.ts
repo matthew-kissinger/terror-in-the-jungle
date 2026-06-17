@@ -173,6 +173,8 @@ describe('summarizePresentationGapContexts', () => {
       terrainStageMorphHashChangedCount: 2,
       terrainStageEdgeMaskHashChangedCount: 1,
       terrainStageTileCountChangedCount: 1,
+      terrainStageBufferVisibleChangedCount: 1,
+      terrainStageBufferVisibleChangedWithoutSubmissionCount: 0,
       terrainSelectionSaturatedCount: 1,
       terrainNotReadyCount: 1,
       lowClearanceCount: 1,
@@ -259,6 +261,78 @@ describe('summarizePresentationGapContexts', () => {
       5: 2,
     });
     expect(summary?.latest.map((gap) => gap.seq)).toEqual([1, 2, 3]);
+  });
+
+  it('separates morph-only stage churn from unsynced buffer-visible terrain changes', () => {
+    const summary = summarizePresentationGapContexts(
+      [],
+      [
+        {
+          gapMs: 30,
+          estimatedDropped60HzFrames: 1,
+          droppedFrameTime60HzMs: 13.3,
+          presentationContext: {
+            terrainSync: {
+              terrainBufferSubmitted: false,
+              submissionClassification: 'same-identity',
+            },
+            terrainByStage: {
+              'after-simulation': {
+                tileHash: 'hash-a',
+                tileIdentityHash: 'identity-a',
+                morphHash: 'morph-a',
+                edgeMaskHash: 'edge-a',
+                tileCount: 12,
+              },
+              'before-render': {
+                tileHash: 'hash-b',
+                tileIdentityHash: 'identity-a',
+                morphHash: 'morph-b',
+                edgeMaskHash: 'edge-a',
+                tileCount: 12,
+              },
+            },
+          },
+        },
+        {
+          gapMs: 34,
+          estimatedDropped60HzFrames: 1,
+          droppedFrameTime60HzMs: 17.3,
+          presentationContext: {
+            terrainSync: {
+              terrainBufferSubmitted: false,
+              submissionClassification: 'same-identity',
+            },
+            terrainByStage: {
+              'after-simulation': {
+                tileHash: 'hash-c',
+                tileIdentityHash: 'identity-c',
+                morphHash: 'morph-c',
+                edgeMaskHash: 'edge-c',
+                tileCount: 12,
+              },
+              'before-render': {
+                tileHash: 'hash-d',
+                tileIdentityHash: 'identity-d',
+                morphHash: 'morph-c',
+                edgeMaskHash: 'edge-d',
+                tileCount: 13,
+              },
+            },
+          },
+        },
+      ],
+    );
+
+    expect(summary?.terrain).toMatchObject({
+      terrainStageHashChangedCount: 2,
+      terrainStageMorphHashChangedCount: 1,
+      terrainStageIdentityHashChangedCount: 1,
+      terrainStageEdgeMaskHashChangedCount: 1,
+      terrainStageTileCountChangedCount: 1,
+      terrainStageBufferVisibleChangedCount: 1,
+      terrainStageBufferVisibleChangedWithoutSubmissionCount: 1,
+    });
   });
 
   it('falls back to runtime rAF entries when final presentation epochs are absent', () => {
