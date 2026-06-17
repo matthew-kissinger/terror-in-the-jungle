@@ -308,7 +308,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     const modelPath = modelPathFor(object);
     if (modelPath) {
       return {
-        ownerKey: \`model:\${modelPath}\`,
+        ownerKey: 'model:' + modelPath,
         ownerLabel: modelPath,
         ownerType: 'model'
       };
