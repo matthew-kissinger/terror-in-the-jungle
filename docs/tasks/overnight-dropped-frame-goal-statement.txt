@@ -61,6 +61,17 @@ Latest static checkpoint:
   targeted ESLint, `npm run typecheck`, and `lint-source-budget` passed. It is
   not a proven dropped-frame win until fresh paired EARS captures pass on a
   quiet machine.
+- Quiet-snapshot trust-grade checkpoint:
+  `perf-capture --quiet-machine-attested` now records GPU warning-band desktop
+  activity separately from hard busy-machine failure. CPU busy remains a hard
+  quiet-snapshot failure; GPU utilization above the hard busy threshold and
+  severe GPU-memory pressure still fail; moderate GPU background activity is
+  preserved as a warning so expected desktop/agent GPU use does not erase an
+  otherwise trusted headed WebGPU capture. `check:dropped-frame-ears` still
+  fails completion on snapshot `fail`, measurement-trust failure, failed rAF
+  gates, or same-experience/harness-equivalence failures. This changes trust
+  classification only; it does not optimize runtime, reduce content, or prove
+  the dropped-frame goal.
 - Fixed-wing opaque material consolidation checkpoint:
   `FixedWingModel` now bakes per-mesh opaque paint colors into vertex colors
   before running the existing static GLB draw-call optimizer, while leaving
@@ -178,7 +189,7 @@ Current alignment:
   focused proof, exact-head CI run `27594724546`, deploy run `27594906745`,
   and `check:live-release` passed. Live proof:
   `artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`.
-- Working branch identity: `task/dropped-frame-perf-harness`.
+- Working branch identity: `task/dropped-frame-paired-evidence`.
 - AC-47 collision is historical context, not the active branch identity.
 - Current status: not complete. The latest known runtime evidence still failed
   the dropped-frame goal, and newer static cleanups are unproven until the next

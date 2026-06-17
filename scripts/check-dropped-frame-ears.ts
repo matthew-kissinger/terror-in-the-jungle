@@ -393,6 +393,10 @@ function addQuietMachineSnapshotCheck(
   const cpuAvg = getNumber(summary, ['captureEnvironment', 'quietMachineSnapshot', 'cpu', 'avgPercent']);
   const cpuMax = getNumber(summary, ['captureEnvironment', 'quietMachineSnapshot', 'cpu', 'maxPercent']);
   const gpuUtil = getNumber(summary, ['captureEnvironment', 'quietMachineSnapshot', 'gpu', 'utilizationPercent']);
+  const gpuLoadClass = getString(summary, ['captureEnvironment', 'quietMachineSnapshot', 'gpu', 'loadClass']);
+  const warnings = asArray(getPath(summary, ['captureEnvironment', 'quietMachineSnapshot', 'warnings']))
+    .filter((value): value is string => typeof value === 'string');
+  const warningSummary = warnings.length > 0 ? ` warnings=${warnings.join(' | ')}` : '';
 
   checks.push({
     id: 'quiet_machine_snapshot_idle',
@@ -401,10 +405,10 @@ function addQuietMachineSnapshotCheck(
       : 'fail',
     value: snapshotStatus,
     message: snapshotStatus === 'pass'
-      ? `Quiet-machine snapshot passed (cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%)`
+      ? `Quiet-machine snapshot passed (cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%/${gpuLoadClass ?? 'unknown'})`
       : snapshotStatus === 'warn'
-        ? `Quiet-machine snapshot had incomplete sensors but no recorded busy failure (cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%)`
-        : `Quiet-machine snapshot is missing or busy (status=${snapshotStatus ?? 'missing'}, cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%)`,
+        ? `Quiet-machine snapshot had warning-band sensors but no recorded busy failure (cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%/${gpuLoadClass ?? 'unknown'}).${warningSummary}`
+        : `Quiet-machine snapshot is missing or busy (status=${snapshotStatus ?? 'missing'}, cpuAvg=${cpuAvg ?? 'missing'}%, cpuMax=${cpuMax ?? 'missing'}%, gpu=${gpuUtil ?? 'missing'}%/${gpuLoadClass ?? 'unknown'}).${warningSummary}`,
   });
 }
 

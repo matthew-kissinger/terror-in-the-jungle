@@ -95,12 +95,23 @@ function tempArtifact(options: ArtifactOptions): string {
         gpu: {
           source: 'fixture',
           available: true,
-          utilizationPercent: options.quietSnapshotStatus === 'fail' ? 24 : 2,
+          loadClass: options.quietSnapshotStatus === 'fail'
+            ? 'busy'
+            : options.quietSnapshotStatus === 'warn'
+              ? 'background'
+              : 'idle',
+          utilizationPercent: options.quietSnapshotStatus === 'fail'
+            ? 48
+            : options.quietSnapshotStatus === 'warn'
+              ? 18
+              : 2,
           memoryUtilizationPercent: 1,
           memoryUsedMiB: 512,
         },
         warnings: options.quietSnapshotStatus === 'fail'
-          ? ['GPU was busy during quiet snapshot: utilization=24%']
+          ? ['GPU was busy during quiet snapshot: utilization=48%']
+          : options.quietSnapshotStatus === 'warn'
+            ? ['GPU background activity during quiet snapshot: utilization=18%']
           : [],
       },
     },
@@ -268,6 +279,22 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       check.id === 'quiet_machine_snapshot_idle'
       && check.status === 'fail'
       && check.value === 'fail'
+    ))).toBe(true);
+  });
+
+  it('allows warning-band quiet-machine GPU activity as non-failing evidence', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      quietSnapshotStatus: 'warn',
+    }));
+
+    expect(artifact.classification).toBe('proven');
+    expect(artifact.warnCount).toBeGreaterThan(1);
+    expect(artifact.checks.some((check) => (
+      check.id === 'quiet_machine_snapshot_idle'
+      && check.status === 'warn'
+      && check.value === 'warn'
+      && check.message.includes('background')
     ))).toBe(true);
   });
 

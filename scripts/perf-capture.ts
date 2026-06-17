@@ -983,9 +983,12 @@ type QuietMachineSnapshot = {
   gpu?: {
     source: string;
     available: boolean;
+    loadClass?: 'idle' | 'background' | 'busy';
     utilizationPercent?: number;
     memoryUtilizationPercent?: number;
     memoryUsedMiB?: number;
+    memoryTotalMiB?: number;
+    memoryUsedPercent?: number;
   };
   warnings: string[];
 };
@@ -1865,8 +1868,16 @@ function roundQuietMetric(value: number): number {
   return Number.isFinite(value) ? Math.round(value * 100) / 100 : 0;
 }
 
+const QUIET_CPU_AVG_FAIL_PERCENT = 15;
+const QUIET_CPU_MAX_FAIL_PERCENT = 35;
+const QUIET_GPU_WARN_PERCENT = 10;
+const QUIET_GPU_FAIL_PERCENT = 35;
+const QUIET_GPU_MEMORY_WARN_PERCENT = 75;
+const QUIET_GPU_MEMORY_FAIL_PERCENT = 90;
+
 function captureQuietMachineSnapshot(): QuietMachineSnapshot {
   const warnings: string[] = [];
+  const failures: string[] = [];
   let cpu: QuietMachineSnapshot['cpu'];
   let gpu: QuietMachineSnapshot['gpu'];
 
@@ -1898,17 +1909,30 @@ function captureQuietMachineSnapshot(): QuietMachineSnapshot {
 
   try {
     const gpuCsv = execFileSync('nvidia-smi', [
-      '--query-gpu=utilization.gpu,utilization.memory,memory.used',
+      '--query-gpu=utilization.gpu,utilization.memory,memory.used,memory.total',
       '--format=csv,noheader,nounits',
     ], { encoding: 'utf-8', timeout: 5000 }).trim();
     const firstLine = gpuCsv.split(/\r?\n/).find((line) => line.trim().length > 0) ?? '';
-    const [utilizationRaw, memoryUtilRaw, memoryUsedRaw] = firstLine.split(',').map((part) => part.trim());
+    const [utilizationRaw, memoryUtilRaw, memoryUsedRaw, memoryTotalRaw] = firstLine.split(',').map((part) => part.trim());
+    const utilizationPercent = roundQuietMetric(Number(utilizationRaw));
+    const memoryUsedMiB = roundQuietMetric(Number(memoryUsedRaw));
+    const memoryTotalMiB = roundQuietMetric(Number(memoryTotalRaw));
+    const memoryUsedPercent = memoryTotalMiB > 0
+      ? roundQuietMetric((memoryUsedMiB / memoryTotalMiB) * 100)
+      : undefined;
     gpu = {
-      source: 'nvidia-smi utilization.gpu,utilization.memory,memory.used',
+      source: 'nvidia-smi utilization.gpu,utilization.memory,memory.used,memory.total',
       available: true,
-      utilizationPercent: roundQuietMetric(Number(utilizationRaw)),
+      loadClass: utilizationPercent > QUIET_GPU_FAIL_PERCENT
+        ? 'busy'
+        : utilizationPercent > QUIET_GPU_WARN_PERCENT
+          ? 'background'
+          : 'idle',
+      utilizationPercent,
       memoryUtilizationPercent: roundQuietMetric(Number(memoryUtilRaw)),
-      memoryUsedMiB: roundQuietMetric(Number(memoryUsedRaw)),
+      memoryUsedMiB,
+      memoryTotalMiB,
+      memoryUsedPercent,
     };
   } catch {
     gpu = {
@@ -1927,15 +1951,25 @@ function captureQuietMachineSnapshot(): QuietMachineSnapshot {
     };
   }
 
-  if (cpu.avgPercent > 15 || cpu.maxPercent > 35) {
-    warnings.push(`CPU was busy during quiet snapshot: avg=${cpu.avgPercent}% max=${cpu.maxPercent}%`);
+  if (cpu.avgPercent > QUIET_CPU_AVG_FAIL_PERCENT || cpu.maxPercent > QUIET_CPU_MAX_FAIL_PERCENT) {
+    failures.push(`CPU was busy during quiet snapshot: avg=${cpu.avgPercent}% max=${cpu.maxPercent}%`);
   }
-  if (gpu?.available && Number(gpu.utilizationPercent ?? 0) > 10) {
-    warnings.push(`GPU was busy during quiet snapshot: utilization=${gpu.utilizationPercent}%`);
+  if (gpu?.available) {
+    const gpuUtilization = Number(gpu.utilizationPercent ?? 0);
+    if (gpuUtilization > QUIET_GPU_FAIL_PERCENT) {
+      failures.push(`GPU was busy during quiet snapshot: utilization=${gpu.utilizationPercent}%`);
+    } else if (gpuUtilization > QUIET_GPU_WARN_PERCENT) {
+      warnings.push(`GPU background activity during quiet snapshot: utilization=${gpu.utilizationPercent}%`);
+    }
+    const memoryUsedPercent = Number(gpu.memoryUsedPercent ?? 0);
+    if (memoryUsedPercent > QUIET_GPU_MEMORY_FAIL_PERCENT) {
+      failures.push(`GPU memory pressure during quiet snapshot: used=${gpu.memoryUsedMiB}MiB/${gpu.memoryTotalMiB}MiB (${gpu.memoryUsedPercent}%)`);
+    } else if (memoryUsedPercent > QUIET_GPU_MEMORY_WARN_PERCENT) {
+      warnings.push(`GPU memory pressure warning during quiet snapshot: used=${gpu.memoryUsedMiB}MiB/${gpu.memoryTotalMiB}MiB (${gpu.memoryUsedPercent}%)`);
+    }
   }
 
-  const hasBusyWarning = warnings.some((warning) => warning.includes('was busy'));
-  const status: QuietMachineSnapshot['status'] = hasBusyWarning
+  const status: QuietMachineSnapshot['status'] = failures.length > 0
     ? 'fail'
     : warnings.length > 0
       ? 'warn'
@@ -1945,7 +1979,7 @@ function captureQuietMachineSnapshot(): QuietMachineSnapshot {
     status,
     cpu,
     gpu,
-    warnings,
+    warnings: [...warnings, ...failures],
   };
 }
 
@@ -4959,7 +4993,7 @@ async function runCapture(): Promise<void> {
       `Quiet-machine snapshot ${quietMachineSnapshot.status}` +
       ` cpuAvg=${quietMachineSnapshot.cpu?.avgPercent ?? 'n/a'}%` +
       ` cpuMax=${quietMachineSnapshot.cpu?.maxPercent ?? 'n/a'}%` +
-      ` gpu=${quietMachineSnapshot.gpu?.available ? `${quietMachineSnapshot.gpu.utilizationPercent}%` : 'n/a'}`
+      ` gpu=${quietMachineSnapshot.gpu?.available ? `${quietMachineSnapshot.gpu.utilizationPercent}%/${quietMachineSnapshot.gpu.loadClass ?? 'unknown'}` : 'n/a'}`
     );
   }
   const combatParam = enableCombat ? '1' : '0';
