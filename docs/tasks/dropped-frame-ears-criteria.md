@@ -28,11 +28,33 @@ Unless the owner explicitly changes this, a completion candidate means all of:
   intent, storm/lightning logic, map content, combat, wildlife, terrain, and
   vegetation remain in scope. Restore rain through a GPU/compute path before
   treating rain visuals/wetness as part of this perf goal again.
-- Sky, cloud, sun, and atmosphere implementation details are not sacred. If
-  profiling or owner-visible quality shows the current Hosek/Wilkie sky,
-  cloud, or sun treatment is both expensive and unattractive, a replacement or
-  simplification is aligned when it improves visual quality and frame pacing
-  without reducing gameplay readability, terrain stability, or scenario mood.
+- Sky, cloud, sun, fog, and atmosphere implementation details are not sacred.
+  If profiling or owner-visible quality shows the current Hosek/Wilkie sky,
+  cloud, fog, or sun treatment is both expensive and unattractive, a
+  replacement or simplification is aligned when it improves visual quality and
+  frame pacing without reducing gameplay readability, terrain stability, or
+  scenario mood.
+  Owner feedback on 2026-06-17 calls the current atmosphere/cloud read weak and
+  the visible sun shader unattractive; future agents should treat that as a
+  valid quality signal, not just a subjective aside. The current branch defaults
+  the visual dome to a per-fragment TSL path, so do not assume the older
+  128x64 baked-texture regression memo is current proof. Measure first, then
+  simplify or replace if it lowers dropped-frame tails or provides a clear
+  same-cost quality win.
+- Fog changes must be evaluated as visual and gameplay authority, not only as
+  `scene.fog.density`. The current implementation can spend fog cost in terrain
+  far-canopy tint/haze, foliage billboard fog, NPC-impostor fog, scene
+  FogExp2, weather density modulation, and aircraft fog-distance culling. A
+  valid optimization can simplify or replace those paths when evidence shows a
+  frame-pacing win, but it must not hide terrain/CDLOD cracks, weaken target or
+  vehicle readability, or change culling semantics without explicit proof.
+- Local sky references to check before inventing a new path:
+  `pixel-forge/examples/three-js/examples/jsm/objects/SkyMesh.js`,
+  `pixel-forge/examples/three-js/examples/webgpu_sky.html`,
+  `game-field-kits/kits/atmosphere-starter/src/atmosphere.ts`, and
+  `sds/docs/archive/research/sun-sky-atmosphere-perf-spike-2026-05-16.md`.
+  No local `threejsroadmap` folder was found in the quick targeted search; if
+  the owner meant a different path, add it here.
 - Required artifacts: `summary.json`, `validation.json`,
   `presentation-epochs.json`, browser stall entries when present,
   render-submission samples when present, final frame, and driver final state.
@@ -92,7 +114,7 @@ Executable scaffold:
 | ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 runtime close-model samples and at least 10% of close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when aggregate combat passes. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 | ST4-PERF-018 | Unwanted behavior | If close-model pools load during the measured runtime of a materialization candidate, the harness shall keep the artifact diagnostic even when aggregate materialization pressure is present. | `npc_close_model_runtime_pool_loads_clear` passes: runtime samples include close-model stats and `poolLoads == 0` across measured play. | `runtime-samples.json`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-019 | Unwanted behavior | If active close models are sampled but tier-transition telemetry is missing, the harness shall not claim materialization-transition stutter is understood or fixed. | `npc_materialization_transition_telemetry` passes: when close models are active/rendered, `materializationTierEvents`, `summary.materializationTierMetrics.totalEvents`, or drained `closeModelStats.transitionWindow` / `summary.materializationTierMetrics.transitionWindowTotalEvents` includes at least one transition. | `runtime-samples.json`, `summary.materializationTierMetrics`, `scripts/check-dropped-frame-ears.ts` |
-| ST4-PERF-020 | Event-driven | When sky, cloud, sun, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | Candidate notes must show the new path improves or preserves scenario mood, terrain readability, and owner-visible quality while reducing measured render/presentation cost. | render attribution, final frame/screenshot evidence, owner playtest |
+| ST4-PERF-020 | Event-driven | When sky, cloud, sun, fog, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | Candidate notes must show the new path improves or preserves scenario mood, terrain readability, NPC/vehicle readability, and owner-visible quality while reducing measured render/presentation cost. | render attribution, final frame/screenshot evidence, owner playtest |
 
 ## Candidate Classification
 
@@ -117,9 +139,12 @@ places where future loops should replace judgement with numbers:
 - Same-experience content counters for vegetation, wildlife, static world
   features, terrain draw distance, and combatant representation per scenario.
 - A WebGPU CPU/GPU/presentation split around failing rAF epochs.
-- A sky/cloud/sun replacement spike against Three.js/WebGPU examples or local
-  reference code if atmosphere shows up in render tails or remains visually
-  unacceptable after the rain burn.
+- A fog/material-family A/B sensor that distinguishes scene fog, terrain
+  far-canopy tint/haze, billboard fog, NPC-impostor fog, and aircraft
+  fog-distance culling before accepting a fog simplification.
+- A sky/cloud/sun/fog replacement spike against Three.js/WebGPU examples or
+  local reference code if atmosphere or fog shows up in render tails or remains
+  visually unacceptable after the rain burn.
 - Promotion of `presentationGapContexts.materialization` and drained
   `closeModelStats.transitionWindow` from diagnostic summary into pass/fail
   budgets once a trusted paired capture establishes acceptable close-GLB

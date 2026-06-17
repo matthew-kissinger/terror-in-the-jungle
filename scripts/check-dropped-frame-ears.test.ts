@@ -29,6 +29,8 @@ type ArtifactOptions = {
   missingMaterializationEvents?: boolean;
   transitionWindowMaterializationEvents?: boolean;
   quietSnapshotStatus?: 'pass' | 'warn' | 'fail';
+  renderMainTailMs?: number;
+  missingRenderTail?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -204,40 +206,59 @@ function tempArtifact(options: ArtifactOptions): string {
   writeFileSync(join(dir, 'summary.json'), JSON.stringify(summary), 'utf-8');
   writeFileSync(join(dir, 'validation.json'), JSON.stringify(validation), 'utf-8');
   writeFileSync(join(dir, 'measurement-trust.json'), JSON.stringify(summary.measurementTrust), 'utf-8');
-  writeFileSync(join(dir, 'runtime-samples.json'), JSON.stringify(runtimeShotCounts.map((shotsThisSession, index) => ({
-    shotsThisSession,
-    hitsThisSession: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
-    harnessDriver: {
-      engineShotsFired: shotsThisSession,
-      engineShotsHit: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
-    },
-    closeModelStats: {
-      candidatesWithinCloseRadius: materializationSamplesWithCandidates > index ? materializationPeakCandidates : 0,
-      renderedCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
-      activeCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
-      poolLoads: options.liveCloseModelPoolLoads && index === 2 ? 1 : 0,
-      transitionWindow: {
-        total: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
-        firstObservation: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
-        toCloseGlb: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
-        toImpostor: 0,
-        toCulled: 0,
-        fromCloseGlb: 0,
-        byTransition: options.transitionWindowMaterializationEvents && index === 1 ? { 'impostor->close-glb': 1 } : {},
-        byReason: options.transitionWindowMaterializationEvents && index === 1 ? { 'close-glb:active': 1 } : {},
+  writeFileSync(join(dir, 'runtime-samples.json'), JSON.stringify(runtimeShotCounts.map((shotsThisSession, index) => {
+    const renderMainMs = index === 2
+      ? options.renderMainTailMs ?? 12
+      : 10;
+    return {
+      frameCount: index * 120,
+      shotsThisSession,
+      hitsThisSession: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
+      harnessDriver: {
+        engineShotsFired: shotsThisSession,
+        engineShotsHit: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
       },
-    },
-    materializationTierEvents: options.missingMaterializationEvents || index !== 1
-      ? []
-      : [{
-          combatantId: 'fixture-npc',
-          fromRender: 'impostor',
-          toRender: 'close-glb',
-          reason: 'close-glb:active',
-          distanceMeters: 20,
-        }],
-    pagePerformanceNowMs: index * 1500,
-  }))), 'utf-8');
+      closeModelStats: {
+        candidatesWithinCloseRadius: materializationSamplesWithCandidates > index ? materializationPeakCandidates : 0,
+        renderedCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
+        activeCloseModels: materializationSamplesWithCandidates > index ? materializationPeakRendered : 0,
+        poolLoads: options.liveCloseModelPoolLoads && index === 2 ? 1 : 0,
+        transitionWindow: {
+          total: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
+          firstObservation: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
+          toCloseGlb: options.transitionWindowMaterializationEvents && index === 1 ? 1 : 0,
+          toImpostor: 0,
+          toCulled: 0,
+          fromCloseGlb: 0,
+          byTransition: options.transitionWindowMaterializationEvents && index === 1 ? { 'impostor->close-glb': 1 } : {},
+          byReason: options.transitionWindowMaterializationEvents && index === 1 ? { 'close-glb:active': 1 } : {},
+        },
+      },
+      materializationTierEvents: options.missingMaterializationEvents || index !== 1
+        ? []
+        : [{
+            combatantId: 'fixture-npc',
+            fromRender: 'impostor',
+            toRender: 'close-glb',
+            reason: 'close-glb:active',
+            distanceMeters: 20,
+          }],
+      ...(!options.missingRenderTail
+        ? {
+            loopFrameBreakdown: [{
+              frameCount: index * 120 + 1,
+              callbackDurationMs: renderMainMs + 6,
+              segments: {
+                'RenderMain.renderer.render': renderMainMs,
+                'Simulation.updateSystems': 4,
+                'RenderOverlay.weapon': 1,
+              },
+            }],
+          }
+        : {}),
+      pagePerformanceNowMs: index * 1500,
+    };
+  })), 'utf-8');
   for (const file of REQUIRED_PLACEHOLDER_FILES) {
     writeFileSync(join(dir, file), file.endsWith('.png') ? '' : '[]', 'utf-8');
   }
@@ -253,6 +274,21 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.completionLaneQualified).toBe(true);
     expect(artifact.failCount).toBe(0);
     expect(artifact.warnCount).toBe(1);
+  });
+
+  it('surfaces renderer.render tails from current-schema loop frame breakdowns', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      renderMainTailMs: 348.6,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'render_main_renderer_render_tail'
+      && check.status === 'fail'
+      && check.value === 348.6
+      && check.message.includes('Prioritize render-side attribution')
+    ))).toBe(true);
   });
 
   it('keeps failed trust or harness equivalence artifacts diagnostic', () => {

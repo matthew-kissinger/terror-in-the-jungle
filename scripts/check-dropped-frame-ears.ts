@@ -75,6 +75,8 @@ const MIN_SUSTAINED_MATERIALIZATION_SAMPLES = 3;
 const MIN_SUSTAINED_MATERIALIZATION_RATIO = 0.1;
 const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES = 3;
 const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_RATIO = 0.05;
+const RENDER_MAIN_RENDER_WARN_MS = 33;
+const RENDER_MAIN_RENDER_FAIL_MS = 100;
 
 const RAF_THRESHOLDS: readonly ThresholdCheck[] = [
   {
@@ -879,6 +881,101 @@ function addTerrainPresentationIntegrityChecks(
   });
 }
 
+function addRenderTailAttributionChecks(
+  checks: DroppedFrameEarsCheck[],
+  runtimeSamples: readonly unknown[] | null
+): void {
+  if (runtimeSamples === null) {
+    checks.push({
+      id: 'render_main_renderer_render_tail',
+      status: 'warn',
+      value: null,
+      message: 'Runtime samples are unavailable; cannot attribute render-main frame tails',
+    });
+    return;
+  }
+
+  let observedFrames = 0;
+  let warnFrames = 0;
+  let failFrames = 0;
+  let peakRenderMs = -1;
+  let peakFrame: number | null = null;
+  let peakSampleFrame: number | null = null;
+  let peakCallbackMs: number | null = null;
+  let peakSimulationMs: number | null = null;
+
+  for (const sample of runtimeSamples) {
+    const sampleRecord = asRecord(sample);
+    const sampleFrame = typeof sampleRecord?.frameCount === 'number' && Number.isFinite(sampleRecord.frameCount)
+      ? sampleRecord.frameCount
+      : null;
+    for (const frame of asArray(sampleRecord?.loopFrameBreakdown)) {
+      const frameRecord = asRecord(frame);
+      const segments = asRecord(frameRecord?.segments);
+      const renderMs = typeof segments?.['RenderMain.renderer.render'] === 'number'
+        && Number.isFinite(segments['RenderMain.renderer.render'])
+        ? segments['RenderMain.renderer.render']
+        : null;
+      if (renderMs === null) continue;
+
+      observedFrames++;
+      if (renderMs >= RENDER_MAIN_RENDER_WARN_MS) warnFrames++;
+      if (renderMs >= RENDER_MAIN_RENDER_FAIL_MS) failFrames++;
+      if (renderMs > peakRenderMs) {
+        peakRenderMs = renderMs;
+        peakFrame = typeof frameRecord?.frameCount === 'number' && Number.isFinite(frameRecord.frameCount)
+          ? frameRecord.frameCount
+          : null;
+        peakSampleFrame = sampleFrame;
+        peakCallbackMs = typeof frameRecord?.callbackDurationMs === 'number' && Number.isFinite(frameRecord.callbackDurationMs)
+          ? frameRecord.callbackDurationMs
+          : null;
+        peakSimulationMs = typeof segments?.['Simulation.updateSystems'] === 'number'
+          && Number.isFinite(segments['Simulation.updateSystems'])
+          ? segments['Simulation.updateSystems']
+          : null;
+      }
+    }
+  }
+
+  if (observedFrames === 0) {
+    checks.push({
+      id: 'render_main_renderer_render_tail',
+      status: 'warn',
+      value: null,
+      message: 'No loop-frame render-main attribution was found; cannot distinguish render tails from simulation tails',
+    });
+    return;
+  }
+
+  const status: CheckStatus = peakRenderMs >= RENDER_MAIN_RENDER_FAIL_MS
+    ? 'fail'
+    : peakRenderMs >= RENDER_MAIN_RENDER_WARN_MS
+      ? 'warn'
+      : 'pass';
+  const peakFrameText = peakFrame !== null
+    ? `frame ${peakFrame}`
+    : 'unknown frame';
+  const sampleFrameText = peakSampleFrame !== null
+    ? `sampleFrame=${peakSampleFrame}`
+    : 'sampleFrame=unknown';
+  const callbackText = peakCallbackMs !== null
+    ? `callback=${peakCallbackMs.toFixed(1)}ms`
+    : 'callback=missing';
+  const simulationText = peakSimulationMs !== null
+    ? `simulation=${peakSimulationMs.toFixed(1)}ms`
+    : 'simulation=missing';
+
+  checks.push({
+    id: 'render_main_renderer_render_tail',
+    status,
+    value: peakRenderMs,
+    message: status === 'pass'
+      ? `Render-main attribution present and below warning threshold (peak=${peakRenderMs.toFixed(1)}ms across ${observedFrames} loop frames)`
+      : `Render-main tail detected: peak RenderMain.renderer.render=${peakRenderMs.toFixed(1)}ms at ${peakFrameText} (${sampleFrameText}, ${callbackText}, ${simulationText}); frames >=${RENDER_MAIN_RENDER_WARN_MS}ms=${warnFrames}, >=${RENDER_MAIN_RENDER_FAIL_MS}ms=${failFrames}. Prioritize render-side attribution before simulation or atmosphere cuts.`,
+  });
+}
+
 export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFrameEarsArtifactEvaluation {
   const absoluteArtifactDir = resolve(artifactDir);
   const summary = readJsonObject(join(absoluteArtifactDir, 'summary.json'));
@@ -959,6 +1056,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addTerrainHeightBoundsTrustChecks(checks, summary);
   addTerrainVisualDomainTrustChecks(checks, summary);
   addTerrainPresentationIntegrityChecks(checks, summary);
+  addRenderTailAttributionChecks(checks, runtimeSamples);
 
   checks.push({
     id: 'owner_visual_acceptance_required',
