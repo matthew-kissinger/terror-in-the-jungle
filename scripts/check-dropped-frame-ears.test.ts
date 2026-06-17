@@ -69,6 +69,13 @@ function tempArtifact(options: ArtifactOptions): string {
       terrainForceInstanceUploadEnabled: false,
       terrainHeightAwareFrustumRequested: false,
       terrainHeightAwareFrustumDisabled: false,
+      terrainPlayableWorldSize: 3200,
+      terrainVisualWorldSize: 3600,
+      terrainVisualMargin: 200,
+      terrainMaxLODLevels: 6,
+      terrainLodRange0: 225,
+      terrainLodRangeLast: 7200,
+      terrainLod0VertexSpacing: 3600 / 2 ** 6 / 32,
       terrainFullSkirtsRequested: false,
       terrainSparseSkirtsRequested: false,
       terrainSkirtsDisabled: false,
@@ -183,6 +190,24 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     }));
     expect(artifact.classification).toBe('rejected');
     expect(artifact.checks.some((check) => check.id === 'forbidden_terrain_height_bounds_heuristic_enabled' && check.status === 'fail')).toBe(true);
+  });
+
+  it('keeps playable-only terrain LOD range captures diagnostic', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      runtimeOverrides: {
+        terrainPlayableWorldSize: 3200,
+        terrainVisualWorldSize: 3600,
+        terrainVisualMargin: 200,
+        terrainMaxLODLevels: 6,
+        terrainLodRange0: 200,
+        terrainLodRangeLast: 6400,
+        terrainLod0VertexSpacing: 3600 / 2 ** 6 / 32,
+      },
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => check.id === 'terrain_lod_ranges_visual_extent_alignment' && check.status === 'fail')).toBe(true);
   });
 });
 

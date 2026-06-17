@@ -3,12 +3,38 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  computeDefaultLODRanges,
   computeLOD0VertexSpacing,
   computeMaxLODLevels,
   computeSourceAwareMaxLODLevels,
+  createTerrainConfig,
 } from './TerrainConfig';
 
 describe('TerrainConfig CDLOD source-aware resolution', () => {
+  it('derives LOD ranges from the visual quadtree extent, not playable-only size', () => {
+    const worldSize = 3200;
+    const visualMargin = 200;
+    const maxLODLevels = 6;
+
+    const ranges = computeDefaultLODRanges(worldSize, maxLODLevels, visualMargin);
+    const playableOnlyRanges = computeDefaultLODRanges(worldSize, maxLODLevels, 0);
+    const quadtreeSize = worldSize + visualMargin * 2;
+
+    expect(ranges[0]).toBeCloseTo((quadtreeSize / 2 ** maxLODLevels) * 4);
+    expect(ranges[0]).toBeGreaterThan(playableOnlyRanges[0]);
+    expect(ranges.at(-1)).toBeCloseTo(playableOnlyRanges.at(-1)! * (quadtreeSize / worldSize));
+  });
+
+  it('creates default terrain config with LOD ranges aligned to visual margin', () => {
+    const config = createTerrainConfig({
+      worldSize: 3200,
+      visualMargin: 200,
+      maxLODLevels: 6,
+    });
+
+    expect(config.lodRanges).toEqual(computeDefaultLODRanges(3200, 6, 200));
+  });
+
   it('keeps procedural terrain on the existing 4m target path', () => {
     const worldSize = 3200;
     const visualMargin = 200;

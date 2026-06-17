@@ -74,6 +74,13 @@ export interface TerrainRenderSubmissionStats {
   lastUpdateInstancesMs: number;
   forceInstanceUploadEnabled: boolean;
   forcedInstanceSubmissions: number;
+  playableWorldSize: number;
+  visualWorldSize: number;
+  visualMargin: number;
+  maxLODLevels: number;
+  lodRange0: number;
+  lodRangeLast: number;
+  lod0VertexSpacing: number;
   heightAwareFrustumEnabled: boolean;
   heightBoundsSource: TerrainHeightBoundsSource;
   selectionNodesVisited: number;
@@ -461,6 +468,10 @@ export class TerrainRenderRuntime {
   getSubmissionStatsForDebug(): TerrainRenderSubmissionStats {
     const shadowStats = this.renderer.getShadowPassStatsForDebug();
     const selectionStats = this.lastSelectionStats;
+    const visualWorldSize = this.config.worldSize + this.config.visualMargin * 2;
+    const tileQuads = Math.max(1, this.config.tileResolution - 1);
+    const lodRange0 = this.config.lodRanges[0] ?? 0;
+    const lodRangeLast = this.config.lodRanges[this.config.lodRanges.length - 1] ?? lodRange0;
     return {
       instanceSubmissions: this.instanceSubmissions,
       regularInstanceSubmissions: this.regularInstanceSubmissions,
@@ -478,6 +489,13 @@ export class TerrainRenderRuntime {
       lastUpdateInstancesMs: this.lastUpdateInstancesMs,
       forceInstanceUploadEnabled: isTerrainForceInstanceUploadEnabled(),
       forcedInstanceSubmissions: this.forcedInstanceSubmissions,
+      playableWorldSize: this.config.worldSize,
+      visualWorldSize,
+      visualMargin: this.config.visualMargin,
+      maxLODLevels: this.config.maxLODLevels,
+      lodRange0,
+      lodRangeLast,
+      lod0VertexSpacing: visualWorldSize / Math.pow(2, this.config.maxLODLevels) / tileQuads,
       heightAwareFrustumEnabled: this.shouldUseHeightAwareFrustum(),
       heightBoundsSource: this.heightBoundsSource,
       selectionNodesVisited: selectionStats?.nodesVisited ?? 0,

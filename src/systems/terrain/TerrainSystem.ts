@@ -880,7 +880,7 @@ export class TerrainSystem implements GameSystem {
 
   private recomputeLodConfig(): void {
     this.config.maxLODLevels = computeSourceAwareMaxLODLevels(this.config.worldSize, this.config.visualMargin, this.config.tileResolution - 1, undefined, this.heightSampleSpacingMeters);
-    this.surfaceRuntime.setLodRanges(this.config.lodRanges = computeDefaultLODRanges(this.config.worldSize, this.config.maxLODLevels));
+    this.surfaceRuntime.setLodRanges(this.config.lodRanges = computeDefaultLODRanges(this.config.worldSize, this.config.maxLODLevels, this.config.visualMargin));
   }
 
   private createVisualExtentProvider(provider: IHeightProvider): IHeightProvider {

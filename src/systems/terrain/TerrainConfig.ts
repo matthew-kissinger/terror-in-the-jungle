@@ -120,9 +120,15 @@ function clampCDLODLevels(levels: number): number {
 /**
  * Compute default LOD ranges from world size and max LOD levels.
  * lodRanges[i] = baseTileSize * 4 * 2^i
+ *
+ * The range authority is the render quadtree extent, not just the playable
+ * terrain extent. CDLOD renders the playable world plus its visual margin, and
+ * the shader computes morphs from these same ranges; using a smaller playable
+ * size makes margin/edge tiles transition on the wrong grid.
  */
-export function computeDefaultLODRanges(worldSize: number, maxLODLevels: number): number[] {
-  const baseTileSize = worldSize / Math.pow(2, maxLODLevels);
+export function computeDefaultLODRanges(worldSize: number, maxLODLevels: number, visualMargin = 0): number[] {
+  const quadtreeSize = worldSize + Math.max(0, visualMargin) * 2;
+  const baseTileSize = quadtreeSize / Math.pow(2, maxLODLevels);
   const ranges: number[] = [];
   for (let i = 0; i < maxLODLevels; i++) {
     ranges.push(baseTileSize * 4 * Math.pow(2, i));
@@ -141,7 +147,7 @@ export function createTerrainConfig(overrides: Partial<TerrainSystemConfig> = {}
     worldSize,
     visualMargin,
     maxLODLevels,
-    lodRanges: overrides.lodRanges ?? computeDefaultLODRanges(worldSize, maxLODLevels),
+    lodRanges: overrides.lodRanges ?? computeDefaultLODRanges(worldSize, maxLODLevels, visualMargin),
     tileResolution: overrides.tileResolution ?? 33,
     heightProvider: overrides.heightProvider ?? 'noise',
     splatmap: overrides.splatmap ?? DEFAULT_SPLATMAP,

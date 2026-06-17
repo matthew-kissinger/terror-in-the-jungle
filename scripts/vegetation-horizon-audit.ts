@@ -184,7 +184,7 @@ function analyzeMode(config: GameModeConfig): ModeHorizonEntry {
   const visualHalfExtent = config.worldSize / 2 + visualMargin;
   const cameraFar = config.cameraFar ?? DEFAULT_CAMERA_FAR_METERS;
   const terrainMaxLodLevels = computeMaxLODLevels(config.worldSize, visualMargin);
-  const terrainLodRanges = computeDefaultLODRanges(config.worldSize, terrainMaxLodLevels)
+  const terrainLodRanges = computeDefaultLODRanges(config.worldSize, terrainMaxLodLevels, visualMargin)
     .map((range) => roundMetric(range));
   const palette = resolvePalette(config);
   const maxPaletteDistance = maxOf(palette.map((entry) => entry.maxDistanceMeters));

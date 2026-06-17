@@ -46,6 +46,13 @@ type TerrainRenderDebugStatsLike = {
   tileFullSkirtTriangles?: unknown;
   lastMainPassTriangleEstimate?: unknown;
   lastShadowPassTriangleEstimate?: unknown;
+  playableWorldSize?: unknown;
+  visualWorldSize?: unknown;
+  visualMargin?: unknown;
+  maxLODLevels?: unknown;
+  lodRange0?: unknown;
+  lodRangeLast?: unknown;
+  lod0VertexSpacing?: unknown;
 };
 
 type TerrainDebugSource = {
@@ -149,6 +156,13 @@ export interface PresentationTerrainRenderEpoch {
   tileFullSkirtTriangles: number;
   lastMainPassTriangleEstimate: number;
   lastShadowPassTriangleEstimate: number;
+  playableWorldSize: number;
+  visualWorldSize: number;
+  visualMargin: number;
+  maxLODLevels: number;
+  lodRange0: number;
+  lodRangeLast: number;
+  lod0VertexSpacing: number;
 }
 
 export interface PresentationEpochContext {
@@ -477,6 +491,13 @@ function summarizeTerrainRender(source: TerrainDebugSource): PresentationTerrain
     tileFullSkirtTriangles: finiteNumber(stats.tileFullSkirtTriangles),
     lastMainPassTriangleEstimate: finiteNumber(stats.lastMainPassTriangleEstimate),
     lastShadowPassTriangleEstimate: finiteNumber(stats.lastShadowPassTriangleEstimate),
+    playableWorldSize: finiteNumber(stats.playableWorldSize),
+    visualWorldSize: finiteNumber(stats.visualWorldSize),
+    visualMargin: finiteNumber(stats.visualMargin),
+    maxLODLevels: finiteNumber(stats.maxLODLevels),
+    lodRange0: finiteNumber(stats.lodRange0),
+    lodRangeLast: finiteNumber(stats.lodRangeLast),
+    lod0VertexSpacing: finiteNumber(stats.lod0VertexSpacing),
   };
 }
 

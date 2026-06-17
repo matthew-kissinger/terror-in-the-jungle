@@ -857,6 +857,13 @@ type CaptureSummary = {
     terrainHeightBoundsTests?: number;
     terrainHeightBoundsFallbacks?: number;
     terrainHeightBoundsRejectedNodes?: number;
+    terrainPlayableWorldSize?: number;
+    terrainVisualWorldSize?: number;
+    terrainVisualMargin?: number;
+    terrainMaxLODLevels?: number;
+    terrainLodRange0?: number;
+    terrainLodRangeLast?: number;
+    terrainLod0VertexSpacing?: number;
     terrainFullSkirtsRequested: boolean;
     terrainSparseSkirtsRequested: boolean;
     terrainSkirtsDisabled: boolean;
@@ -6227,6 +6234,13 @@ async function runCapture(): Promise<void> {
       const runtimeTerrainHeightBoundsTests = terrainDebugNumber(latestTerrainDebug, 'selectionHeightBoundsTests');
       const runtimeTerrainHeightBoundsFallbacks = terrainDebugNumber(latestTerrainDebug, 'selectionHeightBoundsFallbacks');
       const runtimeTerrainHeightBoundsRejectedNodes = terrainDebugNumber(latestTerrainDebug, 'selectionHeightBoundsRejectedNodes');
+      const runtimeTerrainPlayableWorldSize = terrainDebugNumber(latestTerrainDebug, 'playableWorldSize');
+      const runtimeTerrainVisualWorldSize = terrainDebugNumber(latestTerrainDebug, 'visualWorldSize');
+      const runtimeTerrainVisualMargin = terrainDebugNumber(latestTerrainDebug, 'visualMargin');
+      const runtimeTerrainMaxLODLevels = terrainDebugNumber(latestTerrainDebug, 'maxLODLevels');
+      const runtimeTerrainLodRange0 = terrainDebugNumber(latestTerrainDebug, 'lodRange0');
+      const runtimeTerrainLodRangeLast = terrainDebugNumber(latestTerrainDebug, 'lodRangeLast');
+      const runtimeTerrainLod0VertexSpacing = terrainDebugNumber(latestTerrainDebug, 'lod0VertexSpacing');
       const summary: CaptureSummary = {
         startedAt,
         endedAt: nowIso(),
@@ -6316,6 +6330,13 @@ async function runCapture(): Promise<void> {
           terrainHeightBoundsTests: runtimeTerrainHeightBoundsTests,
           terrainHeightBoundsFallbacks: runtimeTerrainHeightBoundsFallbacks,
           terrainHeightBoundsRejectedNodes: runtimeTerrainHeightBoundsRejectedNodes,
+          terrainPlayableWorldSize: runtimeTerrainPlayableWorldSize,
+          terrainVisualWorldSize: runtimeTerrainVisualWorldSize,
+          terrainVisualMargin: runtimeTerrainVisualMargin,
+          terrainMaxLODLevels: runtimeTerrainMaxLODLevels,
+          terrainLodRange0: runtimeTerrainLodRange0,
+          terrainLodRangeLast: runtimeTerrainLodRangeLast,
+          terrainLod0VertexSpacing: runtimeTerrainLod0VertexSpacing,
           terrainFullSkirtsRequested: terrainFullSkirts,
           terrainSparseSkirtsRequested: terrainSparseSkirts,
           terrainSkirtsDisabled: disableTerrainSkirts,

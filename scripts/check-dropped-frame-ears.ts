@@ -261,6 +261,14 @@ function checkStatus(status: boolean, id: string, passMessage: string, failMessa
   };
 }
 
+function closeEnough(actual: number | null, expected: number | null): boolean {
+  if (actual === null || expected === null || !Number.isFinite(actual) || !Number.isFinite(expected)) {
+    return false;
+  }
+  const tolerance = Math.max(0.01, Math.abs(expected) * 0.000001);
+  return Math.abs(actual - expected) <= tolerance;
+}
+
 function rel(path: string): string {
   return relative(process.cwd(), path).replaceAll('\\', '/');
 }
@@ -462,6 +470,54 @@ function addTerrainHeightBoundsTrustChecks(
   });
 }
 
+function addTerrainVisualDomainTrustChecks(
+  checks: DroppedFrameEarsCheck[],
+  summary: Record<string, unknown> | null
+): void {
+  const playableWorldSize = getNumber(summary, ['perfRuntime', 'terrainPlayableWorldSize']);
+  const visualWorldSize = getNumber(summary, ['perfRuntime', 'terrainVisualWorldSize']);
+  const visualMargin = getNumber(summary, ['perfRuntime', 'terrainVisualMargin']);
+  const maxLODLevels = getNumber(summary, ['perfRuntime', 'terrainMaxLODLevels']);
+  const lodRange0 = getNumber(summary, ['perfRuntime', 'terrainLodRange0']);
+  const lodRangeLast = getNumber(summary, ['perfRuntime', 'terrainLodRangeLast']);
+  const lod0VertexSpacing = getNumber(summary, ['perfRuntime', 'terrainLod0VertexSpacing']);
+
+  const expectedVisualWorldSize = playableWorldSize !== null && visualMargin !== null
+    ? playableWorldSize + visualMargin * 2
+    : null;
+  const visualExtentAligned = closeEnough(visualWorldSize, expectedVisualWorldSize);
+  checks.push({
+    id: 'terrain_visual_world_size_alignment',
+    status: visualExtentAligned ? 'pass' : 'fail',
+    value: visualWorldSize,
+    message: visualExtentAligned
+      ? `Terrain visual world size matches playable extent plus margin (${visualWorldSize})`
+      : `Terrain visual world size is not aligned with playable extent plus margin (actual ${visualWorldSize ?? 'missing'}, expected ${expectedVisualWorldSize ?? 'missing'})`,
+  });
+
+  const lodCount = maxLODLevels !== null && Number.isInteger(maxLODLevels) && maxLODLevels > 0
+    ? maxLODLevels
+    : null;
+  const expectedLodRange0 = visualWorldSize !== null && lodCount !== null
+    ? (visualWorldSize / Math.pow(2, lodCount)) * 4
+    : null;
+  const expectedLodRangeLast = expectedLodRange0 !== null && lodCount !== null
+    ? expectedLodRange0 * Math.pow(2, lodCount - 1)
+    : null;
+  const rangesAligned = closeEnough(lodRange0, expectedLodRange0)
+    && closeEnough(lodRangeLast, expectedLodRangeLast)
+    && lod0VertexSpacing !== null
+    && lod0VertexSpacing > 0;
+  checks.push({
+    id: 'terrain_lod_ranges_visual_extent_alignment',
+    status: rangesAligned ? 'pass' : 'fail',
+    value: lodRange0,
+    message: rangesAligned
+      ? `Terrain LOD ranges are derived from the visual quadtree extent (LOD0 ${lodRange0}, last ${lodRangeLast})`
+      : `Terrain LOD ranges are not derived from the visual quadtree extent (LOD0 ${lodRange0 ?? 'missing'} expected ${expectedLodRange0 ?? 'missing'}, last ${lodRangeLast ?? 'missing'} expected ${expectedLodRangeLast ?? 'missing'}, spacing ${lod0VertexSpacing ?? 'missing'})`,
+  });
+}
+
 export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFrameEarsArtifactEvaluation {
   const absoluteArtifactDir = resolve(artifactDir);
   const summary = readJsonObject(join(absoluteArtifactDir, 'summary.json'));
@@ -535,6 +591,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
   addTerrainHeightBoundsTrustChecks(checks, summary);
+  addTerrainVisualDomainTrustChecks(checks, summary);
 
   checks.push({
     id: 'owner_visual_acceptance_required',

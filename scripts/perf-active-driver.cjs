@@ -979,6 +979,13 @@
       tileFullSkirtTriangles: finiteOrNull(value.tileFullSkirtTriangles),
       lastMainPassTriangleEstimate: finiteOrNull(value.lastMainPassTriangleEstimate),
       lastShadowPassTriangleEstimate: finiteOrNull(value.lastShadowPassTriangleEstimate),
+      playableWorldSize: finiteOrNull(value.playableWorldSize),
+      visualWorldSize: finiteOrNull(value.visualWorldSize),
+      visualMargin: finiteOrNull(value.visualMargin),
+      maxLODLevels: finiteOrNull(value.maxLODLevels),
+      lodRange0: finiteOrNull(value.lodRange0),
+      lodRangeLast: finiteOrNull(value.lodRangeLast),
+      lod0VertexSpacing: finiteOrNull(value.lod0VertexSpacing),
     };
   }
 
