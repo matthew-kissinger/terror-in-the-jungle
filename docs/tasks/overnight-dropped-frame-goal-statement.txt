@@ -46,6 +46,23 @@ Completion evidence required:
    and shooting-path work in the suspect set until artifacts narrow it.
 
 Latest static checkpoint:
+- Scenario ground-vehicle render-culling checkpoint:
+  `VehicleManager` now receives the runtime camera and render-culls only
+  unoccupied scenario ground-vehicle roots that are far/offscreen, while
+  leaving physics, seats, occupancy, minimap/state registration, collision
+  ownership, close vehicles, and occupied vehicles active. Concrete vehicle
+  classes expose an optional render root without changing `IVehicle`.
+  World-feature ground vehicles remain owned by `WorldFeatureSystem`'s existing
+  dynamic vehicle visibility optimizer, so the two cullers do not fight over
+  the same root. `WorldFeatureSystem` also tracks dynamic ground-vehicle
+  entries directly instead of scanning all spawned objects for each camera
+  visibility update. This preserves map scale, vehicle availability, combat
+  pressure, terrain/vegetation/weather/wildlife, draw distance policy, player
+  flow, and visual quality for visible/near/occupied vehicles. Source-stable
+  evidence on branch `task/dropped-frame-paired-evidence` at `c1b2a306`:
+  focused vehicle/world tests, `npm run validate:fast`, and `npm run build`
+  passed. It is not a proven dropped-frame win until fresh paired EARS captures
+  pass on a quiet machine.
 - Terrain skirt stability checkpoint:
   `CDLODRenderer` now uses adaptive edge-only skirts as the production default,
   driven by the quadtree `edgeSkirtMask` contract. This removes the legacy
