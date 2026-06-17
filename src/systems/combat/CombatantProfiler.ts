@@ -7,7 +7,7 @@ import type { CloseEngagementTelemetry } from './ai/AIStateEngage';
 import type { TargetAcquisitionTelemetry } from './ai/AITargetAcquisition';
 import type { TargetDistributionTelemetry } from './ClusterManager';
 import type { AiUpdateBreakdown, LosCallsiteTelemetry } from './CombatantAI';
-import type { BillboardUpdateProfile } from './CombatantRenderer';
+import type { BillboardUpdateProfile } from './CombatantCloseModelPolicy';
 
 interface CombatLineOfSightTelemetry {
   hits: number;

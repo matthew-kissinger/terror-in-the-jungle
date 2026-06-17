@@ -377,6 +377,37 @@ function addCombatChecks(checks: DroppedFrameEarsCheck[], validationChecks: read
   ));
 }
 
+function addMaterializationEnvelopeChecks(
+  checks: DroppedFrameEarsCheck[],
+  validationChecks: readonly ValidationCheck[],
+  summary: Record<string, unknown> | null
+): void {
+  const validationPressure = validationCheck(validationChecks, 'npc_materialization_pressure');
+  const peakCandidates = typeof validationPressure?.value === 'number'
+    ? validationPressure.value
+    : getNumber(summary, ['closeModelEnvelope', 'peakCandidatesWithinCloseRadius']);
+  const peakRendered = getNumber(summary, ['closeModelEnvelope', 'peakRenderedCloseModels']);
+  const samplesWithCandidates = getNumber(summary, ['closeModelEnvelope', 'samplesWithCandidates']);
+  const fallbackPassed = peakCandidates !== null
+    && peakRendered !== null
+    && samplesWithCandidates !== null
+    && peakCandidates >= 4
+    && peakRendered >= 2
+    && samplesWithCandidates >= 2;
+  const passed = validationPressure
+    ? validationPressure.status === 'pass'
+    : fallbackPassed;
+
+  checks.push({
+    id: 'npc_materialization_pressure',
+    status: passed ? 'pass' : 'fail',
+    value: peakCandidates,
+    message: passed
+      ? `NPC materialization pressure was represented (peak candidates=${peakCandidates ?? 'unknown'}, peak rendered=${peakRendered ?? 'unknown'}, samplesWithCandidates=${samplesWithCandidates ?? 'unknown'})`
+      : `NPC materialization pressure is missing or thin (peak candidates=${peakCandidates ?? 'missing'}, peak rendered=${peakRendered ?? 'missing'}, samplesWithCandidates=${samplesWithCandidates ?? 'missing'}); completion evidence must not close a materialization fix from low-contact route variance`,
+  });
+}
+
 function addHarnessEquivalenceChecks(checks: DroppedFrameEarsCheck[], validationChecks: readonly ValidationCheck[]): void {
   for (const id of HARNESS_EQUIVALENCE_IDS) {
     const check = validationCheck(validationChecks, id);
@@ -673,6 +704,7 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
 
   addRafChecks(checks, validationChecks, summary);
   addCombatChecks(checks, validationChecks);
+  addMaterializationEnvelopeChecks(checks, validationChecks, summary);
   addHarnessEquivalenceChecks(checks, validationChecks);
   addForbiddenRuntimeChecks(checks, summary, searchParams);
   addTerrainHeightBoundsTrustChecks(checks, summary);

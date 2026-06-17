@@ -50,6 +50,24 @@ import {
   type PixelForgeNpcWeaponRuntimeConfig,
 } from './PixelForgeNpcRuntime';
 import { getPixelForgeNpcViewTileForCamera } from './PixelForgeNpcView';
+import {
+  CLOSE_MODEL_PROMOTION_BUDGET_PER_FRAME,
+  compareCloseModelCandidates,
+  createCloseModelFallbackCounts,
+  createEmptyBillboardUpdateProfile,
+  createEmptyCloseModelRuntimeStats,
+  selectPreferredCloseModelCandidates,
+  type BillboardUpdateProfile,
+  type CloseModelCandidate,
+  type CloseModelFallbackReason,
+  type CloseModelFallbackRecord,
+  type CloseModelPrewarmOptions,
+  type CloseModelPrewarmSummary,
+  type CloseModelRuntimeStats,
+  type CombatantMaterializationReason,
+  type CombatantMaterializationRenderMode,
+  type CombatantMaterializationRow,
+} from './CombatantCloseModelPolicy';
 
 /**
  * Per-clip impostor metadata used by velocity-keyed cadence. Mirrors the values
@@ -92,6 +110,9 @@ function clamp01(value: number): number {
 
 function markInstancedMatrixDirty(mesh: THREE.InstancedMesh, activeCount: number): void {
   const attribute = mesh.instanceMatrix;
+  if (typeof attribute.clearUpdateRanges === 'function') {
+    attribute.clearUpdateRanges();
+  }
   if (activeCount > 0 && typeof attribute.addUpdateRange === 'function') {
     attribute.addUpdateRange(0, activeCount * attribute.itemSize);
   }
@@ -144,208 +165,6 @@ function isNpcCloseModelPerfIsolationEnabled(): boolean {
   }
 }
 
-export type CloseModelFallbackReason = 'perf-isolation' | 'pool-loading' | 'pool-empty' | 'total-cap';
-export type CombatantMaterializationRenderMode = 'close-glb' | 'impostor' | 'culled';
-
-interface CloseModelCandidate {
-  combatant: Combatant;
-  distanceSq: number;
-  poolKey: PixelForgeNpcPoolKey;
-  isOnScreen: boolean;
-  recentlyVisible: boolean;
-  isPlayerSquad: boolean;
-  /**
-   * True when the actor lies inside `hardNearReserveDistanceMeters`. Cluster
-   * density of these actors drives the close-model reserve above the steady
-   * cap. Real-time signal, not a spawn-time snapshot.
-   */
-  isInHardNearReserveBubble: boolean;
-  /**
-   * True when the combatant is in active combat (ENGAGING / SUPPRESSING /
-   * ADVANCING). Phase F budget arbiter v1 priority signal: an active-combat
-   * actor at the edge of the close radius should outrank a non-combat actor
-   * closer to the player.
-   */
-  isInActiveCombat: boolean;
-  priorityScore: number;
-}
-
-function compareCloseModelCandidates(a: CloseModelCandidate, b: CloseModelCandidate): number {
-  return b.priorityScore - a.priorityScore
-    || a.distanceSq - b.distanceSq
-    || a.combatant.id.localeCompare(b.combatant.id);
-}
-
-function selectPreferredCloseModelCandidates(
-  candidates: CloseModelCandidate[],
-  limit: number,
-  target: CloseModelCandidate[] = [],
-): CloseModelCandidate[] {
-  const boundedLimit = Math.max(0, Math.floor(limit));
-  target.length = 0;
-  if (boundedLimit === 0 || candidates.length === 0) return target;
-  if (candidates.length <= boundedLimit) {
-    for (const candidate of candidates) {
-      target.push(candidate);
-    }
-    target.sort(compareCloseModelCandidates);
-    return target;
-  }
-
-  for (const candidate of candidates) {
-    let insertAt = target.length;
-    while (
-      insertAt > 0
-      && compareCloseModelCandidates(candidate, target[insertAt - 1]) < 0
-    ) {
-      insertAt--;
-    }
-    if (insertAt >= boundedLimit && target.length >= boundedLimit) continue;
-
-    const nextLength = Math.min(target.length + 1, boundedLimit);
-    for (let i = nextLength - 1; i > insertAt; i--) {
-      target[i] = target[i - 1];
-    }
-    target[insertAt] = candidate;
-    target.length = nextLength;
-  }
-  return target;
-}
-
-export interface CloseModelFallbackRecord {
-  combatantId: string;
-  poolKey: PixelForgeNpcPoolKey;
-  distanceMeters: number;
-  reason: CloseModelFallbackReason;
-}
-
-export interface CloseModelRuntimeStats {
-  closeRadiusMeters: number;
-  closeModelActiveCap: number;
-  candidatesWithinCloseRadius: number;
-  renderedCloseModels: number;
-  activeCloseModels: number;
-  fallbackCount: number;
-  fallbackCounts: Record<CloseModelFallbackReason, number>;
-  nearestFallbackDistanceMeters: number | null;
-  farthestFallbackDistanceMeters: number | null;
-  poolLoads: number;
-  poolTargets: Record<string, number>;
-  poolAvailable: Record<string, number>;
-}
-
-/**
- * Why a combatant is at its current render lane. Surfaced via
- * `window.npcMaterializationProfile()` for the crop probe and Phase F
- * budget-arbiter diagnostics. The string is parseable: the slot before the
- * colon is the render lane (`close-glb` / `impostor` / `culled`), the slot
- * after the colon is the specific reason within that lane.
- *
- * Examples:
- * - `close-glb:active` — combatant has a live close-GLB instance this frame.
- * - `impostor:total-cap` — close-radius candidate displaced by the cap.
- * - `impostor:pool-empty` — close-radius candidate with no pool slot available.
- * - `impostor:pool-loading` — close-radius candidate while pool grows lazily.
- * - `impostor:perf-isolation` — close-models disabled by perf-isolation flag.
- * - `impostor:beyond-close-radius` — outside the 120 m close radius.
- * - `impostor:not-prioritized` — inside close radius but not in the top-N
- *   prospective set (rare with the hard-near reserve, possible at scale).
- * - `culled:lod-culled` — sim LOD says CULLED; no draw.
- * - `culled:no-billboard` — no billboardIndex assigned this frame.
- */
-export type CombatantMaterializationReason = string;
-
-export interface CombatantMaterializationRow {
-  combatantId: string;
-  faction: Faction;
-  state: CombatantState;
-  simLane: Combatant['simLane'];
-  distanceMeters: number;
-  position: { x: number; y: number; z: number };
-  renderMode: CombatantMaterializationRenderMode;
-  clipId: PixelForgeNpcClipId;
-  poolKey: PixelForgeNpcPoolKey;
-  isPlayerSquad: boolean;
-  billboardIndex: number | null;
-  hasCloseModelWeapon: boolean;
-  closeFallbackReason: CloseModelFallbackReason | null;
-  /** Parseable render-lane reason; see {@link CombatantMaterializationReason}. */
-  reason: CombatantMaterializationReason;
-  /**
-   * True when the combatant is in an active firefight (engaging, suppressing,
-   * or advancing). Phase F budget-arbiter input: these combatants should
-   * remain render-close even at the edge of the close radius.
-   */
-  inActiveCombat: boolean;
-}
-
-export interface CloseModelPrewarmOptions {
-  maxActive?: number;
-  primeFactionAssets?: boolean;
-}
-
-export interface CloseModelPrewarmSummary {
-  skippedReason: 'none' | 'perf-isolation' | 'no-candidates';
-  candidatesWithinCloseRadius: number;
-  requestedPoolTargets: Record<string, number>;
-  primedAssetPaths: number;
-  renderedCloseModels: number;
-  fallbackCount: number;
-  fallbackCounts: Record<CloseModelFallbackReason, number>;
-  poolLoads: number;
-  durationMs: number;
-}
-
-export interface BillboardUpdateProfile {
-  walkFrameMs: number;
-  closeModelMs: number;
-  bucketResetMs: number;
-  impostorWriteMs: number;
-  finalizeMs: number;
-  hitboxDebugMs: number;
-  materializationEventsMs: number;
-  shaderUniformMs: number;
-}
-
-function createEmptyBillboardUpdateProfile(): BillboardUpdateProfile {
-  return {
-    walkFrameMs: 0,
-    closeModelMs: 0,
-    bucketResetMs: 0,
-    impostorWriteMs: 0,
-    finalizeMs: 0,
-    hitboxDebugMs: 0,
-    materializationEventsMs: 0,
-    shaderUniformMs: 0,
-  };
-}
-
-function createCloseModelFallbackCounts(): Record<CloseModelFallbackReason, number> {
-  return {
-    'perf-isolation': 0,
-    'pool-loading': 0,
-    'pool-empty': 0,
-    'total-cap': 0,
-  };
-}
-
-function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
-  return {
-    closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
-    closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
-    candidatesWithinCloseRadius: 0,
-    renderedCloseModels: 0,
-    activeCloseModels: 0,
-    fallbackCount: 0,
-    fallbackCounts: createCloseModelFallbackCounts(),
-    nearestFallbackDistanceMeters: null,
-    farthestFallbackDistanceMeters: null,
-    poolLoads: 0,
-    poolTargets: {},
-    poolAvailable: {},
-  };
-}
-
 interface CloseModelInstance {
   root: THREE.Group;
   mixer: THREE.AnimationMixer;
@@ -386,6 +205,74 @@ interface CloseModelMaterialState {
   depthWrite: boolean;
 }
 
+function queueCloseModelPoolGrowthForDeferredDemand(
+  candidates: CloseModelCandidate[],
+  activeCloseModels: Map<string, CloseModelInstance>,
+  closeModelPools: Map<PixelForgeNpcPoolKey, CloseModelInstance[]>,
+  demandByPool: Map<PixelForgeNpcPoolKey, number>,
+  queuePoolGrowth: (poolKey: PixelForgeNpcPoolKey) => boolean,
+): void {
+  demandByPool.clear();
+  for (const candidate of candidates) {
+    const active = activeCloseModels.get(candidate.combatant.id);
+    if (active?.poolKey === candidate.poolKey) continue;
+    demandByPool.set(candidate.poolKey, (demandByPool.get(candidate.poolKey) ?? 0) + 1);
+  }
+
+  for (const [poolKey, demand] of demandByPool) {
+    const available = closeModelPools.get(poolKey)?.length ?? 0;
+    if (available < demand) {
+      queuePoolGrowth(poolKey);
+    }
+  }
+}
+
+function resolveCloseModelPromotionBudget(
+  overrideBudget: number | null,
+  effectiveActiveCap: number,
+): number {
+  const requested = overrideBudget ?? CLOSE_MODEL_PROMOTION_BUDGET_PER_FRAME;
+  return Math.max(0, Math.min(effectiveActiveCap, Math.floor(requested)));
+}
+
+function releaseLowerPriorityStickyCloseModel(
+  candidate: CloseModelCandidate,
+  stickyActiveCandidates: CloseModelCandidate[],
+  selected: Set<string>,
+  activeCloseModels: Map<string, CloseModelInstance>,
+  releaseCloseModel: (combatantId: string, instance: CloseModelInstance) => void,
+): boolean {
+  for (let i = stickyActiveCandidates.length - 1; i >= 0; i--) {
+    const stickyCandidate = stickyActiveCandidates[i];
+    const stickyId = stickyCandidate.combatant.id;
+    if (!selected.has(stickyId)) continue;
+    if (compareCloseModelCandidates(candidate, stickyCandidate) >= 0) continue;
+
+    const instance = activeCloseModels.get(stickyId);
+    if (!instance) continue;
+    releaseCloseModel(stickyId, instance);
+    selected.delete(stickyId);
+    return true;
+  }
+  return false;
+}
+
+function resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requestedMaxActive?: number): number {
+  const hardNearReserveCount = candidates.reduce(
+    (count, candidate) => count + (candidate.isInHardNearReserveBubble ? 1 : 0),
+    0,
+  );
+  const extraCap = Math.min(
+    Math.max(0, Math.floor(PixelForgeNpcDistanceConfig.hardNearReserveExtraCap)),
+    Math.max(0, hardNearReserveCount - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
+  );
+  const effectiveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + extraCap;
+  if (requestedMaxActive === undefined) {
+    return effectiveCap;
+  }
+  return Math.max(0, Math.min(effectiveCap, Math.floor(requestedMaxActive)));
+}
+
 export class CombatantRenderer {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -412,6 +299,8 @@ export class CombatantRenderer {
   private readonly closeModelSuppressedImpostorIds = new Set<string>();
   private readonly closeModelProspectiveIds = new Set<string>();
   private readonly closeModelPreferredCandidates: CloseModelCandidate[] = [];
+  private readonly closeModelCandidateById = new Map<string, CloseModelCandidate>();
+  private readonly closeModelStickyActiveCandidates: CloseModelCandidate[] = [];
   private readonly closeModelDemandByPool = new Map<PixelForgeNpcPoolKey, number>();
   private readonly stableHashByCombatantId = new Map<string, number>();
   // Tracks the most recent wall-clock time (ms) at which each combatant was on-screen.
@@ -422,6 +311,7 @@ export class CombatantRenderer {
   // NPCs cycle frames at a cadence of `framesPerMeter`.
   private readonly impostorFrameAccumulator = new Map<string, number>();
   private closeModelRuntimeStats = createEmptyCloseModelRuntimeStats();
+  private closeModelPromotionBudgetOverride: number | null = null;
   /**
    * Per-combatant render mode observed at the end of the previous
    * updateBillboards. Phase F slice 6 (tier-transition events) diffs this
@@ -729,7 +619,7 @@ export class CombatantRenderer {
       return emptySummary('no-candidates', 0, primedAssetPaths);
     }
 
-    const maxActive = this.resolveCloseModelActiveCap(candidates, options.maxActive);
+    const maxActive = resolveCloseModelActiveCap(candidates, options.maxActive);
     if (maxActive <= 0) {
       return emptySummary('perf-isolation', candidates.length, primedAssetPaths);
     }
@@ -756,7 +646,12 @@ export class CombatantRenderer {
       await this.createCloseModelPool(poolKey, getPixelForgeNpcRuntimeFaction(poolKey), target);
     }
 
-    this.updateBillboards(combatants, playerPosition);
+    this.closeModelPromotionBudgetOverride = maxActive;
+    try {
+      this.updateBillboards(combatants, playerPosition);
+    } finally {
+      this.closeModelPromotionBudgetOverride = null;
+    }
     const stats = this.getCloseModelRuntimeStats();
     return {
       skippedReason: 'none',
@@ -1277,38 +1172,95 @@ export class CombatantRenderer {
       };
     }
 
-    const selected = this.closeModelSelectedIds;
-    const effectiveActiveCap = this.resolveCloseModelActiveCap(candidates);
+    const effectiveActiveCap = resolveCloseModelActiveCap(candidates);
     const prospectiveCandidates = selectPreferredCloseModelCandidates(
       candidates,
       effectiveActiveCap,
       this.closeModelPreferredCandidates,
     );
+    queueCloseModelPoolGrowthForDeferredDemand(
+      prospectiveCandidates,
+      this.activeCloseModels,
+      this.closeModelPools,
+      this.closeModelDemandByPool,
+      poolKey => this.queueCloseModelPoolGrowth(poolKey),
+    );
+    const promotionBudget = resolveCloseModelPromotionBudget(
+      this.closeModelPromotionBudgetOverride,
+      effectiveActiveCap,
+    );
+    let promotionBudgetRemaining = promotionBudget;
+    let promotionsThisFrame = 0;
+    let replacementsThisFrame = 0;
 
-    // Pre-pass: release any active close model whose combatant is not in this
-    // frame's top-`effectiveActiveCap` prospective set. The candidates list is
-    // already sorted by priority. Without this pre-pass, prior-frame actives
-    // hold pool slots through the iteration below, and new higher-priority
-    // candidates of the same faction can hit a phantom `pool-empty` even when
-    // the released slot would have served them. Pre-releasing eliminates that
-    // cross-frame churn artifact without changing the overall behavior for
-    // steady-state frames (no actives outside prospective ⇒ no releases here).
+    const selected = this.closeModelSelectedIds;
     const prospectiveIds = this.closeModelProspectiveIds;
+    const candidateById = this.closeModelCandidateById;
+    const stickyActiveCandidates = this.closeModelStickyActiveCandidates;
+    candidateById.clear();
+    stickyActiveCandidates.length = 0;
+    for (const candidate of candidates) {
+      candidateById.set(candidate.combatant.id, candidate);
+    }
     for (const candidate of prospectiveCandidates) prospectiveIds.add(candidate.combatant.id);
+
     this.activeCloseModels.forEach((instance, combatantId) => {
-      if (!prospectiveIds.has(combatantId)) {
+      const candidate = candidateById.get(combatantId);
+      if (!candidate) {
         this.releaseCloseModel(combatantId, instance);
+        return;
+      }
+      if (prospectiveIds.has(combatantId)) {
+        selected.add(combatantId);
+      } else {
+        stickyActiveCandidates.push(candidate);
       }
     });
+    stickyActiveCandidates.sort(compareCloseModelCandidates);
+    for (const candidate of stickyActiveCandidates) {
+      if (selected.size >= effectiveActiveCap) break;
+      selected.add(candidate.combatant.id);
+    }
 
     const orderedCandidates = this.canServeCloseModelCandidates(prospectiveCandidates)
       ? prospectiveCandidates
       : candidates.sort(compareCloseModelCandidates);
 
     for (const candidate of orderedCandidates) {
-      if (selected.size >= effectiveActiveCap) {
+      if (selected.has(candidate.combatant.id)) {
+        continue;
+      }
+      if (!prospectiveIds.has(candidate.combatant.id)) {
         this.recordCloseModelFallback(candidate, 'total-cap');
         this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'total-cap');
+        continue;
+      }
+      if (selected.size >= effectiveActiveCap) {
+        if (
+          promotionBudgetRemaining <= 0
+          || !releaseLowerPriorityStickyCloseModel(
+            candidate,
+            stickyActiveCandidates,
+            selected,
+            this.activeCloseModels,
+            (combatantId, instance) => this.releaseCloseModel(combatantId, instance),
+          )
+        ) {
+          const reason: CloseModelFallbackReason = prospectiveIds.has(candidate.combatant.id)
+            ? 'promotion-budget'
+            : 'total-cap';
+          this.recordCloseModelFallback(candidate, reason);
+          this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, reason);
+          continue;
+        }
+        replacementsThisFrame++;
+      }
+      if (promotionBudgetRemaining <= 0) {
+        const reason: CloseModelFallbackReason = prospectiveIds.has(candidate.combatant.id)
+          ? 'promotion-budget'
+          : 'total-cap';
+        this.recordCloseModelFallback(candidate, reason);
+        this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, reason);
         continue;
       }
       const instance = this.ensureCloseModel(candidate.combatant.id, candidate.poolKey);
@@ -1323,28 +1275,43 @@ export class CombatantRenderer {
         continue;
       }
       selected.add(candidate.combatant.id);
-      this.updateCloseModelInstance(instance, candidate.combatant, candidate.poolKey);
+      promotionsThisFrame++;
+      promotionBudgetRemaining--;
     }
 
-    if (orderedCandidates === prospectiveCandidates && selected.size >= effectiveActiveCap) {
-      for (const candidate of candidates) {
-        if (selected.has(candidate.combatant.id)) continue;
-        this.recordCloseModelFallback(candidate, 'total-cap');
-        this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, 'total-cap');
+    for (const candidate of candidates) {
+      if (selected.has(candidate.combatant.id) || this.closeModelFallbackRecords.has(candidate.combatant.id)) {
+        continue;
       }
+      const reason: CloseModelFallbackReason = prospectiveIds.has(candidate.combatant.id)
+        ? 'promotion-budget'
+        : 'total-cap';
+      this.recordCloseModelFallback(candidate, reason);
+      this.reportCloseModelOverflowOnce(candidate.poolKey, candidate.distanceSq, reason);
     }
 
-    // Second release pass catches active models that lost their slot during
-    // iteration (e.g., total-cap displaced them after the pre-pass admitted
-    // them). The pre-pass handles most cases; this guards against the edge
-    // where prospectiveIds does not exactly match the final selected set.
+    this.activeCloseModels.forEach((instance, combatantId) => {
+      if (!selected.has(combatantId)) return;
+      const candidate = candidateById.get(combatantId);
+      if (candidate) {
+        this.updateCloseModelInstance(instance, candidate.combatant, candidate.poolKey);
+      }
+    });
+
     this.activeCloseModels.forEach((instance, combatantId) => {
       if (!selected.has(combatantId)) {
         this.releaseCloseModel(combatantId, instance);
       }
     });
 
-    this.captureCloseModelRuntimeStats(candidates.length, selected.size, effectiveActiveCap);
+    this.captureCloseModelRuntimeStats(
+      candidates.length,
+      selected.size,
+      effectiveActiveCap,
+      promotionBudget,
+      promotionsThisFrame,
+      replacementsThisFrame,
+    );
     return {
       closeModelIds: selected,
       suppressedImpostorIds: this.closeModelSuppressedImpostorIds,
@@ -1418,22 +1385,6 @@ export class CombatantRenderer {
     return true;
   }
 
-  private resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requestedMaxActive?: number): number {
-    const hardNearReserveCount = candidates.reduce(
-      (count, candidate) => count + (candidate.isInHardNearReserveBubble ? 1 : 0),
-      0,
-    );
-    const extraCap = Math.min(
-      Math.max(0, Math.floor(PixelForgeNpcDistanceConfig.hardNearReserveExtraCap)),
-      Math.max(0, hardNearReserveCount - PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP),
-    );
-    const effectiveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP + extraCap;
-    if (requestedMaxActive === undefined) {
-      return effectiveCap;
-    }
-    return Math.max(0, Math.min(effectiveCap, Math.floor(requestedMaxActive)));
-  }
-
   /**
    * Recompute the camera frustum for this update tick. Cheap (one matrix
    * multiply) and lets selection / visibility checks reuse the same value.
@@ -1472,6 +1423,9 @@ export class CombatantRenderer {
     candidatesWithinCloseRadius: number,
     renderedCloseModels: number,
     closeModelActiveCap = PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+    promotionBudgetPerFrame = CLOSE_MODEL_PROMOTION_BUDGET_PER_FRAME,
+    promotionsThisFrame = 0,
+    replacementsThisFrame = 0,
   ): void {
     const fallbackCounts = createCloseModelFallbackCounts();
     const distances: number[] = [];
@@ -1492,6 +1446,9 @@ export class CombatantRenderer {
     this.closeModelRuntimeStats = {
       closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
       closeModelActiveCap,
+      promotionBudgetPerFrame,
+      promotionsThisFrame,
+      replacementsThisFrame,
       candidatesWithinCloseRadius,
       renderedCloseModels,
       activeCloseModels: this.activeCloseModels.size,

@@ -21,6 +21,7 @@ type ArtifactOptions = {
   presentationTerrainOverrides?: Record<string, unknown>;
   presentationGapCount?: number;
   harnessWarnings?: boolean;
+  thinMaterializationPressure?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -35,6 +36,10 @@ function tempArtifact(options: ArtifactOptions): string {
   const measurementTrust = options.measurementTrust ?? 'pass';
   const status = options.status ?? 'ok';
   const harnessWarningStatus = options.harnessWarnings ? 'warn' : 'pass';
+  const materializationPeakCandidates = options.thinMaterializationPressure ? 1 : 5;
+  const materializationPeakRendered = options.thinMaterializationPressure ? 1 : 4;
+  const materializationSamplesWithCandidates = options.thinMaterializationPressure ? 1 : 3;
+  const materializationStatus = options.thinMaterializationPressure ? 'warn' : 'pass';
   const checks = [
     { id: 'raf_stutter_25ms_percent', status: 'pass', value: 0.1, message: 'ok' },
     { id: 'raf_hitch_33ms_percent', status: 'pass', value: 0.1, message: 'ok' },
@@ -42,6 +47,7 @@ function tempArtifact(options: ArtifactOptions): string {
     { id: 'raf_dropped_frame_time_60hz_ms_per_second', status: 'pass', value: 0.2, message: 'ok' },
     { id: 'harness_min_shots_fired', status: 'pass', value: 80, message: 'ok' },
     { id: 'harness_min_hits_recorded', status: 'pass', value: 9, message: 'ok' },
+    { id: 'npc_materialization_pressure', status: materializationStatus, value: materializationPeakCandidates, message: 'ok' },
     { id: 'harness_route_snap_trust', status: harnessWarningStatus, value: 0, message: 'ok' },
     { id: 'harness_frontline_compression_equivalence', status: harnessWarningStatus, value: 0, message: 'ok' },
     { id: 'harness_movement_mode_equivalence', status: harnessWarningStatus, value: 0, message: 'ok' },
@@ -60,6 +66,18 @@ function tempArtifact(options: ArtifactOptions): string {
       rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
     },
     rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
+    closeModelEnvelope: {
+      sampleCount: 8,
+      samplesWithCandidates: materializationSamplesWithCandidates,
+      samplesWithRenderedCloseModels: materializationSamplesWithCandidates,
+      peakCandidatesWithinCloseRadius: materializationPeakCandidates,
+      peakRenderedCloseModels: materializationPeakRendered,
+      peakActiveCloseModels: materializationPeakRendered,
+      peakFallbackCount: 1,
+      peakPromotionsThisFrame: 2,
+      peakReplacementsThisFrame: 1,
+      promotionBudgetPerFrame: 2,
+    },
     perfRuntime: {
       presentationContextCapture: true,
       frontlineCompressionRequested: false,
@@ -131,6 +149,19 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.classification).toBe('diagnostic');
     expect(artifact.checks.some((check) => check.id === 'measurement_trust_pass' && check.status === 'fail')).toBe(true);
     expect(artifact.checks.some((check) => check.id === 'harness_route_snap_trust' && check.status === 'fail')).toBe(true);
+  });
+
+  it('keeps low-contact artifacts diagnostic for materialization claims', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      thinMaterializationPressure: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_pressure'
+      && check.status === 'fail'
+    ))).toBe(true);
   });
 
   it('rejects content-reduction runtime variants even when frame metrics pass', () => {

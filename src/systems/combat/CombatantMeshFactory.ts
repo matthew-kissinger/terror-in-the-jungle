@@ -337,6 +337,9 @@ function markInstancedAttributeDirty(attribute: THREE.InstancedBufferAttribute, 
   const count = activeCount === undefined
     ? attribute.count
     : Math.max(0, Math.min(attribute.count, activeCount));
+  if (typeof attribute.clearUpdateRanges === 'function') {
+    attribute.clearUpdateRanges();
+  }
   if (count > 0 && typeof attribute.addUpdateRange === 'function') {
     attribute.addUpdateRange(0, count * attribute.itemSize);
   }

@@ -45,6 +45,10 @@ Executable scaffold:
   failed trust, WebGPU fallback, missing real combat, missing required files,
   failed rAF gates, and harness-equivalence warnings as diagnostic rather than
   completion evidence.
+- A Shau captures can vary naturally because the driver does not always reach
+  sustained combat or close-model pressure on every run, so materialization and
+  combat-frame claims require pressure evidence instead of assuming identical
+  scenario load across attempts.
 - A passing checker result is still local artifact proof only. Owner playtest,
   terrain/camera visual acceptance, exact-head CI, deploy, and
   `check:live-release` remain required before production completion.
@@ -69,6 +73,7 @@ Executable scaffold:
 | ST4-PERF-014 | Complex | When a local candidate passes static validation while runtime proof is missing, the agent shall call it source-stable but unproven. | `validate:fast` and relevant focused checks pass, but STABILIZAT-4 remains open. | command output, `docs/DIRECTIVES.md` |
 | ST4-PERF-015 | Complex | When both required scenarios pass locally while default content is preserved, the agent shall run release proof before claiming production completion. | Exact-head CI, deploy, `check:live-release`, and owner playtest pass. | CI/deploy URLs, release proof JSON |
 | ST4-PERF-016 | Event-driven | When an agent evaluates saved dropped-frame artifacts, the repo shall provide an executable artifact classifier instead of relying on hand-scanned summaries. | `npm run check:dropped-frame-ears -- --dir <ashau> --dir <openfrontier> --strict` exits 0 only when both scenarios pass the EARS completion artifact gate. | `scripts/check-dropped-frame-ears.ts`, CLI output |
+| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` passes: at least several close candidates are sampled for more than one interval and close models are actually rendered. Thin-contact captures remain diagnostic for materialization even when shots/hits pass. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 
 ## Candidate Classification
 
@@ -78,7 +83,8 @@ Executable scaffold:
 - Source-stable candidate: focused tests, typecheck/lint/build, and
   `validate:fast` pass, but trusted completion-lane captures are missing.
 - Diagnostic signal: a run or probe explains direction but fails trust, lacks
-  combat, uses a diagnostic flag, falls back renderer, or has material harness
+  combat, lacks close-model materialization pressure for a materialization
+  claim, uses a diagnostic flag, falls back renderer, or has material harness
   equivalence warnings.
 - Rejected path: the change fails same-experience invariants, does not move
   trusted dropped-frame evidence, or relies on a harness bypass.

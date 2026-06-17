@@ -111,6 +111,9 @@ type LoopFrameBreakdownSample = {
 type RuntimeCloseModelStats = {
   closeRadiusMeters: number;
   closeModelActiveCap: number;
+  promotionBudgetPerFrame: number;
+  promotionsThisFrame: number;
+  replacementsThisFrame: number;
   candidatesWithinCloseRadius: number;
   renderedCloseModels: number;
   activeCloseModels: number;
@@ -859,6 +862,7 @@ type CaptureSummary = {
   droppedFrameMetrics?: DroppedFrameSummary;
   renderSubmissionMetrics?: RenderSubmissionSummary;
   materializationTierMetrics?: MaterializationTierEventSummary;
+  closeModelEnvelope?: CloseModelEnvelopeSummary;
   presentationGapContexts?: PresentationGapContextSummary;
   sceneAttribution?: SceneAttributionEntry[];
   startupTiming?: {
@@ -1018,6 +1022,19 @@ type MaterializationTierEventSummary = {
     byTransition: Record<string, number>;
     byReason: Record<string, number>;
   };
+};
+
+type CloseModelEnvelopeSummary = {
+  sampleCount: number;
+  samplesWithCandidates: number;
+  samplesWithRenderedCloseModels: number;
+  peakCandidatesWithinCloseRadius: number;
+  peakRenderedCloseModels: number;
+  peakActiveCloseModels: number;
+  peakFallbackCount: number;
+  peakPromotionsThisFrame: number;
+  peakReplacementsThisFrame: number;
+  promotionBudgetPerFrame: number | null;
 };
 
 type ShotPresentationContextStats = {
@@ -2491,6 +2508,28 @@ function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): Ma
   };
 }
 
+function summarizeCloseModelEnvelope(runtimeSamples: RuntimeSample[]): CloseModelEnvelopeSummary | undefined {
+  const samples = runtimeSamples
+    .map((sample) => sample.closeModelStats)
+    .filter((stats): stats is RuntimeCloseModelStats => Boolean(stats));
+  if (samples.length === 0) {
+    return undefined;
+  }
+
+  return {
+    sampleCount: samples.length,
+    samplesWithCandidates: samples.filter((stats) => stats.candidatesWithinCloseRadius > 0).length,
+    samplesWithRenderedCloseModels: samples.filter((stats) => stats.renderedCloseModels > 0).length,
+    peakCandidatesWithinCloseRadius: Math.max(...samples.map((stats) => stats.candidatesWithinCloseRadius)),
+    peakRenderedCloseModels: Math.max(...samples.map((stats) => stats.renderedCloseModels)),
+    peakActiveCloseModels: Math.max(...samples.map((stats) => stats.activeCloseModels)),
+    peakFallbackCount: Math.max(...samples.map((stats) => stats.fallbackCount)),
+    peakPromotionsThisFrame: Math.max(...samples.map((stats) => stats.promotionsThisFrame)),
+    peakReplacementsThisFrame: Math.max(...samples.map((stats) => stats.replacementsThisFrame)),
+    promotionBudgetPerFrame: samples.find((stats) => stats.promotionBudgetPerFrame > 0)?.promotionBudgetPerFrame ?? null,
+  };
+}
+
 function collectHarnessShotEpochs(
   runtimeSamples: RuntimeSample[],
   harnessDriverFinal?: HarnessDriverFinal | null,
@@ -2820,6 +2859,7 @@ function validateRun(
     sampleIntervalMs?: number;
     modeThresholds?: HarnessModeThresholds | null;
     harnessDriverFinal?: HarnessDriverFinal | null;
+    requireCloseModelEnvelope?: boolean;
   }
 ): ValidationReport {
   const checks: ValidationCheck[] = [];
@@ -3118,6 +3158,25 @@ function validateRun(
         : (peakHitRate >= 0.01 ? 'pass' : 'warn'),
       value: peakHitRate,
       message: `Peak hit rate ${(peakHitRate * 100).toFixed(2)}%`
+    });
+  }
+
+  if (options?.requireCloseModelEnvelope) {
+    const envelope = summarizeCloseModelEnvelope(runtimeSamples);
+    const peakCandidates = envelope?.peakCandidatesWithinCloseRadius ?? 0;
+    const samplesWithCandidates = envelope?.samplesWithCandidates ?? 0;
+    const peakRendered = envelope?.peakRenderedCloseModels ?? 0;
+    const materializationPressureObserved =
+      peakCandidates >= 4
+      && samplesWithCandidates >= 2
+      && peakRendered >= 2;
+    checks.push({
+      id: 'npc_materialization_pressure',
+      status: materializationPressureObserved ? 'pass' : 'warn',
+      value: peakCandidates,
+      message: materializationPressureObserved
+        ? `NPC close-model materialization pressure observed (peak candidates=${peakCandidates}, peak rendered=${peakRendered}, samplesWithCandidates=${samplesWithCandidates})`
+        : `NPC close-model materialization pressure was thin (peak candidates=${peakCandidates}, peak rendered=${peakRendered}, samplesWithCandidates=${samplesWithCandidates}); this run is diagnostic for materialization pacing and may reflect A Shau route/contact variance`
     });
   }
 
@@ -5502,40 +5561,43 @@ async function runCapture(): Promise<void> {
             weather: normalizeWeatherDebug(weatherDebug),
             closeModelStats: closeModelStats && typeof closeModelStats === 'object'
               ? {
-                  closeRadiusMeters: Number(closeModelStats.closeRadiusMeters ?? 0),
-                  closeModelActiveCap: Number(closeModelStats.closeModelActiveCap ?? 0),
-                  candidatesWithinCloseRadius: Number(closeModelStats.candidatesWithinCloseRadius ?? 0),
-                  renderedCloseModels: Number(closeModelStats.renderedCloseModels ?? 0),
-                  activeCloseModels: Number(closeModelStats.activeCloseModels ?? 0),
-                  fallbackCount: Number(closeModelStats.fallbackCount ?? 0),
-                  fallbackCounts: closeModelStats.fallbackCounts && typeof closeModelStats.fallbackCounts === 'object'
-                    ? Object.fromEntries(
-                        Object.entries(closeModelStats.fallbackCounts).map(([key, value]: [string, any]) => [
-                          String(key),
-                          Number(value ?? 0)
-                        ])
-                      )
-                    : {},
-                  nearestFallbackDistanceMeters: nullableNumber(closeModelStats.nearestFallbackDistanceMeters),
-                  farthestFallbackDistanceMeters: nullableNumber(closeModelStats.farthestFallbackDistanceMeters),
-                  poolLoads: Number(closeModelStats.poolLoads ?? 0),
-                  poolTargets: closeModelStats.poolTargets && typeof closeModelStats.poolTargets === 'object'
-                    ? Object.fromEntries(
-                        Object.entries(closeModelStats.poolTargets).map(([key, value]: [string, any]) => [
-                          String(key),
-                          Number(value ?? 0)
-                        ])
-                      )
-                    : {},
-                  poolAvailable: closeModelStats.poolAvailable && typeof closeModelStats.poolAvailable === 'object'
-                    ? Object.fromEntries(
-                        Object.entries(closeModelStats.poolAvailable).map(([key, value]: [string, any]) => [
-                          String(key),
-                          Number(value ?? 0)
-                        ])
-                      )
-                    : {}
-                }
+                closeRadiusMeters: Number(closeModelStats.closeRadiusMeters ?? 0),
+                closeModelActiveCap: Number(closeModelStats.closeModelActiveCap ?? 0),
+                promotionBudgetPerFrame: Number(closeModelStats.promotionBudgetPerFrame ?? 0),
+                promotionsThisFrame: Number(closeModelStats.promotionsThisFrame ?? 0),
+                replacementsThisFrame: Number(closeModelStats.replacementsThisFrame ?? 0),
+                candidatesWithinCloseRadius: Number(closeModelStats.candidatesWithinCloseRadius ?? 0),
+                renderedCloseModels: Number(closeModelStats.renderedCloseModels ?? 0),
+                activeCloseModels: Number(closeModelStats.activeCloseModels ?? 0),
+                fallbackCount: Number(closeModelStats.fallbackCount ?? 0),
+                fallbackCounts: closeModelStats.fallbackCounts && typeof closeModelStats.fallbackCounts === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(closeModelStats.fallbackCounts).map(([key, value]: [string, any]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {},
+                nearestFallbackDistanceMeters: nullableNumber(closeModelStats.nearestFallbackDistanceMeters),
+                farthestFallbackDistanceMeters: nullableNumber(closeModelStats.farthestFallbackDistanceMeters),
+                poolLoads: Number(closeModelStats.poolLoads ?? 0),
+                poolTargets: closeModelStats.poolTargets && typeof closeModelStats.poolTargets === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(closeModelStats.poolTargets).map(([key, value]: [string, any]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {},
+                poolAvailable: closeModelStats.poolAvailable && typeof closeModelStats.poolAvailable === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(closeModelStats.poolAvailable).map(([key, value]: [string, any]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {}
+              }
               : undefined,
             terrainRecoveryEvents: objectArray(terrainRecoveryEvents, 64),
             materializationTierEvents: objectArray(materializationTierEvents, 128),
@@ -6385,7 +6447,7 @@ async function runCapture(): Promise<void> {
           ? ` terrainHA=${String(renderTerrainDebug.heightBoundsSource ?? 'unknown')} rej:${Number(renderTerrainDebug.selectionHeightBoundsRejectedNodes ?? 0)}/${Number(renderTerrainDebug.selectionFrustumRejectedNodes ?? 0)} tests=${Number(renderTerrainDebug.selectionHeightBoundsTests ?? 0)} fallbacks=${Number(renderTerrainDebug.selectionHeightBoundsFallbacks ?? 0)}`
           : '';
         const closeModelSuffix = closeStats
-          ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
+          ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} promo=${closeStats.promotionsThisFrame}/${closeStats.promotionBudgetPerFrame} repl=${closeStats.replacementsThisFrame} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
           : '';
         const resourceEntries = Array.isArray(recentResources?.entries) ? recentResources.entries : [];
         const latestResource = resourceEntries.length > 0
@@ -6493,7 +6555,11 @@ async function runCapture(): Promise<void> {
       hitValidation: hitValidationMode,
       sampleIntervalMs,
       modeThresholds,
-      harnessDriverFinal
+      harnessDriverFinal,
+      requireCloseModelEnvelope: enableCombat
+        && activePlayerScenario
+        && !disableNpcCloseModels
+        && (requestedMode === 'open_frontier' || requestedMode === 'a_shau_valley')
     });
     if (!startupState.started) {
       validation.checks.push({
@@ -6755,6 +6821,7 @@ async function runCapture(): Promise<void> {
         droppedFrameMetrics: summarizeDroppedFrames(runtimeSamples, durationSeconds),
         renderSubmissionMetrics: summarizeRenderSubmissions(runtimeSamples),
         materializationTierMetrics: summarizeMaterializationTierEvents(runtimeSamples),
+        closeModelEnvelope: summarizeCloseModelEnvelope(runtimeSamples),
         presentationGapContexts: summarizePresentationGapContexts(
           runtimeSamples,
           finalPresentationEpochs,
