@@ -36,7 +36,6 @@ import {
   getPixelForgeNpcCloseModelDistanceSq,
   getPixelForgeNpcPoolKey,
   getPixelForgeNpcRuntimeFaction,
-  PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
@@ -71,6 +70,15 @@ import {
   type CombatantMaterializationRenderMode,
   type CombatantMaterializationRow,
 } from './CombatantCloseModelPolicy';
+import {
+  applyCloseModelMaterialTuning,
+  collectCloseModelMaterialStates,
+  disposeCloseModelMaterialIfOwned,
+  disposeSharedCloseModelMaterials,
+  restoreCloseModelSharedMaterials,
+  setCloseModelOpacity,
+  type CloseModelMaterialState,
+} from './CombatantCloseModelMaterials';
 
 /**
  * Per-clip impostor metadata used by velocity-keyed cadence. Mirrors the values
@@ -201,13 +209,6 @@ interface CombatantRendererBillboardOptions {
   eagerCloseModelPools?: boolean;
 }
 
-interface CloseModelMaterialState {
-  material: THREE.Material;
-  opacity: number;
-  transparent: boolean;
-  depthWrite: boolean;
-}
-
 function queueCloseModelPoolGrowthForDeferredDemand(
   candidates: CloseModelCandidate[],
   activeCloseModels: Map<string, CloseModelInstance>,
@@ -278,6 +279,58 @@ function resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requested
   return Math.max(0, Math.min(effectiveCap, Math.floor(requestedMaxActive)));
 }
 
+function configureCloseModelFrustumCulling(root: THREE.Object3D): void {
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    child.frustumCulled = true;
+    if (!child.geometry.boundingSphere) {
+      child.geometry.computeBoundingSphere();
+    }
+  });
+}
+
+function createActionMap(
+  mixer: THREE.AnimationMixer,
+  animations: THREE.AnimationClip[],
+): Map<PixelForgeNpcClipId, THREE.AnimationAction> {
+  const actions = new Map<PixelForgeNpcClipId, THREE.AnimationAction>();
+  for (const clip of animations) {
+    if (isPixelForgeNpcClip(clip.name)) {
+      const action = mixer.clipAction(sanitizePixelForgeNpcAnimationClip(clip));
+      if (isOneShotDeathClip(clip.name)) {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      } else {
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.clampWhenFinished = false;
+      }
+      actions.set(clip.name, action);
+    }
+  }
+  mixer.stopAllAction();
+  return actions;
+}
+
+function isPixelForgeNpcClip(value: string): value is PixelForgeNpcClipId {
+  return value === 'idle'
+    || value === 'patrol_walk'
+    || value === 'traverse_run'
+    || value === 'advance_fire'
+    || value === 'walk_fight_forward'
+    || value === 'death_fall_back'
+    || value === 'dead_pose';
+}
+
+function collectBones(root: THREE.Object3D): Map<string, THREE.Object3D> {
+  const bones = new Map<string, THREE.Object3D>();
+  root.traverse((child) => {
+    if (child instanceof THREE.Bone) {
+      bones.set(child.name, child);
+    }
+  });
+  return bones;
+}
+
 export class CombatantRenderer {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -297,6 +350,7 @@ export class CombatantRenderer {
   private closeModelPoolLoads: Map<PixelForgeNpcPoolKey, Promise<void>> = new Map();
   private closeModelPoolTargets: Map<PixelForgeNpcPoolKey, number> = new Map();
   private activeCloseModels: Map<string, CloseModelInstance> = new Map();
+  private readonly sharedCloseModelMaterials = new Map<string, THREE.Material>();
   private readonly closeModelOverflowLastLog = new Map<string, number>();
   private readonly closeModelOverflowReportedThisUpdate = new Set<string>();
   private readonly closeModelFallbackRecords = new Map<string, CloseModelFallbackRecord>();
@@ -834,16 +888,16 @@ export class CombatantRenderer {
         weaponPivot.add(optimizedWeaponRoot);
         model.scene.add(weaponPivot);
         model.scene.visible = false;
-        this.configureCloseModelFrustumCulling(model.scene);
-        this.applyCloseModelMaterialTuning(model.scene, factionConfig);
+        configureCloseModelFrustumCulling(model.scene);
+        applyCloseModelMaterialTuning(model.scene, factionConfig, this.sharedCloseModelMaterials);
         this.scene.add(model.scene);
         const mixer = new THREE.AnimationMixer(model.scene);
         const metrics = this.measureCloseModelMetrics(model.scene);
-        const bones = this.collectBones(model.scene);
+        const bones = collectBones(model.scene);
         const instance: CloseModelInstance = {
           root: model.scene,
           mixer,
-          actions: this.createActionMap(mixer, model.animations),
+          actions: createActionMap(mixer, model.animations),
           poolKey,
           factionConfig,
           weaponPivot,
@@ -853,7 +907,7 @@ export class CombatantRenderer {
           hasWeapon: bones.has(factionConfig.rightHandSocket) && bones.has(factionConfig.leftHandSocket),
           boundsMinY: metrics.boundsMinY,
           visualScale: metrics.visualScale,
-          materialStates: this.collectCloseModelMaterialStates(model.scene),
+          materialStates: collectCloseModelMaterialStates(model.scene),
         };
         pool.push(instance);
         created.push(instance);
@@ -877,16 +931,6 @@ export class CombatantRenderer {
     );
   }
 
-  private configureCloseModelFrustumCulling(root: THREE.Object3D): void {
-    root.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      child.frustumCulled = true;
-      if (!child.geometry.boundingSphere) {
-        child.geometry.computeBoundingSphere();
-      }
-    });
-  }
-
   private countCloseModelInstances(poolKey: PixelForgeNpcPoolKey): number {
     let total = this.closeModelPools.get(poolKey)?.length ?? 0;
     this.activeCloseModels.forEach((instance) => {
@@ -907,135 +951,6 @@ export class CombatantRenderer {
     );
     this.queueCloseModelPoolLoad(poolKey, nextTarget);
     return true;
-  }
-
-  private createActionMap(mixer: THREE.AnimationMixer, animations: THREE.AnimationClip[]): Map<PixelForgeNpcClipId, THREE.AnimationAction> {
-    const actions = new Map<PixelForgeNpcClipId, THREE.AnimationAction>();
-    for (const clip of animations) {
-      if (this.isPixelForgeNpcClip(clip.name)) {
-        const action = mixer.clipAction(sanitizePixelForgeNpcAnimationClip(clip));
-        if (isOneShotDeathClip(clip.name)) {
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-        } else {
-          action.setLoop(THREE.LoopRepeat, Infinity);
-          action.clampWhenFinished = false;
-        }
-        actions.set(clip.name, action);
-      }
-    }
-    mixer.stopAllAction();
-    return actions;
-  }
-
-  private isPixelForgeNpcClip(value: string): value is PixelForgeNpcClipId {
-    return value === 'idle'
-      || value === 'patrol_walk'
-      || value === 'traverse_run'
-      || value === 'advance_fire'
-      || value === 'walk_fight_forward'
-      || value === 'death_fall_back'
-      || value === 'dead_pose';
-  }
-
-  private collectBones(root: THREE.Object3D): Map<string, THREE.Object3D> {
-    const bones = new Map<string, THREE.Object3D>();
-    root.traverse((child) => {
-      if (child instanceof THREE.Bone) {
-        bones.set(child.name, child);
-      }
-    });
-    return bones;
-  }
-
-  private applyCloseModelMaterialTuning(
-    root: THREE.Object3D,
-    factionConfig: PixelForgeNpcFactionRuntimeConfig,
-  ): void {
-    const tuning = PIXEL_FORGE_NPC_CLOSE_MATERIAL_TUNING[factionConfig.packageFaction];
-    root.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      if (Array.isArray(child.material)) {
-        child.material = child.material.map((material) => this.cloneTunedCloseMaterial(material, tuning));
-      } else {
-        child.material = this.cloneTunedCloseMaterial(child.material, tuning);
-      }
-    });
-  }
-
-  private cloneTunedCloseMaterial(
-    material: THREE.Material,
-    tuning: Record<string, number> | undefined,
-  ): THREE.Material {
-    const cloned = material.clone();
-    if (cloned instanceof THREE.MeshStandardMaterial) {
-      const materialNameParts = cloned.name.split('_');
-      const materialToken = materialNameParts[materialNameParts.length - 1];
-      const tunedColor = materialToken && tuning ? tuning[materialToken] : undefined;
-      if (tunedColor !== undefined) {
-        cloned.color.setHex(tunedColor);
-      }
-      const isUniformSurface =
-        materialToken === 'uniform' ||
-        materialToken === 'trousers' ||
-        materialToken === 'headgear' ||
-        materialToken === 'accent';
-      if (isUniformSurface) {
-        cloned.color.offsetHSL(0, 0.08, 0.1);
-      }
-      cloned.emissive.copy(cloned.color).multiplyScalar(isUniformSurface ? 0.16 : 0.06);
-      cloned.emissiveIntensity = isUniformSurface ? 0.28 : 0.1;
-      cloned.roughness = Math.max(cloned.roughness, 0.9);
-      cloned.metalness = 0;
-      cloned.needsUpdate = true;
-    }
-    return cloned;
-  }
-
-  private collectCloseModelMaterialStates(root: THREE.Object3D): CloseModelMaterialState[] {
-    const states: CloseModelMaterialState[] = [];
-    const seen = new Set<THREE.Material>();
-    root.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      const materials = Array.isArray(child.material) ? child.material : [child.material];
-      for (const material of materials) {
-        if (seen.has(material)) continue;
-        seen.add(material);
-        states.push({
-          material,
-          opacity: material.opacity,
-          transparent: material.transparent,
-          depthWrite: material.depthWrite,
-        });
-      }
-    });
-    return states;
-  }
-
-  private setCloseModelOpacity(instance: CloseModelInstance, opacity: number): void {
-    const clamped = clamp01(opacity);
-    for (const state of instance.materialStates) {
-      const material = state.material;
-      const nextOpacity = state.opacity * clamped;
-      const nextTransparent = state.transparent || clamped < 0.999;
-      const nextDepthWrite = clamped >= 0.999 ? state.depthWrite : false;
-      if (
-        material.opacity === nextOpacity &&
-        material.transparent === nextTransparent &&
-        material.depthWrite === nextDepthWrite
-      ) {
-        continue;
-      }
-      const renderStateChanged =
-        material.transparent !== nextTransparent ||
-        material.depthWrite !== nextDepthWrite;
-      material.opacity = nextOpacity;
-      material.transparent = nextTransparent;
-      material.depthWrite = nextDepthWrite;
-      if (renderStateChanged) {
-        material.needsUpdate = true;
-      }
-    }
   }
 
   private normalizeWeaponRoot(root: THREE.Group, weapon: PixelForgeNpcWeaponRuntimeConfig): void {
@@ -1112,8 +1027,8 @@ export class CombatantRenderer {
       : new THREE.MeshStandardMaterial({ color: 0x2f2f2b, roughness: 0.85, metalness: 0.1 });
     const mesh = new THREE.Mesh(merged, material);
     mesh.name = `${weapon.id}_optimized_weapon`;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
     mesh.frustumCulled = true;
     mesh.userData[OPTIMIZED_WEAPON_RESOURCE_KEY] = true;
 
@@ -1511,7 +1426,7 @@ export class CombatantRenderer {
 
     instance.combatantId = combatantId;
     instance.root.visible = true;
-    this.setCloseModelOpacity(instance, 1);
+    setCloseModelOpacity(instance.materialStates, 1);
     instance.actions.forEach((action) => {
       action.paused = false;
       action.timeScale = 1;
@@ -1524,7 +1439,7 @@ export class CombatantRenderer {
     this.activeCloseModels.delete(combatantId);
     instance.root.visible = false;
     instance.mixer.stopAllAction();
-    this.setCloseModelOpacity(instance, 1);
+    setCloseModelOpacity(instance.materialStates, 1);
     instance.actions.forEach((action) => {
       action.paused = false;
       action.time = 0;
@@ -1539,13 +1454,14 @@ export class CombatantRenderer {
 
   private disposeCloseModelInstance(instance: CloseModelInstance): void {
     instance.mixer.stopAllAction();
+    restoreCloseModelSharedMaterials(instance.materialStates);
     instance.root.traverse((child) => {
       if (!(child instanceof THREE.Mesh) || child.userData[OPTIMIZED_WEAPON_RESOURCE_KEY] !== true) return;
       child.geometry.dispose();
       if (Array.isArray(child.material)) {
-        child.material.forEach((material) => material.dispose());
+        child.material.forEach((material) => disposeCloseModelMaterialIfOwned(material));
       } else {
-        child.material.dispose();
+        disposeCloseModelMaterialIfOwned(child.material);
       }
     });
     modelLoader.disposeInstance(instance.root);
@@ -1564,7 +1480,7 @@ export class CombatantRenderer {
       combatant.scale.z * instance.visualScale,
     );
     const deathOpacity = getCombatantDeathOpacity(combatant);
-    this.setCloseModelOpacity(instance, deathOpacity);
+    setCloseModelOpacity(instance.materialStates, deathOpacity);
     instance.root.visible = deathOpacity > CLOSE_MODEL_FADE_EPSILON;
     instance.root.updateMatrixWorld(true);
 
@@ -2440,6 +2356,7 @@ export class CombatantRenderer {
     this.closeModelPools.clear();
     this.closeModelPoolLoads.clear();
     this.closeModelPoolTargets.clear();
+    disposeSharedCloseModelMaterials(this.sharedCloseModelMaterials);
     disposeCombatantMeshes(this.scene, {
       factionMeshes: this.factionMeshes,
       factionAuraMeshes: this.factionAuraMeshes,

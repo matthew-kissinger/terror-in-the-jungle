@@ -286,6 +286,17 @@ function activeCloseModelsFor(target: CombatantRenderer): Map<string, unknown> {
   return (target as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
 }
 
+function findMaterialByName(root: THREE.Object3D, name: string): THREE.Material {
+  let found: THREE.Material | null = null;
+  root.traverse((child) => {
+    if (found || !(child instanceof THREE.Mesh)) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    found = materials.find((material) => material.name === name) ?? null;
+  });
+  if (!found) throw new Error(`Material ${name} not found`);
+  return found;
+}
+
 function advanceCloseModelPromotionFrames(
   target: CombatantRenderer,
   combatants: Map<string, Combatant>,
@@ -496,6 +507,8 @@ describe('CombatantRenderer', () => {
       });
       expect(weaponMeshes).toHaveLength(1);
       expect(weaponMeshes[0].name).toContain('optimized_weapon');
+      expect(weaponMeshes[0].castShadow).toBe(false);
+      expect(weaponMeshes[0].receiveShadow).toBe(false);
     });
 
     it('renders hard-close NPCs as impostors when perf isolation disables close models', async () => {
@@ -566,6 +579,49 @@ describe('CombatantRenderer', () => {
 
       expect(materials.length).toBeGreaterThan(0);
       expect(materials.map((material) => material.version)).toEqual(versions);
+    });
+
+    it('shares steady close-model materials across same-faction actors', () => {
+      const combatants = new Map<string, Combatant>();
+      combatants.set('near-shared-a', createMockCombatant('near-shared-a', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING));
+      combatants.set('near-shared-b', createMockCombatant('near-shared-b', Faction.NVA, new THREE.Vector3(12, 0, 0), CombatantState.ENGAGING));
+
+      advanceCloseModelPromotionFrames(renderer, combatants, new THREE.Vector3(0, 0, 0), 2);
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, { root: THREE.Group }>;
+      }).activeCloseModels;
+      const first = activeCloseModels.get('near-shared-a');
+      const second = activeCloseModels.get('near-shared-b');
+      expect(first).toBeDefined();
+      expect(second).toBeDefined();
+      expect(findMaterialByName(first!.root, 'nva_uniform')).toBe(findMaterialByName(second!.root, 'nva_uniform'));
+    });
+
+    it('forks close-model materials for death fade without fading neighbors', () => {
+      const combatants = new Map<string, Combatant>();
+      const healthy = createMockCombatant('healthy-shared', Faction.NVA, new THREE.Vector3(10, 0, 0), CombatantState.ENGAGING);
+      const dying = createMockCombatant('dying-shared', Faction.NVA, new THREE.Vector3(12, 0, 0), CombatantState.DEAD);
+      dying.isDying = true;
+      dying.deathProgress = 0.95;
+      dying.deathAnimationType = 'fallback';
+      dying.deathDirection = new THREE.Vector3(1, 0, 0);
+      combatants.set('healthy-shared', healthy);
+      combatants.set('dying-shared', dying);
+
+      advanceCloseModelPromotionFrames(renderer, combatants, new THREE.Vector3(0, 0, 0), 2);
+
+      const activeCloseModels = (renderer as unknown as {
+        activeCloseModels: Map<string, { root: THREE.Group }>;
+      }).activeCloseModels;
+      const healthyMaterial = findMaterialByName(activeCloseModels.get('healthy-shared')!.root, 'nva_uniform');
+      const dyingMaterial = findMaterialByName(activeCloseModels.get('dying-shared')!.root, 'nva_uniform');
+
+      expect(dyingMaterial).not.toBe(healthyMaterial);
+      expect(dyingMaterial.opacity).toBeLessThan(1);
+      expect(dyingMaterial.transparent).toBe(true);
+      expect(healthyMaterial.opacity).toBe(1);
+      expect(healthyMaterial.transparent).toBe(false);
     });
 
     it('eager close-model pools only seed the initial demand size', async () => {

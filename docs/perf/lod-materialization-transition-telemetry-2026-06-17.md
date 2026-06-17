@@ -106,3 +106,60 @@ This is a same-experience candidate, not completion proof. It should reduce
 transition chatter and make the new `simLaneTransitions` summary more useful,
 but it still needs a trusted Open Frontier and A Shau capture to prove reduced
 dropped-frame time under combat.
+
+## Paired Capture Read And Close-Model Material Slice
+
+Fresh current-branch EARS diagnostics after the sim-lane hysteresis patch:
+
+- Open Frontier: `artifacts/perf/2026-06-17T14-58-14-572Z`
+- A Shau: `artifacts/perf/2026-06-17T15-02-20-192Z`
+
+Both artifacts remained diagnostic only: they failed measurement trust,
+quiet-machine attestation, and harness view-slew trust. They did pass active
+combat and materialization pressure, so they are useful for owner attribution.
+
+The read is not "combat LOD lane churn is the sampled owner." Open Frontier
+recorded only `2` sim-lane transitions and A Shau recorded `1`; max transition
+rendered lag stayed near zero. The stronger owner-aligned signal is close enemy
+mesh materialization / render fanout:
+
+- Open Frontier peak `npc_close_glb` draw submissions reached `98`, matching
+  `14` close NPCs at roughly `7` submissions/materials each.
+- A Shau peak `npc_close_glb` draw submissions reached `56`, with concurrent
+  fixed-wing, wildlife, terrain, and weapon submissions.
+- Close-model pool loads were `0` in both captures, so this was not an asset
+  download or lazy pool load spike.
+
+`CombatantRenderer` now shares tuned steady-state close-model materials across
+same-faction close NPCs and forks materials only for per-NPC death fade. That
+preserves close-model count, distance, animations, and fade behavior while
+reducing material state churn during imposter-to-mesh transitions and avoiding
+long-run accumulation of per-instance tuned materials. Focused renderer tests
+cover shared steady materials and fade isolation.
+
+Post-change diagnostics:
+
+- Open Frontier: `artifacts/perf/2026-06-17T15-26-27-586Z`
+- A Shau: `artifacts/perf/2026-06-17T15-31-40-485Z`
+
+These are still diagnostic, not completion evidence: both failed measurement
+trust and dropped-frame gates. Open Frontier did improve on the headline
+browser dropped-frame-time metric compared with the prior Open diagnostic
+(`34.61ms/s` -> `25.16ms/s`), and peak `npc_close_glb` submissions dropped to
+`56` instead of the earlier `98` peak. A Shau remained much heavier
+(`74.05ms/s`) with light rain, terrain, close NPCs, weapons, wildlife,
+vehicles, and residual presentation gaps all contributing. Sim-lane
+transitions remained near-zero in Open Frontier (`1`) and zero in A Shau, so
+the next work should not chase combat-lane chatter unless new evidence changes
+that read.
+
+`npm run check:dropped-frame-ears -- --dir artifacts/perf/2026-06-17T15-26-27-586Z --dir artifacts/perf/2026-06-17T15-31-40-485Z --strict`
+correctly fails this pair as diagnostic: neither artifact has quiet-machine
+attestation, both failed measurement trust, and harness view-slew equivalence
+is still missing. Do not promote either capture to completion evidence.
+
+The same pass also stops optimized NPC-carried weapons from casting or
+receiving shadows. The weapons remain visible and socketed, but A Shau's worst
+tail had `16` weapon submissions split across main and shadow passes; removing
+the shadow pass is a same-experience micro-optimization aimed directly at
+close-model transition tails.
