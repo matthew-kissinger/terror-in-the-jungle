@@ -4676,7 +4676,7 @@ async function waitForPressureReadyWarmup(
 
   logStep(
     `🎯 Pressure-ready warmup waiting up to ${timeoutSeconds}s ` +
-    `for ${PRESSURE_READY_CONSECUTIVE_SAMPLES} consecutive contact/materialization samples`
+    `for ${PRESSURE_READY_CONSECUTIVE_SAMPLES} consecutive live-fire or active-ENGAGE samples`
   );
 
   const startedAt = Date.now();
@@ -4720,10 +4720,7 @@ async function waitForPressureReadyWarmup(
 
         let reason = 'not-ready';
         let ready = false;
-        if (closeCandidates >= 2 && renderedCloseModels >= 1) {
-          ready = true;
-          reason = 'close-model-pressure';
-        } else if (engineShotsFired > 0) {
+        if (engineShotsFired > 0) {
           ready = true;
           reason = 'live-fire';
         } else if (botState === 'ENGAGE' && currentTargetDistance !== null && currentTargetDistance <= 220) {
@@ -4797,6 +4794,28 @@ async function waitForPressureReadyWarmup(
     consecutiveReadySamples,
     reason: lastSnapshot?.reason ?? 'timeout',
     lastSnapshot,
+  };
+}
+
+async function captureActiveDriverShotBaseline(page: Page): Promise<{ shots: number; hits: number }> {
+  const baseline = await safeAwait(
+    'active driver shot baseline',
+    page.evaluate(() => {
+      const counters =
+        (window as any).__perfHarnessDriverState?.getCountersSnapshot?.()
+        ?? (window as any).__perfHarnessDriver?.getCountersSnapshot?.()
+        ?? (window as any).__perfHarnessDriverState?.getDebugSnapshot?.()
+        ?? null;
+      return {
+        shots: Number(counters?.engineShotsFired ?? counters?.shotsFired ?? 0),
+        hits: Number(counters?.engineShotsHit ?? 0),
+      };
+    }),
+    3000
+  );
+  return {
+    shots: Math.max(0, Number(baseline?.shots ?? 0)),
+    hits: Math.max(0, Number(baseline?.hits ?? 0)),
   };
 }
 
@@ -5204,6 +5223,8 @@ async function runCapture(): Promise<void> {
   let missedSamples = 0;
   const missedSampleErrors: Record<string, number> = {};
   let measurementTrust: MeasurementTrustReport | null = null;
+  let harnessDriverShotBaseline = 0;
+  let harnessDriverHitBaseline = 0;
   const startedAt = nowIso();
   const sourceGitSha = currentGitSha();
   const sourceGitStatus = gitStatus();
@@ -6018,7 +6039,10 @@ async function runCapture(): Promise<void> {
         activePlayerScenario,
         enableCombat,
       });
-      if (activePlayerScenario) {
+      const preservePressureReadyDriver = activePlayerScenario
+        && pressureReadyWarmupResult.requested
+        && pressureReadyWarmupResult.status === 'ready';
+      if (activePlayerScenario && !preservePressureReadyDriver) {
         await stopActiveScenarioDriver(page);
         await setupActiveScenarioDriver(page, {
           enabled: true,
@@ -6032,8 +6056,19 @@ async function runCapture(): Promise<void> {
           frontlineTriggerDistance,
           maxCompressedPerFaction
         });
+      } else if (preservePressureReadyDriver) {
+        logStep('🎯 Preserving active driver after pressure-ready warmup; timed samples will subtract pre-window shot counters');
       }
       await foregroundCapturePage(page);
+      if (preservePressureReadyDriver) {
+        await page.waitForTimeout(2000);
+        const baseline = await captureActiveDriverShotBaseline(page);
+        harnessDriverShotBaseline = baseline.shots;
+        harnessDriverHitBaseline = baseline.hits;
+        logStep(
+          `🎯 Pressure-ready baseline counters shots=${harnessDriverShotBaseline} hits=${harnessDriverHitBaseline}; resetting frame metrics after settle`
+        );
+      }
       // Reset rolling metrics after the active driver is live so sampling
       // reflects the steady-state window, not startup or harness restart cost.
       await safeAwait(
@@ -6144,6 +6179,8 @@ async function runCapture(): Promise<void> {
           shouldCaptureRenderSubmissions: boolean;
           renderSubmissionMode: string;
           sceneAttributionEvaluateSource: string;
+          driverShotBaseline: number;
+          driverHitBaseline: number;
         }) => {
           const shouldIncludeDetails = options.shouldIncludeDetails;
           const metrics = (window as any).__metrics;
@@ -6335,8 +6372,14 @@ async function runCapture(): Promise<void> {
               rainMatrixBytesPerFrame: Number(debug.rainMatrixBytesPerFrame ?? 0)
             };
           };
-          const harnessEngineShots = Number(harnessCounters?.engineShotsFired ?? harnessDriver?.engineShotsFired);
-          const harnessEngineHits = Number(harnessCounters?.engineShotsHit ?? harnessDriver?.engineShotsHit);
+          const rawHarnessEngineShots = Number(harnessCounters?.engineShotsFired ?? harnessDriver?.engineShotsFired);
+          const rawHarnessEngineHits = Number(harnessCounters?.engineShotsHit ?? harnessDriver?.engineShotsHit);
+          const harnessEngineShots = Number.isFinite(rawHarnessEngineShots)
+            ? Math.max(0, rawHarnessEngineShots - Number(options.driverShotBaseline ?? 0))
+            : rawHarnessEngineShots;
+          const harnessEngineHits = Number.isFinite(rawHarnessEngineHits)
+            ? Math.max(0, rawHarnessEngineHits - Number(options.driverHitBaseline ?? 0))
+            : rawHarnessEngineHits;
           const reportShots = Number(basicValidation?.hitDetection?.shotsThisSession ?? report?.hitDetection?.shotsThisSession ?? 0);
           const reportHits = Number(basicValidation?.hitDetection?.hitsThisSession ?? report?.hitDetection?.hitsThisSession ?? 0);
           const shotsThisSession = Number.isFinite(harnessEngineShots)
@@ -7166,8 +7209,14 @@ async function runCapture(): Promise<void> {
               damageTaken: Number(harnessDriver.damageTaken ?? 0),
               kills: Number(harnessDriver.kills ?? 0),
               accuracy: Number(harnessDriver.accuracy ?? 0),
-              engineShotsFired: Number(harnessDriver.engineShotsFired ?? 0),
-              engineShotsHit: Number(harnessDriver.engineShotsHit ?? 0),
+              engineShotsFired: Math.max(
+                0,
+                Number(harnessDriver.engineShotsFired ?? 0) - Number(options.driverShotBaseline ?? 0)
+              ),
+              engineShotsHit: Math.max(
+                0,
+                Number(harnessDriver.engineShotsHit ?? 0) - Number(options.driverHitBaseline ?? 0)
+              ),
               stateHistogramMs: harnessDriver.stateHistogramMs && typeof harnessDriver.stateHistogramMs === 'object'
                 ? Object.fromEntries(
                     Object.entries(harnessDriver.stateHistogramMs).map(([k, v]: [string, any]) => [
@@ -7199,7 +7248,9 @@ async function runCapture(): Promise<void> {
           shouldCaptureSceneAttribution,
           shouldCaptureRenderSubmissions,
           renderSubmissionMode: runtimeRenderSubmissionMode,
-          sceneAttributionEvaluateSource: PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE
+          sceneAttributionEvaluateSource: PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE,
+          driverShotBaseline: harnessDriverShotBaseline,
+          driverHitBaseline: harnessDriverHitBaseline
         }), 8000);
         probeRoundTripMs.push(Date.now() - probeStart);
         sample = { ts: nowIso(), ...raw };
@@ -7447,6 +7498,11 @@ async function runCapture(): Promise<void> {
     // `__perfHarnessDriverState` is null and that call is a no-op.
     if (page && activeScenarioStarted && !harnessDriverFinal) {
       harnessDriverFinal = await stopActiveScenarioDriver(page);
+      if (harnessDriverFinal && (harnessDriverShotBaseline > 0 || harnessDriverHitBaseline > 0)) {
+        harnessDriverFinal.engineShotsFired = Math.max(0, harnessDriverFinal.engineShotsFired - harnessDriverShotBaseline);
+        harnessDriverFinal.engineShotsHit = Math.max(0, harnessDriverFinal.engineShotsHit - harnessDriverHitBaseline);
+        harnessDriverFinal.shotsFired = Math.max(0, harnessDriverFinal.shotsFired - harnessDriverShotBaseline);
+      }
     }
 
     stage = 'stop-cdp';
@@ -7794,6 +7850,8 @@ async function runCapture(): Promise<void> {
           pressureReadyWarmupConsecutiveReadySamples: pressureReadyWarmupResult.consecutiveReadySamples,
           pressureReadyWarmupReason: pressureReadyWarmupResult.reason,
           pressureReadyWarmupLastSnapshot: pressureReadyWarmupResult.lastSnapshot ?? undefined,
+          pressureReadyDriverShotBaseline: harnessDriverShotBaseline,
+          pressureReadyDriverHitBaseline: harnessDriverHitBaseline,
           weatherStateOverride: weatherStateOverride === 'default' ? undefined : weatherStateOverride,
           frontlineCompressionRequested: compressFrontline,
           victoryConditionsDisabled: disableVictory,
