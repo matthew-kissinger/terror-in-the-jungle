@@ -16,7 +16,7 @@ import {
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
 const MAX_RAIN_OPACITY = 0.6;
-const MIN_ACTIVE_RAIN_FRACTION = 0.5;
+const MIN_ACTIVE_RAIN_FRACTION = 0.3;
 
 function markActiveRainMatricesDirty(attribute: THREE.InstancedBufferAttribute, activeCount: number): void {
   if (typeof attribute.clearUpdateRanges === 'function') {

@@ -1470,6 +1470,7 @@
 
     if (objectiveKind === 'nearest_opfor') {
       if (canSeeTarget) return true;
+      if (targetDistance <= maxFireDistance) return true;
       if (!sameLockedTarget) return false;
       if (botState !== 'ALERT' && botState !== 'ENGAGE' && botState !== 'ADVANCE') return false;
       return targetDistance <= maxFireDistance;
@@ -1798,7 +1799,7 @@
       const dist = botHorizontalDistance(ctx.eyePos, enemy.position);
       const maxFireDistance = Math.max(0, Number(ctx.config.maxFireDistance || 0));
       const targetVisible = !!ctx.canSeeTarget(enemy.position);
-      const advancesCombatObjective = objective && String(objective.kind || '') === 'nearest_opfor' && dist <= maxFireDistance && targetVisible;
+      const advancesCombatObjective = objective && String(objective.kind || '') === 'nearest_opfor' && dist <= maxFireDistance;
       const acquisitionDistance = Math.max(0, Number(ctx.config.targetAcquisitionDistance || ctx.config.maxFireDistance || 0));
       const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
       const interruptsObjective = !objective || advancesCombatObjective || (dist <= interruptDistance && targetVisible);

@@ -1108,8 +1108,8 @@ describe('PlayerBot driver mirror — PATROL and ALERT', () => {
       getObjective: () => ({ kind: 'nearest_opfor', position: target.position, priority: 3 }),
       canSeeTarget: () => false,
     }));
-    expect(step.nextState).toBeNull();
-    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.nextState).toBe('ALERT');
+    expect(step.intent.moveForward).toBe(0);
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.aimTarget.z).toBeCloseTo(-128, 5);
   });
@@ -2602,9 +2602,24 @@ describe('route objective-progress recovery', () => {
     })).toBe(true);
   });
 
-  it('does not turn an occluded nearest-opfor objective into a current fire target', () => {
+  it('allows an occluded nearest-opfor objective inside weapon range to become a recovery target', () => {
     const config = botConfigForProfile(profileForMode('open_frontier'));
     const target = makeBotTarget({ position: { x: 0, y: 0, z: -180 } });
+    expect(shouldUseTargetForCurrentObjective({
+      target,
+      currentTarget: null,
+      objective: { id: target.id, kind: 'nearest_opfor', position: target.position, priority: 3 },
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      botState: 'PATROL',
+      acquisitionDistance: config.targetAcquisitionDistance,
+      maxFireDistance: config.maxFireDistance,
+      canSeeTarget: () => false,
+    })).toBe(true);
+  });
+
+  it('keeps a far occluded nearest-opfor objective in route travel', () => {
+    const config = botConfigForProfile(profileForMode('open_frontier'));
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -800 } });
     expect(shouldUseTargetForCurrentObjective({
       target,
       currentTarget: null,

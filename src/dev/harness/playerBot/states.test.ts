@@ -236,10 +236,10 @@ describe('states — PATROL', () => {
       },
     }));
 
-    expect(step.nextState).toBeNull();
+    expect(step.nextState).toBe('ALERT');
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.aimTarget?.z).toBeCloseTo(-128, 5);
-    expect(step.intent.moveForward).toBe(1);
+    expect(step.intent.moveForward).toBe(0);
   });
 
   it('keeps routing toward a far occluded nearest-opfor objective outside weapon range', () => {

@@ -461,8 +461,8 @@ describe('WeatherSystem', () => {
       const systemAny = system as WeatherSystemAny;
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.visible).toBe(true);
-      expect(systemAny.rainMesh?.count).toBe(5);
-      expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.36, 5);
+      expect(systemAny.rainMesh?.count).toBe(3);
+      expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.6, 5);
       expect(systemAny.rainMesh!.count * (systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity)
         .toBeCloseTo(10 * 0.6 * 0.3, 5);
       expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0.3);
@@ -554,10 +554,10 @@ describe('WeatherSystem', () => {
 
       systemAny.updateRain(1);
 
-      expect(systemAny.rainMesh?.count).toBe(5);
+      expect(systemAny.rainMesh?.count).toBe(3);
       expect(systemAny.rainMesh?.instanceMatrix.updateRanges.at(-1)).toEqual({
         start: 0,
-        count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
+        count: 3 * systemAny.rainMesh!.instanceMatrix.itemSize,
       });
     });
 
@@ -572,7 +572,7 @@ describe('WeatherSystem', () => {
 
       expect(systemAny.rainMesh?.instanceMatrix.updateRanges).toEqual([{
         start: 0,
-        count: 5 * systemAny.rainMesh!.instanceMatrix.itemSize,
+        count: 3 * systemAny.rainMesh!.instanceMatrix.itemSize,
       }]);
     });
   });

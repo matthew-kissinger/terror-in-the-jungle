@@ -22,6 +22,9 @@ export interface DroppedFrameEarsArtifactEvaluation {
   artifactRelPath: string;
   scenario: string | null;
   classification: DroppedFrameEarsClassification;
+  contactQualified: boolean;
+  materializationQualified: boolean;
+  completionLaneQualified: boolean;
   criticalPass: boolean;
   failCount: number;
   warnCount: number;
@@ -262,6 +265,10 @@ function getValidationChecks(validation: Record<string, unknown> | null, summary
 
 function validationCheck(checks: readonly ValidationCheck[], id: string): ValidationCheck | null {
   return checks.find((check) => check.id === id) ?? null;
+}
+
+function checkPassed(checks: readonly DroppedFrameEarsCheck[], id: string): boolean {
+  return checks.some((check) => check.id === id && check.status === 'pass');
 }
 
 function checkStatus(status: boolean, id: string, passMessage: string, failMessage: string, value?: DroppedFrameEarsCheck['value']): DroppedFrameEarsCheck {
@@ -726,13 +733,22 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
     : failCount === 0
       ? 'proven'
       : 'diagnostic';
+  const contactQualified = checkPassed(checks, 'active_combat_shots')
+    && checkPassed(checks, 'active_combat_hits');
+  const materializationQualified = checkPassed(checks, 'npc_materialization_pressure');
+  const completionLaneQualified = classification === 'proven'
+    && contactQualified
+    && materializationQualified;
 
   return {
     artifactDir: absoluteArtifactDir,
     artifactRelPath: rel(absoluteArtifactDir),
     scenario,
     classification,
-    criticalPass: classification === 'proven',
+    contactQualified,
+    materializationQualified,
+    completionLaneQualified,
+    criticalPass: completionLaneQualified,
     failCount,
     warnCount,
     checks,
@@ -820,7 +836,7 @@ function printHumanReport(evaluation: DroppedFrameEarsEvaluation): void {
   ].join(' '));
 
   for (const artifact of evaluation.artifacts) {
-    console.log(`[ST4-EARS] ${artifact.artifactRelPath} scenario=${artifact.scenario ?? 'unknown'} classification=${artifact.classification} fail=${artifact.failCount} warn=${artifact.warnCount}`);
+    console.log(`[ST4-EARS] ${artifact.artifactRelPath} scenario=${artifact.scenario ?? 'unknown'} classification=${artifact.classification} contact=${artifact.contactQualified ? 'qualified' : 'low'} materialization=${artifact.materializationQualified ? 'qualified' : 'thin'} fail=${artifact.failCount} warn=${artifact.warnCount}`);
     for (const check of artifact.checks.filter((entry) => entry.status !== 'pass')) {
       console.log(`  ${check.status.toUpperCase()} ${check.id}: ${check.message}`);
     }
