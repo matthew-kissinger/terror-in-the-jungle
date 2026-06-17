@@ -991,6 +991,13 @@ export class CombatantRenderer {
       const nextOpacity = state.opacity * clamped;
       const nextTransparent = state.transparent || clamped < 0.999;
       const nextDepthWrite = clamped >= 0.999 ? state.depthWrite : false;
+      if (
+        material.opacity === nextOpacity &&
+        material.transparent === nextTransparent &&
+        material.depthWrite === nextDepthWrite
+      ) {
+        continue;
+      }
       const renderStateChanged =
         material.transparent !== nextTransparent ||
         material.depthWrite !== nextDepthWrite;

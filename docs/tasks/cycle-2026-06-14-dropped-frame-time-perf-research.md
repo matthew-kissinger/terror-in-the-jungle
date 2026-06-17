@@ -1312,3 +1312,8 @@ Update 2026-06-17 12:30 UTC / 08:30 EDT:
   rain upload remains a high-confidence A Shau-only target; full wildlife
   batching is the stronger longer-term wildlife fix if the shadow cutoff does
   not move paired EARS captures enough.
+- Small close-model hygiene landed after that readout: steady opacity/depth
+  state now skips redundant material writes when active close-model materials
+  are already at the target fade state. This does not change close-model cap,
+  distance, animation, or selection; the larger close-model target remains
+  reducing resident body GLB mesh/material fanout.
