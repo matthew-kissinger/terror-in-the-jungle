@@ -23,6 +23,7 @@ type ArtifactOptions = {
   harnessWarnings?: boolean;
   lowCombat?: boolean;
   thinMaterializationPressure?: boolean;
+  burstyMaterializationContact?: boolean;
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -39,7 +40,12 @@ function tempArtifact(options: ArtifactOptions): string {
   const harnessWarningStatus = options.harnessWarnings ? 'warn' : 'pass';
   const materializationPeakCandidates = options.thinMaterializationPressure ? 1 : 5;
   const materializationPeakRendered = options.thinMaterializationPressure ? 1 : 4;
-  const materializationSamplesWithCandidates = options.thinMaterializationPressure ? 1 : 3;
+  const materializationSampleCount = options.burstyMaterializationContact ? 40 : 8;
+  const materializationSamplesWithCandidates = options.thinMaterializationPressure
+    ? 1
+    : options.burstyMaterializationContact
+      ? 2
+      : 3;
   const materializationStatus = options.thinMaterializationPressure ? 'warn' : 'pass';
   const combatStatus = options.lowCombat ? 'fail' : 'pass';
   const shotCount = options.lowCombat ? 0 : 80;
@@ -71,7 +77,7 @@ function tempArtifact(options: ArtifactOptions): string {
     },
     rendererBackend: { resolvedBackend: 'webgpu', strictWebGPU: true },
     closeModelEnvelope: {
-      sampleCount: 8,
+      sampleCount: materializationSampleCount,
       samplesWithCandidates: materializationSamplesWithCandidates,
       samplesWithRenderedCloseModels: materializationSamplesWithCandidates,
       peakCandidatesWithinCloseRadius: materializationPeakCandidates,
@@ -167,6 +173,24 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
     expect(artifact.classification).toBe('diagnostic');
     expect(artifact.checks.some((check) => (
       check.id === 'npc_materialization_pressure'
+      && check.status === 'fail'
+    ))).toBe(true);
+  });
+
+  it('keeps burst-only materialization artifacts diagnostic even when peak pressure passes', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      burstyMaterializationContact: true,
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.materializationQualified).toBe(false);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_pressure'
+      && check.status === 'pass'
+    ))).toBe(true);
+    expect(artifact.checks.some((check) => (
+      check.id === 'npc_materialization_sustained_contact'
       && check.status === 'fail'
     ))).toBe(true);
   });

@@ -71,6 +71,9 @@ const REQUIRED_FILES = [
   'final-frame.png',
 ] as const;
 
+const MIN_SUSTAINED_MATERIALIZATION_SAMPLES = 3;
+const MIN_SUSTAINED_MATERIALIZATION_RATIO = 0.1;
+
 const RAF_THRESHOLDS: readonly ThresholdCheck[] = [
   {
     id: 'raf_stutter_25ms_percent',
@@ -288,6 +291,10 @@ function closeEnough(actual: number | null, expected: number | null): boolean {
   return Math.abs(actual - expected) <= tolerance;
 }
 
+function formatPercent(value: number | null): string {
+  return value === null ? 'missing' : `${(value * 100).toFixed(1)}%`;
+}
+
 function rel(path: string): string {
   return relative(process.cwd(), path).replaceAll('\\', '/');
 }
@@ -395,6 +402,11 @@ function addMaterializationEnvelopeChecks(
     : getNumber(summary, ['closeModelEnvelope', 'peakCandidatesWithinCloseRadius']);
   const peakRendered = getNumber(summary, ['closeModelEnvelope', 'peakRenderedCloseModels']);
   const samplesWithCandidates = getNumber(summary, ['closeModelEnvelope', 'samplesWithCandidates']);
+  const sampleCount = getNumber(summary, ['closeModelEnvelope', 'sampleCount']);
+  const samplesWithRenderedCloseModels = getNumber(summary, ['closeModelEnvelope', 'samplesWithRenderedCloseModels']);
+  const candidateSampleRatio = sampleCount !== null && sampleCount > 0 && samplesWithCandidates !== null
+    ? samplesWithCandidates / sampleCount
+    : null;
   const fallbackPassed = peakCandidates !== null
     && peakRendered !== null
     && samplesWithCandidates !== null
@@ -410,8 +422,24 @@ function addMaterializationEnvelopeChecks(
     status: passed ? 'pass' : 'fail',
     value: peakCandidates,
     message: passed
-      ? `NPC materialization pressure was represented (peak candidates=${peakCandidates ?? 'unknown'}, peak rendered=${peakRendered ?? 'unknown'}, samplesWithCandidates=${samplesWithCandidates ?? 'unknown'})`
-      : `NPC materialization pressure is missing or thin (peak candidates=${peakCandidates ?? 'missing'}, peak rendered=${peakRendered ?? 'missing'}, samplesWithCandidates=${samplesWithCandidates ?? 'missing'}); completion evidence must not close a materialization fix from low-contact route variance`,
+      ? `NPC materialization pressure was represented (peak candidates=${peakCandidates ?? 'unknown'}, peak rendered=${peakRendered ?? 'unknown'}, samplesWithCandidates=${samplesWithCandidates ?? 'unknown'}/${sampleCount ?? 'unknown'})`
+      : `NPC materialization pressure is missing or thin (peak candidates=${peakCandidates ?? 'missing'}, peak rendered=${peakRendered ?? 'missing'}, samplesWithCandidates=${samplesWithCandidates ?? 'missing'}/${sampleCount ?? 'missing'}); completion evidence must not close a materialization fix from low-contact route variance`,
+  });
+
+  const sustained = sampleCount !== null
+    && samplesWithCandidates !== null
+    && samplesWithRenderedCloseModels !== null
+    && samplesWithCandidates >= MIN_SUSTAINED_MATERIALIZATION_SAMPLES
+    && samplesWithRenderedCloseModels >= MIN_SUSTAINED_MATERIALIZATION_SAMPLES
+    && candidateSampleRatio !== null
+    && candidateSampleRatio >= MIN_SUSTAINED_MATERIALIZATION_RATIO;
+  checks.push({
+    id: 'npc_materialization_sustained_contact',
+    status: sustained ? 'pass' : 'fail',
+    value: candidateSampleRatio,
+    message: sustained
+      ? `NPC materialization contact was sustained across detailed samples (${samplesWithCandidates}/${sampleCount}, ${formatPercent(candidateSampleRatio)}; rendered=${samplesWithRenderedCloseModels})`
+      : `NPC materialization contact was too bursty for completion comparison (${samplesWithCandidates ?? 'missing'}/${sampleCount ?? 'missing'}, ${formatPercent(candidateSampleRatio)}; rendered=${samplesWithRenderedCloseModels ?? 'missing'}; min samples=${MIN_SUSTAINED_MATERIALIZATION_SAMPLES}, min ratio=${formatPercent(MIN_SUSTAINED_MATERIALIZATION_RATIO)})`,
   });
 }
 
@@ -735,7 +763,8 @@ export function evaluateDroppedFrameEarsArtifact(artifactDir: string): DroppedFr
       : 'diagnostic';
   const contactQualified = checkPassed(checks, 'active_combat_shots')
     && checkPassed(checks, 'active_combat_hits');
-  const materializationQualified = checkPassed(checks, 'npc_materialization_pressure');
+  const materializationQualified = checkPassed(checks, 'npc_materialization_pressure')
+    && checkPassed(checks, 'npc_materialization_sustained_contact');
   const completionLaneQualified = classification === 'proven'
     && contactQualified
     && materializationQualified;

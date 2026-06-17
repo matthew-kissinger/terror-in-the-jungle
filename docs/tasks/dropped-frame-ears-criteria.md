@@ -46,9 +46,10 @@ Executable scaffold:
   failed rAF gates, and harness-equivalence warnings as diagnostic rather than
   completion evidence.
 - A Shau captures can vary naturally because the driver does not always reach
-  sustained combat or close-model pressure on every run, so materialization and
-  combat-frame claims require pressure evidence instead of assuming identical
-  scenario load across attempts.
+  sustained combat or close-model pressure on every run. Materialization and
+  combat-frame claims require sustained pressure evidence, not just a peak
+  shot/hit or candidate count, because otherwise one run can look better or
+  worse simply from route/contact variance.
 - A passing checker result is still local artifact proof only. Owner playtest,
   terrain/camera visual acceptance, exact-head CI, deploy, and
   `check:live-release` remain required before production completion.
@@ -73,7 +74,7 @@ Executable scaffold:
 | ST4-PERF-014 | Complex | When a local candidate passes static validation while runtime proof is missing, the agent shall call it source-stable but unproven. | `validate:fast` and relevant focused checks pass, but STABILIZAT-4 remains open. | command output, `docs/DIRECTIVES.md` |
 | ST4-PERF-015 | Complex | When both required scenarios pass locally while default content is preserved, the agent shall run release proof before claiming production completion. | Exact-head CI, deploy, `check:live-release`, and owner playtest pass. | CI/deploy URLs, release proof JSON |
 | ST4-PERF-016 | Event-driven | When an agent evaluates saved dropped-frame artifacts, the repo shall provide an executable artifact classifier instead of relying on hand-scanned summaries. | `npm run check:dropped-frame-ears -- --dir <ashau> --dir <openfrontier> --strict` exits 0 only when both scenarios pass the EARS completion artifact gate. | `scripts/check-dropped-frame-ears.ts`, CLI output |
-| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` passes: at least several close candidates are sampled for more than one interval and close models are actually rendered. Thin-contact captures remain diagnostic for materialization even when shots/hits pass. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
+| ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 detailed samples and at least 10% of detailed close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when shots/hits pass. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 
 ## Candidate Classification
 

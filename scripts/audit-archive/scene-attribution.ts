@@ -289,31 +289,53 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     if (names.includes('hitboxdebug')) return 'debug_overlays';
     return 'unattributed';
   };
-  const ownerInfoFor = (object) => {
+  const normalizeOwnerSummary = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((entry) => {
+        const ownerKey = entry?.ownerKey;
+        if (typeof ownerKey !== 'string' || ownerKey.length === 0) return null;
+        const ownerLabel = entry.ownerLabel;
+        const ownerType = entry.ownerType;
+        const weight = Number(entry.sourceMeshCount ?? entry.weight ?? 1);
+        return {
+          ownerKey,
+          ownerLabel: typeof ownerLabel === 'string' && ownerLabel.length > 0 ? ownerLabel : ownerKey,
+          ownerType: typeof ownerType === 'string' && ownerType.length > 0 ? ownerType : null,
+          weight: Number.isFinite(weight) && weight > 0 ? weight : 1
+        };
+      })
+      .filter(Boolean);
+  };
+  const ownerInfosFor = (object) => {
     let current = object;
     while (current) {
       const data = current.userData ?? {};
+      const summary = normalizeOwnerSummary(data.perfOwnerSummary);
+      if (summary.length > 0) return summary;
       const key = data.perfOwnerKey;
       if (typeof key === 'string' && key.length > 0) {
         const label = data.perfOwnerLabel;
         const type = data.perfOwnerType;
-        return {
+        return [{
           ownerKey: key,
           ownerLabel: typeof label === 'string' && label.length > 0 ? label : key,
-          ownerType: typeof type === 'string' && type.length > 0 ? type : null
-        };
+          ownerType: typeof type === 'string' && type.length > 0 ? type : null,
+          weight: 1
+        }];
       }
       current = current.parent;
     }
     const modelPath = modelPathFor(object);
     if (modelPath) {
-      return {
+      return [{
         ownerKey: 'model:' + modelPath,
         ownerLabel: modelPath,
-        ownerType: 'model'
-      };
+        ownerType: 'model',
+        weight: 1
+      }];
     }
-    return null;
+    return [];
   };
   const triangleCountFor = (geometry, group) => {
     if (!geometry) return 0;
@@ -387,13 +409,24 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
     }
     return owner;
   };
-  const recordOwner = (bucket, ownerInfo, triangles, instances) => {
+  const recordOwner = (bucket, ownerInfo, triangles, instances, drawSubmissions = 1) => {
     const owner = getOwnerBucket(bucket, ownerInfo);
     if (!owner) return;
-    owner.drawSubmissions += 1;
+    owner.drawSubmissions += drawSubmissions;
     owner.triangles += triangles;
     owner.instances += instances;
-    owner.meshes += 1;
+    owner.meshes += drawSubmissions;
+  };
+  const recordOwners = (bucket, ownerInfos, triangles, instances) => {
+    if (!Array.isArray(ownerInfos) || ownerInfos.length === 0) return;
+    const totalWeight = ownerInfos.reduce((total, owner) => total + Math.max(0, Number(owner.weight ?? 1)), 0);
+    if (!(totalWeight > 0)) return;
+    for (const ownerInfo of ownerInfos) {
+      const weight = Math.max(0, Number(ownerInfo.weight ?? 1));
+      if (!(weight > 0)) continue;
+      const share = weight / totalWeight;
+      recordOwner(bucket, ownerInfo, triangles * share, instances * share, share);
+    }
   };
   const normalizePassType = (passType) => {
     return typeof passType === 'string' && passType.length > 0 ? passType : 'unknown';
@@ -504,7 +537,8 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       const instances = instanceCountFor(object, geometry);
       const instanceMultiplier = object?.isInstancedMesh ? instances : Math.max(1, instances);
       const triangles = Math.round(triangleCountFor(geometry, group) * instanceMultiplier);
-      const ownerInfo = ownerInfoFor(object);
+      const ownerInfos = ownerInfosFor(object);
+      const primaryOwnerInfo = ownerInfos[0] ?? null;
       const frameCount = readFrameCount();
       if (frameCount !== state.lastEventScanFrameCount) {
         addMetricEventFrames(globalScope.__metrics?.getSnapshot?.(), state.interestingFrameCounts);
@@ -538,15 +572,15 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       if (material) frameBucket.materials.add(material);
       if (geometry) frameBucket.geometries.add(geometry);
       incrementPassType(frameBucket.passTypes, normalizedPassType);
-      recordOwner(frameBucket, ownerInfo, triangles, instances);
+      recordOwners(frameBucket, ownerInfos, triangles, instances);
       if (frameBucket.examples.length < 4) {
         frameBucket.examples.push({
           nameChain: nameChainFor(object) || '(unnamed)',
           type: object.type || 'Object3D',
           modelPath: modelPathFor(object) || null,
-          ownerKey: ownerInfo?.ownerKey ?? null,
-          ownerLabel: ownerInfo?.ownerLabel ?? null,
-          ownerType: ownerInfo?.ownerType ?? null,
+          ownerKey: primaryOwnerInfo?.ownerKey ?? null,
+          ownerLabel: primaryOwnerInfo?.ownerLabel ?? null,
+          ownerType: primaryOwnerInfo?.ownerType ?? null,
           materialType: materialLabelFor(material),
           passType: normalizedPassType,
           triangles,
@@ -562,7 +596,7 @@ export const PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_INSTALL_SOURCE = String.r
       if (material) totalBucket.materials.add(material);
       if (geometry) totalBucket.geometries.add(geometry);
       incrementPassType(totalBucket.passTypes, normalizedPassType);
-      recordOwner(totalBucket, ownerInfo, triangles, instances);
+      recordOwners(totalBucket, ownerInfos, triangles, instances);
       if (totalBucket.examples.length < 4 && frameBucket.examples.length > 0) {
         totalBucket.examples.push(frameBucket.examples[frameBucket.examples.length - 1]);
       }

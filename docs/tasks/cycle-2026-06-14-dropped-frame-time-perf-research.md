@@ -56,6 +56,35 @@ need the same release shepherding before they are called shipped.
 
 ## Latest Static Sidecar Findings
 
+- 2026-06-17 A Shau EARS rerun:
+  `artifacts/perf/2026-06-17T10-36-26-323Z` ran on clean local
+  `90a314f5`, headed strict WebGPU with real A Shau contact. It is diagnostic,
+  not completion proof: `check:dropped-frame-ears --strict` reports contact
+  and materialization qualified, but capture status, validation,
+  measurement trust, rAF gates, and view-slew equivalence still fail. The run
+  had 85 sim shots / 85 hits, close-model pressure across 22 of 57 detailed
+  samples, `rAF >25ms 2.30%`, `rAF >33ms 0.54%`, estimated dropped frames
+  `2.79/s`, and dropped-frame time `40.53ms/s`. The tail remains render /
+  presentation-led: the slowest loop callback was about `303.6ms`, with
+  `RenderMain.renderer.render` about `293.2ms`. Tail render submissions showed
+  terrain as the triangle owner (`300,544` triangles / 10 submissions),
+  vegetation imposters next (`60,386` triangles / 6 submissions), and
+  world-static features as the draw-submission owner (`45` submissions).
+  Browser observers recorded 54 Long Animation Frames, including one around
+  `314ms`, so treat this as a render/presentation stall problem before
+  simulation micro-optimization.
+- A Shau route/contact variance is now enforced in the artifact gate, not just
+  noted in prose. `check:dropped-frame-ears` requires both peak
+  `npc_materialization_pressure` and sustained
+  `npc_materialization_sustained_contact` before materialization-sensitive
+  evidence can be completion-qualified; burst-only or low-contact A Shau runs
+  remain diagnostic even if shots/hits pass.
+- Render-submission owner attribution now preserves source-owner summaries on
+  generated static-model batch meshes. This does not change runtime content or
+  draw policy; it fixes the blind spot where generated world-static batches
+  collapsed into `world-feature-sector:*` and hid which feature placements were
+  represented in a hot sector. The next capture should show source-feature
+  owners for world-static batch tails instead of only sector labels.
 - Source-aware CDLOD resolution correction:
   A Shau's renderer was still choosing near CDLOD depth from the default
   procedural 4 m target even though its authoritative DEM source is 9 m per
