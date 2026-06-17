@@ -250,6 +250,8 @@ function releaseLowerPriorityStickyCloseModel(
     const stickyId = stickyCandidate.combatant.id;
     if (!selected.has(stickyId)) continue;
     if (compareCloseModelCandidates(candidate, stickyCandidate) >= 0) continue;
+    const priorityGain = candidate.priorityScore - stickyCandidate.priorityScore;
+    if (priorityGain < PixelForgeNpcDistanceConfig.closeModelReplacementPriorityMargin) continue;
 
     const instance = activeCloseModels.get(stickyId);
     if (!instance) continue;

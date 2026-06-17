@@ -534,6 +534,29 @@ describe('CombatantLODManager', () => {
       nowSpy.mockRestore();
     });
 
+    it('reports sim-lane transitions and rendered catch-up lag for perf captures', () => {
+      const promoted = createMockCombatant('promoted', new THREE.Vector3(10, 12, 0));
+      promoted.simLane = 'culled';
+      promoted.renderedPosition = new THREE.Vector3(10, 2, 0);
+      const demoted = createMockCombatant('demoted', new THREE.Vector3(700, 0, 0));
+      demoted.simLane = 'high';
+      combatants.set(promoted.id, promoted);
+      combatants.set(demoted.id, demoted);
+
+      manager.updateCombatants(0.016);
+
+      const stats = manager.getFrameSchedulingStats().simLaneTransitions;
+      expect(stats.total).toBe(2);
+      expect(stats.towardHigherFidelity).toBe(1);
+      expect(stats.towardLowerFidelity).toBe(1);
+      expect(stats.byTransition).toMatchObject({
+        'culled->high': 1,
+        'high->culled': 1,
+      });
+      expect(stats.maxRenderedVerticalLagMeters).toBeCloseTo(10);
+      expect(stats.maxTransitionRenderedLagMeters).toBeCloseTo(10);
+    });
+
     it('should schedule medium LOD updates based on dynamic interval and stagger', () => {
       const combatant = createMockCombatant('medium', new THREE.Vector3(200, 0, 0));
       combatants.set('medium', combatant);

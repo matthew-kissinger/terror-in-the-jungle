@@ -192,7 +192,26 @@ export class CombatantProfiler {
       maxHighFullUpdatesPerFrame: 0,
       maxMediumFullUpdatesPerFrame: 0,
       aiBudgetExceededEvents: 0,
-      aiSevereOverBudgetEvents: 0
+      aiSevereOverBudgetEvents: 0,
+      simLaneTransitions: {
+        total: 0,
+        towardHigherFidelity: 0,
+        towardLowerFidelity: 0,
+        toHigh: 0,
+        toMedium: 0,
+        toLow: 0,
+        toCulled: 0,
+        fromHigh: 0,
+        fromMedium: 0,
+        fromLow: 0,
+        fromCulled: 0,
+        byTransition: {} as Record<string, number>,
+        maxRenderedLagMeters: 0,
+        maxRenderedHorizontalLagMeters: 0,
+        maxRenderedVerticalLagMeters: 0,
+        maxTransitionRenderedLagMeters: 0,
+        sampledRenderedLagCount: 0
+      }
     },
     closeEngagement: emptyCloseEngagementProfile()
   };
@@ -302,6 +321,25 @@ export class CombatantProfiler {
         maxMediumFullUpdatesPerFrame: number;
         aiBudgetExceededEvents: number;
         aiSevereOverBudgetEvents: number;
+        simLaneTransitions: {
+          total: number;
+          towardHigherFidelity: number;
+          towardLowerFidelity: number;
+          toHigh: number;
+          toMedium: number;
+          toLow: number;
+          toCulled: number;
+          fromHigh: number;
+          fromMedium: number;
+          fromLow: number;
+          fromCulled: number;
+          byTransition: Record<string, number>;
+          maxRenderedLagMeters: number;
+          maxRenderedHorizontalLagMeters: number;
+          maxRenderedVerticalLagMeters: number;
+          maxTransitionRenderedLagMeters: number;
+          sampledRenderedLagCount: number;
+        };
       };
       closeEngagement: CloseEngagementProfile;
     };

@@ -112,6 +112,13 @@ export const PixelForgeNpcDistanceConfig = {
   /** Debounce window (ms) to avoid rapid swap thrash when a combatant flickers off-screen. */
   recentlyVisibleMs: 800,
   /**
+   * Minimum priority-score improvement required before a new candidate evicts
+   * an already active close model. Distance-only ordering changes are tiny
+   * (< 1), while semantic boosts such as squad, active combat, on-screen, and
+   * hard-near remain large enough to cut through.
+   */
+  closeModelReplacementPriorityMargin: 1,
+  /**
    * Velocity-squared threshold below which an impostor holds its idle frame.
    * Roughly (0.2 m/s)^2.
    */

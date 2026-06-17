@@ -970,11 +970,17 @@ describe('CombatantRenderer', () => {
       const activeAfterFrame1 = activeCloseModelsFor(renderer);
       expect(activeAfterFrame1.size).toBe(hardNearReserveCap);
 
-      // Frame 2: a new, higher-priority NVA cluster (cluster B, closer) appears
-      // while cluster A is still in the candidate list but now lower priority.
+      // Frame 2: a new, higher-priority NVA cluster (cluster B, actively
+      // fighting) appears while cluster A is still in the candidate list but
+      // now lower priority.
       const frame2 = new Map<string, Combatant>(frame1);
       for (let i = 0; i < hardNearReserveCap; i++) {
-        const combatant = createMockCombatant(`nva-b-${i}`, Faction.NVA, new THREE.Vector3(8 + i * 0.5, 0, 0));
+        const combatant = createMockCombatant(
+          `nva-b-${i}`,
+          Faction.NVA,
+          new THREE.Vector3(8 + i * 0.5, 0, 0),
+          CombatantState.ENGAGING,
+        );
         frame2.set(combatant.id, combatant);
       }
       renderer.updateBillboards(frame2, new THREE.Vector3(0, 0, 0));
@@ -1013,6 +1019,60 @@ describe('CombatantRenderer', () => {
       expect(stats.fallbackCounts['pool-empty']).toBe(0);
       // Cluster A is displaced via total-cap, not pool-empty.
       expect(stats.fallbackCounts['total-cap']).toBe(hardNearReserveCap);
+    });
+
+    it('keeps distance-only cap-edge candidates on impostors instead of thrashing close-model slots', async () => {
+      await (renderer as unknown as {
+        createCloseModelPool(
+          poolKey: Faction,
+          factionConfig: ReturnType<typeof getPixelForgeNpcRuntimeFaction>,
+          targetSize: number,
+        ): Promise<void>;
+      }).createCloseModelPool(
+        Faction.NVA,
+        getPixelForgeNpcRuntimeFaction(Faction.NVA),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_POOL_PER_FACTION,
+      );
+
+      const combatants = new Map<string, Combatant>();
+      for (let i = 0; i < PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP; i++) {
+        const combatant = createMockCombatant(
+          `stable-${i}`,
+          Faction.NVA,
+          new THREE.Vector3(70 + i * 0.5, 0, 0),
+          CombatantState.PATROLLING,
+        );
+        combatants.set(combatant.id, combatant);
+      }
+
+      advanceCloseModelPromotionFrames(
+        renderer,
+        combatants,
+        new THREE.Vector3(0, 0, 0),
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+      );
+      let active = activeCloseModelsFor(renderer);
+      for (let i = 0; i < PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP; i++) {
+        expect(active.has(`stable-${i}`)).toBe(true);
+      }
+
+      const marginallyCloser = createMockCombatant(
+        'distance-only-newcomer',
+        Faction.NVA,
+        new THREE.Vector3(69.5, 0, 0),
+        CombatantState.PATROLLING,
+      );
+      combatants.set(marginallyCloser.id, marginallyCloser);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      active = activeCloseModelsFor(renderer);
+      expect(active.has('distance-only-newcomer')).toBe(false);
+      expect(active.has(`stable-${PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP - 1}`)).toBe(true);
+      expect(marginallyCloser.billboardIndex).toBeGreaterThanOrEqual(0);
+      const { stats } = readCloseModelTelemetry(renderer);
+      expect(stats.replacementsThisFrame).toBe(0);
+      expect(stats.renderedCloseModels).toBe(PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP);
     });
 
     it('budget arbiter v1: active-combat actors outrank closer non-combat actors at the cap edge', async () => {

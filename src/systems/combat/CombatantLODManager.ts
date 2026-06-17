@@ -23,6 +23,12 @@ import { Logger } from '../../utils/Logger';
 import { NpcLodConfig } from '../../config/CombatantConfig';
 import { DESTINATION_ARRIVAL_RADIUS } from './CombatantMovementStates';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
+import {
+  cloneSimLaneTransitionStats,
+  createEmptySimLaneTransitionStats,
+  setCombatantSimLane,
+  type CombatantFrameSchedulingStats,
+} from './CombatantSimLaneTelemetry';
 
 const DESTINATION_ARRIVAL_RADIUS_SQ = DESTINATION_ARRIVAL_RADIUS * DESTINATION_ARRIVAL_RADIUS;
 
@@ -143,6 +149,7 @@ export class CombatantLODManager {
   private highFullUpdateCostEmaMs = 0.5;
   private highFullUpdateCostPeakMs = 0.5;
   private readonly highFullUpdateCostById = new Map<string, number>();
+  private simLaneTransitionStats = createEmptySimLaneTransitionStats();
 
   // Module dependencies
   private combatantAI: CombatantAI;
@@ -365,6 +372,7 @@ export class CombatantLODManager {
       this.projectedHighFullUpdateDeferralsThisFrame = 0;
       this.aiBudgetExceededEventsThisFrame = 0;
       this.aiSevereOverBudgetEventsThisFrame = 0;
+      this.simLaneTransitionStats = createEmptySimLaneTransitionStats();
       this.aiBudgetMs = Math.max(CombatantLODManager.MIN_AI_BUDGET_MS, this.AI_FRAME_BUDGET_MS * this.intervalScale);
 
       now = Date.now();
@@ -404,7 +412,7 @@ export class CombatantLODManager {
             Math.abs(combatant.position.z) > worldSize) {
           this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
           combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
-          combatant.simLane = 'culled';
+          setCombatantSimLane(this.simLaneTransitionStats, combatant, 'culled');
           this.lodCulledCount++;
           return;
         }
@@ -428,7 +436,7 @@ export class CombatantLODManager {
     const highStart = performance.now();
     this.trackCombatAiPhase('Combat.AI.High', () => {
       this.highBucket.forEach((combatant, index) => {
-        combatant.simLane = 'high';
+        setCombatantSimLane(this.simLaneTransitionStats, combatant, 'high');
         this.lodHighCount++;
 
         // Stagger AI decisions before consulting the budget guard. Off-frame
@@ -481,7 +489,7 @@ export class CombatantLODManager {
     const mediumStart = performance.now();
     this.trackCombatAiPhase('Combat.AI.Medium', () => {
       this.mediumBucket.forEach((combatant, index) => {
-        combatant.simLane = 'medium';
+        setCombatantSimLane(this.simLaneTransitionStats, combatant, 'medium');
         this.lodMediumCount++;
         const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
         const elapsedMs = now - (combatant.lastUpdateTime || 0);
@@ -529,7 +537,7 @@ export class CombatantLODManager {
     const lowStart = performance.now();
     this.trackCombatAiPhase('Combat.AI.Low', () => {
       this.lowBucket.forEach((combatant, index) => {
-        combatant.simLane = 'low';
+        setCombatantSimLane(this.simLaneTransitionStats, combatant, 'low');
         this.lodLowCount++;
         if (isLargeWorldMode && this.frameCounter % STAGGER_LOW !== index % STAGGER_LOW) {
           this.staggeredSkipCount++;
@@ -559,7 +567,7 @@ export class CombatantLODManager {
     this.trackCombatAiPhase('Combat.AI.Culled', () => {
       for (let index = 0; index < this.culledBucket.length; index++) {
         const combatant = this.culledBucket[index];
-        combatant.simLane = 'culled';
+        setCombatantSimLane(this.simLaneTransitionStats, combatant, 'culled');
         this.lodCulledCount++;
         if (isLargeWorldMode) {
           const culledElapsedMs = performance.now() - culledStart;
@@ -918,21 +926,7 @@ export class CombatantLODManager {
     });
   }
 
-  getFrameSchedulingStats(): {
-    frameCounter: number;
-    intervalScale: number;
-    aiBudgetMs: number;
-    staggeredSkips: number;
-    highFullUpdates: number;
-    mediumFullUpdates: number;
-    projectedHighFullUpdateDeferrals: number;
-    highFullUpdateCostEmaMs: number;
-    highFullUpdateCostPeakMs: number;
-    maxHighFullUpdatesPerFrame: number;
-    maxMediumFullUpdatesPerFrame: number;
-    aiBudgetExceededEvents: number;
-    aiSevereOverBudgetEvents: number;
-  } {
+  getFrameSchedulingStats(): CombatantFrameSchedulingStats {
     return {
       frameCounter: this.frameCounter,
       intervalScale: this.intervalScale,
@@ -946,7 +940,8 @@ export class CombatantLODManager {
       maxHighFullUpdatesPerFrame: this.maxHighFullUpdatesPerFrame,
       maxMediumFullUpdatesPerFrame: this.maxMediumFullUpdatesPerFrame,
       aiBudgetExceededEvents: this.aiBudgetExceededEventsThisFrame,
-      aiSevereOverBudgetEvents: this.aiSevereOverBudgetEventsThisFrame
+      aiSevereOverBudgetEvents: this.aiSevereOverBudgetEventsThisFrame,
+      simLaneTransitions: cloneSimLaneTransitionStats(this.simLaneTransitionStats),
     };
   }
 

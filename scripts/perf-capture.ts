@@ -294,6 +294,25 @@ type RuntimeSample = {
       maxMediumFullUpdatesPerFrame: number;
       aiBudgetExceededEvents: number;
       aiSevereOverBudgetEvents: number;
+      simLaneTransitions?: {
+        total: number;
+        towardHigherFidelity: number;
+        towardLowerFidelity: number;
+        toHigh: number;
+        toMedium: number;
+        toLow: number;
+        toCulled: number;
+        fromHigh: number;
+        fromMedium: number;
+        fromLow: number;
+        fromCulled: number;
+        byTransition: Record<string, number>;
+        maxRenderedLagMeters: number;
+        maxRenderedHorizontalLagMeters: number;
+        maxRenderedVerticalLagMeters: number;
+        maxTransitionRenderedLagMeters: number;
+        sampledRenderedLagCount: number;
+      };
     };
   };
   renderer?: {
@@ -875,6 +894,7 @@ type CaptureSummary = {
   droppedFrameMetrics?: DroppedFrameSummary;
   renderSubmissionMetrics?: RenderSubmissionSummary;
   materializationTierMetrics?: MaterializationTierEventSummary;
+  simLaneTransitionMetrics?: SimLaneTransitionSummary;
   closeModelEnvelope?: CloseModelEnvelopeSummary;
   presentationGapContexts?: PresentationGapContextSummary;
   sceneAttribution?: SceneAttributionEntry[];
@@ -1045,6 +1065,33 @@ type MaterializationTierEventSummary = {
     byTransition: Record<string, number>;
     byReason: Record<string, number>;
   };
+};
+
+type SimLaneTransitionStats = NonNullable<
+  NonNullable<NonNullable<RuntimeSample['combatBreakdown']>['aiScheduling']>['simLaneTransitions']
+>;
+
+type SimLaneTransitionSummary = {
+  sampleCount: number;
+  samplesWithTransitions: number;
+  totalTransitions: number;
+  towardHigherFidelity: number;
+  towardLowerFidelity: number;
+  byTransition: Record<string, number>;
+  peakTransitionSample?: {
+    ts: string;
+    frameCount: number;
+    total: number;
+    towardHigherFidelity: number;
+    towardLowerFidelity: number;
+    byTransition: Record<string, number>;
+    maxRenderedLagMeters: number;
+    maxTransitionRenderedLagMeters: number;
+  };
+  maxRenderedLagMeters: number;
+  maxRenderedHorizontalLagMeters: number;
+  maxRenderedVerticalLagMeters: number;
+  maxTransitionRenderedLagMeters: number;
 };
 
 type CloseModelEnvelopeSummary = {
@@ -2578,6 +2625,80 @@ function summarizeMaterializationTierEvents(runtimeSamples: RuntimeSample[]): Ma
     transitionWindowByReason,
     peakSample,
     peakTransitionWindowSample,
+  };
+}
+
+function summarizeSimLaneTransitions(runtimeSamples: RuntimeSample[]): SimLaneTransitionSummary | undefined {
+  const samples = runtimeSamples
+    .map((sample) => ({
+      ts: sample.ts,
+      frameCount: sample.frameCount,
+      transitions: sample.combatBreakdown?.aiScheduling?.simLaneTransitions,
+    }))
+    .filter((sample): sample is { ts: string; frameCount: number; transitions: SimLaneTransitionStats } =>
+      Boolean(sample.transitions));
+  if (samples.length === 0) {
+    return undefined;
+  }
+
+  const byTransition: Record<string, number> = {};
+  let totalTransitions = 0;
+  let towardHigherFidelity = 0;
+  let towardLowerFidelity = 0;
+  let maxRenderedLagMeters = 0;
+  let maxRenderedHorizontalLagMeters = 0;
+  let maxRenderedVerticalLagMeters = 0;
+  let maxTransitionRenderedLagMeters = 0;
+  let peakTransitionSample: SimLaneTransitionSummary['peakTransitionSample'];
+
+  for (const sample of samples) {
+    const transitions = sample.transitions;
+    const total = Number(transitions.total ?? 0);
+    totalTransitions += total;
+    towardHigherFidelity += Number(transitions.towardHigherFidelity ?? 0);
+    towardLowerFidelity += Number(transitions.towardLowerFidelity ?? 0);
+    mergeNumericRecordCounts(byTransition, transitions.byTransition);
+
+    maxRenderedLagMeters = Math.max(maxRenderedLagMeters, Number(transitions.maxRenderedLagMeters ?? 0));
+    maxRenderedHorizontalLagMeters = Math.max(
+      maxRenderedHorizontalLagMeters,
+      Number(transitions.maxRenderedHorizontalLagMeters ?? 0),
+    );
+    maxRenderedVerticalLagMeters = Math.max(
+      maxRenderedVerticalLagMeters,
+      Number(transitions.maxRenderedVerticalLagMeters ?? 0),
+    );
+    maxTransitionRenderedLagMeters = Math.max(
+      maxTransitionRenderedLagMeters,
+      Number(transitions.maxTransitionRenderedLagMeters ?? 0),
+    );
+
+    if (total > 0 && (!peakTransitionSample || total > peakTransitionSample.total)) {
+      peakTransitionSample = {
+        ts: sample.ts,
+        frameCount: sample.frameCount,
+        total,
+        towardHigherFidelity: Number(transitions.towardHigherFidelity ?? 0),
+        towardLowerFidelity: Number(transitions.towardLowerFidelity ?? 0),
+        byTransition: { ...transitions.byTransition },
+        maxRenderedLagMeters: Number(transitions.maxRenderedLagMeters ?? 0),
+        maxTransitionRenderedLagMeters: Number(transitions.maxTransitionRenderedLagMeters ?? 0),
+      };
+    }
+  }
+
+  return {
+    sampleCount: samples.length,
+    samplesWithTransitions: samples.filter((sample) => Number(sample.transitions.total ?? 0) > 0).length,
+    totalTransitions,
+    towardHigherFidelity,
+    towardLowerFidelity,
+    byTransition,
+    peakTransitionSample,
+    maxRenderedLagMeters,
+    maxRenderedHorizontalLagMeters,
+    maxRenderedVerticalLagMeters,
+    maxTransitionRenderedLagMeters,
   };
 }
 
@@ -6122,7 +6243,37 @@ async function runCapture(): Promise<void> {
                     maxHighFullUpdatesPerFrame: Number(combatProfile.timing.aiScheduling.maxHighFullUpdatesPerFrame ?? 0),
                     maxMediumFullUpdatesPerFrame: Number(combatProfile.timing.aiScheduling.maxMediumFullUpdatesPerFrame ?? 0),
                     aiBudgetExceededEvents: Number(combatProfile.timing.aiScheduling.aiBudgetExceededEvents ?? 0),
-                    aiSevereOverBudgetEvents: Number(combatProfile.timing.aiScheduling.aiSevereOverBudgetEvents ?? 0)
+                    aiSevereOverBudgetEvents: Number(combatProfile.timing.aiScheduling.aiSevereOverBudgetEvents ?? 0),
+                    simLaneTransitions: combatProfile.timing.aiScheduling.simLaneTransitions
+                      && typeof combatProfile.timing.aiScheduling.simLaneTransitions === 'object'
+                      ? {
+                          total: Number(combatProfile.timing.aiScheduling.simLaneTransitions.total ?? 0),
+                          towardHigherFidelity: Number(combatProfile.timing.aiScheduling.simLaneTransitions.towardHigherFidelity ?? 0),
+                          towardLowerFidelity: Number(combatProfile.timing.aiScheduling.simLaneTransitions.towardLowerFidelity ?? 0),
+                          toHigh: Number(combatProfile.timing.aiScheduling.simLaneTransitions.toHigh ?? 0),
+                          toMedium: Number(combatProfile.timing.aiScheduling.simLaneTransitions.toMedium ?? 0),
+                          toLow: Number(combatProfile.timing.aiScheduling.simLaneTransitions.toLow ?? 0),
+                          toCulled: Number(combatProfile.timing.aiScheduling.simLaneTransitions.toCulled ?? 0),
+                          fromHigh: Number(combatProfile.timing.aiScheduling.simLaneTransitions.fromHigh ?? 0),
+                          fromMedium: Number(combatProfile.timing.aiScheduling.simLaneTransitions.fromMedium ?? 0),
+                          fromLow: Number(combatProfile.timing.aiScheduling.simLaneTransitions.fromLow ?? 0),
+                          fromCulled: Number(combatProfile.timing.aiScheduling.simLaneTransitions.fromCulled ?? 0),
+                          byTransition: combatProfile.timing.aiScheduling.simLaneTransitions.byTransition
+                            && typeof combatProfile.timing.aiScheduling.simLaneTransitions.byTransition === 'object'
+                            ? Object.fromEntries(
+                                Object.entries(combatProfile.timing.aiScheduling.simLaneTransitions.byTransition).map(([key, value]: [string, unknown]) => [
+                                  String(key),
+                                  Number(value ?? 0)
+                                ])
+                              )
+                            : {},
+                          maxRenderedLagMeters: Number(combatProfile.timing.aiScheduling.simLaneTransitions.maxRenderedLagMeters ?? 0),
+                          maxRenderedHorizontalLagMeters: Number(combatProfile.timing.aiScheduling.simLaneTransitions.maxRenderedHorizontalLagMeters ?? 0),
+                          maxRenderedVerticalLagMeters: Number(combatProfile.timing.aiScheduling.simLaneTransitions.maxRenderedVerticalLagMeters ?? 0),
+                          maxTransitionRenderedLagMeters: Number(combatProfile.timing.aiScheduling.simLaneTransitions.maxTransitionRenderedLagMeters ?? 0),
+                          sampledRenderedLagCount: Number(combatProfile.timing.aiScheduling.simLaneTransitions.sampledRenderedLagCount ?? 0)
+                        }
+                      : undefined
                   } : undefined
                 }
               : undefined,
@@ -6531,6 +6682,11 @@ async function runCapture(): Promise<void> {
         const closeModelSuffix = closeStats
           ? ` close=${closeStats.renderedCloseModels}/${closeStats.candidatesWithinCloseRadius} active=${closeStats.activeCloseModels}/${closeStats.closeModelActiveCap} promo=${closeStats.promotionsThisFrame}/${closeStats.promotionBudgetPerFrame} repl=${closeStats.replacementsThisFrame} fallback=${closeStats.fallbackCount} poolLoads=${closeStats.poolLoads}`
           : '';
+        const simLaneTransitions = sample.combatBreakdown?.aiScheduling?.simLaneTransitions;
+        const simLaneSuffix = simLaneTransitions
+          && (simLaneTransitions.total > 0 || simLaneTransitions.maxRenderedLagMeters > 0)
+          ? ` simLane=${simLaneTransitions.total} up=${simLaneTransitions.towardHigherFidelity} down=${simLaneTransitions.towardLowerFidelity} lag=${simLaneTransitions.maxRenderedLagMeters.toFixed(1)}m transLag=${simLaneTransitions.maxTransitionRenderedLagMeters.toFixed(1)}m`
+          : '';
         const resourceEntries = Array.isArray(recentResources?.entries) ? recentResources.entries : [];
         const latestResource = resourceEntries.length > 0
           ? resourceEntries[resourceEntries.length - 1]
@@ -6550,7 +6706,7 @@ async function runCapture(): Promise<void> {
         const fireTerrainBlockSuffix = fireTerrainBlockedFrame > 0 || fireTerrainBlockedTotal > 0
           ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}%`
           : '';
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${heightAwareTerrainSuffix}${vegetationSuffix}${weatherSuffix}${closeModelSuffix}${driverSuffix}`);
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve}${simLaneSuffix} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${heightAwareTerrainSuffix}${vegetationSuffix}${weatherSuffix}${closeModelSuffix}${driverSuffix}`);
         // harness-lifecycle-halt-on-match-end: latch the first match-end
         // observation, then break the loop after MATCH_END_TAIL_MS so we
         // finalize close to the moment the engine declared a winner instead
@@ -6903,6 +7059,7 @@ async function runCapture(): Promise<void> {
         droppedFrameMetrics: summarizeDroppedFrames(runtimeSamples, durationSeconds),
         renderSubmissionMetrics: summarizeRenderSubmissions(runtimeSamples),
         materializationTierMetrics: summarizeMaterializationTierEvents(runtimeSamples),
+        simLaneTransitionMetrics: summarizeSimLaneTransitions(runtimeSamples),
         closeModelEnvelope: summarizeCloseModelEnvelope(runtimeSamples),
         presentationGapContexts: summarizePresentationGapContexts(
           runtimeSamples,

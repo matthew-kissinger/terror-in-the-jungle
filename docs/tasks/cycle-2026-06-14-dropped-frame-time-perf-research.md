@@ -1483,3 +1483,17 @@ Update 2026-06-17 14:18 UTC / 10:18 EDT:
 - Verification for the correction passed: `npm run typecheck`,
   `npx vitest run scripts/check-dropped-frame-ears.test.ts scripts/perf-presentation-gap-summary.test.ts`,
   and `npx eslint scripts/perf-capture.ts scripts/check-dropped-frame-ears.ts scripts/perf-presentation-gap-summary.ts`.
+
+Update 2026-06-17 14:35 UTC / 10:35 EDT:
+
+- Owner still sees stutter and slow frames as enemies cross LOD /
+  materialization tiers. We kept the close-model replacement hysteresis patch,
+  but the goal is still open because the same run worsened overall and remained
+  render-bound.
+- Harness blind spot patched: `CombatantLODManager` now emits read-only
+  `simLaneTransitions` telemetry and `perf-capture` serializes, logs, and
+  summarizes it. Short built-bundle smoke
+  `artifacts/perf/2026-06-17T14-30-31-527Z` proves schema/runtime emission only.
+- Detailed evidence, caveats, and next optimization targets are in
+  `docs/perf/lod-materialization-transition-telemetry-2026-06-17.md`. Next
+  trusted capture should correlate stutter with sim-lane transitions first.
