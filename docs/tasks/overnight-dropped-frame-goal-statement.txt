@@ -46,6 +46,21 @@ Completion evidence required:
    and shooting-path work in the suspect set until artifacts narrow it.
 
 Latest static checkpoint:
+- World-feature micro-detail shadow checkpoint:
+  close-detail world props that already use `detailRenderDistanceM` (fuel
+  drums, supply/ammo crates, foxholes, punji-style detail) now remain visible
+  at the same cull distances and still receive scene shadows, but no longer
+  cast their own shadow-map submissions. Larger world-feature silhouettes
+  (buildings, bunkers, towers, tents, bridges), terrain, vehicles, fixed-wing
+  aircraft, vegetation, wildlife, weather, combat pressure, draw distance,
+  model paths, prefab/generated-airfield layouts, terrain grounding, LOS/collision
+  registration, and player flow are preserved. This targets A Shau / base
+  close-detail shadow-submission pressure without deleting or hiding props.
+  Source-stable evidence on branch `task/dropped-frame-paired-evidence`:
+  focused WorldFeatureSystem / GroundVehicleRenderOptimization tests,
+  targeted ESLint, `npm run typecheck`, and `lint-source-budget` passed. It is
+  not a proven dropped-frame win until fresh paired EARS captures pass on a
+  quiet machine.
 - Fixed-wing opaque material consolidation checkpoint:
   `FixedWingModel` now bakes per-mesh opaque paint colors into vertex colors
   before running the existing static GLB draw-call optimizer, while leaving

@@ -809,10 +809,23 @@ describe('WorldFeatureSystem', () => {
     const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
     const sector = root.children.find((child) => child.name.startsWith('WorldFeatureSector_')) as THREE.Group;
     const detail = root.getObjectByName(StructureModels.SUPPLY_CRATE) as THREE.Group;
+    const detailMeshes = collectMeshes(detail);
+    const nonDetailMeshes = collectMeshes(root).filter((mesh) => {
+      let current: THREE.Object3D | null = mesh;
+      while (current) {
+        if (current === detail) return false;
+        current = current.parent;
+      }
+      return true;
+    });
     expect(sector.visible).toBe(true);
     expect(detail.visible).toBe(false);
     expect(detail.userData.worldFeatureDetailRenderDistanceM).toBe(110);
-    expect(collectMeshes(detail)).toHaveLength(1);
+    expect(detailMeshes).toHaveLength(1);
+    expect(detailMeshes.every((mesh) => !mesh.castShadow && mesh.receiveShadow)).toBe(true);
+    expect(detailMeshes.every((mesh) => mesh.userData.worldFeatureDetailShadowCaster === false)).toBe(true);
+    expect(nonDetailMeshes.length).toBeGreaterThan(0);
+    expect(nonDetailMeshes.every((mesh) => mesh.castShadow && mesh.receiveShadow)).toBe(true);
 
     camera.position.set(0, 30, -55);
     camera.lookAt(0, 10, -150);

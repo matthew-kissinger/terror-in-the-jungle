@@ -70,6 +70,16 @@ export function enableWorldFeatureShadows(object: THREE.Object3D): void {
   });
 }
 
+export function disableWorldFeatureDetailShadowCasting(object: THREE.Object3D): void {
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.castShadow = false;
+      child.receiveShadow = true;
+      child.userData.worldFeatureDetailShadowCaster = false;
+    }
+  });
+}
+
 function applyWorldFeatureAttribution(
   object: THREE.Object3D,
   metadata: WorldFeatureAttributionMetadata,

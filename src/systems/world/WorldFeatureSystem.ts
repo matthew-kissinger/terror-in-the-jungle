@@ -15,7 +15,7 @@ import { AIRFIELD_TEMPLATES, getAirfieldTemplateCompatibilityIssues } from './Ai
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { disposeGeneratedGroundVehicleResources, prepareDynamicGroundVehicleForRendering, updateDynamicGroundVehicleVisibility } from './GroundVehicleRenderOptimization';
-import { applyWorldFeatureGroupAttribution, applyWorldFeaturePlacementAttribution, applyWorldFeatureSectorAttribution, enableWorldFeatureShadows } from './WorldFeaturePerfAttribution';
+import { applyWorldFeatureGroupAttribution, applyWorldFeaturePlacementAttribution, applyWorldFeatureSectorAttribution, disableWorldFeatureDetailShadowCasting, enableWorldFeatureShadows } from './WorldFeaturePerfAttribution';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import { createGroundVehicleForModelPath, groundVehicleIdForPlacement, isGroundVehicleModelPath } from '../vehicle/GroundVehicle';
@@ -401,6 +401,7 @@ export class WorldFeatureSystem implements GameSystem {
             placement.modelPath,
             profile.drawCallOptimization ?? 'merge',
           );
+          disableWorldFeatureDetailShadowCasting(object);
           applyWorldFeaturePlacementAttribution(object, feature, placement, i, objectId, { perfCategory: 'world_static_features' });
           parent.add(object);
           object.updateMatrixWorld(true);
