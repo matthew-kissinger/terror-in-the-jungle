@@ -154,13 +154,18 @@ export class WeatherSystem implements GameSystem {
       this.setWeatherState(config.initialState, true);
       this.cycleTimer = this.getRandomCycleDuration();
     }
+    this.syncRainParticleRuntime();
   }
 
   async init(): Promise<void> {
-    this.createRainParticles();
+    if (this.shouldRenderRainParticles()) {
+      this.createRainParticles();
+    }
   }
 
   private createRainParticles(): void {
+    if (this.rainMesh) return;
+
     const geometry = new THREE.PlaneGeometry(0.05, 1.0);
     const material = new THREE.MeshBasicMaterial({
       color: 0xaaaaaa,
@@ -270,7 +275,7 @@ export class WeatherSystem implements GameSystem {
     if (instant) {
       this.currentState = state;
       this.transitionProgress = 1.0;
-      this.setSurfaceWetness(getBlendedRainIntensity(state, state, 1.0));
+      this.setSurfaceWetness(this.resolveSurfaceWetness(getBlendedRainIntensity(state, state, 1.0)));
       this.updateAtmosphere();
     } else {
       this.transitionProgress = 0.0;
@@ -282,6 +287,8 @@ export class WeatherSystem implements GameSystem {
     const matrixElements = this.lastRainMatrixUploadCount * 16;
     return {
       configEnabled: this.config?.enabled === true,
+      visualRainEnabled: this.shouldRenderRainParticles(),
+      surfaceWetnessEnabled: this.shouldApplyPrecipitationSurfaceWetness(),
       currentState: this.currentState,
       targetState: this.targetState,
       transitionProgress: this.transitionProgress,
@@ -311,11 +318,19 @@ export class WeatherSystem implements GameSystem {
   }
 
   private updateRain(deltaTime: number): void {
-    if (!this.rainMesh) return;
-
     // Determine rain intensity based on blended state
     const intensity = getBlendedRainIntensity(this.currentState, this.targetState, this.transitionProgress);
-    this.setSurfaceWetness(intensity);
+    this.setSurfaceWetness(this.resolveSurfaceWetness(intensity));
+
+    if (!this.shouldRenderRainParticles()) {
+      this.deactivateRainParticles();
+      return;
+    }
+
+    if (!this.rainMesh) {
+      this.createRainParticles();
+    }
+    if (!this.rainMesh) return;
 
     if (intensity <= 0.01) {
       if (this.rainInactive) {
@@ -402,6 +417,45 @@ export class WeatherSystem implements GameSystem {
     if (this.rainCount <= 0 || intensity <= 0.01) return 0;
     const activeFraction = Math.min(1, Math.max(MIN_ACTIVE_RAIN_FRACTION, intensity));
     return Math.max(1, Math.min(this.rainCount, Math.ceil(this.rainCount * activeFraction)));
+  }
+
+  private shouldRenderRainParticles(): boolean {
+    return this.config?.visualRain !== false;
+  }
+
+  private shouldApplyPrecipitationSurfaceWetness(): boolean {
+    return this.config?.visualRain !== false;
+  }
+
+  private resolveSurfaceWetness(intensity: number): number {
+    return this.shouldApplyPrecipitationSurfaceWetness() ? intensity : 0;
+  }
+
+  private syncRainParticleRuntime(): void {
+    if (!this.shouldRenderRainParticles()) {
+      this.disposeRainParticles();
+      this.deactivateRainParticles();
+    }
+  }
+
+  private deactivateRainParticles(): void {
+    if (this.rainMesh) {
+      this.rainMesh.visible = false;
+      this.rainMesh.count = 0;
+    }
+    this.activeRainCount = 0;
+    this.rainMatrixUploadPhase = 0;
+    this.lastRainMatrixUploadStart = 0;
+    this.lastRainMatrixUploadCount = 0;
+    this.rainInactive = true;
+  }
+
+  private disposeRainParticles(): void {
+    if (!this.rainMesh) return;
+    this.scene.remove(this.rainMesh);
+    this.rainMesh.geometry.dispose();
+    (this.rainMesh.material as THREE.Material).dispose();
+    this.rainMesh = undefined;
   }
 
   private resolveRainMatrixUploadWindow(activeCount: number, forceFullUpload: boolean): { start: number; count: number } {
@@ -505,10 +559,6 @@ export class WeatherSystem implements GameSystem {
   }
 
   dispose(): void {
-    if (this.rainMesh) {
-      this.scene.remove(this.rainMesh);
-      this.rainMesh.geometry.dispose();
-      (this.rainMesh.material as THREE.Material).dispose();
-    }
+    this.disposeRainParticles();
   }
 }

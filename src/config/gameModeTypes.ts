@@ -25,6 +25,12 @@ export interface WeatherConfig {
   initialState: WeatherState;
   transitionChance: number; // 0-1 chance per minute
   cycleDuration: { min: number; max: number }; // minutes
+  /**
+   * Controls precipitation surface effects and visible raindrop rendering only.
+   * Weather state, atmosphere, cloud/fog intent, and lightning remain active
+   * when this is false.
+   */
+  visualRain?: boolean;
 }
 
 export interface ZoneConfig {

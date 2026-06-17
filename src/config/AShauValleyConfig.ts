@@ -78,7 +78,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   chunkSize: 256,
   weather: {
     enabled: true,
-    initialState: WeatherState.LIGHT_RAIN,
+    initialState: WeatherState.LIGHT_RAIN, visualRain: false,
     transitionChance: 0.3,
     cycleDuration: { min: 3, max: 10 }
   },

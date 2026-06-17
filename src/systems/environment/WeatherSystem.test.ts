@@ -233,6 +233,34 @@ describe('WeatherSystem', () => {
       const systemAny = system as WeatherSystemAny;
       expect(systemAny.cycleTimer).toBe(90);
     });
+
+    it('disables precipitation particles and wetness for controlled-burn weather', async () => {
+      const { system, terrainRuntime } = createSystemWithRainCount(10);
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.3);
+      system.setWeatherConfig(createWeatherConfig({
+        initialState: WeatherState.LIGHT_RAIN,
+        visualRain: false,
+      }));
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
+      await system.init();
+      vi.clearAllMocks();
+      const systemAny = system as WeatherSystemAny;
+
+      system.update(1);
+
+      expect(systemAny.currentState).toBe(WeatherState.LIGHT_RAIN);
+      expect(updateAtmosphere).toHaveBeenCalled();
+      expect(terrainRuntime.setSurfaceWetness).not.toHaveBeenCalled();
+      expect(systemAny.rainMesh).toBeUndefined();
+      expect(systemAny.activeRainCount).toBe(0);
+      expect(system.getDebugInfo()).toMatchObject({
+        visualRainEnabled: false,
+        surfaceWetnessEnabled: false,
+        activeRainCount: 0,
+        rainVisible: false,
+        surfaceWetness: 0,
+      });
+    });
   });
 
   describe('setWeatherState', () => {
@@ -471,6 +499,27 @@ describe('WeatherSystem', () => {
       expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0.3);
     });
 
+    it('deactivates existing rain particles and wetness when visual rain is disabled', async () => {
+      const { system, terrainRuntime } = createSystemWithRainCount(10);
+      await system.init();
+      const systemAny = system as WeatherSystemAny;
+      expect(systemAny.rainMesh).toBeDefined();
+
+      system.setWeatherConfig(createWeatherConfig({
+        initialState: WeatherState.LIGHT_RAIN,
+        visualRain: false,
+      }));
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
+      vi.clearAllMocks();
+      vi.mocked(getBlendedRainIntensity).mockReturnValue(0.8);
+      systemAny.updateRain(1);
+
+      expect(systemAny.rainMesh).toBeUndefined();
+      expect(systemAny.activeRainCount).toBe(0);
+      expect(systemAny.lastRainMatrixUploadCount).toBe(0);
+      expect(terrainRuntime.setSurfaceWetness).not.toHaveBeenCalled();
+    });
+
     it('applies storm wind strength', async () => {
       const { system } = createSystemWithRainCount(1);
       await system.init();
@@ -659,12 +708,14 @@ describe('WeatherSystem', () => {
       await system.init();
       const systemAny = system as WeatherSystemAny;
       const removeSpy = vi.spyOn(scene, 'remove');
-      const geometryDisposeSpy = vi.spyOn(systemAny.rainMesh!.geometry, 'dispose');
-      const materialDisposeSpy = vi.spyOn(systemAny.rainMesh!.material as THREE.Material, 'dispose');
+      const rainMesh = systemAny.rainMesh!;
+      const geometryDisposeSpy = vi.spyOn(rainMesh.geometry, 'dispose');
+      const materialDisposeSpy = vi.spyOn(rainMesh.material as THREE.Material, 'dispose');
       system.dispose();
-      expect(removeSpy).toHaveBeenCalledWith(systemAny.rainMesh);
+      expect(removeSpy).toHaveBeenCalledWith(rainMesh);
       expect(geometryDisposeSpy).toHaveBeenCalled();
       expect(materialDisposeSpy).toHaveBeenCalled();
+      expect(systemAny.rainMesh).toBeUndefined();
     });
   });
 

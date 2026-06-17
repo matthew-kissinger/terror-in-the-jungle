@@ -155,6 +155,8 @@ type RuntimeVegetationStats = {
 
 type RuntimeWeatherStats = {
   configEnabled: boolean;
+  visualRainEnabled: boolean;
+  surfaceWetnessEnabled: boolean;
   currentState: string;
   targetState: string;
   transitionProgress: number;
@@ -5260,6 +5262,263 @@ async function runCapture(): Promise<void> {
               }
               return entries;
             };
+            const finiteNumber = function(value, fallback = 0) {
+              const parsed = Number(value);
+              return Number.isFinite(parsed) ? parsed : fallback;
+            };
+            const compactString = function(value, limit = 220) {
+              const text = String(value ?? '');
+              return text.length > limit ? text.slice(0, limit) + '...' : text;
+            };
+            const uniqueObjects = function(groups, limit = 32, keyFor) {
+              const out = [];
+              const seen = new Set();
+              for (const group of groups) {
+                if (!Array.isArray(group)) continue;
+                for (const entry of group) {
+                  if (!entry || typeof entry !== 'object') continue;
+                  const key = typeof keyFor === 'function' ? keyFor(entry) : null;
+                  const identity = key ?? entry;
+                  if (seen.has(identity)) continue;
+                  seen.add(identity);
+                  out.push(entry);
+                  if (out.length >= limit) return out;
+                }
+              }
+              return out;
+            };
+            const topByNumber = function(value, limit, scorer) {
+              if (!Array.isArray(value)) return [];
+              return value
+                .filter((entry) => Boolean(entry && typeof entry === 'object'))
+                .slice()
+                .sort((a, b) => finiteNumber(scorer(b)) - finiteNumber(scorer(a)))
+                .slice(0, Math.max(0, Math.floor(Number(limit) || 0)));
+            };
+            const compactNumberRecord = function(value, limit = 16) {
+              if (!value || typeof value !== 'object') return {};
+              return Object.fromEntries(
+                Object.entries(value)
+                  .map(([name, raw]) => [String(name), finiteNumber(raw)])
+                  .filter(([, numberValue]) => Number.isFinite(numberValue))
+                  .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                  .slice(0, Math.max(1, Math.floor(Number(limit) || 16)))
+              );
+            };
+            const compactTimingBuckets = function(value, limit = 32) {
+              if (!value || typeof value !== 'object') return undefined;
+              const entries = Object.entries(value)
+                .map(([name, raw]) => {
+                  const bucket = raw && typeof raw === 'object' ? raw : {};
+                  return [
+                    String(name),
+                    {
+                      count: finiteNumber(bucket.count),
+                      totalDurationMs: finiteNumber(bucket.totalDurationMs),
+                      maxDurationMs: finiteNumber(bucket.maxDurationMs)
+                    }
+                  ];
+                })
+                .sort((a, b) => finiteNumber(b[1].totalDurationMs) - finiteNumber(a[1].totalDurationMs))
+                .slice(0, Math.max(1, Math.floor(Number(limit) || 32)));
+              return Object.fromEntries(entries);
+            };
+            const compactJsonValue = function(value, depth = 0, options = {}) {
+              const maxDepth = Math.max(1, Math.floor(Number(options.maxDepth) || 5));
+              const arrayLimit = Math.max(1, Math.floor(Number(options.arrayLimit) || 8));
+              const entryLimit = Math.max(1, Math.floor(Number(options.entryLimit) || 48));
+              const stringLimit = Math.max(32, Math.floor(Number(options.stringLimit) || 220));
+              if (value === null || value === undefined) return value ?? null;
+              const type = typeof value;
+              if (type === 'number' || type === 'boolean') return value;
+              if (type === 'string') return compactString(value, stringLimit);
+              if (type !== 'object') return null;
+              if (depth >= maxDepth) {
+                return Array.isArray(value)
+                  ? { truncatedArray: true, length: value.length }
+                  : { truncatedObject: true };
+              }
+              if (Array.isArray(value)) {
+                const start = Math.max(0, value.length - arrayLimit);
+                return value
+                  .slice(start)
+                  .map((entry) => compactJsonValue(entry, depth + 1, options));
+              }
+              const output = {};
+              let count = 0;
+              for (const [key, child] of Object.entries(value)) {
+                if (count >= entryLimit) break;
+                output[String(key)] = compactJsonValue(child, depth + 1, options);
+                count += 1;
+              }
+              return output;
+            };
+            const compactDiagnosticObject = function(value, options) {
+              if (!value || typeof value !== 'object') return null;
+              return compactJsonValue(value, 0, options ?? {
+                maxDepth: 5,
+                arrayLimit: 8,
+                entryLimit: 48,
+                stringLimit: 220
+              });
+            };
+            const compactDiagnosticArray = function(value, limit = 12, options) {
+              return objectArray(value, limit)
+                .map((entry) => compactDiagnosticObject(entry, options))
+                .filter((entry) => Boolean(entry && typeof entry === 'object'));
+            };
+            const selectImportantRafEntries = function(value, limit = 16) {
+              const entries = objectArray(value, 32);
+              return uniqueObjects([
+                entries.slice(-8),
+                topByNumber(entries, 12, (entry) => Number(entry.gapMs ?? 0)),
+                topByNumber(entries, 8, (entry) => Number(entry.droppedFrameTime60HzMs ?? 0))
+              ], limit, (entry) => {
+                const atMs = Number(entry.atMs ?? entry.endAtMs ?? 0);
+                const gapMs = Number(entry.gapMs ?? 0);
+                return Number.isFinite(atMs) ? 'raf:' + atMs.toFixed(3) + ':' + gapMs.toFixed(3) : null;
+              }).sort((a, b) => finiteNumber(a.atMs ?? a.endAtMs) - finiteNumber(b.atMs ?? b.endAtMs));
+            };
+            const selectImportantLoopFrames = function(value, limit = 16) {
+              const entries = objectArray(value, 64);
+              return uniqueObjects([
+                entries.slice(-4),
+                topByNumber(entries, 12, (entry) => Number(entry.callbackDurationMs ?? 0)),
+                topByNumber(entries, 8, (entry) => Number(entry.timestampDeltaMs ?? 0)),
+                topByNumber(entries, 6, (entry) => Number(entry.unmeasuredCallbackMs ?? 0))
+              ], limit, (entry) => {
+                const frameCount = Number(entry.frameCount ?? NaN);
+                if (Number.isFinite(frameCount)) return 'loop-frame:' + frameCount;
+                const startedAtMs = Number(entry.startedAtMs ?? 0);
+                return Number.isFinite(startedAtMs) ? 'loop-start:' + startedAtMs.toFixed(3) : null;
+              }).sort((a, b) => finiteNumber(a.startedAtMs ?? a.frameCount) - finiteNumber(b.startedAtMs ?? b.frameCount));
+            };
+            const compactRenderSubmissionCategory = function(category, ownerLimit = 4, exampleLimit = 2) {
+              if (!category || typeof category !== 'object') return null;
+              return {
+                category: String(category.category ?? 'unattributed'),
+                drawSubmissions: finiteNumber(category.drawSubmissions),
+                triangles: finiteNumber(category.triangles),
+                instances: finiteNumber(category.instances),
+                meshes: finiteNumber(category.meshes),
+                materials: finiteNumber(category.materials),
+                geometries: finiteNumber(category.geometries),
+                passTypes: compactNumberRecord(category.passTypes, 8),
+                topOwners: ownerLimit > 0 && Array.isArray(category.topOwners)
+                  ? category.topOwners.slice(0, ownerLimit).map((owner) => ({
+                      ownerKey: compactString(owner?.ownerKey ?? 'unknown', 160),
+                      ownerLabel: compactString(owner?.ownerLabel ?? owner?.ownerKey ?? 'unknown', 160),
+                      ownerType: owner?.ownerType === null || owner?.ownerType === undefined
+                        ? null
+                        : compactString(owner.ownerType, 80),
+                      drawSubmissions: finiteNumber(owner?.drawSubmissions),
+                      triangles: finiteNumber(owner?.triangles),
+                      instances: finiteNumber(owner?.instances),
+                      meshes: finiteNumber(owner?.meshes)
+                    }))
+                  : undefined,
+                examples: exampleLimit > 0 && Array.isArray(category.examples)
+                  ? category.examples.slice(0, exampleLimit).map((example) => ({
+                      nameChain: compactString(example?.nameChain ?? '', 180),
+                      type: compactString(example?.type ?? '', 80),
+                      modelPath: example?.modelPath === null || example?.modelPath === undefined
+                        ? null
+                        : compactString(example.modelPath, 180),
+                      ownerKey: example?.ownerKey === null || example?.ownerKey === undefined
+                        ? null
+                        : compactString(example.ownerKey, 120),
+                      ownerLabel: example?.ownerLabel === null || example?.ownerLabel === undefined
+                        ? null
+                        : compactString(example.ownerLabel, 120),
+                      ownerType: example?.ownerType === null || example?.ownerType === undefined
+                        ? null
+                        : compactString(example.ownerType, 80),
+                      materialType: example?.materialType === null || example?.materialType === undefined
+                        ? null
+                        : compactString(example.materialType, 80),
+                      passType: example?.passType === undefined ? undefined : compactString(example.passType, 80),
+                      triangles: finiteNumber(example?.triangles),
+                      instances: finiteNumber(example?.instances)
+                    }))
+                  : undefined
+              };
+            };
+            const selectImportantRenderCategories = function(value, limit = 16) {
+              const entries = objectArray(value, 96);
+              const unattributed = entries.filter((entry) => String(entry.category ?? '') === 'unattributed');
+              return uniqueObjects([
+                topByNumber(entries, 12, (entry) => Number(entry.drawSubmissions ?? 0)),
+                topByNumber(entries, 12, (entry) => Number(entry.triangles ?? 0)),
+                unattributed
+              ], limit, (entry) => 'category:' + String(entry.category ?? 'unattributed'));
+            };
+            const renderFrameAnchorMs = function(frame) {
+              const first = Number(frame?.firstAtMs ?? NaN);
+              const last = Number(frame?.lastAtMs ?? NaN);
+              if (Number.isFinite(first) && Number.isFinite(last)) return (first + last) / 2;
+              if (Number.isFinite(last)) return last;
+              if (Number.isFinite(first)) return first;
+              return null;
+            };
+            const selectImportantRenderFrames = function(frames, rafEntries, limit = 32) {
+              const entries = objectArray(frames, 128);
+              const gapEntries = selectImportantRafEntries(rafEntries, 8);
+              const nearestToGaps = [];
+              for (const gap of gapEntries) {
+                const anchor = Number(gap.atMs ?? gap.endAtMs ?? NaN);
+                if (!Number.isFinite(anchor)) continue;
+                let best = null;
+                let bestDelta = Number.POSITIVE_INFINITY;
+                for (const frame of entries) {
+                  const frameAnchor = renderFrameAnchorMs(frame);
+                  if (frameAnchor === null) continue;
+                  const delta = Math.abs(frameAnchor - anchor);
+                  if (delta < bestDelta) {
+                    best = frame;
+                    bestDelta = delta;
+                  }
+                }
+                if (best) nearestToGaps.push(best);
+              }
+              return uniqueObjects([
+                nearestToGaps,
+                entries.slice(-4),
+                topByNumber(entries, 6, (entry) => Number(entry.drawSubmissions ?? 0)),
+                topByNumber(entries, 6, (entry) => Number(entry.triangles ?? 0))
+              ], limit, (entry) => {
+                const frameCount = Number(entry.frameCount ?? NaN);
+                return Number.isFinite(frameCount) ? 'render-frame:' + frameCount : null;
+              }).sort((a, b) => finiteNumber(a.frameCount) - finiteNumber(b.frameCount));
+            };
+            const compactRenderSubmissionDrain = function(value, rafEntries) {
+              if (!value || typeof value !== 'object') return null;
+              return {
+                mode: value.mode === undefined ? undefined : String(value.mode),
+                installedCount: finiteNumber(value.installedCount),
+                installPasses: finiteNumber(value.installPasses),
+                rawFrameCount: value.rawFrameCount === undefined ? undefined : finiteNumber(value.rawFrameCount),
+                frameCountStart: nullableNumber(value.frameCountStart),
+                frameCountEnd: nullableNumber(value.frameCountEnd),
+                frames: selectImportantRenderFrames(value.frames, rafEntries, 8).map((frame) => ({
+                  frameCount: finiteNumber(frame.frameCount),
+                  firstAtMs: finiteNumber(frame.firstAtMs),
+                  lastAtMs: finiteNumber(frame.lastAtMs),
+                  drawSubmissions: finiteNumber(frame.drawSubmissions),
+                  triangles: finiteNumber(frame.triangles),
+                  instances: finiteNumber(frame.instances),
+                  passTypes: compactNumberRecord(frame.passTypes, 8),
+                  categories: selectImportantRenderCategories(frame.categories, 8)
+                    .map((category) => compactRenderSubmissionCategory(category, 2, 0))
+                    .filter(Boolean)
+                })),
+                totals: selectImportantRenderCategories(value.totals, 10)
+                  .map((category) => compactRenderSubmissionCategory(category, 4, 1))
+                  .filter(Boolean),
+                errors: Array.isArray(value.errors)
+                  ? value.errors.slice(0, 8).map((entry) => compactString(entry, 220))
+                  : undefined
+              };
+            };
             const normalizeRuntimeLiveness = function(value) {
               const raw = objectOrNull(value);
               if (!raw) return null;
@@ -5287,15 +5546,26 @@ async function runCapture(): Promise<void> {
                 effectiveHeightAtPlayer: nullableNumber(raw.effectiveHeightAtPlayer),
                 collisionHeightDeltaAtPlayer: nullableNumber(raw.collisionHeightDeltaAtPlayer),
                 collisionContributorsAtPlayer: Array.isArray(raw.collisionContributorsAtPlayer)
-                  ? raw.collisionContributorsAtPlayer.filter((entry) => Boolean(entry && typeof entry === 'object'))
+                  ? raw.collisionContributorsAtPlayer
+                      .filter((entry) => Boolean(entry && typeof entry === 'object'))
+                      .slice(0, 4)
+                      .map((entry) => compactDiagnosticObject(entry, { maxDepth: 3, arrayLimit: 4, entryLimit: 24, stringLimit: 160 }))
                   : [],
-                playerMovementDebug: objectOrNull(raw.playerMovementDebug),
+                playerMovementDebug: compactDiagnosticObject(raw.playerMovementDebug, { maxDepth: 4, arrayLimit: 4, entryLimit: 32, stringLimit: 180 }),
               };
             };
             window.__perfCaptureHarnessHelpers = {
               nullableNumber,
               objectOrNull,
               objectArray,
+              compactDiagnosticObject,
+              compactDiagnosticArray,
+              compactNumberRecord,
+              compactTimingBuckets,
+              selectImportantLoopFrames,
+              selectImportantRafEntries,
+              topByNumber,
+              compactRenderSubmissionDrain,
               normalizeRuntimeLiveness,
             };
           })();
@@ -5664,6 +5934,17 @@ async function runCapture(): Promise<void> {
             : null;
           const memory = (performance as any).memory;
           const snapshot = metrics?.getSnapshot?.();
+          const sampleHelpers = (window as any).__perfCaptureHarnessHelpers;
+          const nullableNumber = sampleHelpers.nullableNumber;
+          const compactDiagnosticObject = sampleHelpers.compactDiagnosticObject;
+          const compactDiagnosticArray = sampleHelpers.compactDiagnosticArray;
+          const compactNumberRecord = sampleHelpers.compactNumberRecord;
+          const compactTimingBuckets = sampleHelpers.compactTimingBuckets;
+          const selectImportantLoopFrames = sampleHelpers.selectImportantLoopFrames;
+          const selectImportantRafEntries = sampleHelpers.selectImportantRafEntries;
+          const topByNumber = sampleHelpers.topByNumber;
+          const compactRenderSubmissionDrain = sampleHelpers.compactRenderSubmissionDrain;
+          const normalizeRuntimeLiveness = sampleHelpers.normalizeRuntimeLiveness;
           const rawFrameEvents = Array.isArray(snapshot?.frameEvents)
             ? snapshot.frameEvents
             : [];
@@ -5685,13 +5966,8 @@ async function runCapture(): Promise<void> {
           const rawLoopFrameBreakdown = (window as any).__gameLoopFrameBreakdown?.drain?.() ?? [];
           const loopFrameBreakdown: LoopFrameBreakdownSample[] = [];
           if (Array.isArray(rawLoopFrameBreakdown)) {
-            const loopFrameBreakdownStart = Math.max(0, rawLoopFrameBreakdown.length - 64);
-            for (
-              let loopFrameBreakdownIndex = loopFrameBreakdownStart;
-              loopFrameBreakdownIndex < rawLoopFrameBreakdown.length;
-              loopFrameBreakdownIndex++
-            ) {
-              const entry = rawLoopFrameBreakdown[loopFrameBreakdownIndex];
+            const selectedLoopFrameBreakdown = selectImportantLoopFrames(rawLoopFrameBreakdown, 6);
+            for (const entry of selectedLoopFrameBreakdown) {
                 const rawSegments = entry?.segments && typeof entry.segments === 'object'
                   ? entry.segments
                   : {};
@@ -5701,9 +5977,6 @@ async function runCapture(): Promise<void> {
                 const rawTelemetryTimings = Array.isArray(entry?.telemetryTimings)
                   ? entry.telemetryTimings
                   : [];
-                const rawCombatTiming = entry?.combatTiming && typeof entry.combatTiming === 'object'
-                  ? entry.combatTiming
-                  : null;
                 loopFrameBreakdown.push({
                   frameCount: Number.isFinite(Number(entry?.frameCount)) ? Number(entry.frameCount) : null,
                   startedAtMs: Number(entry?.startedAtMs ?? 0),
@@ -5712,26 +5985,27 @@ async function runCapture(): Promise<void> {
                   callbackDurationMs: Number(entry?.callbackDurationMs ?? 0),
                   segmentTotalMs: Number(entry?.segmentTotalMs ?? 0),
                   unmeasuredCallbackMs: Number(entry?.unmeasuredCallbackMs ?? 0),
-                  segments: Object.fromEntries(
-                    Object.entries(rawSegments)
-                      .map(([name, value]: [string, any]) => [String(name), Number(value ?? 0)])
-                      .filter(([, value]) => Number.isFinite(value))
-                  ),
-                  systemTimings: rawSystemTimings
-                    .map((timing: any) => ({
+                  segments: compactNumberRecord(rawSegments, 16),
+                  systemTimings: topByNumber(
+                    rawSystemTimings
+                      .map((timing: any) => ({
                       name: String(timing?.name ?? 'unknown'),
                       lastMs: Number(timing?.lastMs ?? 0),
                       emaMs: Number(timing?.emaMs ?? timing?.timeMs ?? 0),
                       budgetMs: Number(timing?.budgetMs ?? 0),
                       overBudget: Boolean(timing?.overBudget)
                     }))
-                    .filter((timing: any) =>
+                      .filter((timing: any) =>
                       Number.isFinite(timing.lastMs) &&
                       Number.isFinite(timing.emaMs) &&
                       Number.isFinite(timing.budgetMs)
-                    ),
-                  telemetryTimings: rawTelemetryTimings
-                    .map((timing: any) => ({
+                      ),
+                    8,
+                    (timing: any) => Math.max(Math.abs(Number(timing.lastMs ?? 0)), Math.abs(Number(timing.emaMs ?? 0)))
+                  ),
+                  telemetryTimings: topByNumber(
+                    rawTelemetryTimings
+                      .map((timing: any) => ({
                       name: String(timing?.name ?? 'unknown'),
                       lastMs: Number(timing?.lastMs ?? 0),
                       emaMs: Number(timing?.emaMs ?? timing?.timeMs ?? 0),
@@ -5739,23 +6013,19 @@ async function runCapture(): Promise<void> {
                       budgetMs: Number(timing?.budgetMs ?? 0),
                       overBudget: Boolean(timing?.overBudget)
                     }))
-                    .filter((timing: any) =>
+                      .filter((timing: any) =>
                       Number.isFinite(timing.lastMs) &&
                       Number.isFinite(timing.emaMs) &&
                       Number.isFinite(timing.peakMs) &&
                       Number.isFinite(timing.budgetMs)
+                      ),
+                    8,
+                    (timing: any) => Math.max(Math.abs(Number(timing.lastMs ?? 0)), Math.abs(Number(timing.peakMs ?? 0)))
                   ),
-                  combatTiming: rawCombatTiming
-                    ? JSON.parse(JSON.stringify(rawCombatTiming))
-                    : undefined
+                  combatTiming: undefined
                 });
             }
           }
-          const sampleHelpers = (window as any).__perfCaptureHarnessHelpers;
-          const nullableNumber = sampleHelpers.nullableNumber;
-          const objectOrNull = sampleHelpers.objectOrNull;
-          const objectArray = sampleHelpers.objectArray;
-          const normalizeRuntimeLiveness = sampleHelpers.normalizeRuntimeLiveness;
           const normalizeVegetationDebug = (debug: any) => {
             if (!debug || typeof debug !== 'object') return undefined;
             const byType: Record<string, { active: number; highWater: number; free: number }> = {};
@@ -5795,6 +6065,8 @@ async function runCapture(): Promise<void> {
             if (!debug || typeof debug !== 'object') return undefined;
             return {
               configEnabled: Boolean(debug.configEnabled),
+              visualRainEnabled: Boolean(debug.visualRainEnabled),
+              surfaceWetnessEnabled: Boolean(debug.surfaceWetnessEnabled),
               currentState: String(debug.currentState ?? 'unknown'),
               targetState: String(debug.targetState ?? 'unknown'),
               transitionProgress: Number(debug.transitionProgress ?? 0),
@@ -5866,7 +6138,10 @@ async function runCapture(): Promise<void> {
                 ? tracker?.drainSummary?.() ?? tracker?.drain?.() ?? null
                 : tracker?.drain?.() ?? null;
               if (rawRenderSubmissions && typeof rawRenderSubmissions === 'object' && !rawRenderSubmissions.error) {
-                renderSubmissions = rawRenderSubmissions;
+                renderSubmissions = compactRenderSubmissionDrain(
+                  rawRenderSubmissions,
+                  browserStalls?.recent?.rafCadence?.entries
+                );
               } else {
                 renderSubmissionError = String(rawRenderSubmissions?.error ?? 'render_submission_tracker_unavailable');
               }
@@ -5963,8 +6238,16 @@ async function runCapture(): Promise<void> {
                   : undefined
               }
               : undefined,
-            terrainRecoveryEvents: objectArray(terrainRecoveryEvents, 64),
-            materializationTierEvents: objectArray(materializationTierEvents, 128),
+            terrainRecoveryEvents: compactDiagnosticArray(
+              terrainRecoveryEvents,
+              32,
+              { maxDepth: 4, arrayLimit: 4, entryLimit: 48, stringLimit: 180 }
+            ),
+            materializationTierEvents: compactDiagnosticArray(
+              materializationTierEvents,
+              128,
+              { maxDepth: 4, arrayLimit: 4, entryLimit: 48, stringLimit: 180 }
+            ),
             renderer: rendererStats ? {
               drawCalls: Number(rendererStats.drawCalls ?? 0),
               triangles: Number(rendererStats.triangles ?? 0),
@@ -6024,16 +6307,7 @@ async function runCapture(): Promise<void> {
                 webglTextureUploadTotalDurationMs: Number(browserStalls.totals?.webglTextureUploadTotalDurationMs ?? 0),
                 webglTextureUploadMaxDurationMs: Number(browserStalls.totals?.webglTextureUploadMaxDurationMs ?? 0),
                 webglTextureUploadByOperation: browserStalls.totals?.webglTextureUploadByOperation && typeof browserStalls.totals.webglTextureUploadByOperation === 'object'
-                  ? Object.fromEntries(
-                      Object.entries(browserStalls.totals.webglTextureUploadByOperation).map(([name, value]: [string, any]) => [
-                        String(name),
-                        {
-                          count: Number(value?.count ?? 0),
-                          totalDurationMs: Number(value?.totalDurationMs ?? 0),
-                          maxDurationMs: Number(value?.maxDurationMs ?? 0)
-                        }
-                      ])
-                    )
+                  ? compactTimingBuckets(browserStalls.totals.webglTextureUploadByOperation, 16)
                   : undefined,
                 rafCadence: browserStalls.totals?.rafCadence && typeof browserStalls.totals.rafCadence === 'object'
                   ? {
@@ -6051,16 +6325,7 @@ async function runCapture(): Promise<void> {
                     }
                   : undefined,
                 userTimingByName: browserStalls.totals?.userTimingByName && typeof browserStalls.totals.userTimingByName === 'object'
-                  ? Object.fromEntries(
-                      Object.entries(browserStalls.totals.userTimingByName).map(([name, value]: [string, any]) => [
-                        String(name),
-                        {
-                          count: Number(value?.count ?? 0),
-                          totalDurationMs: Number(value?.totalDurationMs ?? 0),
-                          maxDurationMs: Number(value?.maxDurationMs ?? 0)
-                        }
-                      ])
-                    )
+                  ? compactTimingBuckets(browserStalls.totals.userTimingByName, 32)
                   : undefined
               },
               recent: {
@@ -6069,7 +6334,7 @@ async function runCapture(): Promise<void> {
                   totalDurationMs: Number(browserStalls.recent?.longTasks?.totalDurationMs ?? 0),
                   maxDurationMs: Number(browserStalls.recent?.longTasks?.maxDurationMs ?? 0),
                   entries: Array.isArray(browserStalls.recent?.longTasks?.entries)
-                    ? browserStalls.recent.longTasks.entries.map((entry: any) => ({
+                    ? topByNumber(browserStalls.recent.longTasks.entries, 8, (entry: any) => Number(entry.duration ?? 0)).map((entry: any) => ({
                         name: String(entry.name ?? 'longtask'),
                         startTime: Number(entry.startTime ?? 0),
                         duration: Number(entry.duration ?? 0),
@@ -6110,7 +6375,7 @@ async function runCapture(): Promise<void> {
                   maxDurationMs: Number(browserStalls.recent?.longAnimationFrames?.maxDurationMs ?? 0),
                   blockingDurationMs: Number(browserStalls.recent?.longAnimationFrames?.blockingDurationMs ?? 0),
                   entries: Array.isArray(browserStalls.recent?.longAnimationFrames?.entries)
-                    ? browserStalls.recent.longAnimationFrames.entries.map((entry: any) => ({
+                    ? topByNumber(browserStalls.recent.longAnimationFrames.entries, 8, (entry: any) => Number(entry.duration ?? 0)).map((entry: any) => ({
                         startTime: Number(entry.startTime ?? 0),
                         duration: Number(entry.duration ?? 0),
                         blockingDuration: Number(entry.blockingDuration ?? 0),
@@ -6164,7 +6429,7 @@ async function runCapture(): Promise<void> {
                       droppedFrameTime60HzMs: Number(browserStalls.recent.rafCadence.droppedFrameTime60HzMs ?? 0),
                       maxGapMs: Number(browserStalls.recent.rafCadence.maxGapMs ?? 0),
                       entries: Array.isArray(browserStalls.recent.rafCadence.entries)
-                        ? browserStalls.recent.rafCadence.entries.slice(0, 16).map((entry: any) => ({
+                        ? selectImportantRafEntries(browserStalls.recent.rafCadence.entries, 2).map((entry: any) => ({
                             atMs: Number(entry.atMs ?? 0),
                             gapMs: Number(entry.gapMs ?? 0),
                             estimatedDropped60HzFrames: Number(entry.estimatedDropped60HzFrames ?? 0),
@@ -6174,23 +6439,14 @@ async function runCapture(): Promise<void> {
                             hitch33: Boolean(entry.hitch33),
                             hitch50: Boolean(entry.hitch50),
                             hitch100: Boolean(entry.hitch100),
-                            presentationContext: objectOrNull(entry.presentationContext),
-                            harnessContext: objectOrNull(entry.harnessContext)
+                            presentationContext: compactDiagnosticObject(entry.presentationContext, { maxDepth: 4, arrayLimit: 2, entryLimit: 36, stringLimit: 160 }),
+                            harnessContext: compactDiagnosticObject(entry.harnessContext, { maxDepth: 4, arrayLimit: 2, entryLimit: 36, stringLimit: 160 })
                           }))
                         : []
                     }
                   : undefined,
                 userTimingByName: browserStalls.recent?.userTimingByName && typeof browserStalls.recent.userTimingByName === 'object'
-                  ? Object.fromEntries(
-                      Object.entries(browserStalls.recent.userTimingByName).map(([name, value]: [string, any]) => [
-                        String(name),
-                        {
-                          count: Number(value?.count ?? 0),
-                          totalDurationMs: Number(value?.totalDurationMs ?? 0),
-                          maxDurationMs: Number(value?.maxDurationMs ?? 0)
-                        }
-                      ])
-                    )
+                  ? compactTimingBuckets(browserStalls.recent.userTimingByName, 32)
                   : undefined
               }
             } : undefined,
@@ -6288,10 +6544,18 @@ async function runCapture(): Promise<void> {
                   } : undefined,
                   effectPoolsMs: Number(combatProfile.timing.effectPoolsMs ?? 0),
                   influenceMapMs: Number(combatProfile.timing.influenceMapMs ?? 0),
-                  aiStateMs: typeof combatProfile.timing.aiStateMs === 'object' ? combatProfile.timing.aiStateMs : undefined,
-                  aiMethodMs: typeof combatProfile.timing.aiMethodMs === 'object' ? combatProfile.timing.aiMethodMs : undefined,
-                  aiMethodCounts: typeof combatProfile.timing.aiMethodCounts === 'object' ? combatProfile.timing.aiMethodCounts : undefined,
-                  aiMethodTotalCounts: typeof combatProfile.timing.aiMethodTotalCounts === 'object' ? combatProfile.timing.aiMethodTotalCounts : undefined,
+                  aiStateMs: typeof combatProfile.timing.aiStateMs === 'object'
+                    ? compactNumberRecord(combatProfile.timing.aiStateMs, 32)
+                    : undefined,
+                  aiMethodMs: typeof combatProfile.timing.aiMethodMs === 'object'
+                    ? compactNumberRecord(combatProfile.timing.aiMethodMs, 48)
+                    : undefined,
+                  aiMethodCounts: typeof combatProfile.timing.aiMethodCounts === 'object'
+                    ? compactNumberRecord(combatProfile.timing.aiMethodCounts, 48)
+                    : undefined,
+                  aiMethodTotalCounts: typeof combatProfile.timing.aiMethodTotalCounts === 'object'
+                    ? compactNumberRecord(combatProfile.timing.aiMethodTotalCounts, 48)
+                    : undefined,
                   aiSlowestUpdate: combatProfile.timing.aiSlowestUpdate && typeof combatProfile.timing.aiSlowestUpdate === 'object'
                     ? {
                         combatantId: String(combatProfile.timing.aiSlowestUpdate.combatantId ?? 'unknown'),
@@ -6300,10 +6564,10 @@ async function runCapture(): Promise<void> {
                         lodLevel: String(combatProfile.timing.aiSlowestUpdate.lodLevel ?? 'unknown'),
                         totalMs: Number(combatProfile.timing.aiSlowestUpdate.totalMs ?? 0),
                         methodMs: typeof combatProfile.timing.aiSlowestUpdate.methodMs === 'object'
-                          ? combatProfile.timing.aiSlowestUpdate.methodMs
+                          ? compactNumberRecord(combatProfile.timing.aiSlowestUpdate.methodMs, 24)
                           : {},
                         methodCounts: typeof combatProfile.timing.aiSlowestUpdate.methodCounts === 'object'
-                          ? combatProfile.timing.aiSlowestUpdate.methodCounts
+                          ? compactNumberRecord(combatProfile.timing.aiSlowestUpdate.methodCounts, 24)
                           : {}
                       }
                     : null,
@@ -6453,7 +6717,7 @@ async function runCapture(): Promise<void> {
               healthTopUpCount: Number(harnessDriver.healthTopUpCount ?? 0),
               lastShotAt: Number(harnessDriver.lastShotAt ?? 0),
               lastFireProbe: harnessDriver.lastFireProbe && typeof harnessDriver.lastFireProbe === 'object'
-                ? harnessDriver.lastFireProbe
+                ? compactDiagnosticObject(harnessDriver.lastFireProbe, { maxDepth: 3, arrayLimit: 4, entryLimit: 24, stringLimit: 160 })
                 : null,
               terrainProfile: typeof harnessDriver.terrainProfile === 'string'
                 ? harnessDriver.terrainProfile
@@ -6486,7 +6750,11 @@ async function runCapture(): Promise<void> {
               lastCurrentTargetState: typeof harnessDriver.lastCurrentTargetState === 'string'
                 ? harnessDriver.lastCurrentTargetState
                 : null,
-              shotEpochs: objectArray(harnessDriver.shotEpochs),
+              shotEpochs: compactDiagnosticArray(
+                harnessDriver.shotEpochs,
+                2,
+                { maxDepth: 4, arrayLimit: 2, entryLimit: 40, stringLimit: 160 }
+              ),
               aimDotGateRejectedShots: Number(harnessDriver.aimDotGateRejectedShots ?? 0),
               fireStartRejected: Number(harnessDriver.fireStartRejected ?? 0),
               runtimeShotPreviewRejectedShots: Number(harnessDriver.runtimeShotPreviewRejectedShots ?? 0),
@@ -6510,7 +6778,11 @@ async function runCapture(): Promise<void> {
               droppedDeadTargetLocks: Number(harnessDriver.droppedDeadTargetLocks ?? 0),
               firingRetargets: Number(harnessDriver.firingRetargets ?? 0),
               firingRetargetFireStops: Number(harnessDriver.firingRetargetFireStops ?? 0),
-              firingRetargetEpochs: objectArray(harnessDriver.firingRetargetEpochs),
+              firingRetargetEpochs: compactDiagnosticArray(
+                harnessDriver.firingRetargetEpochs,
+                8,
+                { maxDepth: 4, arrayLimit: 4, entryLimit: 48, stringLimit: 180 }
+              ),
               shotsFired: Number(harnessDriver.shotsFired ?? 0),
               reloadsIssued: Number(harnessDriver.reloadsIssued ?? 0),
               stuckTeleportCount: Number(harnessDriver.stuckTeleportCount ?? 0),
@@ -6604,7 +6876,11 @@ async function runCapture(): Promise<void> {
               maxPathStartSnapDistance: nullableNumber(harnessDriver.maxPathStartSnapDistance),
               maxPathEndSnapDistance: nullableNumber(harnessDriver.maxPathEndSnapDistance),
               untrustedPathSnapCount: nullableNumber(harnessDriver.untrustedPathSnapCount),
-              routeSnapEpochs: objectArray(harnessDriver.routeSnapEpochs),
+              routeSnapEpochs: compactDiagnosticArray(
+                harnessDriver.routeSnapEpochs,
+                8,
+                { maxDepth: 4, arrayLimit: 4, entryLimit: 48, stringLimit: 180 }
+              ),
               routeProgressDistance: nullableNumber(harnessDriver.routeProgressDistance),
               routeProgressAgeMs: nullableNumber(harnessDriver.routeProgressAgeMs),
               routeProgressTravelMeters: nullableNumber(harnessDriver.routeProgressTravelMeters),
@@ -6614,10 +6890,19 @@ async function runCapture(): Promise<void> {
               playerDistanceMoved: nullableNumber(harnessDriver.playerDistanceMoved),
               movementIntentCalls: nullableNumber(harnessDriver.movementIntentCalls),
               nonZeroMovementIntentCalls: nullableNumber(harnessDriver.nonZeroMovementIntentCalls),
-              lastMovementIntent: objectOrNull(harnessDriver.lastMovementIntent),
-              lastNonZeroMovementIntent: objectOrNull(harnessDriver.lastNonZeroMovementIntent),
+              lastMovementIntent: compactDiagnosticObject(
+                harnessDriver.lastMovementIntent,
+                { maxDepth: 4, arrayLimit: 4, entryLimit: 32, stringLimit: 160 }
+              ),
+              lastNonZeroMovementIntent: compactDiagnosticObject(
+                harnessDriver.lastNonZeroMovementIntent,
+                { maxDepth: 4, arrayLimit: 4, entryLimit: 32, stringLimit: 160 }
+              ),
               runtimeLiveness: normalizeRuntimeLiveness(harnessDriver.runtimeLiveness),
-              weaponHarness: objectOrNull(harnessDriver.weaponHarness),
+              weaponHarness: compactDiagnosticObject(
+                harnessDriver.weaponHarness,
+                { maxDepth: 4, arrayLimit: 4, entryLimit: 48, stringLimit: 180 }
+              ),
               perceptionRange: nullableNumber(harnessDriver.perceptionRange),
               matchEndedAtMs: nullableNumber(harnessDriver.matchEndedAtMs),
               matchOutcome: typeof harnessDriver.matchOutcome === 'string'
@@ -6736,7 +7021,7 @@ async function runCapture(): Promise<void> {
         }
         const weather = sample.weather;
         const weatherSuffix = weather
-          ? ` weather=${weather.currentState}->${weather.targetState} rain=${Number(weather.activeRainCount ?? 0)}/${Number(weather.rainCount ?? 0)} opacity=${Number(weather.rainOpacity ?? 0).toFixed(2)} wet=${Number(weather.surfaceWetness ?? 0).toFixed(2)} upload=${(Number(weather.rainMatrixBytesPerFrame ?? 0) / 1024).toFixed(1)}KB`
+          ? ` weather=${weather.currentState}->${weather.targetState} visualRain=${weather.visualRainEnabled ? 'on' : 'off'} wetness=${weather.surfaceWetnessEnabled ? 'on' : 'off'} rain=${Number(weather.activeRainCount ?? 0)}/${Number(weather.rainCount ?? 0)} opacity=${Number(weather.rainOpacity ?? 0).toFixed(2)} wet=${Number(weather.surfaceWetness ?? 0).toFixed(2)} upload=${(Number(weather.rainMatrixBytesPerFrame ?? 0) / 1024).toFixed(1)}KB`
           : '';
         const rafStutter25Count = Number(rafCadence?.stutter25Count ?? 0);
         const rafHitch33Count = Number(rafCadence?.hitch33Count ?? 0);

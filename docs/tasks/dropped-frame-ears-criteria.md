@@ -22,7 +22,17 @@ Unless the owner explicitly changes this, a completion candidate means all of:
 - No content-reduction flags: no disabled wildlife, no disabled terrain
   shadows, no disabled terrain skirts, no reduced vegetation density, no
   reduced draw distance, no weakened combat, no shortened terrain, no
-  frontline compression, and no diagnostic-only bypasses.
+  frontline compression, and no diagnostic-only bypasses. Visible raindrop
+  particles and precipitation terrain wetness are explicitly out of scope for
+  this dropped-frame lane as of 2026-06-17; weather state, fog/cloud/lighting
+  intent, storm/lightning logic, map content, combat, wildlife, terrain, and
+  vegetation remain in scope. Restore rain through a GPU/compute path before
+  treating rain visuals/wetness as part of this perf goal again.
+- Sky, cloud, sun, and atmosphere implementation details are not sacred. If
+  profiling or owner-visible quality shows the current Hosek/Wilkie sky,
+  cloud, or sun treatment is both expensive and unattractive, a replacement or
+  simplification is aligned when it improves visual quality and frame pacing
+  without reducing gameplay readability, terrain stability, or scenario mood.
 - Required artifacts: `summary.json`, `validation.json`,
   `presentation-epochs.json`, browser stall entries when present,
   render-submission samples when present, final frame, and driver final state.
@@ -70,7 +80,7 @@ Executable scaffold:
 | ST4-PERF-005 | Ubiquitous | The harness shall fail completion if the capture uses a content-reduction or visual-degradation flag. | No forbidden flag is present in `perfRuntime` or URL params. | `summary.json`, `perfRuntime`, capture command |
 | ST4-PERF-006 | Ubiquitous | The rAF gate shall be treated as the primary player-visible frame-pacing contract. | `rAF >25ms <0.5%`, `rAF >33ms <0.25%`, estimated dropped 60 Hz frames `<0.1/s`, dropped-frame time `<1ms/s`. | `validation.json`, `summary.json` |
 | ST4-PERF-007 | Unwanted behavior | If a capture fails measurement trust, the agent shall classify all perf deltas from that run as diagnostic only. | Reports use "diagnostic" language and do not mark a candidate as a proven win. | handoff docs, `progress.md` |
-| ST4-PERF-008 | Unwanted behavior | If metrics improve while same-experience invariants regress, the agent shall reject the change as a goal failure. | No accepted candidate reduces combat pressure, map size, terrain/vegetation readability, wildlife where enabled, weather, war assets, draw distance, or normal player flow. | diff review, final frame/samples, owner playtest |
+| ST4-PERF-008 | Unwanted behavior | If metrics improve while same-experience invariants regress, the agent shall reject the change as a goal failure. | No accepted candidate reduces combat pressure, map size, terrain/vegetation readability, wildlife where enabled, weather state/atmosphere, war assets, draw distance, or normal player flow. Visible raindrop particles and precipitation wetness are the owner-approved exceptions for this lane and must be tracked as a compute/GPU restoration follow-up. | diff review, final frame/samples, owner playtest |
 | ST4-PERF-009 | State-driven | While A Shau is being used as the worst-case scenario, terrain/CDLOD/camera glitch evidence shall remain in scope until resolved or disproven. | No sky-ribbon, backface, underside, white-gap, or camera-clipping symptom in normal play or captured evidence. | final frame, sampled screenshots, owner playtest |
 | ST4-PERF-010 | Event-driven | When a terrain/CDLOD optimization changes geometry, skirts, culling, shadow bounds, morph cadence, or submission cadence, the agent shall record what exact visual and gameplay invariants are preserved. | Candidate note names preserved map scale, LOD range, seam coverage, height sampling, shadows, vegetation, weather, combat, and player flow. | handoff docs, PR/commit message |
 | ST4-PERF-011 | Event-driven | When render tails remain dominated by `RenderMain.renderer.render`, the next loop shall prioritize render-side attribution before simulation micro-optimization. | Tail report includes terrain, vegetation, world-static, NPC, wildlife, shadow, and overlay categories where available. | tail attribution, render-submission samples |
@@ -82,6 +92,7 @@ Executable scaffold:
 | ST4-PERF-017 | Complex | When a candidate claims to improve NPC materialization or close-combat frame pacing, the harness shall distinguish real close-model pressure from low-contact A Shau route variance. | `npc_materialization_pressure` and `npc_materialization_sustained_contact` pass: close candidates and rendered close models appear across at least 3 runtime close-model samples and at least 10% of close-model samples. Thin or burst-only contact captures remain diagnostic for materialization even when aggregate combat passes. | `validation.json`, `summary.closeModelEnvelope`, `runtime-samples.json` |
 | ST4-PERF-018 | Unwanted behavior | If close-model pools load during the measured runtime of a materialization candidate, the harness shall keep the artifact diagnostic even when aggregate materialization pressure is present. | `npc_close_model_runtime_pool_loads_clear` passes: runtime samples include close-model stats and `poolLoads == 0` across measured play. | `runtime-samples.json`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-019 | Unwanted behavior | If active close models are sampled but tier-transition telemetry is missing, the harness shall not claim materialization-transition stutter is understood or fixed. | `npc_materialization_transition_telemetry` passes: when close models are active/rendered, `materializationTierEvents`, `summary.materializationTierMetrics.totalEvents`, or drained `closeModelStats.transitionWindow` / `summary.materializationTierMetrics.transitionWindowTotalEvents` includes at least one transition. | `runtime-samples.json`, `summary.materializationTierMetrics`, `scripts/check-dropped-frame-ears.ts` |
+| ST4-PERF-020 | Event-driven | When sky, cloud, sun, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | Candidate notes must show the new path improves or preserves scenario mood, terrain readability, and owner-visible quality while reducing measured render/presentation cost. | render attribution, final frame/screenshot evidence, owner playtest |
 
 ## Candidate Classification
 
@@ -106,6 +117,9 @@ places where future loops should replace judgement with numbers:
 - Same-experience content counters for vegetation, wildlife, static world
   features, terrain draw distance, and combatant representation per scenario.
 - A WebGPU CPU/GPU/presentation split around failing rAF epochs.
+- A sky/cloud/sun replacement spike against Three.js/WebGPU examples or local
+  reference code if atmosphere shows up in render tails or remains visually
+  unacceptable after the rain burn.
 - Promotion of `presentationGapContexts.materialization` and drained
   `closeModelStats.transitionWindow` from diagnostic summary into pass/fail
   budgets once a trusted paired capture establishes acceptable close-GLB
