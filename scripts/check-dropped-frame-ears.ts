@@ -77,6 +77,9 @@ const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_SAMPLES = 3;
 const MIN_SUSTAINED_COMBAT_SHOT_INCREASE_RATIO = 0.05;
 const RENDER_MAIN_RENDER_WARN_MS = 33;
 const RENDER_MAIN_RENDER_FAIL_MS = 100;
+const RENDERER_RESOURCE_TEXTURE_JUMP_WARN = 16;
+const RENDERER_RESOURCE_GEOMETRY_JUMP_WARN = 16;
+const RENDERER_RESOURCE_PROGRAM_JUMP_WARN = 2;
 
 const RAF_THRESHOLDS: readonly ThresholdCheck[] = [
   {
@@ -217,6 +220,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function getRendererCounter(sample: unknown, key: 'textures' | 'geometries' | 'programs'): number | null {
+  const renderer = asRecord(asRecord(sample)?.renderer);
+  const value = renderer?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function readJsonObject(path: string): Record<string, unknown> | null {
@@ -901,10 +910,11 @@ function addRenderTailAttributionChecks(
   let peakRenderMs = -1;
   let peakFrame: number | null = null;
   let peakSampleFrame: number | null = null;
+  let peakSampleIndex: number | null = null;
   let peakCallbackMs: number | null = null;
   let peakSimulationMs: number | null = null;
 
-  for (const sample of runtimeSamples) {
+  runtimeSamples.forEach((sample, sampleIndex) => {
     const sampleRecord = asRecord(sample);
     const sampleFrame = typeof sampleRecord?.frameCount === 'number' && Number.isFinite(sampleRecord.frameCount)
       ? sampleRecord.frameCount
@@ -927,6 +937,7 @@ function addRenderTailAttributionChecks(
           ? frameRecord.frameCount
           : null;
         peakSampleFrame = sampleFrame;
+        peakSampleIndex = sampleIndex;
         peakCallbackMs = typeof frameRecord?.callbackDurationMs === 'number' && Number.isFinite(frameRecord.callbackDurationMs)
           ? frameRecord.callbackDurationMs
           : null;
@@ -936,7 +947,7 @@ function addRenderTailAttributionChecks(
           : null;
       }
     }
-  }
+  });
 
   if (observedFrames === 0) {
     checks.push({
@@ -973,6 +984,66 @@ function addRenderTailAttributionChecks(
     message: status === 'pass'
       ? `Render-main attribution present and below warning threshold (peak=${peakRenderMs.toFixed(1)}ms across ${observedFrames} loop frames)`
       : `Render-main tail detected: peak RenderMain.renderer.render=${peakRenderMs.toFixed(1)}ms at ${peakFrameText} (${sampleFrameText}, ${callbackText}, ${simulationText}); frames >=${RENDER_MAIN_RENDER_WARN_MS}ms=${warnFrames}, >=${RENDER_MAIN_RENDER_FAIL_MS}ms=${failFrames}. Prioritize render-side attribution before simulation or atmosphere cuts.`,
+  });
+
+  if (peakRenderMs < RENDER_MAIN_RENDER_WARN_MS) {
+    checks.push({
+      id: 'render_main_renderer_resource_growth_context',
+      status: 'pass',
+      value: null,
+      message: 'Renderer resource growth context is not required because render-main attribution is below the warning threshold',
+    });
+    return;
+  }
+
+  if (peakSampleIndex === null || peakSampleIndex <= 0) {
+    checks.push({
+      id: 'render_main_renderer_resource_growth_context',
+      status: 'warn',
+      value: null,
+      message: 'Render-main tail exists but no previous runtime sample is available for renderer resource-growth attribution',
+    });
+    return;
+  }
+
+  const previousSample = runtimeSamples[peakSampleIndex - 1];
+  const peakSample = runtimeSamples[peakSampleIndex];
+  const previousTextures = getRendererCounter(previousSample, 'textures');
+  const peakTextures = getRendererCounter(peakSample, 'textures');
+  const previousGeometries = getRendererCounter(previousSample, 'geometries');
+  const peakGeometries = getRendererCounter(peakSample, 'geometries');
+  const previousPrograms = getRendererCounter(previousSample, 'programs');
+  const peakPrograms = getRendererCounter(peakSample, 'programs');
+  if (
+    previousTextures === null
+    || peakTextures === null
+    || previousGeometries === null
+    || peakGeometries === null
+    || previousPrograms === null
+    || peakPrograms === null
+  ) {
+    checks.push({
+      id: 'render_main_renderer_resource_growth_context',
+      status: 'warn',
+      value: null,
+      message: 'Render-main tail exists but renderer texture/geometry/program counters are missing around the peak sample',
+    });
+    return;
+  }
+
+  const textureDelta = peakTextures - previousTextures;
+  const geometryDelta = peakGeometries - previousGeometries;
+  const programDelta = peakPrograms - previousPrograms;
+  const resourceJumpDetected = textureDelta >= RENDERER_RESOURCE_TEXTURE_JUMP_WARN
+    || geometryDelta >= RENDERER_RESOURCE_GEOMETRY_JUMP_WARN
+    || programDelta >= RENDERER_RESOURCE_PROGRAM_JUMP_WARN;
+  checks.push({
+    id: 'render_main_renderer_resource_growth_context',
+    status: resourceJumpDetected ? 'fail' : 'pass',
+    value: `textures+${textureDelta} geometries+${geometryDelta} programs+${programDelta}`,
+    message: resourceJumpDetected
+      ? `Render-main tail coincides with renderer resource growth (textures +${textureDelta}, geometries +${geometryDelta}, programs +${programDelta}); treat GPU residency/material warmup as unproven even if CPU-side pool-load counters are zero.`
+      : `Render-main tail did not coincide with a large renderer resource jump (textures +${textureDelta}, geometries +${geometryDelta}, programs +${programDelta})`,
   });
 }
 

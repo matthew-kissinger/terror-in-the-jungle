@@ -17,6 +17,7 @@ import {
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
 } from '../systems/combat/PixelForgeNpcRuntime';
+import { prepareCombatantRendererCloseModelPipelineWarmup } from '../systems/combat/CloseModelPipelineWarmup';
 
 const LIVE_ENTRY_FRAME_YIELD_TIMEOUT_MS = 100;
 const NPC_CLOSE_MODEL_PREWARM_TIMEOUT_MS = 1800;
@@ -278,6 +279,18 @@ async function prewarmWildlifeAssets(engine: GameEngine): Promise<void> {
 }
 
 async function prewarmRendererPipelines(engine: GameEngine): Promise<void> {
+  const closeModelWarmup = prepareCombatantRendererCloseModelPipelineWarmup(
+    engine.systemManager.combatantSystem.getRenderer(),
+    engine.renderer.camera,
+  );
+  if (closeModelWarmup.count > 0) {
+    markStartup(`engine-init.startup-flow.renderer-pipeline-prewarm.close-models-${closeModelWarmup.count}`);
+    Logger.info(
+      'engine-init',
+      `Renderer pipeline prewarm exposing ${closeModelWarmup.count} pooled NPC close models`,
+      closeModelWarmup.poolCounts,
+    );
+  }
   try {
     const result = await engine.renderer.precompileShadersAsync({
       renderOnce: true,
@@ -288,6 +301,11 @@ async function prewarmRendererPipelines(engine: GameEngine): Promise<void> {
   } catch (error) {
     markStartup('engine-init.startup-flow.renderer-pipeline-prewarm.failed');
     Logger.warn('engine-init', 'Renderer pipeline prewarm failed:', error);
+  } finally {
+    closeModelWarmup.restore();
+    if (closeModelWarmup.count > 0) {
+      markStartup('engine-init.startup-flow.renderer-pipeline-prewarm.close-models-restored');
+    }
   }
 }
 

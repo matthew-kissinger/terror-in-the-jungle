@@ -31,6 +31,11 @@ type ArtifactOptions = {
   quietSnapshotStatus?: 'pass' | 'warn' | 'fail';
   renderMainTailMs?: number;
   missingRenderTail?: boolean;
+  resourceJumpAtRenderTail?: {
+    textures?: number;
+    geometries?: number;
+    programs?: number;
+  };
 };
 
 const REQUIRED_PLACEHOLDER_FILES = [
@@ -210,10 +215,16 @@ function tempArtifact(options: ArtifactOptions): string {
     const renderMainMs = index === 2
       ? options.renderMainTailMs ?? 12
       : 10;
+    const resourceJump = index >= 2 ? options.resourceJumpAtRenderTail : undefined;
     return {
       frameCount: index * 120,
       shotsThisSession,
       hitsThisSession: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
+      renderer: {
+        textures: 42 + (resourceJump?.textures ?? 0),
+        geometries: 478 + (resourceJump?.geometries ?? 0),
+        programs: 65 + (resourceJump?.programs ?? 0),
+      },
       harnessDriver: {
         engineShotsFired: shotsThisSession,
         engineShotsHit: shotsThisSession > 0 ? Math.min(hitCount, Math.max(1, Math.floor(shotsThisSession / 10))) : 0,
@@ -288,6 +299,22 @@ describe('evaluateDroppedFrameEarsArtifact', () => {
       && check.status === 'fail'
       && check.value === 348.6
       && check.message.includes('Prioritize render-side attribution')
+    ))).toBe(true);
+  });
+
+  it('surfaces renderer resource jumps around render-main tails as unproven GPU residency', () => {
+    const artifact = evaluateDroppedFrameEarsArtifact(tempArtifact({
+      scenario: 'a_shau_valley',
+      renderMainTailMs: 348.6,
+      resourceJumpAtRenderTail: { textures: 64, geometries: 65, programs: 2 },
+    }));
+
+    expect(artifact.classification).toBe('diagnostic');
+    expect(artifact.checks.some((check) => (
+      check.id === 'render_main_renderer_resource_growth_context'
+      && check.status === 'fail'
+      && check.value === 'textures+64 geometries+65 programs+2'
+      && check.message.includes('GPU residency/material warmup as unproven')
     ))).toBe(true);
   });
 

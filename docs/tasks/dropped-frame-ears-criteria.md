@@ -115,6 +115,7 @@ Executable scaffold:
 | ST4-PERF-018 | Unwanted behavior | If close-model pools load during the measured runtime of a materialization candidate, the harness shall keep the artifact diagnostic even when aggregate materialization pressure is present. | `npc_close_model_runtime_pool_loads_clear` passes: runtime samples include close-model stats and `poolLoads == 0` across measured play. | `runtime-samples.json`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-019 | Unwanted behavior | If active close models are sampled but tier-transition telemetry is missing, the harness shall not claim materialization-transition stutter is understood or fixed. | `npc_materialization_transition_telemetry` passes: when close models are active/rendered, `materializationTierEvents`, `summary.materializationTierMetrics.totalEvents`, or drained `closeModelStats.transitionWindow` / `summary.materializationTierMetrics.transitionWindowTotalEvents` includes at least one transition. | `runtime-samples.json`, `summary.materializationTierMetrics`, `scripts/check-dropped-frame-ears.ts` |
 | ST4-PERF-020 | Event-driven | When sky, cloud, sun, fog, or atmosphere rendering contributes to frame tails or visibly degrades the game, the agent may replace or simplify that implementation instead of preserving shader parity. | Candidate notes must show the new path improves or preserves scenario mood, terrain readability, NPC/vehicle readability, and owner-visible quality while reducing measured render/presentation cost. | render attribution, final frame/screenshot evidence, owner playtest |
+| ST4-PERF-021 | Unwanted behavior | If a `RenderMain.renderer.render` tail coincides with sudden renderer-memory growth, the agent shall treat asset or material GPU residency as unproven even when CPU-side pool-load counters are zero. | Candidate evidence shows no large texture/geometry/program jump around render-tail epochs, or the resources are intentionally warmed during pre-reveal startup with startup marks naming the warmup path. | `runtime-samples.json`, renderer memory counters, startup marks |
 
 ## Candidate Classification
 
@@ -151,6 +152,9 @@ places where future loops should replace judgement with numbers:
   transition and draw/material pressure.
 - Pixel Forge texture residency/upload timing that works for WebGPU, not only
   WebGL-style upload observers.
+- Renderer-memory jump attribution around render-main tails, including
+  textures, geometries, and programs, so first-visible WebGPU resource uploads
+  cannot hide behind healthy CPU-side pool-load counters.
 - A screenshot or pixel-stability regression lane for the terrain/camera
   glitch class.
 - A typed/replayable driver path that reduces CJS active-driver drift from the
