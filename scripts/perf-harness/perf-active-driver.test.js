@@ -85,6 +85,7 @@ const {
   shouldUseTerrainDirectObjectiveRoute,
   shouldUseTerrainDirectCombatApproachRoute,
   shouldCooldownCombatTargetAfterRouteFailure,
+  routeFailureCooldownTargetId,
   shouldRequireTrustedCombatApproachRoute,
   shouldCooldownObjectiveAfterRouteFailure,
   createDirectCombatFallbackPath,
@@ -2591,6 +2592,12 @@ describe('route objective-progress recovery', () => {
       failureReason: 'combat_approach_unavailable',
       targetVisible: false,
     })).toBe(true);
+  });
+
+  it('uses the route target id for no-lock nearest-opfor cooldowns', () => {
+    expect(routeFailureCooldownTargetId(null, { id: 'combatant_52' })).toBe('combatant_52');
+    expect(routeFailureCooldownTargetId({ id: 'locked_7' }, { id: 'combatant_52' })).toBe('locked_7');
+    expect(routeFailureCooldownTargetId(null, null)).toBeNull();
   });
 
   it('keeps visible combat targets eligible for routed or direct pursuit', () => {

@@ -1596,6 +1596,17 @@
       || failureReason === 'nav_failed';
   }
 
+  function routeFailureCooldownTargetId(currentTarget, routeTarget) {
+    const currentId = currentTarget && currentTarget.id !== null && currentTarget.id !== undefined
+      ? String(currentTarget.id)
+      : null;
+    if (currentId) return currentId;
+    const routeId = routeTarget && routeTarget.id !== null && routeTarget.id !== undefined
+      ? String(routeTarget.id)
+      : null;
+    return routeId || null;
+  }
+
   function shouldRequireTrustedCombatApproachRoute(opts) {
     const targetKind = String(opts && opts.targetKind || '');
     if (targetKind !== 'current_target' && targetKind !== 'nearest_opfor') return false;
@@ -2674,7 +2685,7 @@
 
     function getCurrentTargetLiveDetails(systems, target) {
       if (!target || !target.id) {
-        return { live: true, found: false, health: null, state: null };
+        return { live: null, found: false, health: null, state: null };
       }
       const cs = systems && systems.combatantSystem;
       const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
@@ -3691,7 +3702,7 @@
               failureReason: state.lastPathFailureReason,
               targetVisible: fallbackLos.clear,
             })) {
-              const blockedId = state.currentTarget && state.currentTarget.id;
+              const blockedId = routeFailureCooldownTargetId(state.currentTarget, target);
               if (markTargetTemporarilyBlocked(
                 state.blockedTargetUntil,
                 blockedId,
@@ -3702,6 +3713,7 @@
                 state.waypoints = null;
                 state.waypointIdx = 0;
                 state.lastWaypointReplanAt = 0;
+                state.routeTargetResets++;
               }
             }
             if (shouldCooldownObjectiveAfterRouteFailure({
@@ -5046,6 +5058,7 @@
       shouldUseTerrainDirectObjectiveRoute: shouldUseTerrainDirectObjectiveRoute,
       shouldUseTerrainDirectCombatApproachRoute: shouldUseTerrainDirectCombatApproachRoute,
       shouldCooldownCombatTargetAfterRouteFailure: shouldCooldownCombatTargetAfterRouteFailure,
+      routeFailureCooldownTargetId: routeFailureCooldownTargetId,
       shouldRequireTrustedCombatApproachRoute: shouldRequireTrustedCombatApproachRoute,
       shouldCooldownObjectiveAfterRouteFailure: shouldCooldownObjectiveAfterRouteFailure,
       createDirectCombatFallbackPath: createDirectCombatFallbackPath,
