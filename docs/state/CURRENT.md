@@ -1,6 +1,6 @@
 # Current State
 
-Last aligned: 2026-06-17 local / 2026-06-18 UTC: the dropped-frame evidence-pipeline closeout code-bearing commit `ef1ae16b3bb781b1bc6ecd52153faf5155c9ee68` reached `master`, CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke (`artifacts/perf/2026-06-18T00-30-00-863Z/projekt-143-live-release-proof/release-proof.json`). It tightens occluded combat routing, aligns AI LOS with fire-authority terrain segments, splits aimed/suppressive terrain-block telemetry, keeps health/ammo visible during active-driver captures, fixes hidden-canvas shader prewarm, and pre-materializes active-combat close NPCs with release hysteresis. This is a shipped stabilization/evidence pipeline, not a dropped-frame completion claim: Open Frontier artifact `artifacts/perf/2026-06-17T23-48-02-957Z` is dirty-machine diagnostic-only and still fails rAF/dropped-frame and terrain-block pressure gates; HUD smoke artifact `artifacts/perf/2026-06-18T00-06-19-692Z` proves health/ammo visibility but intentionally lacks combat pressure. Runtime completion is not claimed until quiet-machine Open Frontier + A Shau EARS captures and owner playtest pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-06-17 local / 2026-06-18 UTC: the latest stabilization checkpoint narrows the terrain-fire authority gap by routing AI LOS and CombatantCombat fire/preview blocking through the same dense terrain fire-profile helper; focused proof is `AILineOfSight.test.ts` and `CombatantCombat.test.ts`. This builds on the earlier dropped-frame evidence-pipeline closeout code-bearing commit `ef1ae16b3bb781b1bc6ecd52153faf5155c9ee68`, which reached `master`, CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke (`artifacts/perf/2026-06-18T00-30-00-863Z/projekt-143-live-release-proof/release-proof.json`). That slice tightened occluded combat routing, aligned AI LOS with fire-authority terrain segments, split aimed/suppressive terrain-block telemetry, kept health/ammo visible during active-driver captures, fixed hidden-canvas shader prewarm, and pre-materialized active-combat close NPCs with release hysteresis. This is a shipped stabilization/evidence pipeline, not a dropped-frame completion claim: Open Frontier artifact `artifacts/perf/2026-06-17T23-48-02-957Z` is dirty-machine diagnostic-only and still fails rAF/dropped-frame and terrain-block pressure gates; HUD smoke artifact `artifacts/perf/2026-06-18T00-06-19-692Z` proves health/ammo visibility but intentionally lacks combat pressure. Runtime completion is not claimed until reboot/quiet-machine Open Frontier + A Shau EARS captures and owner playtest pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -30,6 +30,17 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
+- **2026-06-17 local / 2026-06-18 UTC — terrain-fire authority stabilization checkpoint**:
+  AI LOS and CombatantCombat now share the same dense terrain fire-profile
+  helper for heightfield blocking, covering the narrow-ridge case where LOS
+  could previously claim visibility while the fire gate rejected every shot.
+  Focused proof is `npm run test:run --
+  src/systems/combat/ai/AILineOfSight.test.ts` and `npm run test:run --
+  src/systems/combat/CombatantCombat.test.ts`. This should reduce fight-through-
+  terrain loops and bad active-driver pressure windows, but it is not dropped-
+  frame completion evidence. Long perf captures should wait until the machine
+  is rebooted because the current Windows session showed bloated kernel paged
+  pool after several days of development.
 - **2026-06-17 local / 2026-06-18 UTC — dropped-frame evidence-pipeline closeout release**
   (`ef1ae16b` code-bearing slice, plus this docs closeout): the achievable closeout goal was to
   ship a production-stable evidence pipeline and same-experience mitigations,

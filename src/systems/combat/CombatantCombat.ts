@@ -33,6 +33,7 @@ import {
   copyNpcMuzzlePosition,
   copyPlayerCenterMassPosition,
 } from './CombatantBodyMetrics';
+import { findTerrainFireProfileBlockDistance } from './CombatTerrainOcclusion';
 import { isWorldBuilderFlagActive } from '../../dev/worldBuilder/WorldBuilderConsole';
 
 const COMBAT_PLAYER_SHOT_HIT_DETECTION = 'Combat.PlayerShot.HitDetection';
@@ -53,12 +54,6 @@ export interface CombatHitResult {
 
 export class CombatantCombat {
   private readonly MAX_ENGAGEMENT_RANGE = 280;
-  private readonly TERRAIN_SAMPLE_STEP = 2.0;
-  private readonly TERRAIN_OCCLUSION_EPSILON = 0.15;
-  private readonly CLOSE_RANGE_HEIGHT_PROFILE_DISTANCE = 200;
-  private readonly CLOSE_RANGE_HEIGHT_PROFILE_MARGIN = 1.0;
-  private readonly CLOSE_RANGE_HEIGHT_PROFILE_REQUIRED_SAMPLES = 2;
-  private readonly TERRAIN_PROFILE_ENDPOINT_PADDING = 4.0;
 
   private impactEffectsPool: ImpactEffectsPool;
   public hitDetection: CombatantHitDetection;
@@ -548,53 +543,13 @@ export class CombatantCombat {
   }
 
   private findHeightProfileBlockCandidateDistance(ray: THREE.Ray, maxDistance: number): number | null {
-    if (!this.terrainSystem) {
-      return null;
-    }
-
-    const end = Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
-    if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return null;
-
-    const endpointPadding = Math.min(
-      this.TERRAIN_PROFILE_ENDPOINT_PADDING,
-      Math.max(0, end * 0.15),
+    return findTerrainFireProfileBlockDistance(
+      this.terrainSystem,
+      ray,
+      maxDistance,
+      this.scratchSamplePoint,
+      this.MAX_ENGAGEMENT_RANGE,
     );
-    const startDistance = Math.max(this.TERRAIN_SAMPLE_STEP, endpointPadding);
-    const stopDistance = end - endpointPadding;
-    if (stopDistance <= startDistance) return null;
-
-    const isCloseRange = end <= this.CLOSE_RANGE_HEIGHT_PROFILE_DISTANCE;
-    const requiredBlockingSamples = isCloseRange
-      ? this.CLOSE_RANGE_HEIGHT_PROFILE_REQUIRED_SAMPLES
-      : 1;
-    const occlusionMargin = isCloseRange
-      ? this.CLOSE_RANGE_HEIGHT_PROFILE_MARGIN
-      : -this.TERRAIN_OCCLUSION_EPSILON;
-    let firstBlockingDistance = 0;
-    let consecutiveBlockingSamples = 0;
-
-    for (let d = startDistance; d < stopDistance; d += this.TERRAIN_SAMPLE_STEP) {
-      this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
-      const terrainY = this.terrainSystem.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
-      if (!Number.isFinite(terrainY)) {
-        consecutiveBlockingSamples = 0;
-        continue;
-      }
-
-      if (terrainY - this.scratchSamplePoint.y >= occlusionMargin) {
-        if (consecutiveBlockingSamples === 0) {
-          firstBlockingDistance = d;
-        }
-        consecutiveBlockingSamples++;
-        if (consecutiveBlockingSamples >= requiredBlockingSamples) {
-          return firstBlockingDistance;
-        }
-      } else {
-        consecutiveBlockingSamples = 0;
-      }
-    }
-
-    return null;
   }
 
   private isNpcFireBlockedByTerrain(combatant: Combatant, targetPoint: THREE.Vector3, fireKind: 'aimed' | 'suppressive'): boolean {

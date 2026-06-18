@@ -13,6 +13,7 @@ import {
   copyNpcMuzzlePosition,
   copyPlayerCenterMassPosition,
 } from '../CombatantBodyMetrics';
+import { findTerrainFireProfileBlockDistance } from '../CombatTerrainOcclusion';
 
 // Module-level scratch vectors for LOS checks
 const _toTarget = new THREE.Vector3();
@@ -23,6 +24,7 @@ const _fireOrigin = new THREE.Vector3();
 const _fireTarget = new THREE.Vector3();
 const _direction = new THREE.Vector3();
 const _intersection = new THREE.Vector3();
+const _heightProfileSample = new THREE.Vector3();
 const _ray = new THREE.Ray();
 
 /** Cache entry for LOS results */
@@ -407,24 +409,14 @@ export class AILineOfSight {
     if (!this.terrainSystem) return false;
 
     const distance = this.writeTerrainFireSegment(combatant, target, targetPos);
-    if (distance < 35 || distance > 220) return false;
+    if (distance <= 0) return false;
 
-    const samples = Math.min(6, Math.max(2, Math.floor(distance / 20)));
-    let blockingSamples = 0;
-    for (let i = 1; i < samples; i++) {
-      const t = i / samples;
-      const sampleX = _fireOrigin.x + (_fireTarget.x - _fireOrigin.x) * t;
-      const sampleZ = _fireOrigin.z + (_fireTarget.z - _fireOrigin.z) * t;
-      const lineY = _fireOrigin.y + (_fireTarget.y - _fireOrigin.y) * t;
-      const terrainY = Number(this.terrainSystem.getEffectiveHeightAt(sampleX, sampleZ));
-      if (!Number.isFinite(terrainY)) continue;
-      if (terrainY > lineY + 1.2) {
-        blockingSamples++;
-        if (blockingSamples >= 2) {
-          return true;
-        }
-      }
-    }
-    return false;
+    _ray.set(_fireOrigin, _direction);
+    return findTerrainFireProfileBlockDistance(
+      this.terrainSystem,
+      _ray,
+      distance,
+      _heightProfileSample,
+    ) !== null;
   }
 }

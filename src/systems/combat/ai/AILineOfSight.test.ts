@@ -113,11 +113,11 @@ describe('AILineOfSight heightfield prefilter', () => {
     expect(terrainSystem.raycastTerrain).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks LOS with the heightfield fallback when terrain raycast misses a ridge', () => {
+  it('blocks LOS with the shared fire-profile fallback when terrain raycast misses a narrow ridge', () => {
     (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
     const los = new AILineOfSight();
     const terrainSystem = {
-      getEffectiveHeightAt: vi.fn((x: number) => (x >= 35 && x <= 65 ? NPC_Y_OFFSET + 2 : 0)),
+      getEffectiveHeightAt: vi.fn((x: number) => (x >= 36 && x <= 44 ? NPC_Y_OFFSET + 2 : 0)),
       raycastTerrain: vi.fn(() => ({ hit: false }))
     } as any;
     los.setTerrainSystem(terrainSystem);
