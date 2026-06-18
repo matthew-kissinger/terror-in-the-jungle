@@ -433,6 +433,15 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
+  /* Perf-driver runs need player vitals visible for human observation even if
+     a transient presentation state would normally dim or hide the slots. */
+  [data-perf-driver-active="true"][data-phase="playing"] .hud-slot[data-region="health"],
+  [data-perf-driver-active="true"][data-phase="playing"] .hud-slot[data-region="ammo"] {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
   /* =========================================================
    * ADS MODE
    * When aiming down sights, hide non-essential HUD.

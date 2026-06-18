@@ -581,7 +581,22 @@ export class GameRenderer {
     }
 
     if (options.renderOnce === true) {
-      this.renderer.render(this.scene, this.camera);
+      const canvas = this.renderer.domElement;
+      const previousDisplay = canvas.style.display;
+      const previousOpacity = canvas.style.opacity;
+      const needsHiddenWarmupLayout = previousDisplay === 'none';
+      if (needsHiddenWarmupLayout) {
+        canvas.style.display = 'block';
+        canvas.style.opacity = '0';
+      }
+      try {
+        this.renderer.render(this.scene, this.camera);
+      } finally {
+        if (needsHiddenWarmupLayout) {
+          canvas.style.display = previousDisplay;
+          canvas.style.opacity = previousOpacity;
+        }
+      }
     }
     this.lastShaderPrecompileCompletedAtMs = performance.now();
     Logger.info('Renderer', `Shader pre-compilation complete async${reason} (${elapsed.toFixed(1)}ms)`);

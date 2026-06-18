@@ -280,6 +280,19 @@ function resolveCloseModelActiveCap(candidates: CloseModelCandidate[], requested
   return Math.max(0, Math.min(effectiveCap, Math.floor(requestedMaxActive)));
 }
 
+function summarizeCloseModelCandidateEligibility(candidates: CloseModelCandidate[]): {
+  activeCombatExtendedCandidates: number;
+  releaseHysteresisCandidates: number;
+} {
+  let activeCombatExtendedCandidates = 0;
+  let releaseHysteresisCandidates = 0;
+  for (const candidate of candidates) {
+    if (candidate.eligibilityReason === 'active-combat') activeCombatExtendedCandidates++;
+    if (candidate.eligibilityReason === 'release-hysteresis') releaseHysteresisCandidates++;
+  }
+  return { activeCombatExtendedCandidates, releaseHysteresisCandidates };
+}
+
 function configureCloseModelFrustumCulling(root: THREE.Object3D): void {
   root.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) return;
@@ -1137,7 +1150,16 @@ export class CombatantRenderer {
       for (const candidate of candidates) {
         this.recordCloseModelFallback(candidate, 'perf-isolation');
       }
-      this.captureCloseModelRuntimeStats(candidates.length, 0);
+      const candidateEligibility = summarizeCloseModelCandidateEligibility(candidates);
+      this.captureCloseModelRuntimeStats(
+        candidates.length,
+        0,
+        PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
+        CLOSE_MODEL_PROMOTION_BUDGET_PER_FRAME,
+        0,
+        0,
+        candidateEligibility,
+      );
       return {
         closeModelIds: this.closeModelSelectedIds,
         suppressedImpostorIds: this.closeModelSuppressedImpostorIds,
@@ -1276,14 +1298,8 @@ export class CombatantRenderer {
       }
     });
 
-    this.captureCloseModelRuntimeStats(
-      candidates.length,
-      selected.size,
-      effectiveActiveCap,
-      promotionBudget,
-      promotionsThisFrame,
-      replacementsThisFrame,
-    );
+    const candidateEligibility = summarizeCloseModelCandidateEligibility(candidates);
+    this.captureCloseModelRuntimeStats(candidates.length, selected.size, effectiveActiveCap, promotionBudget, promotionsThisFrame, replacementsThisFrame, candidateEligibility);
     return {
       closeModelIds: selected,
       suppressedImpostorIds: this.closeModelSuppressedImpostorIds,
@@ -1295,12 +1311,35 @@ export class CombatantRenderer {
     playerPosition: THREE.Vector3,
     nowMs: number,
   ): CloseModelCandidate[] {
+    const closeRadiusMeters = getPixelForgeNpcCloseModelDistanceMeters();
     const closeRadiusSq = getPixelForgeNpcCloseModelDistanceSq();
+    const activeCombatCloseRadiusMeters = Math.max(closeRadiusMeters, Number(PixelForgeNpcDistanceConfig.activeCombatCloseModelDistanceMeters) || closeRadiusMeters);
+    const releaseRadiusMeters = Math.max(
+      closeRadiusMeters,
+      closeRadiusMeters + Math.max(0, Number(PixelForgeNpcDistanceConfig.closeModelReleaseHysteresisMeters) || 0),
+    );
+    const activeCombatCloseRadiusSq = activeCombatCloseRadiusMeters * activeCombatCloseRadiusMeters;
+    const releaseRadiusSq = releaseRadiusMeters * releaseRadiusMeters;
     const candidates: CloseModelCandidate[] = [];
     combatants.forEach((combatant) => {
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       const distanceSq = combatant.position.distanceToSquared(playerPosition);
-      if (distanceSq > closeRadiusSq) return;
+      const isInActiveCombat = combatant.state === CombatantState.ENGAGING
+        || combatant.state === CombatantState.SUPPRESSING
+        || combatant.state === CombatantState.ADVANCING;
+      const isAlreadyCloseModel = this.activeCloseModels.has(combatant.id);
+      const eligibilityReason: CloseModelCandidate['eligibilityReason'] = (() => {
+        if (distanceSq <= closeRadiusSq) return 'base-close';
+        if (isInActiveCombat && distanceSq <= activeCombatCloseRadiusSq) return 'active-combat';
+        if (isAlreadyCloseModel && distanceSq <= releaseRadiusSq) return 'release-hysteresis';
+        return 'base-close';
+      })();
+      if (
+        eligibilityReason === 'base-close'
+        && distanceSq > closeRadiusSq
+      ) {
+        return;
+      }
       const poolKey = getPixelForgeNpcPoolKey(combatant, this.playerSquadId);
 
       const isOnScreen = this.isCombatantOnScreen(combatant);
@@ -1314,9 +1353,6 @@ export class CombatantRenderer {
       const isHardNear = distance <= PixelForgeNpcDistanceConfig.hardNearDistanceMeters;
       const isInHardNearReserveBubble =
         distance <= PixelForgeNpcDistanceConfig.hardNearReserveDistanceMeters;
-      const isInActiveCombat = combatant.state === CombatantState.ENGAGING
-        || combatant.state === CombatantState.SUPPRESSING
-        || combatant.state === CombatantState.ADVANCING;
       const priorityScore =
         PixelForgeNpcDistanceConfig.hardNearReserveWeight * (isInHardNearReserveBubble ? 1 : 0) +
         PixelForgeNpcDistanceConfig.hardNearWeight * (isHardNear ? 1 : 0) +
@@ -1330,6 +1366,7 @@ export class CombatantRenderer {
         combatant,
         distanceSq,
         poolKey,
+        eligibilityReason,
         isOnScreen,
         recentlyVisible,
         isPlayerSquad,
@@ -1398,6 +1435,10 @@ export class CombatantRenderer {
     promotionBudgetPerFrame = CLOSE_MODEL_PROMOTION_BUDGET_PER_FRAME,
     promotionsThisFrame = 0,
     replacementsThisFrame = 0,
+    candidateEligibilityCounts: {
+      activeCombatExtendedCandidates: number;
+      releaseHysteresisCandidates: number;
+    } = { activeCombatExtendedCandidates: 0, releaseHysteresisCandidates: 0 },
   ): void {
     const fallbackCounts = createCloseModelFallbackCounts();
     const distances: number[] = [];
@@ -1414,9 +1455,12 @@ export class CombatantRenderer {
     this.closeModelPools.forEach((pool, key) => {
       poolAvailable[String(key)] = pool.length;
     });
+    const closeRadiusMeters = getPixelForgeNpcCloseModelDistanceMeters();
+    const activeCombatCloseRadiusMeters = Math.max(closeRadiusMeters, Number(PixelForgeNpcDistanceConfig.activeCombatCloseModelDistanceMeters) || closeRadiusMeters);
+    const releaseRadiusMeters = closeRadiusMeters + Math.max(0, Number(PixelForgeNpcDistanceConfig.closeModelReleaseHysteresisMeters) || 0);
 
     this.closeModelRuntimeStats = {
-      closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
+      closeRadiusMeters,
       closeModelActiveCap,
       promotionBudgetPerFrame,
       promotionsThisFrame,
@@ -1431,6 +1475,10 @@ export class CombatantRenderer {
       poolLoads: this.closeModelPoolLoads.size,
       poolTargets,
       poolAvailable,
+      activeCombatCloseRadiusMeters,
+      releaseRadiusMeters,
+      activeCombatExtendedCandidates: candidateEligibilityCounts.activeCombatExtendedCandidates,
+      releaseHysteresisCandidates: candidateEligibilityCounts.releaseHysteresisCandidates,
       transitionWindow: cloneCloseModelTransitionWindow(this.closeModelTransitionWindow),
     };
   }

@@ -12,6 +12,7 @@ import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { modelLoader } from '../assets/ModelLoader';
 import {
   getPixelForgeNpcRuntimeFaction,
+  PixelForgeNpcDistanceConfig,
   PIXEL_FORGE_NPC_CLOSE_MODEL_HARD_NEAR_RESERVE_EXTRA_CAP,
   PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION,
   PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG,
@@ -260,6 +261,10 @@ type CloseModelStatsProbe = {
   nearestFallbackDistanceMeters: number | null;
   farthestFallbackDistanceMeters: number | null;
   poolLoads: number;
+  activeCombatCloseRadiusMeters: number;
+  releaseRadiusMeters: number;
+  activeCombatExtendedCandidates: number;
+  releaseHysteresisCandidates: number;
 };
 
 type CloseModelFallbackProbe = {
@@ -665,6 +670,77 @@ describe('CombatantRenderer', () => {
       const activeCloseModels = (renderer as unknown as { activeCloseModels: Map<string, unknown> }).activeCloseModels;
       expect(combatant.billboardIndex).toBe(-1);
       expect(activeCloseModels.has('expanded-near')).toBe(true);
+    });
+
+    it('pre-materializes active-combat NPCs before the base close-model distance', () => {
+      const combatants = new Map<string, Combatant>();
+      const activeDistance = PixelForgeNpcDistanceConfig.closeModelDistanceMeters + 20;
+      const active = createMockCombatant(
+        'active-preclose',
+        Faction.NVA,
+        new THREE.Vector3(activeDistance, 0, 0),
+        CombatantState.ENGAGING,
+      );
+      const idle = createMockCombatant(
+        'idle-preclose',
+        Faction.NVA,
+        new THREE.Vector3(activeDistance + 1, 0, 0),
+        CombatantState.PATROLLING,
+      );
+      combatants.set(active.id, active);
+      combatants.set(idle.id, idle);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 0));
+
+      const activeCloseModels = activeCloseModelsFor(renderer);
+      expect(activeCloseModels.has(active.id)).toBe(true);
+      expect(active.billboardIndex).toBe(-1);
+      expect(activeCloseModels.has(idle.id)).toBe(false);
+      expect(idle.billboardIndex).toBeGreaterThanOrEqual(0);
+
+      const { stats } = readCloseModelTelemetry(renderer);
+      expect(stats.activeCombatCloseRadiusMeters).toBe(PixelForgeNpcDistanceConfig.activeCombatCloseModelDistanceMeters);
+      expect(stats.activeCombatExtendedCandidates).toBe(1);
+      expect(stats.releaseHysteresisCandidates).toBe(0);
+    });
+
+    it('keeps an active close model through the release hysteresis band', () => {
+      const playerPosition = new THREE.Vector3(0, 0, 0);
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant(
+        'hysteresis-1',
+        Faction.NVA,
+        new THREE.Vector3(10, 0, 0),
+        CombatantState.PATROLLING,
+      );
+      combatants.set(combatant.id, combatant);
+
+      renderer.updateBillboards(combatants, playerPosition);
+      expect(activeCloseModelsFor(renderer).has(combatant.id)).toBe(true);
+
+      combatant.position.set(PixelForgeNpcDistanceConfig.closeModelDistanceMeters + 8, 0, 0);
+      renderer.updateBillboards(combatants, playerPosition);
+      expect(activeCloseModelsFor(renderer).has(combatant.id)).toBe(true);
+      expect(combatant.billboardIndex).toBe(-1);
+
+      const { stats } = readCloseModelTelemetry(renderer);
+      expect(stats.releaseRadiusMeters).toBe(
+        PixelForgeNpcDistanceConfig.closeModelDistanceMeters
+          + PixelForgeNpcDistanceConfig.closeModelReleaseHysteresisMeters,
+      );
+      expect(stats.activeCombatExtendedCandidates).toBe(0);
+      expect(stats.releaseHysteresisCandidates).toBe(1);
+
+      combatant.position.set(
+        PixelForgeNpcDistanceConfig.closeModelDistanceMeters
+          + PixelForgeNpcDistanceConfig.closeModelReleaseHysteresisMeters
+          + 8,
+        0,
+        0,
+      );
+      renderer.updateBillboards(combatants, playerPosition);
+      expect(activeCloseModelsFor(renderer).has(combatant.id)).toBe(false);
+      expect(combatant.billboardIndex).toBeGreaterThanOrEqual(0);
     });
 
     it('keeps close NPCs visible as impostors while a close-model pool is still lazy-loading', async () => {

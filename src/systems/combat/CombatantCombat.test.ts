@@ -17,6 +17,7 @@ import { TerrainSystem } from '../terrain/TerrainSystem';
 import {
   getCombatFireRaycastBudgetStats,
   resetCombatFireRaycastBudget,
+  resetCombatFireRaycastBudgetStats,
   tryConsumeCombatFireRaycast,
 } from './ai/CombatFireRaycastBudget';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
@@ -154,7 +155,7 @@ describe('CombatantCombat', () => {
     combatantCombat.setTerrainSystem(mockTerrainSystem);
 
     vi.clearAllMocks();
-    resetCombatFireRaycastBudget();
+    resetCombatFireRaycastBudgetStats();
     (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
     (mockTerrainSystem.getEffectiveHeightAt as any).mockReturnValue(-1000);
   });
@@ -296,7 +297,10 @@ describe('CombatantCombat', () => {
       expect(shooter.currentBurst).toBe(0);
       expect(mockMuzzleFlashSystem.spawnNPC).not.toHaveBeenCalled();
       expect(mockTracerPool.spawn).not.toHaveBeenCalled();
-      expect(getCombatFireRaycastBudgetStats().terrainBlockedThisFrame).toBe(1);
+      const fireBudgetStats = getCombatFireRaycastBudgetStats();
+      expect(fireBudgetStats.terrainBlockedThisFrame).toBe(1);
+      expect(fireBudgetStats.aimedTotalTerrainBlocked).toBe(1);
+      expect(fireBudgetStats.suppressiveTotalTerrainBlocked).toBe(0);
     });
 
     it('blocks suppressive fire when the last-known area is terrain-occluded', () => {
@@ -327,7 +331,10 @@ describe('CombatantCombat', () => {
       expect(shooter.currentBurst).toBe(0);
       expect(mockMuzzleFlashSystem.spawnNPC).not.toHaveBeenCalled();
       expect(mockTracerPool.spawn).not.toHaveBeenCalled();
-      expect(getCombatFireRaycastBudgetStats().terrainBlockedThisFrame).toBe(1);
+      const fireBudgetStats = getCombatFireRaycastBudgetStats();
+      expect(fireBudgetStats.terrainBlockedThisFrame).toBe(1);
+      expect(fireBudgetStats.aimedTotalTerrainBlocked).toBe(0);
+      expect(fireBudgetStats.suppressiveTotalTerrainBlocked).toBe(1);
     });
 
     it('keeps suppressive fire active when the last-known area is clear', () => {

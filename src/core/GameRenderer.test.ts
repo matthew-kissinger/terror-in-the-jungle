@@ -126,3 +126,40 @@ describe('GameRenderer performance stats', () => {
     });
   });
 });
+
+describe('GameRenderer shader prewarm', () => {
+  it('renders hidden startup prewarm against a laid-out transparent canvas and restores the style', async () => {
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'none';
+    canvas.style.opacity = '0.4';
+    const duringRenderStyles: Array<{ display: string; opacity: string }> = [];
+    const renderer = {
+      domElement: canvas,
+      extensions: {
+        has: (name: string) => name === 'KHR_parallel_shader_compile',
+      },
+      compileAsync: vi.fn(() => Promise.resolve()),
+      render: vi.fn(() => {
+        duringRenderStyles.push({
+          display: canvas.style.display,
+          opacity: canvas.style.opacity,
+        });
+      }),
+    };
+
+    const result = await GameRenderer.prototype.precompileShadersAsync.call({
+      renderer,
+      scene: new THREE.Scene(),
+      camera: new THREE.PerspectiveCamera(),
+      lastShaderPrecompileCompletedAtMs: -Infinity,
+    } as unknown as GameRenderer, {
+      renderOnce: true,
+      reason: 'test',
+    });
+
+    expect(result).toBe('complete');
+    expect(duringRenderStyles).toEqual([{ display: 'block', opacity: '0' }]);
+    expect(canvas.style.display).toBe('none');
+    expect(canvas.style.opacity).toBe('0.4');
+  });
+});

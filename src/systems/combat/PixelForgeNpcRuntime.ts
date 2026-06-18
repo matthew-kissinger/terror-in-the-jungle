@@ -71,6 +71,18 @@ export const PixelForgeNpcDistanceConfig = {
   /** Radius (meters) within which an NPC is eligible to render as a 3D close model. */
   closeModelDistanceMeters: 120,
   /**
+   * Active-combat actors become close-model eligible before the base visual
+   * threshold so combat state and visual materialization do not both flip on
+   * the same near-contact frame. The active close-model cap still bounds cost.
+   */
+  activeCombatCloseModelDistanceMeters: 150,
+  /**
+   * Already-active close models persist slightly past the base distance before
+   * releasing back to impostors. This hysteresis removes threshold chatter
+   * when NPCs strafe around the close-model boundary.
+   */
+  closeModelReleaseHysteresisMeters: 32,
+  /**
    * Hard-near bubble where turn-pop is more damaging than spending a close
    * slot on a currently off-screen actor.
    */

@@ -5,7 +5,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { AILineOfSight } from './AILineOfSight';
 import { resetRaycastBudget } from './RaycastBudget';
-import { NPC_Y_OFFSET } from '../../../config/CombatantConfig';
+import {
+  NPC_CENTER_MASS_Y_OFFSET,
+  NPC_MUZZLE_Y_OFFSET,
+  NPC_Y_OFFSET,
+  PLAYER_CENTER_MASS_Y_OFFSET,
+} from '../../../config/CombatantConfig';
 
 function makeCombatant(id: string, x: number, z: number): any {
   return {
@@ -129,6 +134,34 @@ describe('AILineOfSight heightfield prefilter', () => {
     expect(stats.fullEvaluationBlocked).toBe(1);
   });
 
+  it('blocks full LOS when terrain intersects the NPC fire-authority segment', () => {
+    (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
+    const los = new AILineOfSight();
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => -2),
+      raycastTerrain: vi.fn((origin: THREE.Vector3) => {
+        const usesFireOrigin = Math.abs(origin.y - (NPC_Y_OFFSET + NPC_MUZZLE_Y_OFFSET)) < 0.001;
+        return usesFireOrigin ? { hit: true, distance: 10 } : { hit: false };
+      })
+    } as any;
+    los.setTerrainSystem(terrainSystem);
+
+    const source = makeCombatant('a', 0, 0);
+    const target = makeCombatant('b', 80, 0);
+    const visible = los.canSeeTarget(source, target, new THREE.Vector3());
+
+    expect(visible).toBe(false);
+    expect(terrainSystem.raycastTerrain).toHaveBeenCalledTimes(1);
+    const [origin, direction] = terrainSystem.raycastTerrain.mock.calls[0];
+    const expectedDirection = new THREE.Vector3(
+      80,
+      NPC_CENTER_MASS_Y_OFFSET - NPC_MUZZLE_Y_OFFSET,
+      0,
+    ).normalize();
+    expect(origin.y).toBeCloseTo(NPC_Y_OFFSET + NPC_MUZZLE_Y_OFFSET, 5);
+    expect(direction.y).toBeCloseTo(expectedDirection.y, 5);
+  });
+
   it('serves a repeated check from cache without re-running the full evaluation', () => {
     (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
     const los = new AILineOfSight();
@@ -203,7 +236,7 @@ describe('AILineOfSight heightfield prefilter', () => {
     nowSpy.mockRestore();
   });
 
-  it('does not double-raise player eye position for full LOS terrain raycasts', () => {
+  it('uses player center mass rather than double-raising player eye position for terrain raycasts', () => {
     (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__ = false;
     const los = new AILineOfSight();
     const terrainSystem = {
@@ -229,7 +262,12 @@ describe('AILineOfSight heightfield prefilter', () => {
     expect(visible).toBe(true);
     expect(terrainSystem.raycastTerrain).toHaveBeenCalled();
     const [origin, direction] = terrainSystem.raycastTerrain.mock.calls[0];
-    expect(origin.y).toBeCloseTo(NPC_Y_OFFSET, 5);
-    expect(direction.y).toBeCloseTo(0, 5);
+    const expectedDirection = new THREE.Vector3(
+      80,
+      PLAYER_CENTER_MASS_Y_OFFSET - NPC_MUZZLE_Y_OFFSET,
+      0,
+    ).normalize();
+    expect(origin.y).toBeCloseTo(NPC_Y_OFFSET + NPC_MUZZLE_Y_OFFSET, 5);
+    expect(direction.y).toBeCloseTo(expectedDirection.y, 5);
   });
 });

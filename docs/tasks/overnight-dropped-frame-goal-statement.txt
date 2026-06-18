@@ -1,11 +1,23 @@
-Aligned finish-line goal (2026-06-15):
+Aligned stabilization goal (2026-06-17):
 
-Reduce player-visible dropped-frame time and stutter in real Open Frontier and
-A Shau gameplay while preserving the current game experience. Success is not a
-lower metric produced by deleting, hiding, delaying, or weakening the game:
-combat pressure, terrain and vegetation readability, wildlife/animals where
-enabled, war-asset visuals, weather/atmosphere, draw distance, player flow, and
-mode startup/deploy behavior must remain materially equivalent or better.
+Ship a production-stable dropped-frame evidence pipeline and the current
+same-experience mitigations, then use trusted evidence to decide the next
+optimization target. This closeout is successful when the harness no longer
+silently lies about combat pressure, HUD/player state, route snapping,
+terrain/fire authority, or NPC materialization pressure; current fixes are
+validated, documented, merged, deployed, and live-verified; and the remaining
+Open Frontier + A Shau dropped-frame finish line is explicit. Do not claim the
+whole perf problem is solved until quiet-machine, headed, strict-WebGPU,
+default-content captures with real combat pass the EARS gates and owner
+playtest accepts terrain/camera visual stability.
+
+Longer finish line remains: reduce player-visible dropped-frame time and
+stutter in real Open Frontier and A Shau gameplay while preserving the current
+game experience. Success is not a lower metric produced by deleting, hiding,
+delaying, or weakening the game: combat pressure, terrain and vegetation
+readability, wildlife/animals where enabled, war-asset visuals,
+weather/atmosphere, draw distance, player flow, and mode startup/deploy
+behavior must remain materially equivalent or better.
 
 Completion evidence required:
 0. The quantitative scaffold in

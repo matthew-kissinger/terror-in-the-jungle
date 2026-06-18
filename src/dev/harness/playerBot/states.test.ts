@@ -223,7 +223,7 @@ describe('states — PATROL', () => {
     expect(step.nextState).toBe('ALERT');
   });
 
-  it('advances toward an occluded nearest-opfor objective inside weapon range', () => {
+  it('keeps an occluded nearest-opfor objective inside weapon range in route travel', () => {
     const target = makeTarget({ position: { x: 0, y: 0, z: -128 } });
     const step = stepState('PATROL', makeCtx({
       findNearestEnemy: () => target,
@@ -236,10 +236,10 @@ describe('states — PATROL', () => {
       },
     }));
 
-    expect(step.nextState).toBe('ALERT');
+    expect(step.nextState).toBeNull();
     expect(step.intent.firePrimary).toBe(false);
     expect(step.intent.aimTarget?.z).toBeCloseTo(-128, 5);
-    expect(step.intent.moveForward).toBe(0);
+    expect(step.intent.moveForward).toBeGreaterThan(0);
   });
 
   it('keeps routing toward a far occluded nearest-opfor objective outside weapon range', () => {
@@ -509,8 +509,8 @@ describe('states — ADVANCE', () => {
     expect(step.intent.firePrimary).toBe(false);
   });
 
-  it('keeps moving forward when target is still occluded', () => {
-    const target = makeTarget({ position: { x: 0, y: 0, z: -30 } });
+  it('keeps moving forward when target is still occluded outside standoff distance', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -80 } });
     const step = stepState('ADVANCE', makeCtx({
       currentTarget: target,
       canSeeTarget: () => false,
@@ -518,14 +518,14 @@ describe('states — ADVANCE', () => {
     expect(step.intent.moveForward).toBeGreaterThan(0);
   });
 
-  it('keeps repositioning toward a close occluded target outside point-blank distance', () => {
-    const target = makeTarget({ position: { x: 0, y: 0, z: -15 } });
+  it('holds standoff instead of walking into a close occluded target', () => {
+    const target = makeTarget({ position: { x: 0, y: 0, z: -30 } });
     const step = stepState('ADVANCE', makeCtx({
       currentTarget: target,
       canSeeTarget: () => false,
     }));
     expect(step.nextState).toBeNull();
-    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.moveForward).toBe(0);
     expect(step.intent.firePrimary).toBe(false);
   });
 

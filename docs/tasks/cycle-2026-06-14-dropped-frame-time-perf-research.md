@@ -1,14 +1,12 @@
 # cycle-2026-06-14-dropped-frame-time-perf-research
 
 Status: deployed stabilization baseline; open performance-research task.
-Goal: reduce player-visible dropped-frame time and stutter in real Open
-Frontier and A Shau gameplay while preserving the current game experience.
-Completion requires quiet-machine captures with real combat and representative
-world content passing the dropped-frame gate through the enriched harness. A
-static optimization, green build, or narrower metric is not completion. The
-copyable finish-line statement lives in
-`docs/tasks/overnight-dropped-frame-goal-statement.txt`. The quantitative
-pass/fail scaffold for future loops lives in
+Current closeout goal: ship a production-stable evidence pipeline and
+same-experience mitigations, then leave the remaining dropped-frame finish line
+explicit. The longer goal still requires quiet-machine Open Frontier + A Shau
+captures with real combat and representative world content passing EARS; static
+green checks or narrower metrics are not completion. Copyable goal:
+`docs/tasks/overnight-dropped-frame-goal-statement.txt`; scaffold:
 `docs/tasks/dropped-frame-ears-criteria.md`.
 
 Release alignment: the 2026-06-15 local stabilization pass shipped at
@@ -55,6 +53,8 @@ need the same release shepherding before they are called shipped.
   where a symptom was observed.
 
 ## Latest Static Sidecar Findings
+
+- 2026-06-17 local / 2026-06-18 UTC stabilization candidate: current source work tightens combat routing, AI/fire terrain authority, terrain-block telemetry, active-driver health/ammo HUD visibility, hidden-canvas shader prewarm, and active-combat close-model hysteresis. HUD smoke `artifacts/perf/2026-06-18T00-06-19-692Z` passed `harness_hud_vitals_visible` (12/12) but lacks combat pressure; full Open Frontier diagnostic `artifacts/perf/2026-06-17T23-48-02-957Z` was dirty and still failed rAF/dropped-frame plus terrain-block gates. Next: validate, merge/deploy/live proof, then fresh quiet-machine paired EARS captures.
 
 - 2026-06-17 A Shau EARS rerun:
   `artifacts/perf/2026-06-17T10-36-26-323Z` ran on clean local

@@ -42,7 +42,7 @@ export function horizontalDistance(a: BotVec3, b: BotVec3): number {
 
 const TARGET_ACTOR_AIM_Y_OFFSET = getCombatantVisualChestAimYOffset();
 const OBJECTIVE_LOOK_HEIGHT = NPC_Y_OFFSET + TARGET_ACTOR_AIM_Y_OFFSET;
-const OCCLUDED_TARGET_HOLD_DISTANCE = 6;
+const OCCLUDED_TARGET_HOLD_DISTANCE = 45;
 
 function aimPointForTarget(target: BotTarget): BotVec3 {
   const anchor = target.aimPosition ?? target.position;
@@ -71,9 +71,9 @@ function shouldInterruptObjectiveForTarget(
   const maxFireDistance = Math.max(0, ctx.config.maxFireDistance);
   const visible = ctx.canSeeTarget(target.position);
   if (objective.kind === 'nearest_opfor') {
-    // Treat close occluded nearest-opfor objectives as combat recovery, not
-    // patrol travel; ALERT/ADVANCE can regain LOS while firing remains gated.
-    return dist <= maxFireDistance;
+    // Do not promote terrain-occluded nearest-opfor travel into combat lock.
+    // The route overlay owns repositioning until the shot path is visible.
+    return visible && dist <= maxFireDistance;
   }
   const acquisitionDistance = Math.max(0, ctx.config.targetAcquisitionDistance);
   const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
@@ -88,7 +88,7 @@ function resolveUngatedCombatTarget(ctx: PlayerBotStateContext): BotTarget | nul
 
 function pushInDistanceForVisibility(ctx: PlayerBotStateContext, visible: boolean): number {
   if (visible) return ctx.config.pushInDistance;
-  return Math.min(ctx.config.pushInDistance, OCCLUDED_TARGET_HOLD_DISTANCE);
+  return Math.max(ctx.config.pushInDistance, OCCLUDED_TARGET_HOLD_DISTANCE);
 }
 
 function tacticalHoldDistance(config: PlayerBotStateContext['config']): number {

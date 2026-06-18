@@ -175,6 +175,16 @@ export class CombatantProfiler {
       totalRequested: 0,
       totalDenied: 0,
       totalTerrainBlocked: 0,
+      aimedTotalRequested: 0,
+      aimedTotalDenied: 0,
+      aimedTotalTerrainBlocked: 0,
+      aimedDenialRate: 0,
+      aimedTerrainBlockRate: 0,
+      suppressiveTotalRequested: 0,
+      suppressiveTotalDenied: 0,
+      suppressiveTotalTerrainBlocked: 0,
+      suppressiveDenialRate: 0,
+      suppressiveTerrainBlockRate: 0,
       saturationRate: 0,
       denialRate: 0,
       terrainBlockRate: 0
@@ -303,6 +313,16 @@ export class CombatantProfiler {
         totalRequested: number;
         totalDenied: number;
         totalTerrainBlocked: number;
+        aimedTotalRequested: number;
+        aimedTotalDenied: number;
+        aimedTotalTerrainBlocked: number;
+        aimedDenialRate: number;
+        aimedTerrainBlockRate: number;
+        suppressiveTotalRequested: number;
+        suppressiveTotalDenied: number;
+        suppressiveTotalTerrainBlocked: number;
+        suppressiveDenialRate: number;
+        suppressiveTerrainBlockRate: number;
         saturationRate: number;
         denialRate: number;
         terrainBlockRate: number;

@@ -222,7 +222,7 @@ export class CombatantCombat {
       } else {
         copyNpcCenterMassPosition(this._targetFirePos, targetPos);
       }
-      if (this.isNpcFireBlockedByTerrain(combatant, this._targetFirePos)) {
+      if (this.isNpcFireBlockedByTerrain(combatant, this._targetFirePos, 'aimed')) {
         return;
       }
     }
@@ -322,7 +322,7 @@ export class CombatantCombat {
       return;
     }
 
-    if (this.isNpcFireBlockedByTerrain(combatant, targetPos)) {
+    if (this.isNpcFireBlockedByTerrain(combatant, targetPos, 'suppressive')) {
       return;
     }
 
@@ -597,14 +597,14 @@ export class CombatantCombat {
     return null;
   }
 
-  private isNpcFireBlockedByTerrain(combatant: Combatant, targetPoint: THREE.Vector3): boolean {
+  private isNpcFireBlockedByTerrain(combatant: Combatant, targetPoint: THREE.Vector3, fireKind: 'aimed' | 'suppressive'): boolean {
     if (!this.terrainSystem || !combatant.simLane ||
         (combatant.simLane !== 'high' && combatant.simLane !== 'medium')) {
       return false;
     }
 
     // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
-    if (!tryConsumeCombatFireRaycast()) {
+    if (!tryConsumeCombatFireRaycast(fireKind)) {
       return true;
     }
 
@@ -618,14 +618,14 @@ export class CombatantCombat {
 
     const terrainHit = this.terrainSystem.raycastTerrain(this._muzzlePos, this._fireDirection, fireDistance);
     if (terrainHit.hit && terrainHit.distance! < fireDistance - 0.5) {
-      recordCombatFireTerrainBlocked();
+      recordCombatFireTerrainBlocked(fireKind);
       return true;
     }
 
     this._fireRay.set(this._muzzlePos, this._fireDirection);
     const heightProfileBlockDistance = this.findHeightProfileBlockCandidateDistance(this._fireRay, fireDistance);
     if (heightProfileBlockDistance !== null) {
-      recordCombatFireTerrainBlocked();
+      recordCombatFireTerrainBlocked(fireKind);
       return true;
     }
     return false;

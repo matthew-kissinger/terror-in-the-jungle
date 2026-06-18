@@ -2,18 +2,25 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { Combatant, ITargetable } from '../types';
+import { Combatant, ITargetable, isPlayerTarget } from '../types';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 import { tryConsumeRaycast } from './RaycastBudget';
-import { copyActorEyePosition } from '../CombatantBodyMetrics';
+import {
+  copyActorEyePosition,
+  copyNpcCenterMassPosition,
+  copyNpcMuzzlePosition,
+  copyPlayerCenterMassPosition,
+} from '../CombatantBodyMetrics';
 
 // Module-level scratch vectors for LOS checks
 const _toTarget = new THREE.Vector3();
 const _forward = new THREE.Vector3();
 const _eyePos = new THREE.Vector3();
 const _targetEyePos = new THREE.Vector3();
+const _fireOrigin = new THREE.Vector3();
+const _fireTarget = new THREE.Vector3();
 const _direction = new THREE.Vector3();
 const _intersection = new THREE.Vector3();
 const _ray = new THREE.Ray();
@@ -261,7 +268,7 @@ export class AILineOfSight {
     let heightfieldPrefilterChecked = false;
     if (this.isHeightfieldPrefilterEnabled() && this.terrainSystem) {
       heightfieldPrefilterChecked = true;
-      const blocked = this.isBlockedByHeightfield(combatant, targetPos, distance);
+      const blocked = this.isBlockedByHeightfield(combatant, target, targetPos);
       if (blocked) {
         AILineOfSight.prefilterRejects++;
         this.setCacheEntry(attackerId, targetId, { result: false, timestamp: now });
@@ -289,7 +296,7 @@ export class AILineOfSight {
 
     // --- Full LOS evaluation ---
     AILineOfSight.fullEvaluations++;
-    const result = this.evaluateFullLOS(combatant, targetPos, distance, heightfieldPrefilterChecked);
+    const result = this.evaluateFullLOS(combatant, target, targetPos, distance, heightfieldPrefilterChecked);
     if (result) {
       AILineOfSight.fullEvaluationClear++;
     } else {
@@ -307,6 +314,7 @@ export class AILineOfSight {
    */
   private evaluateFullLOS(
     combatant: Combatant,
+    target: ITargetable,
     targetPos: THREE.Vector3,
     distance: number,
     heightfieldAlreadyChecked = false,
@@ -317,16 +325,18 @@ export class AILineOfSight {
     // Terrain LOS check (high/medium LOD only)
     if (this.terrainSystem && combatant.simLane &&
         (combatant.simLane === 'high' || combatant.simLane === 'medium')) {
-      _direction.subVectors(_targetEyePos, _eyePos).normalize();
-      AILineOfSight.terrainRaycasts++;
+      const fireDistance = this.writeTerrainFireSegment(combatant, target, targetPos);
+      if (fireDistance > 0) {
+        AILineOfSight.terrainRaycasts++;
 
-      const terrainHit = this.terrainSystem.raycastTerrain(_eyePos, _direction, distance);
+        const terrainHit = this.terrainSystem.raycastTerrain(_fireOrigin, _direction, fireDistance);
 
-      if (terrainHit.hit && terrainHit.distance! < distance - 1) {
-        return false;
-      }
-      if (!heightfieldAlreadyChecked && this.isBlockedByHeightfield(combatant, targetPos, distance)) {
-        return false;
+        if (terrainHit.hit && terrainHit.distance! < fireDistance - 0.5) {
+          return false;
+        }
+        if (!heightfieldAlreadyChecked && this.isBlockedByHeightfield(combatant, target, targetPos)) {
+          return false;
+        }
       }
     }
 
@@ -355,6 +365,27 @@ export class AILineOfSight {
     return true;
   }
 
+  private writeTerrainFireSegment(
+    combatant: Combatant,
+    target: ITargetable,
+    targetPos: THREE.Vector3,
+  ): number {
+    copyNpcMuzzlePosition(_fireOrigin, combatant.position);
+    if (isPlayerTarget(target)) {
+      copyPlayerCenterMassPosition(_fireTarget, targetPos);
+    } else {
+      copyNpcCenterMassPosition(_fireTarget, targetPos);
+    }
+
+    _direction.subVectors(_fireTarget, _fireOrigin);
+    const distance = _direction.length();
+    if (!Number.isFinite(distance) || distance <= 0.001) {
+      return 0;
+    }
+    _direction.multiplyScalar(1 / distance);
+    return distance;
+  }
+
   private isHeightfieldPrefilterEnabled(): boolean {
     const fromGlobal = (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__;
     if (typeof fromGlobal === 'boolean') return fromGlobal;
@@ -368,19 +399,23 @@ export class AILineOfSight {
     }
   }
 
-  private isBlockedByHeightfield(combatant: Combatant, targetPos: THREE.Vector3, distance: number): boolean {
-    if (!this.terrainSystem || distance < 35 || distance > 220) return false;
+  private isBlockedByHeightfield(
+    combatant: Combatant,
+    target: ITargetable,
+    targetPos: THREE.Vector3,
+  ): boolean {
+    if (!this.terrainSystem) return false;
 
-    copyActorEyePosition(_eyePos, combatant.position);
-    copyActorEyePosition(_targetEyePos, targetPos);
+    const distance = this.writeTerrainFireSegment(combatant, target, targetPos);
+    if (distance < 35 || distance > 220) return false;
 
     const samples = Math.min(6, Math.max(2, Math.floor(distance / 20)));
     let blockingSamples = 0;
     for (let i = 1; i < samples; i++) {
       const t = i / samples;
-      const sampleX = _eyePos.x + (_targetEyePos.x - _eyePos.x) * t;
-      const sampleZ = _eyePos.z + (_targetEyePos.z - _eyePos.z) * t;
-      const lineY = _eyePos.y + (_targetEyePos.y - _eyePos.y) * t;
+      const sampleX = _fireOrigin.x + (_fireTarget.x - _fireOrigin.x) * t;
+      const sampleZ = _fireOrigin.z + (_fireTarget.z - _fireOrigin.z) * t;
+      const lineY = _fireOrigin.y + (_fireTarget.y - _fireOrigin.y) * t;
       const terrainY = Number(this.terrainSystem.getEffectiveHeightAt(sampleX, sampleZ));
       if (!Number.isFinite(terrainY)) continue;
       if (terrainY > lineY + 1.2) {

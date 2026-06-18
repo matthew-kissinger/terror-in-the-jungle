@@ -4,6 +4,7 @@
 import type { PixelForgeNpcClipId } from '../../config/pixelForgeAssets';
 import {
   getPixelForgeNpcCloseModelDistanceMeters,
+  PixelForgeNpcDistanceConfig,
   PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
   type PixelForgeNpcPoolKey,
 } from './PixelForgeNpcRuntime';
@@ -19,6 +20,7 @@ export interface CloseModelCandidate {
   combatant: Combatant;
   distanceSq: number;
   poolKey: PixelForgeNpcPoolKey;
+  eligibilityReason: 'base-close' | 'active-combat' | 'release-hysteresis';
   isOnScreen: boolean;
   recentlyVisible: boolean;
   isPlayerSquad: boolean;
@@ -92,6 +94,10 @@ export interface CloseModelRuntimeStats {
   poolLoads: number;
   poolTargets: Record<string, number>;
   poolAvailable: Record<string, number>;
+  activeCombatCloseRadiusMeters: number;
+  releaseRadiusMeters: number;
+  activeCombatExtendedCandidates: number;
+  releaseHysteresisCandidates: number;
   transitionWindow: CloseModelTransitionWindow;
 }
 
@@ -215,8 +221,9 @@ export function recordCloseModelTransitionWindow(
 }
 
 export function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
+  const closeRadiusMeters = getPixelForgeNpcCloseModelDistanceMeters();
   return {
-    closeRadiusMeters: getPixelForgeNpcCloseModelDistanceMeters(),
+    closeRadiusMeters,
     closeModelActiveCap: PIXEL_FORGE_NPC_CLOSE_MODEL_TOTAL_CAP,
     promotionBudgetPerFrame: CLOSE_MODEL_PROMOTION_BUDGET_PER_FRAME,
     promotionsThisFrame: 0,
@@ -231,6 +238,14 @@ export function createEmptyCloseModelRuntimeStats(): CloseModelRuntimeStats {
     poolLoads: 0,
     poolTargets: {},
     poolAvailable: {},
+    activeCombatCloseRadiusMeters: Math.max(
+      closeRadiusMeters,
+      Number(PixelForgeNpcDistanceConfig.activeCombatCloseModelDistanceMeters) || closeRadiusMeters,
+    ),
+    releaseRadiusMeters: closeRadiusMeters
+      + Math.max(0, Number(PixelForgeNpcDistanceConfig.closeModelReleaseHysteresisMeters) || 0),
+    activeCombatExtendedCandidates: 0,
+    releaseHysteresisCandidates: 0,
     transitionWindow: createEmptyCloseModelTransitionWindow(),
   };
 }

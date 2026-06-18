@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
+// @vitest-environment jsdom
 
 // @ts-nocheck
 // A4-class regression guard for the perf-active harness driver.
@@ -82,7 +83,9 @@ const {
   shouldUseDirectCombatRouteFallback,
   shouldUseDirectCombatRouteBypass,
   shouldUseTerrainDirectObjectiveRoute,
+  shouldUseTerrainDirectCombatApproachRoute,
   shouldCooldownCombatTargetAfterRouteFailure,
+  shouldRequireTrustedCombatApproachRoute,
   shouldCooldownObjectiveAfterRouteFailure,
   createDirectCombatFallbackPath,
   computeCombatApproachCandidates,
@@ -99,6 +102,7 @@ const {
   combatObjectiveMaxDistanceForProfile,
   supportsFrontlineCompression,
   usesPlayerAnchoredFrontlineCompression,
+  setPerfDriverHudActive,
   placeCompressedCombatantForHarness,
   // bot-pathing-pit-and-steep-uphill exports — waypoint/replan/pit heuristics.
   shouldAdvanceWaypoint,
@@ -123,6 +127,19 @@ const {
   objectiveBlockKey,
   routeTargetIdentityKey,
 } = driver;
+
+describe('perf-active-driver HUD visibility marker', () => {
+  it('marks the native HUD while the perf driver is active', () => {
+    document.body.innerHTML = '<div id="game-hud-root"></div>';
+    const root = document.getElementById('game-hud-root');
+
+    setPerfDriverHudActive(true);
+    expect(root.dataset.perfDriverActive).toBe('true');
+
+    setPerfDriverHudActive(false);
+    expect(root.dataset.perfDriverActive).toBeUndefined();
+  });
+});
 
 function makeBotCtx(overrides = {}) {
   const config = overrides.config || botConfigForProfile(profileForMode('ai_sandbox'));
@@ -1366,22 +1383,22 @@ describe('PlayerBot driver mirror — ADVANCE', () => {
     expect(step.intent.firePrimary).toBe(false);
   });
 
-  it('keeps moving forward when target remains occluded', () => {
+  it('keeps moving forward when target remains occluded outside standoff distance', () => {
     const step = stepBotState('ADVANCE', makeBotCtx({
-      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -30 } }),
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -80 } }),
       canSeeTarget: () => false,
     }));
     expect(step.intent.moveForward).toBeGreaterThan(0);
     expect(step.intent.firePrimary).toBe(false);
   });
 
-  it('keeps repositioning toward a close occluded target outside point-blank distance', () => {
+  it('holds standoff instead of walking into a close occluded target', () => {
     const step = stepBotState('ADVANCE', makeBotCtx({
-      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -15 } }),
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -30 } }),
       canSeeTarget: () => false,
     }));
     expect(step.nextState).toBeNull();
-    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.moveForward).toBe(0);
     expect(step.intent.firePrimary).toBe(false);
   });
 
@@ -2508,6 +2525,17 @@ describe('route objective-progress recovery', () => {
     })).toBe(true);
   });
 
+  it('backs out to standoff candidates when an occluded combat route is already too close', () => {
+    const player = { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 };
+    const target = { x: 0, y: PLAYER_EYE_HEIGHT, z: -26 };
+    const candidates = computeCombatApproachCandidates(player, target);
+
+    expect(candidates.length).toBeGreaterThan(1);
+    expect(candidates[0].z).toBeGreaterThan(player.z);
+    expect(Math.hypot(candidates[0].x - target.x, candidates[0].z - target.z)).toBeGreaterThan(70);
+    expect(candidates.some(candidate => Math.abs(candidate.x) > 1)).toBe(true);
+  });
+
   it('does not direct-fallback combat targets that are terrain-occluded', () => {
     expect(shouldUseDirectCombatRouteFallback({
       targetKind: 'current_target',
@@ -2518,10 +2546,49 @@ describe('route objective-progress recovery', () => {
     })).toBe(false);
   });
 
+  it('requires a trusted approach anchor before routing to terrain-occluded combat targets', () => {
+    expect(shouldRequireTrustedCombatApproachRoute({
+      targetKind: 'current_target',
+      targetVisible: false,
+    })).toBe(true);
+    expect(shouldRequireTrustedCombatApproachRoute({
+      targetKind: 'nearest_opfor',
+      targetVisible: false,
+    })).toBe(true);
+    expect(shouldRequireTrustedCombatApproachRoute({
+      targetKind: 'current_target',
+      targetVisible: true,
+    })).toBe(false);
+    expect(shouldRequireTrustedCombatApproachRoute({
+      targetKind: 'zone',
+      targetVisible: false,
+    })).toBe(false);
+  });
+
+  it('uses terrain-direct routing for trusted combat approach anchors on terrain-direct profiles', () => {
+    expect(shouldUseTerrainDirectCombatApproachRoute({
+      allowTerrainDirect: true,
+      hasCombatApproachTarget: true,
+    })).toBe(true);
+    expect(shouldUseTerrainDirectCombatApproachRoute({
+      allowTerrainDirect: false,
+      hasCombatApproachTarget: true,
+    })).toBe(false);
+    expect(shouldUseTerrainDirectCombatApproachRoute({
+      allowTerrainDirect: true,
+      hasCombatApproachTarget: false,
+    })).toBe(false);
+  });
+
   it('cools down occluded combat targets after trusted routing fails', () => {
     expect(shouldCooldownCombatTargetAfterRouteFailure({
       targetKind: 'current_target',
       failureReason: 'snap_distance_untrusted',
+      targetVisible: false,
+    })).toBe(true);
+    expect(shouldCooldownCombatTargetAfterRouteFailure({
+      targetKind: 'nearest_opfor',
+      failureReason: 'combat_approach_unavailable',
       targetVisible: false,
     })).toBe(true);
   });

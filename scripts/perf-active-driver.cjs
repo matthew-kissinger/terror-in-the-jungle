@@ -214,6 +214,7 @@
   const NAVMESH_TRUSTED_ROUTE_SNAP_DISTANCE = 24;
   const COMBAT_APPROACH_MIN_HOLD_DISTANCE = 45;
   const COMBAT_APPROACH_MAX_HOLD_DISTANCE = 170;
+  const COMBAT_APPROACH_CLOSE_STANDOFF_DISTANCE = 85;
   const COMBAT_APPROACH_LATERAL_MIN = 24;
   const COMBAT_APPROACH_LATERAL_MAX = 90;
   // Humanized synthetic-camera slew cap. The driver used to allow 24 deg yaw /
@@ -1578,6 +1579,11 @@
     return true;
   }
 
+  function shouldUseTerrainDirectCombatApproachRoute(opts) {
+    if (!opts || opts.allowTerrainDirect !== true) return false;
+    return opts.hasCombatApproachTarget === true;
+  }
+
   function shouldCooldownCombatTargetAfterRouteFailure(opts) {
     const targetKind = String(opts && opts.targetKind || '');
     if (targetKind !== 'current_target' && targetKind !== 'nearest_opfor') return false;
@@ -1586,7 +1592,14 @@
     return failureReason === 'end_snap_failed'
       || failureReason === 'start_snap_failed'
       || failureReason === 'snap_distance_untrusted'
+      || failureReason === 'combat_approach_unavailable'
       || failureReason === 'nav_failed';
+  }
+
+  function shouldRequireTrustedCombatApproachRoute(opts) {
+    const targetKind = String(opts && opts.targetKind || '');
+    if (targetKind !== 'current_target' && targetKind !== 'nearest_opfor') return false;
+    return !(opts && opts.targetVisible === true);
   }
 
   function shouldCooldownObjectiveAfterRouteFailure(opts) {
@@ -1659,14 +1672,38 @@
     );
     const targetY = Number.isFinite(Number(target.y)) ? Number(target.y) : Number(playerPos.y || 0);
     const baseHold = Math.min(holdDistance, Math.max(0, distance - 8));
-    const pushCandidate = (items, backoff, lateral) => {
-      if (!Number.isFinite(backoff) || backoff <= 0 || backoff >= distance) return;
+    const pushCandidate = (items, backoff, lateral, options) => {
+      const allowRetreat = options && options.allowRetreat === true;
+      if (!Number.isFinite(backoff) || backoff <= 0) return;
+      if (!allowRetreat && backoff >= distance) return;
+      if (allowRetreat && backoff <= distance + 6) return;
       const x = Number(target.x || 0) - ux * backoff + lateralX * lateral;
       const z = Number(target.z || 0) - uz * backoff + lateralZ * lateral;
       if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+      if (allowRetreat) {
+        const playerDistance = Math.hypot(x - Number(playerPos.x || 0), z - Number(playerPos.z || 0));
+        if (
+          !Number.isFinite(playerDistance)
+          || playerDistance < 6
+          || playerDistance > COMBAT_APPROACH_MAX_HOLD_DISTANCE
+        ) {
+          return;
+        }
+      }
       items.push({ x, y: targetY, z });
     };
     const candidates = [];
+    if (distance < COMBAT_APPROACH_MIN_HOLD_DISTANCE) {
+      const retreatHold = Math.min(
+        COMBAT_APPROACH_MAX_HOLD_DISTANCE,
+        Math.max(COMBAT_APPROACH_CLOSE_STANDOFF_DISTANCE, COMBAT_APPROACH_MIN_HOLD_DISTANCE),
+      );
+      pushCandidate(candidates, retreatHold, 0, { allowRetreat: true });
+      pushCandidate(candidates, Math.min(COMBAT_APPROACH_MAX_HOLD_DISTANCE, retreatHold * 1.25), 0, { allowRetreat: true });
+      pushCandidate(candidates, retreatHold, lateralDistance, { allowRetreat: true });
+      pushCandidate(candidates, retreatHold, -lateralDistance, { allowRetreat: true });
+      return candidates;
+    }
     pushCandidate(candidates, baseHold, 0);
     pushCandidate(candidates, Math.min(distance - 4, baseHold * 1.45), 0);
     pushCandidate(candidates, baseHold, lateralDistance);
@@ -1744,11 +1781,11 @@
     };
   }
 
-  const OCCLUDED_TARGET_HOLD_DISTANCE = 6;
+  const OCCLUDED_TARGET_HOLD_DISTANCE = COMBAT_APPROACH_MIN_HOLD_DISTANCE;
   function pushInDistanceForVisibility(config, visible) {
     const push = Math.max(0, Number(config && config.pushInDistance || 0));
     if (visible) return push;
-    return Math.min(push, OCCLUDED_TARGET_HOLD_DISTANCE);
+    return Math.max(push, OCCLUDED_TARGET_HOLD_DISTANCE);
   }
 
   function tacticalHoldDistance(config) {
@@ -2145,6 +2182,21 @@
 
   function usesPlayerAnchoredFrontlineCompression(mode) {
     return mode === 'open_frontier' || mode === 'a_shau_valley';
+  }
+
+  function setPerfDriverHudActive(active) {
+    const documentRef = globalWindow && globalWindow.document
+      ? globalWindow.document
+      : root && root.document;
+    const hudRoot = documentRef && typeof documentRef.getElementById === 'function'
+      ? documentRef.getElementById('game-hud-root')
+      : null;
+    if (!hudRoot || !hudRoot.dataset) return;
+    if (active) {
+      hudRoot.dataset.perfDriverActive = 'true';
+      return;
+    }
+    delete hudRoot.dataset.perfDriverActive;
   }
 
   function placeCompressedCombatantForHarness(systems, combatant, x, z) {
@@ -3552,9 +3604,14 @@
       if (needsReplan) {
         const combatRoute = targetKindName === 'current_target' || targetKindName === 'nearest_opfor';
         const prePathLos = combatRoute ? queryTargetLineOfSight(systems, playerPos, target) : null;
-        const combatApproachTarget = combatRoute && !(prePathLos && prePathLos.clear)
+        const requiresCombatApproachRoute = shouldRequireTrustedCombatApproachRoute({
+          targetKind: targetKindName,
+          targetVisible: prePathLos && prePathLos.clear,
+        });
+        const combatApproachTarget = requiresCombatApproachRoute
           ? resolveCombatApproachRouteTarget(systems, playerPos, target, targetKindName)
           : null;
+        const combatApproachUnavailable = requiresCombatApproachRoute && !combatApproachTarget;
         const pathTarget = combatApproachTarget || target;
         const usingCombatApproachRoute = !!combatApproachTarget;
         const useDirectCombatRoute = shouldUseDirectCombatRouteBypass({
@@ -3569,9 +3626,23 @@
           targetVisible: prePathLos && prePathLos.clear,
           allowTerrainDirect: profile.aggressiveMode === true,
         });
-        const path = useTerrainDirectRoute
-          ? createDirectCombatFallbackPath(playerPos, target)
-          : queryPath(systems, playerPos, pathTarget);
+        const useCombatApproachTerrainDirect = shouldUseTerrainDirectCombatApproachRoute({
+          allowTerrainDirect: profile.aggressiveMode === true,
+          hasCombatApproachTarget: usingCombatApproachRoute,
+        });
+        let path = null;
+        if (combatApproachUnavailable) {
+          state.lastPathFailureReason = 'combat_approach_unavailable';
+          state.lastPathQueryDistance = targetDistance;
+          state.lastPathStartSnapped = null;
+          state.lastPathEndSnapped = null;
+          state.lastPathStartSnapDistance = null;
+          state.lastPathEndSnapDistance = null;
+        } else {
+          path = useTerrainDirectRoute || useCombatApproachTerrainDirect
+            ? createDirectCombatFallbackPath(playerPos, pathTarget)
+            : queryPath(systems, playerPos, pathTarget);
+        }
         state.lastWaypointReplanAt = now;
         if (path && path.length > 0) {
           state.waypoints = path;
@@ -3581,9 +3652,11 @@
             ? 'direct_combat_fallback'
             : useTerrainDirectRoute
               ? 'terrain_direct'
-              : usingCombatApproachRoute
-                ? 'combat_approach'
-                : 'ok';
+              : useCombatApproachTerrainDirect
+                ? 'combat_approach_terrain_direct'
+                : usingCombatApproachRoute
+                  ? 'combat_approach'
+                  : 'ok';
           state.lastPathLength = path.length;
           state.lastPathFailureReason = null;
         } else {
@@ -4490,12 +4563,14 @@
     // ── Public surface ──
 
     function start() {
+      setPerfDriverHudActive(true);
       state.heartbeatTimer = setInterval(tick, decisionIntervalMs);
       tick();
     }
 
     function stop() {
       if (state.heartbeatTimer) { clearInterval(state.heartbeatTimer); state.heartbeatTimer = null; }
+      setPerfDriverHudActive(false);
       const systems = getSystems();
       const runtimeLiveness = getRuntimeLiveness(systems);
       // One last roll-up before we tear down so the stop-stats reflect
@@ -4969,7 +5044,9 @@
       shouldUseDirectCombatRouteFallback: shouldUseDirectCombatRouteFallback,
       shouldUseDirectCombatRouteBypass: shouldUseDirectCombatRouteBypass,
       shouldUseTerrainDirectObjectiveRoute: shouldUseTerrainDirectObjectiveRoute,
+      shouldUseTerrainDirectCombatApproachRoute: shouldUseTerrainDirectCombatApproachRoute,
       shouldCooldownCombatTargetAfterRouteFailure: shouldCooldownCombatTargetAfterRouteFailure,
+      shouldRequireTrustedCombatApproachRoute: shouldRequireTrustedCombatApproachRoute,
       shouldCooldownObjectiveAfterRouteFailure: shouldCooldownObjectiveAfterRouteFailure,
       createDirectCombatFallbackPath: createDirectCombatFallbackPath,
       computeCombatApproachCandidates: computeCombatApproachCandidates,
@@ -4987,6 +5064,7 @@
       combatObjectiveMaxDistanceForProfile: combatObjectiveMaxDistanceForProfile,
       supportsFrontlineCompression: supportsFrontlineCompression,
       usesPlayerAnchoredFrontlineCompression: usesPlayerAnchoredFrontlineCompression,
+      setPerfDriverHudActive: setPerfDriverHudActive,
       normalizeDriverSeed: normalizeDriverSeed,
       createSeededRandom: createSeededRandom,
       placeCompressedCombatantForHarness: placeCompressedCombatantForHarness,

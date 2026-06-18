@@ -1,6 +1,6 @@
 # Current State
 
-Last aligned: 2026-06-16 UTC (2026-06-15 local): dropped-frame stabilization shipped at `5684df747f2092c9095ad1bd5e868abacfd5ab77` after the terrain coherency fix, dense vegetation-ring rollback, and dropped-frame harness alignment, then owner playtest fixes for land-vehicle steering and the detached Huey rotor/stabilizer mesh shipped at `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`. Exact-head CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke passed for `d7fdd9c` in CI run `27594724546`, deploy run `27594906745`, and `artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`. The active goal remains dropped-frame time / visible-stutter reduction without shrinking Open Frontier or A Shau; runtime completion is not claimed until fresh quiet-machine capture and owner playtest pass. Fresh current-head A Shau evidence at `artifacts/perf/2026-06-16T04-57-34-868Z` still fails the goal and points at terrain/CDLOD presentation churn plus render pressure, not completion. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-06-17 local / 2026-06-18 UTC: the last production-proven dropped-frame stabilization remains `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295` with exact-head CI, deploy, live manifest SHA parity, Pages/R2/SW headers, and live browser smoke in `artifacts/perf/2026-06-16T04-51-05-642Z/projekt-143-live-release-proof/release-proof.json`. The active branch `task/dropped-frame-paired-evidence` is now a stabilization/evidence-pipeline closeout, not a completion claim: current source-stable work tightens occluded combat routing, aligns AI LOS with fire-authority terrain segments, splits aimed/suppressive terrain-block telemetry, keeps health/ammo visible during active-driver captures, fixes hidden-canvas shader prewarm, and pre-materializes active-combat close NPCs with release hysteresis. Open Frontier artifact `artifacts/perf/2026-06-17T23-48-02-957Z` is dirty-machine diagnostic-only and still fails rAF/dropped-frame and terrain-block pressure gates; HUD smoke artifact `artifacts/perf/2026-06-18T00-06-19-692Z` proves health/ammo visibility but intentionally lacks combat pressure. Runtime completion is not claimed until quiet-machine Open Frontier + A Shau EARS captures and owner playtest pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,10 +26,24 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-06-15)
+## Current focus (2026-06-17)
 
 The most recent shipped work, newest first:
 
+- **2026-06-17 local / 2026-06-18 UTC — dropped-frame evidence-pipeline closeout candidate**
+  (`task/dropped-frame-paired-evidence`): the achievable closeout goal is to
+  ship a production-stable evidence pipeline and same-experience mitigations,
+  then leave the remaining dropped-frame finish line explicit. Current branch
+  work addresses harness false positives and playtest-observed blind spots:
+  trusted combat-approach anchors instead of occluded direct pursuit, shared
+  AI/fire terrain authority, aimed-vs-suppressive terrain-block telemetry,
+  active-driver HUD health/ammo visibility, hidden-canvas shader prewarm, and
+  active-combat close-model pre-materialization with release hysteresis.
+  Source validation is required before merge/deploy. Runtime proof remains
+  open: `artifacts/perf/2026-06-17T23-48-02-957Z` is diagnostic-only, and
+  `artifacts/perf/2026-06-18T00-06-19-692Z` is only a short HUD wiring smoke.
+  Future completion still requires quiet-machine Open Frontier + A Shau EARS
+  captures, live production proof, and owner playtest.
 - **2026-06-15 local / 2026-06-16 UTC — dropped-frame stabilization and owner hotfix release**
   (`5684df747f2092c9095ad1bd5e868abacfd5ab77` stabilization, followed by
   `d7fdd9ca1d04f5546cfc8506a13bed22f5e6f295`, branch

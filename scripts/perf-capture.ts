@@ -171,6 +171,28 @@ type RuntimeWeatherStats = {
   rainMatrixBytesPerFrame: number;
 };
 
+type RuntimeHudElementState = {
+  mounted: boolean;
+  visible: boolean;
+  display: string | null;
+  visibility: string | null;
+  opacity: string | null;
+  width: number;
+  height: number;
+  text: string | null;
+};
+
+type RuntimeHudState = {
+  rootMounted: boolean;
+  phase: string | null;
+  actorMode: string | null;
+  vehicle: string | null;
+  ads: boolean | null;
+  perfDriverActive: boolean;
+  health: RuntimeHudElementState;
+  ammo: RuntimeHudElementState;
+};
+
 type RuntimeSample = {
   ts: string;
   pagePerformanceNowMs?: number;
@@ -193,6 +215,7 @@ type RuntimeSample = {
   heapUsedMb?: number;
   heapTotalMb?: number;
   uiErrorPanelVisible?: boolean;
+  hudState?: RuntimeHudState;
   closeModelStats?: RuntimeCloseModelStats;
   vegetation?: RuntimeVegetationStats;
   weather?: RuntimeWeatherStats;
@@ -279,6 +302,16 @@ type RuntimeSample = {
       totalRequested: number;
       totalDenied: number;
       totalTerrainBlocked: number;
+      aimedTotalRequested: number;
+      aimedTotalDenied: number;
+      aimedTotalTerrainBlocked: number;
+      aimedDenialRate: number;
+      aimedTerrainBlockRate: number;
+      suppressiveTotalRequested: number;
+      suppressiveTotalDenied: number;
+      suppressiveTotalTerrainBlocked: number;
+      suppressiveDenialRate: number;
+      suppressiveTerrainBlockRate: number;
       saturationRate: number;
       denialRate: number;
       terrainBlockRate: number;
@@ -3448,6 +3481,28 @@ function validateRun(
       : 'No loading/init error panel appeared during capture'
   });
 
+  const perfDriverHudSamples = runtimeSamples.filter(
+    s => s.hudState?.perfDriverActive === true && s.hudState.phase === 'playing'
+  );
+  if (perfDriverHudSamples.length > 0) {
+    const missingHealthSamples = perfDriverHudSamples.filter(s => s.hudState?.health.visible !== true).length;
+    const missingAmmoSamples = perfDriverHudSamples.filter(s => s.hudState?.ammo.visible !== true).length;
+    const missingVitalsSamples = perfDriverHudSamples.filter(
+      s => s.hudState?.health.visible !== true || s.hudState?.ammo.visible !== true
+    ).length;
+    const missingRatio = missingVitalsSamples / perfDriverHudSamples.length;
+    checks.push({
+      id: 'harness_hud_vitals_visible',
+      status: missingVitalsSamples === 0
+        ? 'pass'
+        : missingRatio <= 0.1
+          ? 'warn'
+          : 'fail',
+      value: missingRatio,
+      message: `Perf-driver HUD vitals visible in ${perfDriverHudSamples.length - missingVitalsSamples}/${perfDriverHudSamples.length} playing samples; missing health=${missingHealthSamples}, ammo=${missingAmmoSamples}`
+    });
+  }
+
   const combatHeavySamples = runtimeSamples.filter(s => {
     const top = s.systemTop[0];
     return top && top.name.toLowerCase().includes('combat') && top.emaMs > 16.67;
@@ -3481,6 +3536,10 @@ function validateRun(
     const budget = latestByRequests.combatBreakdown?.combatFireRaycastBudget;
     const totalRequested = Math.max(0, Number(budget?.totalRequested ?? 0));
     const totalBlocked = Math.max(0, Number(budget?.totalTerrainBlocked ?? 0));
+    const aimedRequested = Math.max(0, Number(budget?.aimedTotalRequested ?? 0));
+    const aimedBlocked = Math.max(0, Number(budget?.aimedTotalTerrainBlocked ?? 0));
+    const suppressiveRequested = Math.max(0, Number(budget?.suppressiveTotalRequested ?? 0));
+    const suppressiveBlocked = Math.max(0, Number(budget?.suppressiveTotalTerrainBlocked ?? 0));
     const reportedRate = Number(budget?.terrainBlockRate);
     const blockRate = Number.isFinite(reportedRate)
       ? reportedRate
@@ -3500,7 +3559,7 @@ function validateRun(
       value: blockRate,
       message: totalRequested < COMBAT_FIRE_TERRAIN_BLOCK_MIN_REQUESTS
         ? `Combat fire terrain-block sample is too thin (${totalBlocked}/${totalRequested}); cannot prove fight geometry is representative`
-        : `Combat fire terrain-block rate ${(blockRate * 100).toFixed(1)}% (${totalBlocked}/${totalRequested}; warn>=${(COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE * 100).toFixed(0)}%, fail>=${(COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE * 100).toFixed(0)}%)`
+        : `Combat fire terrain-block rate ${(blockRate * 100).toFixed(1)}% (${totalBlocked}/${totalRequested}; aimed=${aimedBlocked}/${aimedRequested}; suppressive=${suppressiveBlocked}/${suppressiveRequested}; warn>=${(COMBAT_FIRE_TERRAIN_BLOCK_WARN_RATE * 100).toFixed(0)}%, fail>=${(COMBAT_FIRE_TERRAIN_BLOCK_FAIL_RATE * 100).toFixed(0)}%)`
     });
   }
 
@@ -6203,7 +6262,11 @@ async function runCapture(): Promise<void> {
           (window as any).perf?.reset?.();
           (window as any).__perfHarnessObservers?.reset?.();
           (window as any).__gameLoopFrameBreakdown?.reset?.();
-          (window as any).__atmosphereSkyRefreshStats?.({ reset: true });
+          if (typeof (window as any).__atmosphereSkyRefreshStats === 'function') {
+            (window as any).__atmosphereSkyRefreshStats({ reset: true });
+          } else {
+            (window as any).__engine?.systemManager?.atmosphereSystem?.resetSkyRefreshStatsForDebug?.();
+          }
           (window as any).__materializationTierEvents?.({ clear: true, limit: 1 });
           (window as any).__engine?.systemManager?.combatantSystem?.combatantRenderer
             ?.getCloseModelRuntimeStats?.({ drainTransitionWindow: true });
@@ -6501,10 +6564,12 @@ async function runCapture(): Promise<void> {
           const atmosphereSkyRefresh = (() => {
             try {
               const accessor = (window as any).__atmosphereSkyRefreshStats;
-              if (typeof accessor !== 'function') {
+              const stats = typeof accessor === 'function'
+                ? accessor()
+                : (window as any).__engine?.systemManager?.atmosphereSystem?.getSkyRefreshStatsForDebug?.();
+              if (!stats) {
                 return { available: false, fireCount: 0, totalMs: 0, lastMs: 0, avgMs: 0 };
               }
-              const stats = accessor();
               return {
                 available: true,
                 fireCount: Number(stats?.fireCount ?? 0),
@@ -6590,6 +6655,53 @@ async function runCapture(): Promise<void> {
               renderSubmissionError = error instanceof Error ? error.message : String(error);
             }
           }
+          const readHudElementState = (element: Element | null) => {
+            if (!(element instanceof HTMLElement)) {
+              return {
+                mounted: false,
+                visible: false,
+                display: null,
+                visibility: null,
+                opacity: null,
+                width: 0,
+                height: 0,
+                text: null
+              };
+            }
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            const opacity = Number(style.opacity || '1');
+            const visible = style.display !== 'none'
+              && style.visibility !== 'hidden'
+              && Number.isFinite(opacity)
+              && opacity > 0.01
+              && rect.width > 0
+              && rect.height > 0;
+            return {
+              mounted: true,
+              visible,
+              display: style.display,
+              visibility: style.visibility,
+              opacity: style.opacity,
+              width: Number(rect.width.toFixed(1)),
+              height: Number(rect.height.toFixed(1)),
+              text: (element.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 80) || null
+            };
+          };
+          const hudRoot = document.getElementById('game-hud-root');
+          const healthElement = document.querySelector('.hud-slot[data-region="health"] .health-display');
+          const ammoSlot = document.querySelector('.hud-slot[data-region="ammo"]');
+          const ammoElement = ammoSlot?.firstElementChild ?? null;
+          const hudState = {
+            rootMounted: Boolean(hudRoot),
+            phase: hudRoot?.dataset.phase ?? null,
+            actorMode: hudRoot?.dataset.actorMode ?? null,
+            vehicle: hudRoot?.dataset.vehicle ?? null,
+            ads: hudRoot?.dataset.ads === undefined ? null : hudRoot.dataset.ads === 'true',
+            perfDriverActive: hudRoot?.dataset.perfDriverActive === 'true',
+            health: readHudElementState(healthElement),
+            ammo: readHudElementState(ammoElement)
+          };
           return {
             pagePerformanceNowMs: Number(performance.now()),
             pageWallNowMs: Date.now(),
@@ -6611,6 +6723,7 @@ async function runCapture(): Promise<void> {
             heapUsedMb: memory?.usedJSHeapSize ? Number(memory.usedJSHeapSize) / (1024 * 1024) : undefined,
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
+            hudState,
             vegetation: normalizeVegetationDebug(vegetationDebug),
             weather: normalizeWeatherDebug(weatherDebug),
             atmosphereSkyRefresh,
@@ -7093,6 +7206,16 @@ async function runCapture(): Promise<void> {
                     totalRequested: Number(combatProfile.timing.combatFireRaycastBudget.totalRequested ?? 0),
                     totalDenied: Number(combatProfile.timing.combatFireRaycastBudget.totalDenied ?? 0),
                     totalTerrainBlocked: Number(combatProfile.timing.combatFireRaycastBudget.totalTerrainBlocked ?? 0),
+                    aimedTotalRequested: Number(combatProfile.timing.combatFireRaycastBudget.aimedTotalRequested ?? 0),
+                    aimedTotalDenied: Number(combatProfile.timing.combatFireRaycastBudget.aimedTotalDenied ?? 0),
+                    aimedTotalTerrainBlocked: Number(combatProfile.timing.combatFireRaycastBudget.aimedTotalTerrainBlocked ?? 0),
+                    aimedDenialRate: Number(combatProfile.timing.combatFireRaycastBudget.aimedDenialRate ?? 0),
+                    aimedTerrainBlockRate: Number(combatProfile.timing.combatFireRaycastBudget.aimedTerrainBlockRate ?? 0),
+                    suppressiveTotalRequested: Number(combatProfile.timing.combatFireRaycastBudget.suppressiveTotalRequested ?? 0),
+                    suppressiveTotalDenied: Number(combatProfile.timing.combatFireRaycastBudget.suppressiveTotalDenied ?? 0),
+                    suppressiveTotalTerrainBlocked: Number(combatProfile.timing.combatFireRaycastBudget.suppressiveTotalTerrainBlocked ?? 0),
+                    suppressiveDenialRate: Number(combatProfile.timing.combatFireRaycastBudget.suppressiveDenialRate ?? 0),
+                    suppressiveTerrainBlockRate: Number(combatProfile.timing.combatFireRaycastBudget.suppressiveTerrainBlockRate ?? 0),
                     saturationRate: Number(combatProfile.timing.combatFireRaycastBudget.saturationRate ?? 0),
                     denialRate: Number(combatProfile.timing.combatFireRaycastBudget.denialRate ?? 0),
                     terrainBlockRate: Number(combatProfile.timing.combatFireRaycastBudget.terrainBlockRate ?? 0)
@@ -7459,6 +7582,10 @@ async function runCapture(): Promise<void> {
         const fireTerrainBlockedFrame = Number(combatFireBudget?.terrainBlockedThisFrame ?? 0);
         const fireTerrainBlockedTotal = Number(combatFireBudget?.totalTerrainBlocked ?? 0);
         const fireTerrainBlockRatePct = Number(combatFireBudget?.terrainBlockRate ?? 0) * 100;
+        const aimedFireBlockedTotal = Number(combatFireBudget?.aimedTotalTerrainBlocked ?? 0);
+        const aimedFireRequestedTotal = Number(combatFireBudget?.aimedTotalRequested ?? 0);
+        const suppressiveFireBlockedTotal = Number(combatFireBudget?.suppressiveTotalTerrainBlocked ?? 0);
+        const suppressiveFireRequestedTotal = Number(combatFireBudget?.suppressiveTotalRequested ?? 0);
         const vegetation = sample.vegetation;
         let vegetationSuffix = '';
         if (vegetation) {
@@ -7601,7 +7728,7 @@ async function runCapture(): Promise<void> {
           ? ` gpu=${sample.gpu.available ? `${sample.gpu.gpuTimeMs.toFixed(2)}ms` : 'unavailable'} backend=${sample.rendererBackend?.resolvedBackend ?? 'unknown'}`
           : '';
         const fireTerrainBlockSuffix = fireTerrainBlockedFrame > 0 || fireTerrainBlockedTotal > 0
-          ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}%`
+          ? ` fireTerrainBlock=${fireTerrainBlockedFrame}/${fireTerrainBlockedTotal} ${fireTerrainBlockRatePct.toFixed(1)}% aimed=${aimedFireBlockedTotal}/${aimedFireRequestedTotal} supp=${suppressiveFireBlockedTotal}/${suppressiveFireRequestedTotal}`
           : '';
         logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h33=${Number(sample.hitch33Count ?? 0)} h50=${Number(sample.hitch50Count ?? 0)} raf25=${rafStutter25Count} raf33=${rafHitch33Count} rafDrop60=${rafDropped60HzFrames} rafDropTime60=${rafDroppedFrameTime60HzMs.toFixed(1)}ms rafMax=${rafMaxGapMs.toFixed(1)}ms${recentRafSuffix} shots=${engineShots} hits=${engineHits} hitRate=${(engineHitRate * 100).toFixed(1)}% trigger=${triggerShots} ${drawCallsSuffix} tri=${triangles}${gpuSuffix} rayDeny=${denialRatePct.toFixed(1)}%${fireTerrainBlockSuffix} aiStarve=${aiStarve}${simLaneSuffix} longTasks=${recentLongTasks} loafs=${recentLoafs}${resourceSuffix}${terrainSuffix}${terrainSyncSuffix}${heightAwareTerrainSuffix}${vegetationSuffix}${weatherSuffix}${closeModelSuffix}${driverSuffix}`);
         // harness-lifecycle-halt-on-match-end: latch the first match-end
