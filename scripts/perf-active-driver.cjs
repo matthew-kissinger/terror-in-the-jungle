@@ -1596,15 +1596,35 @@
       || failureReason === 'nav_failed';
   }
 
-  function routeFailureCooldownTargetId(currentTarget, routeTarget) {
+  function shouldCooldownCombatTargetAfterNoProgress(opts) {
+    const targetKind = String(opts && opts.targetKind || '');
+    return targetKind === 'current_target' || targetKind === 'nearest_opfor';
+  }
+
+  function routeFailureIdentityTargetId(routeIdentityKey, targetKind) {
+    if (routeIdentityKey === null || routeIdentityKey === undefined) return null;
+    const key = String(routeIdentityKey);
+    const kind = String(targetKind || '');
+    if (!kind) return null;
+    const prefix = `${kind}:`;
+    if (!key.startsWith(prefix)) return null;
+    const id = key.slice(prefix.length);
+    return id ? id : null;
+  }
+
+  function routeFailureCooldownTargetId(currentTarget, routeTarget, routeIdentityKey, targetKind) {
+    const kind = String(targetKind || '');
     const currentId = currentTarget && currentTarget.id !== null && currentTarget.id !== undefined
       ? String(currentTarget.id)
       : null;
-    if (currentId) return currentId;
     const routeId = routeTarget && routeTarget.id !== null && routeTarget.id !== undefined
       ? String(routeTarget.id)
       : null;
-    return routeId || null;
+    const identityId = routeFailureIdentityTargetId(routeIdentityKey, kind);
+    if (kind === 'nearest_opfor') {
+      return routeId || identityId || currentId || null;
+    }
+    return currentId || routeId || identityId || null;
   }
 
   function shouldRequireTrustedCombatApproachRoute(opts) {
@@ -3578,14 +3598,25 @@
           state.lastRouteProgressDistance = routeProgressDistance;
           state.lastRouteProgressMoved = state.playerDistanceMoved;
           state.lastRouteProgressAt = now;
-          if (targetKindName === 'current_target') {
-            markTargetTemporarilyBlocked(
+          if (shouldCooldownCombatTargetAfterNoProgress({ targetKind: targetKindName })) {
+            const blockedId = routeFailureCooldownTargetId(
+              state.currentTarget,
+              target,
+              routeIdentityKey,
+              targetKindName,
+            );
+            if (markTargetTemporarilyBlocked(
               state.blockedTargetUntil,
-              state.currentTarget && state.currentTarget.id,
+              blockedId,
               now,
               ROUTE_NO_PROGRESS_TARGET_COOLDOWN_MS,
-            );
-            state.currentTarget = null;
+            )) {
+              state.currentTarget = null;
+              state.waypoints = null;
+              state.waypointIdx = 0;
+              state.lastWaypointReplanAt = 0;
+              state.routeTargetResets++;
+            }
           }
         } else {
           const closure = Number(state.lastRouteProgressDistance) - routeProgressDistance;
@@ -3702,7 +3733,12 @@
               failureReason: state.lastPathFailureReason,
               targetVisible: fallbackLos.clear,
             })) {
-              const blockedId = routeFailureCooldownTargetId(state.currentTarget, target);
+              const blockedId = routeFailureCooldownTargetId(
+                state.currentTarget,
+                target,
+                routeIdentityKey,
+                targetKindName,
+              );
               if (markTargetTemporarilyBlocked(
                 state.blockedTargetUntil,
                 blockedId,
@@ -5058,6 +5094,7 @@
       shouldUseTerrainDirectObjectiveRoute: shouldUseTerrainDirectObjectiveRoute,
       shouldUseTerrainDirectCombatApproachRoute: shouldUseTerrainDirectCombatApproachRoute,
       shouldCooldownCombatTargetAfterRouteFailure: shouldCooldownCombatTargetAfterRouteFailure,
+      shouldCooldownCombatTargetAfterNoProgress: shouldCooldownCombatTargetAfterNoProgress,
       routeFailureCooldownTargetId: routeFailureCooldownTargetId,
       shouldRequireTrustedCombatApproachRoute: shouldRequireTrustedCombatApproachRoute,
       shouldCooldownObjectiveAfterRouteFailure: shouldCooldownObjectiveAfterRouteFailure,

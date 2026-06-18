@@ -85,6 +85,7 @@ const {
   shouldUseTerrainDirectObjectiveRoute,
   shouldUseTerrainDirectCombatApproachRoute,
   shouldCooldownCombatTargetAfterRouteFailure,
+  shouldCooldownCombatTargetAfterNoProgress,
   routeFailureCooldownTargetId,
   shouldRequireTrustedCombatApproachRoute,
   shouldCooldownObjectiveAfterRouteFailure,
@@ -2595,9 +2596,17 @@ describe('route objective-progress recovery', () => {
   });
 
   it('uses the route target id for no-lock nearest-opfor cooldowns', () => {
-    expect(routeFailureCooldownTargetId(null, { id: 'combatant_52' })).toBe('combatant_52');
-    expect(routeFailureCooldownTargetId({ id: 'locked_7' }, { id: 'combatant_52' })).toBe('locked_7');
+    expect(routeFailureCooldownTargetId(null, { id: 'combatant_52' }, null, 'nearest_opfor')).toBe('combatant_52');
+    expect(routeFailureCooldownTargetId(null, { x: 12, z: -30 }, 'nearest_opfor:combatant_52', 'nearest_opfor')).toBe('combatant_52');
+    expect(routeFailureCooldownTargetId({ id: 'locked_7' }, { id: 'combatant_52' }, null, 'current_target')).toBe('locked_7');
+    expect(routeFailureCooldownTargetId({ id: 'locked_7' }, { id: 'combatant_52' }, null, 'nearest_opfor')).toBe('combatant_52');
     expect(routeFailureCooldownTargetId(null, null)).toBeNull();
+  });
+
+  it('cools down nearest-opfor and current-target routes that stop making progress', () => {
+    expect(shouldCooldownCombatTargetAfterNoProgress({ targetKind: 'current_target' })).toBe(true);
+    expect(shouldCooldownCombatTargetAfterNoProgress({ targetKind: 'nearest_opfor' })).toBe(true);
+    expect(shouldCooldownCombatTargetAfterNoProgress({ targetKind: 'zone' })).toBe(false);
   });
 
   it('keeps visible combat targets eligible for routed or direct pursuit', () => {
