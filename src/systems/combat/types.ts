@@ -183,6 +183,8 @@ export interface Combatant extends ITargetable {
   inCover?: boolean;
   suppressionTarget?: THREE.Vector3;
   suppressionEndTime?: number;
+  suppressionTerrainBlockedUntil?: number;
+  suppressionTerrainBlockedPoint?: THREE.Vector3;
   lastSuppressedTime?: number;
   nearMissCount?: number;
   isDying?: boolean;

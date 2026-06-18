@@ -303,7 +303,7 @@ describe('CombatantCombat', () => {
       expect(fireBudgetStats.suppressiveTotalTerrainBlocked).toBe(0);
     });
 
-    it('blocks suppressive fire when the last-known area is terrain-occluded', () => {
+    it('abandons a suppressive-fire lane when the last-known area is terrain-occluded', () => {
       const shooter = createMockCombatant(
         'suppressor-1',
         Faction.NVA,
@@ -312,6 +312,9 @@ describe('CombatantCombat', () => {
         new THREE.Vector3(0, NPC_Y_OFFSET, 0)
       );
       shooter.lastKnownTargetPos = new THREE.Vector3(80, NPC_Y_OFFSET, 0);
+      shooter.suppressionTarget = shooter.lastKnownTargetPos.clone();
+      shooter.suppressionEndTime = Date.now() + 4000;
+      shooter.isFullAuto = true;
       shooter.skillProfile.burstLength = 10;
 
       (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
@@ -335,6 +338,13 @@ describe('CombatantCombat', () => {
       expect(fireBudgetStats.terrainBlockedThisFrame).toBe(1);
       expect(fireBudgetStats.aimedTotalTerrainBlocked).toBe(0);
       expect(fireBudgetStats.suppressiveTotalTerrainBlocked).toBe(1);
+      expect(shooter.state).toBe(CombatantState.ADVANCING);
+      expect(shooter.isFullAuto).toBe(false);
+      expect(shooter.destinationPoint?.distanceTo(new THREE.Vector3(80, NPC_Y_OFFSET, 0))).toBeLessThan(0.001);
+      expect(shooter.suppressionTarget).toBeUndefined();
+      expect(shooter.suppressionEndTime).toBeUndefined();
+      expect(shooter.suppressionTerrainBlockedUntil).toBeGreaterThan(Date.now());
+      expect(shooter.suppressionTerrainBlockedPoint?.distanceTo(new THREE.Vector3(80, NPC_Y_OFFSET, 0))).toBeLessThan(0.001);
     });
 
     it('keeps suppressive fire active when the last-known area is clear', () => {
@@ -358,6 +368,8 @@ describe('CombatantCombat', () => {
 
       expect(shooter.gunCore.registerShot).toHaveBeenCalledTimes(1);
       expect(shooter.currentBurst).toBe(1);
+      expect(shooter.state).toBe(CombatantState.SUPPRESSING);
+      expect(shooter.suppressionTerrainBlockedUntil).toBeUndefined();
       expect(mockMuzzleFlashSystem.spawnNPC).toHaveBeenCalledTimes(1);
       expect(mockTracerPool.spawn).toHaveBeenCalledTimes(1);
     });
