@@ -1,0 +1,41 @@
+{
+  "generator": "scripts/bake-static-impostor-atlases.ts",
+  "generatedAt": "2026-06-19T18:40:14.611Z",
+  "slug": "wooden-barrel",
+  "modelPath": "props/wooden-barrel.glb",
+  "atlasSize": [
+    2048,
+    768
+  ],
+  "tileSize": [
+    256,
+    256
+  ],
+  "columns": 8,
+  "rows": 3,
+  "azimuthFrames": 8,
+  "elevationFrames": 3,
+  "planePaddingScale": 1.16,
+  "bounds": {
+    "center": [
+      0,
+      0.44999998807907104,
+      0
+    ],
+    "size": [
+      0.6999999880790713,
+      0.8999999761581421,
+      0.7135836780071261
+    ],
+    "radius": 0.6725328255768513,
+    "plane": {
+      "width": 0.9996007447120464,
+      "height": 0.8999999761581421
+    }
+  },
+  "maps": {
+    "baseColor": "./assets/static-impostors/wooden-barrel/atlas.base-color.png",
+    "normal": "./assets/static-impostors/wooden-barrel/atlas.normal.png",
+    "depth": "./assets/static-impostors/wooden-barrel/atlas.depth.png"
+  }
+}

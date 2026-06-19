@@ -376,6 +376,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   setHUDSystem(hudSystem: HUDSystem): void {
     this.hudSystem = hudSystem
+    this.setStatsTracker(hudSystem.getStatsTracker())
     this.firing.setHUDSystem(hudSystem)
     this.switching.setHUDSystem(hudSystem)
     // Wire ADS state to HUD visibility

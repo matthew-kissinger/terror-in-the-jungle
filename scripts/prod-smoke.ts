@@ -16,6 +16,12 @@ const INDEX_PATH = join(DIST_ROOT, 'index.html');
 const START_TIMEOUT_MS = 90_000;
 const POST_PLAY_TIMEOUT_MS = 60_000;
 let activePort = DEFAULT_PORT;
+const SYSTEM_CHROME_CANDIDATES = [
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+] as const;
 
 const MIME_TYPES: Record<string, string> = {
   '.br': 'application/octet-stream',
@@ -104,6 +110,14 @@ function resolveListeningPort(server: ReturnType<typeof createServer>): number {
   return address.port;
 }
 
+function resolveChromiumExecutablePath(): string | undefined {
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  if (explicit && existsSync(explicit)) {
+    return explicit;
+  }
+  return SYSTEM_CHROME_CANDIDATES.find((path) => existsSync(path));
+}
+
 async function runSmoke(): Promise<SmokeResult> {
   const server = createServer(serveFile);
   await new Promise<void>((resolve) => server.listen(activePort, HOST, resolve));
@@ -113,7 +127,11 @@ async function runSmoke(): Promise<SmokeResult> {
   const pageErrors: string[] = [];
   const requestErrors: string[] = [];
 
-  const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-webgl'] });
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: resolveChromiumExecutablePath(),
+    args: ['--use-angle=swiftshader', '--enable-webgl'],
+  });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('console', (msg) => {

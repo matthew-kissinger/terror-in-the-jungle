@@ -26,6 +26,7 @@ let mockSwitching: any;
 let mockTracerPool: any;
 let mockMuzzleFlashSystem: any;
 let mockImpactEffectsPool: any;
+let mockStatsTracker: any;
 
 const mockGunCore = {
   canFire: vi.fn(() => true),
@@ -238,6 +239,13 @@ describe('FirstPersonWeapon', () => {
       dispose: vi.fn(),
     };
 
+    mockStatsTracker = {
+      registerShot: vi.fn(),
+      addDamage: vi.fn(),
+      addHeadshot: vi.fn(),
+      updateLongestKill: vi.fn(),
+    };
+
     // Reset all mock functions
     vi.clearAllMocks();
 
@@ -258,7 +266,9 @@ describe('FirstPersonWeapon', () => {
     mockCombatantSystem = {} as CombatantSystem;
 
     mockHUDSystem = {
+      getStatsTracker: vi.fn(() => mockStatsTracker),
       updateAmmoDisplay: vi.fn(),
+      setADS: vi.fn(),
     } as unknown as HUDSystem;
 
     mockAudioManager = {} as AudioManager;
@@ -313,6 +323,13 @@ describe('FirstPersonWeapon', () => {
       await weapon.init();
 
       expect(mockHUDSystem.updateAmmoDisplay).toHaveBeenCalledWith(30, 90);
+    });
+
+    it('should wire HUD-owned player stats into weapon firing', () => {
+      weapon.setHUDSystem(mockHUDSystem);
+
+      expect(mockHUDSystem.getStatsTracker).toHaveBeenCalled();
+      expect(mockFiring.setStatsTracker).toHaveBeenCalledWith(mockStatsTracker);
     });
 
     it('should wire up input callbacks during construction', () => {

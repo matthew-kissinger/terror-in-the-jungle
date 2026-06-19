@@ -1406,6 +1406,12 @@ const TRACE_STOP_TIMEOUT_MS = 15_000;
 const SCENARIO_SETUP_TIMEOUT_MS = 10_000;
 const POST_CAPTURE_HARD_TIMEOUT_MS = 120_000;
 const PERF_SERVER_HOST = '127.0.0.1';
+const SYSTEM_CHROME_CANDIDATES = [
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+] as const;
 const PAGE_EVALUATE_HELPER_SHIM_SOURCE = `
 (() => {
   if (typeof globalThis.__name !== 'function') {
@@ -1447,6 +1453,14 @@ function currentGitSha(): string {
 function gitStatus(): string[] {
   const output = gitOutputOrFallback(['status', '--short'], '');
   return output.split(/\r?\n/).filter(Boolean);
+}
+
+function resolveChromiumExecutablePath(): string | undefined {
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  if (explicit && existsSync(explicit)) {
+    return explicit;
+  }
+  return SYSTEM_CHROME_CANDIDATES.find((path) => existsSync(path));
 }
 
 async function safeAwait<T>(label: string, promise: Promise<T>, timeoutMs: number): Promise<T | null> {
@@ -5171,6 +5185,17 @@ async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal 
   };
 }
 
+async function resetActiveScenarioDriverCounters(page: Page): Promise<void> {
+  const result = await safeAwait(
+    'reset active scenario driver counters',
+    page.evaluate(() => (window as any).__perfHarnessDriver?.resetCountersForCapture?.() ?? null),
+    SCENARIO_SETUP_TIMEOUT_MS
+  );
+  const transitions = Number((result as any)?.movementTransitions ?? 0);
+  const state = String((result as any)?.botState ?? (result as any)?.movementState ?? 'unknown');
+  logStep(`🎮 Active driver counters reset for capture (state=${state}, transitions=${transitions})`);
+}
+
 async function startChromeTracing(
   cdp: CDPSession,
   options: { includeV8CpuProfiler: boolean }
@@ -5647,8 +5672,13 @@ async function runCapture(): Promise<void> {
 
     stage = 'launch-browser';
     logStep(`🌐 Launching browser (${headed ? 'headed' : 'headless'})`);
+    const executablePath = resolveChromiumExecutablePath();
+    if (executablePath) {
+      logStep(`🌐 Using Chromium executable ${executablePath}`);
+    }
     context = await chromium.launchPersistentContext(browserProfileDir, {
       headless: !headed,
+      executablePath,
       args: [
         '--disable-dev-shm-usage',
         '--no-sandbox',
@@ -6227,19 +6257,7 @@ async function runCapture(): Promise<void> {
         && pressureReadyWarmupResult.requested
         && pressureReadyWarmupResult.status === 'ready';
       if (activePlayerScenario && !preservePressureReadyDriver) {
-        await stopActiveScenarioDriver(page);
-        await setupActiveScenarioDriver(page, {
-          enabled: true,
-          mode: requestedMode,
-          driverSeed,
-          compressFrontline,
-          allowWarpRecovery,
-          topUpHealth: activeTopUpHealth,
-          autoRespawn: activeAutoRespawn,
-          movementDecisionIntervalMs,
-          frontlineTriggerDistance,
-          maxCompressedPerFaction
-        });
+        await resetActiveScenarioDriverCounters(page);
       } else if (preservePressureReadyDriver) {
         logStep('🎯 Preserving active driver after pressure-ready warmup; timed samples will subtract pre-window shot counters');
       }

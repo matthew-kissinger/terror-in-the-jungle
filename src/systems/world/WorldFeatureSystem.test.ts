@@ -7,6 +7,10 @@ import { GameMode } from '../../config/gameModeTypes';
 import { WorldFeatureSystem } from './WorldFeatureSystem';
 import { modelLoader } from '../assets/ModelLoader';
 import { BuildingModels, GroundVehicleModels, StructureModels } from '../assets/modelPaths';
+import {
+  StaticImpostorSystem,
+  type LoadedStaticImpostorAtlas,
+} from './staticImpostors/StaticImpostorSystem';
 
 vi.mock('../assets/ModelLoader', () => ({
   modelLoader: {
@@ -59,6 +63,16 @@ function makeNamedMockModel(name: string): THREE.Group {
   right.position.x = 1.5;
   group.add(left, right);
   return group;
+}
+
+function makeAtlas(): LoadedStaticImpostorAtlas {
+  return {
+    textures: {
+      baseColorMap: new THREE.Texture(),
+      normalMap: new THREE.Texture(),
+      depthMap: new THREE.Texture(),
+    },
+  };
 }
 
 describe('WorldFeatureSystem', () => {
@@ -571,6 +585,58 @@ describe('WorldFeatureSystem', () => {
     });
 
     expect(batchedMeshCount).toBe(1);
+  });
+
+  it('keeps impostor-eligible static placements out of sector batching so their mesh can be suppressed', async () => {
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 20, 0);
+    const staticImpostors = new StaticImpostorSystem(scene, camera, {
+      textureProvider: { loadAtlas: vi.fn(async () => makeAtlas()) },
+    });
+    system = new WorldFeatureSystem(scene, camera, staticImpostors);
+    system.setTerrainManager(terrainManager);
+    system.setGameModeManager({
+      getCurrentConfig: () => currentConfig,
+    } as any);
+    currentConfig = {
+      id: GameMode.ZONE_CONTROL,
+      features: [
+        {
+          id: 'impostor_static_feature',
+          kind: 'village',
+          position: new THREE.Vector3(0, 0, -240),
+          staticPlacements: [
+            {
+              modelPath: StructureModels.VILLAGE_HUT,
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+    system.update(0.016);
+
+    const root = scene.children.find((child) => child.name === 'WorldStaticFeatureBatchRoot') as THREE.Group;
+    let authoredMeshCount = 0;
+    let generatedOptimizedMeshCount = 0;
+    root.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        authoredMeshCount++;
+      }
+      if (child.userData.generatedOptimizedMesh === true) {
+        generatedOptimizedMeshCount++;
+      }
+    });
+
+    expect(staticImpostors.getDebugInfo()).toEqual(expect.objectContaining({
+      registeredInstances: 1,
+      activeImpostors: 1,
+    }));
+    expect(authoredMeshCount).toBe(2);
+    expect(generatedOptimizedMeshCount).toBe(0);
   });
 
   it('distance-culls static feature groups instead of keeping every base visible', async () => {

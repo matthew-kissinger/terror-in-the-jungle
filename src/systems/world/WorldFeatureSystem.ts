@@ -17,6 +17,7 @@ import { GameModeManager } from './GameModeManager';
 import { disposeGeneratedGroundVehicleResources, prepareDynamicGroundVehicleForRendering, updateDynamicGroundVehicleVisibility } from './GroundVehicleRenderOptimization';
 import { applyWorldFeatureGroupAttribution, applyWorldFeaturePlacementAttribution, applyWorldFeatureSectorAttribution, disableWorldFeatureDetailShadowCasting, enableWorldFeatureShadows } from './WorldFeaturePerfAttribution';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
+import { isStaticImpostorControlledMesh, StaticImpostorSystem } from './staticImpostors/StaticImpostorSystem';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import { createGroundVehicleForModelPath, groundVehicleIdForPlacement, isGroundVehicleModelPath } from '../vehicle/GroundVehicle';
 import { FixedWingModel } from '../vehicle/FixedWingModel';
@@ -88,11 +89,16 @@ function matrixApproximatelyEquals(a: THREE.Matrix4, b: THREE.Matrix4, epsilon: 
   const left = a.elements;
   const right = b.elements;
   for (let i = 0; i < 16; i++) {
-    if (Math.abs(left[i] - right[i]) > epsilon) {
-      return false;
-    }
+    if (Math.abs(left[i] - right[i]) > epsilon) return false;
   }
   return true;
+}
+
+function isDetailCullMesh(mesh: THREE.Mesh): boolean {
+  for (let current: THREE.Object3D | null = mesh; current; current = current.parent) {
+    if (current.userData[WORLD_FEATURE_DETAIL_CULL_KEY] === true) return true;
+  }
+  return false;
 }
 
 interface TerrainPlacementCandidate {
@@ -144,6 +150,7 @@ export class WorldFeatureSystem implements GameSystem {
   private fixedWingModel?: FixedWingModel;
   private vehicleManager?: VehicleManager;
   private losAccelerator?: LOSAccelerator;
+  private staticImpostorSystem?: StaticImpostorSystem;
   private spawnedObjects: SpawnedFeatureObject[] = [];
   private dynamicGroundVehicleObjects: SpawnedFeatureObject[] = [];
   private featureGroups: WorldFeatureRenderSector[] = [];
@@ -157,9 +164,10 @@ export class WorldFeatureSystem implements GameSystem {
   private staticVisibilityPoseInitialized = false;
   private staticVisibilityFramesSinceRefresh = 0;
 
-  constructor(scene: THREE.Scene, camera?: THREE.Camera) {
+  constructor(scene: THREE.Scene, camera?: THREE.Camera, staticImpostorSystem?: StaticImpostorSystem) {
     this.scene = scene;
     this.camera = camera;
+    this.staticImpostorSystem = staticImpostorSystem ?? (camera ? new StaticImpostorSystem(scene, camera) : undefined);
   }
 
   async init(): Promise<void> {
@@ -203,7 +211,7 @@ export class WorldFeatureSystem implements GameSystem {
     this.losAccelerator = losAccelerator;
   }
 
-  update(_deltaTime: number): void {
+  update(deltaTime: number): void {
     if (!this.terrainManager || !this.gameModeManager || this.buildInFlight) {
       return;
     }
@@ -211,6 +219,7 @@ export class WorldFeatureSystem implements GameSystem {
     const config = this.gameModeManager.getCurrentConfig();
     if (this.builtModeId === config.id) {
       this.updateFeatureVisibility();
+      this.staticImpostorSystem?.update(deltaTime);
       return;
     }
 
@@ -235,6 +244,7 @@ export class WorldFeatureSystem implements GameSystem {
 
   dispose(): void {
     this.clearSpawnedObjects();
+    this.staticImpostorSystem?.dispose();
   }
 
   private async rebuildForMode(modeId: string, features: MapFeatureDefinition[]): Promise<void> {
@@ -417,6 +427,7 @@ export class WorldFeatureSystem implements GameSystem {
           parent.add(object);
         }
         freezeTransform(object);
+        if (!hasDetailCull) this.staticImpostorSystem?.registerInstance({ id: objectId, modelPath: placement.modelPath, object });
       }
       const collisionRegistered = !isDynamicGroundVehicle &&
         placement.registerCollision === true &&
@@ -450,9 +461,10 @@ export class WorldFeatureSystem implements GameSystem {
       batchNamePrefix: 'world_static_features',
       strategy: 'batch',
       minBucketSize: 2,
-      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true ||
-        this.isGroundVehicleMesh(mesh) ||
-        this.isDetailCullMesh(mesh),
+      excludeMesh: (mesh) => (mesh as THREE.BatchedMesh).isBatchedMesh === true
+        || this.isGroundVehicleMesh(mesh)
+        || isDetailCullMesh(mesh)
+        || isStaticImpostorControlledMesh(mesh),
     });
 
     if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
@@ -671,23 +683,10 @@ export class WorldFeatureSystem implements GameSystem {
   }
 
   private isGroundVehicleMesh(mesh: THREE.Mesh): boolean {
-    let current: THREE.Object3D | null = mesh;
-    while (current) {
+    for (let current: THREE.Object3D | null = mesh; current; current = current.parent) {
       if (typeof current.userData.worldFeatureGroundVehicleId === 'string') {
         return true;
       }
-      current = current.parent;
-    }
-    return false;
-  }
-
-  private isDetailCullMesh(mesh: THREE.Mesh): boolean {
-    let current: THREE.Object3D | null = mesh;
-    while (current) {
-      if (current.userData[WORLD_FEATURE_DETAIL_CULL_KEY] === true) {
-        return true;
-      }
-      current = current.parent;
     }
     return false;
   }
@@ -755,6 +754,7 @@ export class WorldFeatureSystem implements GameSystem {
   }
 
   private clearSpawnedObjects(): void {
+    this.staticImpostorSystem?.clear();
     for (const entry of this.spawnedObjects) {
       if (entry.vehicleId && this.vehicleManager) {
         this.vehicleManager.unregister(entry.vehicleId);
