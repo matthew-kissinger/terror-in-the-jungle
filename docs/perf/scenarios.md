@@ -85,6 +85,101 @@ params or constructor options to the in-page bot driver.
   non-representative scheduling and GPU-readback stalls during `combat120`.
   Authoritative perf gating is local `validate:full`.
 
+### Local laptop Xwayland capture note, 2026-06-19
+
+This laptop session was a Plasma Wayland desktop with Xwayland on `:0`. The
+shell had no `DISPLAY` or `XAUTHORITY`, so headed Playwright initially failed
+with `Authorization required, but no authorization protocol specified`.
+
+Working invocation:
+
+```bash
+DISPLAY=:0 XAUTHORITY=/run/user/1000/xauth_SARRAf npm run perf:quick
+```
+
+To rediscover the auth path on this machine:
+
+```bash
+ps -eo pid,user,args | rg 'Xwayland|kwin_wayland'
+```
+
+Look for the `Xwayland :0 -auth ...` or `kwin_wayland --xwayland-xauthority
+...` argument and pass that file as `XAUTHORITY`. The run still used WebGPU's
+WebGL2 fallback (`No available adapters`), so treat numbers as laptop-local
+evidence only, not a desktop baseline.
+
+The capture artifact
+`artifacts/perf/2026-06-19T19-45-32-219Z/` reached startup, active-driver
+setup, warmup, and the 30s runtime window, but validation failed. Measurement
+trust was usable with caution (`probeAvg=55.24ms`, `probeP95=69.00ms`), frame
+progression passed (`947` frames over 30s), and no browser errors were
+captured. The failing gates were frame-tail and active-player combat behavior:
+peak p99 hit `100ms`, and the harness recorded `0` player shots / `0` hits.
+The owner also visually observed that the player bot did not appear to fire on
+anyone during the capture.
+
+That no-fire result was a harness-driver bug, not evidence against rendering.
+The driver tried to fire (`shotsFired=122`) but every intent was rejected by
+the final aim gate (`aimDotGateRejectedShots=122`, engine shots/hits `0/0`).
+Diagnostic capture `artifacts/perf/2026-06-19T19-56-25-308Z/` showed
+`lastFireProbe.reason=vertical_angle_rejected` while LOS was clear and aim-dot
+was valid. The compressed frontline had OPFOR above the player on terrain, so
+the camera-to-target vertical component sat around `0.46-0.55`; the old `0.45`
+sky-shot guard rejected steep uphill ground fire.
+
+Post-fix capture `artifacts/perf/2026-06-19T20-00-43-943Z/` confirmed the
+player bot could fire in the normal `perf:quick` path
+(`player_shots_recorded=160`, `player_hits_recorded=16`), but two follow-ups
+were still needed. Capture `artifacts/perf/2026-06-19T20-08-35-952Z/` showed
+engine-side shot counters were still `0` until `FirstPersonWeapon.setHUDSystem`
+wired the HUD-owned `PlayerStatsTracker` into the firing subsystem. That same
+short capture exposed the downhill version of the fire-gate bug: the driver
+used `abs(verticalComponent)`, so steep downhill ground targets were rejected
+the same way steep uphill targets had been.
+
+The final driver fix treats the vertical sky-shot guard as upward-only and
+raises the long-range upward threshold to `0.9`. Steep uphill and downhill
+ground shots are allowed; near-vertical upward long-range shots are still
+suppressed. The active-driver debug snapshot now records `targetVisible`,
+`lastTargetLosStatus`, `lastFireLosStatus`, and `lastFireProbe` so future
+captures can distinguish LOS, aim-dot, vertical-gate, and successful-fire
+decisions.
+
+Capture `artifacts/perf/2026-06-19T20-13-05-386Z/` is the proof artifact for
+that fix. It used a shorter 12s runtime window after 8s warmup to recheck the
+bug quickly on the laptop, and validation ended at `warn` rather than `fail`:
+`player_shots_recorded=67`, `player_hits_recorded=20`,
+`harness_min_shots_fired` passed, `harness_min_hits_recorded` passed,
+`aimDotGateRejectedShots=0`, and runtime `lastFireProbe.reason=ok` while the
+vertical component sat around `0.84-0.86`. Frame-tail caveats remained
+laptop-local (`peak_p99_frame_ms=46.60ms`, `avg_frame_ms=28.60ms`,
+measurement trust `probeAvg=44.50ms`, `probeP95=58.00ms`), but
+`hitch_50ms_percent` passed at `0.46%`.
+
+The stock 30s `npm run perf:quick` path was rerun afterward as
+`artifacts/perf/2026-06-19T20-19-36-379Z/`. It still exited nonzero on this
+laptop, but for frame-tail gates rather than active-player behavior:
+`player_shots_recorded=176`, `player_hits_recorded=11`, engine shots/hits
+`177/11`, `movementTransitions=9`, `aimDotGateRejectedShots=0`, and
+`losRejectedShots=0`; the failing checks were `peak_p99_frame_ms=66.10ms` and
+`hitch_50ms_percent=3.10%`. Tail attribution again ruled out cover search and
+showed the tail dominated by render/Other (`57.0ms`, `86%`) with Combat at
+`9.1ms` (`14%`). Scene attribution showed `world_static_features` at zero
+visible draw calls in AI Sandbox, so the static-impostor win is not expected to
+move this scenario materially.
+
+`scripts/perf-capture.ts` now keeps the warmed active driver running and calls
+`resetCountersForCapture()` before the measured window instead of stopping and
+restarting the bot after warmup. Paired with the existing runtime-metric reset,
+that keeps startup/route-settling noise out of the measured shot, hit, damage,
+and frame counters while preserving the same in-page driver instance for the
+runtime capture.
+
+Do not use these laptop artifacts for baseline refresh or perf-comparison
+claims; use them only as proof that the headed Xwayland setup works, that the
+active-player firing gate handles hilly ground combat, and that the remaining
+warnings are laptop/WebGL2 fallback frame-tail context.
+
 ## Active-player driver
 
 Most steady-state scenarios run with the `PerfActivePlayerBot` enabled

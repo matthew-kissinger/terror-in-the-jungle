@@ -43,6 +43,7 @@ const {
   targetActorAimYOffset,
   targetChestProxyRadius,
   DEFAULT_BULLET_SPEED,
+  FIRE_VERTICAL_COMPONENT_THRESHOLD,
   PLAYER_CLIMB_SLOPE_DOT,
   PLAYER_MAX_CLIMB_ANGLE_RAD,
   PLAYER_MAX_CLIMB_GRADIENT,
@@ -183,7 +184,7 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
       cameraForward: { x: 0, y: 0, z: -1 },
       toTarget: { x: 0, y: 0, z: -1 },
       aimDotThreshold: 0.8,
-      verticalThreshold: 0.45,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
       closeRange: false
     });
     expect(result.shouldFire).toBe(true);
@@ -197,7 +198,7 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
       cameraForward: { x: 0, y: 0, z: -1 },
       toTarget: { x: 0, y: 0, z: 1 },
       aimDotThreshold: 0.8,
-      verticalThreshold: 0.45,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
       closeRange: false
     });
     expect(result.shouldFire).toBe(false);
@@ -210,25 +211,60 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
       cameraForward: { x: 0, y: 0, z: -1 },
       toTarget: { x: 1, y: 0, z: 0 },
       aimDotThreshold: 0.8,
-      verticalThreshold: 0.45,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
       closeRange: false
     });
     expect(result.shouldFire).toBe(false);
     expect(result.reason).toBe('aim_dot_too_low');
   });
 
-  it('rejects fire when vertical angle is extreme at long range', () => {
+  it('rejects fire when upward vertical angle is extreme at long range', () => {
     // Target direction mostly vertical (looking up at a helicopter). At long
     // range the harness suppresses vertical shots to avoid skybox cheese.
     const result = evaluateFireDecision({
       cameraForward: { x: 0, y: 0.95, z: -0.312 }, // aim nearly straight up
       toTarget: { x: 0, y: 0.95, z: -0.312 },      // target also nearly straight up
       aimDotThreshold: 0.8,
-      verticalThreshold: 0.45,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
       closeRange: false
     });
     expect(result.shouldFire).toBe(false);
     expect(result.reason).toBe('vertical_angle_rejected');
+  });
+
+  it('allows steep uphill ground fire below the sky-shot threshold', () => {
+    // AI Sandbox frontline compression can put OPFOR on a ridge above the
+    // player. This is hilly ground combat, not a helicopter/skybox shot.
+    const result = evaluateFireDecision({
+      cameraForward: { x: 0, y: 0.55, z: 0.835 },
+      toTarget: { x: 0, y: 0.55, z: 0.835 },
+      aimDotThreshold: 0.8,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
+      closeRange: false
+    });
+    expect(result.shouldFire).toBe(true);
+  });
+
+  it('allows steep uphill ground fire unless it is nearly vertical', () => {
+    const result = evaluateFireDecision({
+      cameraForward: { x: 0, y: 0.8, z: 0.6 },
+      toTarget: { x: 0, y: 0.8, z: 0.6 },
+      aimDotThreshold: 0.8,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
+      closeRange: false
+    });
+    expect(result.shouldFire).toBe(true);
+  });
+
+  it('allows steep downhill ground fire', () => {
+    const result = evaluateFireDecision({
+      cameraForward: { x: 0, y: -0.95, z: -0.312 },
+      toTarget: { x: 0, y: -0.95, z: -0.312 },
+      aimDotThreshold: 0.8,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
+      closeRange: false
+    });
+    expect(result.shouldFire).toBe(true);
   });
 
   it('allows steep vertical angles when closeRange=true (knife fight on a hill)', () => {
@@ -236,7 +272,7 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
       cameraForward: { x: 0, y: 0.95, z: -0.312 },
       toTarget: { x: 0, y: 0.95, z: -0.312 },
       aimDotThreshold: 0.8,
-      verticalThreshold: 0.45,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
       closeRange: true
     });
     expect(result.shouldFire).toBe(true);
@@ -253,6 +289,19 @@ describe('perf-active-driver fire decision (A4 regression)', () => {
     });
     expect(result.shouldFire).toBe(true);
     expect(result.reason).toBe('ok');
+  });
+
+  it('still rejects near-vertical upward long-range shots with steep-ground allowance', () => {
+    const result = evaluateFireDecision({
+      cameraForward: { x: 0, y: 0.95, z: -0.312 },
+      toTarget: { x: 0, y: 0.95, z: -0.312 },
+      aimDotThreshold: 0.8,
+      verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
+      closeRange: false,
+      allowSteepGroundFire: true
+    });
+    expect(result.shouldFire).toBe(false);
+    expect(result.reason).toBe('vertical_angle_rejected');
   });
 
   it('returns missing_vectors when inputs are incomplete', () => {

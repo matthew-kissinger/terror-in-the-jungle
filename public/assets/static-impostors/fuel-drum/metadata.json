@@ -1,0 +1,41 @@
+{
+  "generator": "scripts/bake-static-impostor-atlases.ts",
+  "generatedAt": "2026-06-19T18:39:39.955Z",
+  "slug": "fuel-drum",
+  "modelPath": "structures/fuel-drum.glb",
+  "atlasSize": [
+    2048,
+    768
+  ],
+  "tileSize": [
+    256,
+    256
+  ],
+  "columns": 8,
+  "rows": 3,
+  "azimuthFrames": 8,
+  "elevationFrames": 3,
+  "planePaddingScale": 1.16,
+  "bounds": {
+    "center": [
+      0,
+      0.46000001300126314,
+      0
+    ],
+    "size": [
+      0.6019999980926516,
+      0.9200000260025263,
+      0.6019999980926516
+    ],
+    "radius": 0.626739188828127,
+    "plane": {
+      "width": 0.8513565618512053,
+      "height": 0.9200000260025263
+    }
+  },
+  "maps": {
+    "baseColor": "./assets/static-impostors/fuel-drum/atlas.base-color.png",
+    "normal": "./assets/static-impostors/fuel-drum/atlas.normal.png",
+    "depth": "./assets/static-impostors/fuel-drum/atlas.depth.png"
+  }
+}

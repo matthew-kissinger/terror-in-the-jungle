@@ -1,0 +1,41 @@
+{
+  "generator": "scripts/bake-static-impostor-atlases.ts",
+  "generatedAt": "2026-06-19T18:39:48.543Z",
+  "slug": "m35-truck",
+  "modelPath": "vehicles/ground/m35-truck.glb",
+  "atlasSize": [
+    2048,
+    768
+  ],
+  "tileSize": [
+    256,
+    256
+  ],
+  "columns": 8,
+  "rows": 3,
+  "azimuthFrames": 8,
+  "elevationFrames": 3,
+  "planePaddingScale": 1.16,
+  "bounds": {
+    "center": [
+      0,
+      1.2933153527569434,
+      0
+    ],
+    "size": [
+      2.680000000596047,
+      2.586630705513887,
+      6.289999904185535
+    ],
+    "radius": 3.65503615592774,
+    "plane": {
+      "width": 6.837141127536337,
+      "height": 2.586630705513887
+    }
+  },
+  "maps": {
+    "baseColor": "./assets/static-impostors/m35-truck/atlas.base-color.png",
+    "normal": "./assets/static-impostors/m35-truck/atlas.normal.png",
+    "depth": "./assets/static-impostors/m35-truck/atlas.depth.png"
+  }
+}

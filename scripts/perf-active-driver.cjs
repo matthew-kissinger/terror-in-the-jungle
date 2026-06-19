@@ -58,13 +58,16 @@
     const tnz = tz / tLen;
     const aimDot = fnx * tnx + fny * tny + fnz * tnz;
     const verticalComponent = Math.abs(tny);
+    const upwardVerticalComponent = Math.max(0, tny);
     const dotThreshold = Number.isFinite(aimDotThreshold) ? aimDotThreshold : 0.8;
     const vThreshold = Number.isFinite(verticalThreshold) ? verticalThreshold : 0.45;
+    const steepGroundFireAllowed = allowSteepGroundFire
+      && upwardVerticalComponent <= FIRE_VERTICAL_COMPONENT_THRESHOLD;
 
     if (aimDot < dotThreshold) {
       return { shouldFire: false, reason: 'aim_dot_too_low', aimDot: aimDot, verticalComponent: verticalComponent };
     }
-    if (verticalComponent > vThreshold && !closeRange && !allowSteepGroundFire) {
+    if (upwardVerticalComponent > vThreshold && !closeRange && !steepGroundFireAllowed) {
       return { shouldFire: false, reason: 'vertical_angle_rejected', aimDot: aimDot, verticalComponent: verticalComponent };
     }
     return { shouldFire: true, reason: 'ok', aimDot: aimDot, verticalComponent: verticalComponent };
@@ -133,6 +136,7 @@
   const TARGET_CHEST_HEIGHT = PLAYER_EYE_HEIGHT + TARGET_ACTOR_AIM_Y_OFFSET;
   const TARGET_LOS_HEIGHT = TARGET_CHEST_HEIGHT;
   const DEFAULT_BULLET_SPEED = 400;
+  const FIRE_VERTICAL_COMPONENT_THRESHOLD = 0.9;
 
   function targetActorAimYOffset(scaleY) {
     const scale = Number.isFinite(Number(scaleY)) ? Number(scaleY) : 1;
@@ -3322,18 +3326,21 @@
         : null;
     }
 
-    function pollEngineCombatStats(systems) {
+    function readEngineCombatStats(systems) {
       const hud = systems && systems.hudSystem;
-      if (!hud || typeof hud.getStatsTracker !== 'function') return;
+      if (!hud || typeof hud.getStatsTracker !== 'function') return null;
       let tracker;
       try {
         tracker = hud.getStatsTracker();
-      } catch (_err) { return; }
-      if (!tracker || typeof tracker.getStats !== 'function') return;
-      let stats;
+      } catch (_err) { return null; }
+      if (!tracker || typeof tracker.getStats !== 'function') return null;
       try {
-        stats = tracker.getStats();
-      } catch (_err) { return; }
+        return tracker.getStats();
+      } catch (_err) { return null; }
+    }
+
+    function pollEngineCombatStats(systems) {
+      const stats = readEngineCombatStats(systems);
       if (!stats) return;
       const damage = rebasedTotal(state.damageDealt, stats.damageDealt, state.damageDealtBaseline);
       state.damageDealt = damage.total;
@@ -3347,6 +3354,89 @@
       const sh = rebasedTotal(state.shotsHitEngine, stats.shotsHit, state.shotsHitBaseline);
       state.shotsHitEngine = sh.total;
       state.shotsHitBaseline = sh.newBaseline;
+    }
+
+    function resetEngineCombatBaselines(systems) {
+      const stats = readEngineCombatStats(systems);
+      state.damageDealt = 0;
+      state.kills = 0;
+      state.shotsFiredEngine = 0;
+      state.shotsHitEngine = 0;
+      state.damageDealtBaseline = stats ? Number(stats.damageDealt || 0) : null;
+      state.killsBaseline = stats ? Number(stats.kills || 0) : null;
+      state.shotsFiredBaseline = stats ? Number(stats.shotsFired || 0) : null;
+      state.shotsHitBaseline = stats ? Number(stats.shotsHit || 0) : null;
+    }
+
+    function resetCountersForCapture() {
+      const systems = getSystems();
+      const now = Date.now();
+      const health = getPlayerHealth(systems);
+      state.lastHealth = health.cur;
+      state.damageTaken = 0;
+      state.respawnCount = 0;
+      state.ammoRefillCount = 0;
+      state.healthTopUpCount = 0;
+      state.frontlineMoveCount = 0;
+      state.lastShotAt = now;
+      state.shotsFired = 0;
+      state.reloadsIssued = 0;
+      state.losRejectedShots = 0;
+      state.losUnknownTargetChecks = 0;
+      state.fireUnknownLosRejectedShots = 0;
+      state.aimDotGateRejectedShots = 0;
+      state.fireStartRejected = 0;
+      state.pulsedFireStops = 0;
+      state.runtimeShotPreviewRejectedShots = 0;
+      state.runtimeShotPreviewAimSettlingShots = 0;
+      state.runtimeShotPreviewTerrainBlockedShots = 0;
+      state.runtimeShotPreviewUnavailableShots = 0;
+      state.runtimeShotPreviewMissShots = 0;
+      state.runtimeShotPreviewWrongTargetShots = 0;
+      state.lastTargetLosStatus = null;
+      state.lastTargetLosReason = null;
+      state.lastFireLosStatus = null;
+      state.lastFireLosReason = null;
+      state.lastFireProbe = null;
+      state.lastRuntimeShotPreviewStatus = null;
+      state.lastRuntimeShotPreviewReason = null;
+      state.lastRuntimeShotPreviewHitTargetId = null;
+      state.lastRuntimeShotPreviewExpectedInSpatialCandidates = null;
+      state.shotEpochs = [];
+      state.firingRetargets = 0;
+      state.firingRetargetFireStops = 0;
+      state.firingRetargetEpochs = [];
+      state.stuckTeleportCount = 0;
+      state.stuckWaypointSkips = 0;
+      state.maxStuckMs = 0;
+      state.stuckMs = 0;
+      state.transitions = 0;
+      state.lastStateChangeAt = now;
+      state.timeInStateMs = 0;
+      state.stateHistogram = {
+        PATROL: 0, ALERT: 0, ENGAGE: 0, ADVANCE: 0, RESPAWN_WAIT: 0, MATCH_ENDED: 0,
+      };
+      state.waypointsFollowed = 0;
+      state.waypointReplanFailures = 0;
+      state.routeTargetResets = 0;
+      state.routeNoProgressResets = 0;
+      state.routeSnapEpochs = [];
+      state.playerDistanceMoved = 0;
+      state.lastMovementSamplePos = null;
+      state.movementIntentCalls = 0;
+      state.cameraMovementIntentCalls = 0;
+      state.nonZeroMovementIntentCalls = 0;
+      state.nonZeroCameraMovementIntentCalls = 0;
+      state.lastMovementIntent = null;
+      state.lastNonZeroMovementIntent = null;
+      state.firstObjectiveDistance = state.lastObjectiveDistance;
+      state.minObjectiveDistance = state.lastObjectiveDistance;
+      state.lastRouteProgressMoved = 0;
+      state.lastRouteProgressAt = now;
+      state.matchEndedAtMs = null;
+      state.matchOutcome = null;
+      resetEngineCombatBaselines(systems);
+      return getDebugSnapshot();
     }
 
     function getCameraAngles(systems) {
@@ -4380,7 +4470,7 @@
             cameraForward: { x: _tmpForward.x, y: _tmpForward.y, z: _tmpForward.z },
             toTarget: toTarget,
             aimDotThreshold: 0.8,
-            verticalThreshold: 0.45,
+            verticalThreshold: FIRE_VERTICAL_COMPONENT_THRESHOLD,
             closeRange: dist < 10,
             allowSteepGroundFire: !!state.currentTarget,
           });
@@ -4390,6 +4480,19 @@
           state.lastAimGatePassed = passesAimGate;
           state.lastAimGateReason = fireAimReason;
           state.lastAimDot = Number.isFinite(Number(fireAimDot)) ? Number(fireAimDot) : state.lastAimDot;
+          state.lastFireProbe = {
+            reason: fireAimReason,
+            passesAimGate,
+            aimDot: Number.isFinite(Number(fireAimDot)) ? Number(fireAimDot) : null,
+            aimReason: fireAimReason,
+            verticalComponent: Number.isFinite(Number(decision.verticalComponent)) ? Number(decision.verticalComponent) : null,
+            distance: Number.isFinite(dist) ? dist : null,
+            closeRange: dist < 10,
+            losStatus: 'not_checked',
+            losReason: 'not_checked',
+            cameraForward: { x: _tmpForward.x, y: _tmpForward.y, z: _tmpForward.z },
+            toTarget,
+          };
           if (!passesAimGate) state.aimDotGateRejectedShots++;
         }
         let passesFireLosGate = true;
@@ -4409,6 +4512,9 @@
           state.lastFireLosStatus = fireLosStatus;
           state.lastFireLosReason = fireLosReason;
           state.lastFireProbe = {
+            ...(state.lastFireProbe && typeof state.lastFireProbe === 'object' ? state.lastFireProbe : {}),
+            reason: fireAimReason,
+            passesAimGate,
             aimDot: Number.isFinite(Number(fireAimDot)) ? Number(fireAimDot) : null,
             aimReason: fireAimReason,
             losStatus: fireLosStatus,
@@ -4948,6 +5054,7 @@
     start();
     return {
       stop: stop,
+      resetCountersForCapture: resetCountersForCapture,
       getDebugSnapshot: getDebugSnapshot,
       getCountersSnapshot: getCountersSnapshot,
       movementPatternCount: 5, // PATROL/ALERT/ENGAGE/ADVANCE/RESPAWN_WAIT — informative only
@@ -4985,6 +5092,10 @@
         const stats = globalWindow.__perfHarnessDriverState.stop();
         globalWindow.__perfHarnessDriverState = null;
         return stats;
+      },
+      resetCountersForCapture: function () {
+        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.resetCountersForCapture) return null;
+        return globalWindow.__perfHarnessDriverState.resetCountersForCapture();
       },
       getDebugSnapshot: function () {
         if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.getDebugSnapshot) return null;
@@ -5054,6 +5165,7 @@
       targetActorAimYOffset: targetActorAimYOffset,
       targetChestProxyRadius: targetChestProxyRadius,
       DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED,
+      FIRE_VERTICAL_COMPONENT_THRESHOLD: FIRE_VERTICAL_COMPONENT_THRESHOLD,
       PLAYER_CLIMB_SLOPE_DOT: PLAYER_CLIMB_SLOPE_DOT,
       PLAYER_MAX_CLIMB_ANGLE_RAD: PLAYER_MAX_CLIMB_ANGLE_RAD,
       PLAYER_MAX_CLIMB_GRADIENT: PLAYER_MAX_CLIMB_GRADIENT,
