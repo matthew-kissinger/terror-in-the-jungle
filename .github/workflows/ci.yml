@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           # Full history so the interface-fence gate can diff the whole PR
           # range (base..HEAD) — not just the last commit — and so check:fence
@@ -112,7 +112,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -132,7 +132,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -167,7 +167,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Ensure SSH client present (container)
         run: command -v ssh-keyscan >/dev/null 2>&1 || { apt-get update && apt-get install -y --no-install-recommends openssh-client; }
@@ -195,7 +195,7 @@ jobs:
       full: ${{ steps.label.outputs.full }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Path filter
@@ -241,7 +241,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Ensure SSH client present (container)
         run: command -v ssh-keyscan >/dev/null 2>&1 || { apt-get update && apt-get install -y --no-install-recommends openssh-client; }
@@ -277,7 +277,7 @@ jobs:
       full: ${{ steps.label.outputs.full }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - name: Path filter
@@ -326,7 +326,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Ensure SSH client present (container)
         run: command -v ssh-keyscan >/dev/null 2>&1 || { apt-get update && apt-get install -y --no-install-recommends openssh-client; }
