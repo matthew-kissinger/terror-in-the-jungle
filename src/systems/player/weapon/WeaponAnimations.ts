@@ -39,7 +39,11 @@ export class WeaponAnimations {
 
   // Base position (relative to screen)
   private readonly basePosition = { x: 0.5, y: -0.6, z: -0.82 }
-  private readonly adsPosition = { x: 0.0, y: -0.18, z: -0.55 }
+  // ADS sight-line drop: y tuned against the center crosshair via headless
+  // screenshot alignment (the rifle's front sight post lands on the reticle).
+  // Previously -0.18, which sat the gun body above the crosshair so iron sights
+  // never lined up. See tools/weapon/capture-ads-align.mjs.
+  private readonly adsPosition = { x: 0.0, y: -0.44, z: -0.55 }
 
   private baseFOV = 75 // Store base FOV for zoom effect
   private camera?: THREE.Camera
