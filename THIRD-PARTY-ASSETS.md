@@ -43,6 +43,32 @@ These are third-party typefaces distributed under the **SIL Open Font License
 1.1** (see each package's bundled license under `node_modules/`). They are not
 relicensed; CC BY-SA 4.0 does not apply to them.
 
+## Vegetation — third-party 3D models + textures
+
+Staged under `public/assets/vegetation/` (normalized binaries) and
+`public/assets/vegetation/source/` (raw source, git-ignored). Full provenance
+per asset in [`docs/asset-provenance/vegetation-2026-06/`](docs/asset-provenance/vegetation-2026-06/)
+and the engine-agnostic descriptors in
+[`packages/vegetation-library/catalog/`](packages/vegetation-library/catalog/).
+
+**Shipped (in the runtime bundle):**
+
+- **Jungle Tree** — author **kobaltsecond**, Sketchfab, **CC BY 4.0**.
+  https://sketchfab.com/3d-models/jungle-tree-46f83ec5f6c04abf9d509c1070f67d1e
+  Normalized (pivot + webp textures) to `public/assets/vegetation/jungle-tree/`.
+  **Attribution required** — keep this credit while shipped.
+
+**Staged, not yet shipped (credit becomes required if/when shipped):**
+
+- **Tropical Plants Pack M02P** — mozzarellaARC, Sketchfab, **CC BY 4.0**.
+- **free bamboo set** — Sketchfab, **CC BY 4.0** (verify author handle on use).
+- **Rice Plant** — Sketchfab, **CC BY 4.0** (verify author handle on use).
+- **ambientCG** Grass004 / LeafSet013 / LeafSet017 / Foliage001 — **CC0** (no attribution required).
+- **Poly Haven** fern_02 / dead_tree_trunk / dead_tree_trunk_02 — **CC0** (no attribution required).
+
+First-party vegetation (Kiln Studio procedural banyans) is original work under
+CC BY-SA 4.0 and is **not** listed here.
+
 ## npm runtime + build dependencies — third-party, own licenses
 
 Runtime code dependencies (e.g. **three.js** — MIT; **@recast-navigation/\*** —

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vegetation Gallery</title>
+<style>
+  html,body{margin:0;height:100%;background:#17191c;color:#cfd3d6;font:14px system-ui,sans-serif;overflow:hidden}
+  #ui{position:fixed;top:10px;left:10px;z-index:10;background:#0c0e10dd;padding:10px 12px;border-radius:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;max-width:60vw}
+  button{background:#23272b;color:#cfd3d6;border:1px solid #353a3f;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px}
+  button.on{background:#2f6b3a;border-color:#3f8a4d;color:#fff}
+  .sep{width:100%;height:0;margin:2px 0}
+  .lbl{opacity:.6;font-size:11px;width:100%;margin-top:4px}
+  #info{position:fixed;bottom:10px;left:10px;z-index:10;background:#0c0e10cc;padding:8px 12px;border-radius:8px;font-size:12px}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<div id="ui"></div>
+<div id="info">drag = orbit · scroll = zoom · right-drag = pan</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.185.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.185.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const MODELS = [
+  { group: 'Canopy hero (active)', items: [
+    { label: 'Jungle Tree (normalized)', src: 'assets/vegetation/jungle-tree/jungle-tree.glb' },
+  ]},
+  { group: 'Banyans (shelved candidates)', items: [
+    { label: 'Banyan Standard', src: 'assets/vegetation/banyan/banyan-standard-textured.glb' },
+    { label: 'Banyan Large', src: 'assets/vegetation/banyan/banyan-large-textured.glb' },
+  ]},
+];
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x20242a);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x4a3f33, 1.15));
+const sun = new THREE.DirectionalLight(0xfff2e0, 2.2); sun.position.set(12, 20, 8); scene.add(sun);
+const grid = new THREE.GridHelper(60, 60, 0x3a3f45, 0x2a2e33); scene.add(grid);
+
+const loader = new GLTFLoader();
+let current = null, wire = false;
+
+function frame(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+  obj.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));
+  const r = Math.max(s.x, s.y, s.z);
+  camera.position.set(r * 0.9, s.y * 0.6, r * 1.3);
+  controls.target.set(0, s.y * 0.45, 0); controls.update();
+}
+
+function load(src, label) {
+  loader.load(`/${src}?t=${Date.now()}`, (gltf) => {
+    if (current) scene.remove(current);
+    current = gltf.scene;
+    let tris = 0;
+    current.traverse(o => { if (o.isMesh) { o.material.wireframe = wire; o.frustumCulled = false; if (o.geometry.index) tris += o.geometry.index.count / 3; } });
+    scene.add(current);
+    frame(current);
+    const box = new THREE.Box3().setFromObject(current); const s = box.getSize(new THREE.Vector3());
+    document.getElementById('info').textContent = `${label} — ${s.x.toFixed(1)}×${s.y.toFixed(1)}×${s.z.toFixed(1)}m · ${Math.round(tris).toLocaleString()} tris`;
+  }, undefined, (e) => { document.getElementById('info').textContent = 'load error: ' + (e?.message || e); });
+}
+
+const ui = document.getElementById('ui');
+let buttons = [];
+for (const g of MODELS) {
+  const lbl = document.createElement('div'); lbl.className = 'lbl'; lbl.textContent = g.group; ui.appendChild(lbl);
+  for (const m of g.items) {
+    const b = document.createElement('button'); b.textContent = m.label;
+    b.onclick = () => { buttons.forEach(x => x.classList.remove('on')); b.classList.add('on'); load(m.src, m.label); };
+    ui.appendChild(b); buttons.push(b);
+  }
+}
+const sep = document.createElement('div'); sep.className = 'sep'; ui.appendChild(sep);
+const w = document.createElement('button'); w.textContent = 'Wireframe';
+w.onclick = () => { wire = !wire; w.classList.toggle('on', wire); if (current) current.traverse(o => { if (o.isMesh) o.material.wireframe = wire; }); };
+ui.appendChild(w);
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+buttons[0].classList.add('on'); load(MODELS[0].items[0].src, MODELS[0].items[0].label);
+</script>
+</body>
+</html>

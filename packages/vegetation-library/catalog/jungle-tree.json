@@ -1,0 +1,45 @@
+{
+  "id": "jungle-tree",
+  "commonName": "Jungle tree (canopy hero)",
+  "species": "Taxodium-like (bald cypress base, vined)",
+  "tags": ["tree", "canopy", "hero", "aerial-roots", "vines", "moss"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "kobaltsecond",
+    "url": "https://sketchfab.com/3d-models/jungle-tree-46f83ec5f6c04abf9d509c1070f67d1e",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 30720,
+    "notes": "Owner-selected canopy hero (replaces banyan candidates until a better banyan is found/made). Normalized to ground-center pivot; 16 textures webp-compressed (12.3MB -> 4.9MB). Credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-jungle",
+      "role": "hero",
+      "path": "jungle-tree/jungle-tree.glb",
+      "tris": 30720,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 15.75, 0], "size": [29.58, 31.51, 28.31], "radius": 25.8 },
+      "budget": { "trisPerInstance": 30720, "drawCallsPerBatch": 9, "textureMb": 4.9 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+octa-far",
+    "rationale": "Canopy hero placed sparsely. Close mesh keeps the aerial-root/vine silhouette the owner liked; beyond ~180m it collapses to an octahedral impostor. A decimated mid mesh (~12k) is a planned optimization but not required to ship. Impostor not yet baked.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 180, "representationId": "mesh-jungle", "budget": { "trisPerInstance": 30720, "drawCallsPerBatch": 9 } },
+      { "minDistanceMeters": 180, "maxDistanceMeters": null, "representationId": null, "plannedKind": "octaImpostor", "notes": "Bake an 8x3 octahedral impostor from the normalized jungle-tree mesh." }
+    ]
+  },
+  "ecology": {
+    "tier": "canopy",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.08,
+    "slopeRangeDeg": [0, 20],
+    "cluster": { "min": 1, "max": 2, "radiusMeters": 18 }
+  }
+}
