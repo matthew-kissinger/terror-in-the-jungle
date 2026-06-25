@@ -1,0 +1,15 @@
+{
+  "slug": "polyhaven-dead-tree-trunk",
+  "displayName": "Dead Tree Trunk (+ variant 02)",
+  "provider": "Poly Haven",
+  "author": "Poly Haven (CC0)",
+  "sourceUrl": "https://polyhaven.com/a/dead_tree_trunk",
+  "variantUrl": "https://polyhaven.com/a/dead_tree_trunk_02",
+  "license": "CC0-1.0",
+  "attributionRequired": false,
+  "resolution": "1k gltf",
+  "acquiredAt": "2026-06-25",
+  "stagedPath": "public/assets/vegetation/source/polyhaven-dead-tree-trunk*",
+  "intendedSpecies": "jungle-deadfall",
+  "notes": "CC0 dead trunks for jungleDeadfall cover props. Decimate + add collision footprint before promotion to 'ready'. Auto-downloaded via Poly Haven files API."
+}

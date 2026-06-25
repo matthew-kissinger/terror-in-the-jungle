@@ -12,8 +12,9 @@ import banyanLarge from '../catalog/banyan-large.json';
 import banyanStandard from '../catalog/banyan-standard.json';
 import elephantGrass from '../catalog/elephant-grass.json';
 import fern from '../catalog/fern.json';
+import jungleDeadfall from '../catalog/jungle-deadfall.json';
 
-const RAW: readonly unknown[] = [banyanLarge, banyanStandard, elephantGrass, fern];
+const RAW: readonly unknown[] = [banyanLarge, banyanStandard, elephantGrass, fern, jungleDeadfall];
 
 // Validate once at load. Narrows RAW to VegetationAsset[].
 assertCatalog(RAW);
