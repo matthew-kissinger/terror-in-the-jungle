@@ -1,0 +1,11 @@
+{
+  "slug": "rice-plant",
+  "provider": "dario-scaramuzza (Sketchfab)",
+  "sourceUrl": "https://sketchfab.com/search?q=rice+plant&type=models",
+  "license": "CC-BY",
+  "sourceTriangles": null,
+  "status": "pending-download",
+  "localPath": "public/assets/vegetation/source/rice-plant/",
+  "attributionRequired": true,
+  "notes": "Tier 3 #10 — search 'rice plant' CC-BY on Sketchfab. ricePaddyPlants close detail (paddy/riverbank); ambientCG cards fill the field. Capture exact author handle + model URL + license version on download."
+}

@@ -1,0 +1,13 @@
+{
+  "slug": "m02p-tropical-plants",
+  "provider": "mozzarellaARC (Sketchfab)",
+  "sourceUrl": "https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0",
+  "license": "CC-BY-4.0",
+  "sourceTriangles": 46575,
+  "status": "pending-download (browser/login)",
+  "localPath": "public/assets/vegetation/source/m02p-tropical-plants/",
+  "attributionRequired": true,
+  "notes": "Tier 1 #1 — the spine. GLB, 23397 verts, 18 textures, 0 anim. Palms, areca, banana, fern, taro, understory. Re-bakes the 6 already-accepted species into one M02P art family (biggest cohesion win). Verify exact author handle + license version on download.",
+  "author": "MozzarellaARC",
+  "isDownloadable": true
+}

@@ -1,0 +1,11 @@
+{
+  "slug": "mangrove-hero",
+  "provider": "Nice2meetU2 / nigromancer (Sketchfab)",
+  "sourceUrl": "https://sketchfab.com/search?q=mangrove&type=models",
+  "license": "CC-BY",
+  "sourceTriangles": null,
+  "status": "pending-download",
+  "localPath": "public/assets/vegetation/source/mangrove-hero/",
+  "attributionRequired": true,
+  "notes": "Tier 2 #8 — search 'mangrove' CC-BY on Sketchfab; pick 2-3 for a stand. Prop roots are the silhouette; compose with mangrove-tree-roots (#5). Capture exact author handle(s) + model URL(s) + license version on download."
+}

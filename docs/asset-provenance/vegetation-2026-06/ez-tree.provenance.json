@@ -1,0 +1,11 @@
+{
+  "slug": "ez-tree",
+  "provider": "dgreenheck (eztree.dev generator)",
+  "sourceUrl": "https://eztree.dev",
+  "license": "MIT",
+  "sourceTriangles": null,
+  "status": "pending-download",
+  "localPath": "public/assets/vegetation/source/ez-tree/",
+  "attributionRequired": false,
+  "notes": "Tier 1 #2 — generator (repo https://github.com/dgreenheck/ez-tree), native GLB export. Generate 4-6 teak + 4-6 rubber variants offline on shared bark/leaf materials; commit generated GLBs, do NOT add as a runtime dependency. Tri counts depend on generated variants (target LOD0 <= ~10k)."
+}

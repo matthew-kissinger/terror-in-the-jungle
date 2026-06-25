@@ -1,0 +1,11 @@
+{
+  "slug": "lordsamueli-bamboo",
+  "provider": "LordSamueliSolo (Sketchfab)",
+  "sourceUrl": "https://sketchfab.com/search?q=bamboo&type=models",
+  "license": "CC-BY",
+  "sourceTriangles": null,
+  "status": "pending-download",
+  "localPath": "public/assets/vegetation/source/lordsamueli-bamboo/",
+  "attributionRequired": true,
+  "notes": "Tier 3 #11 — search 'bamboo' CC-BY on Sketchfab; ships alpha leaf PNGs. bambooGrove alt (M02P bamboo is primary). Capture exact author handle + model URL + license version on download."
+}
