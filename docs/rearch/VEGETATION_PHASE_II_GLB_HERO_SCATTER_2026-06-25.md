@@ -90,3 +90,29 @@ TerrainSystem
 
 ## Done when
 - jungle-tree scatters by biome density in A Shau, grounded, mesh↔impostor LOD works, clean chunk teardown (no instance leak), all gates green, perf delta reported, owner playtest row queued. Branch `task/veg-glb-hero-scatter`; do not deploy (await owner walk).
+
+---
+
+## Implementation log (2026-06-25) — COMPLETE, awaiting owner walk
+
+Implemented on branch `task/veg-glb-hero-scatter`. Files:
+- **NEW** `src/systems/terrain/GLBHeroScatterer.ts` — cell-streaming sparse GLB scatterer driving the impostor system; deps injected for testability.
+- **NEW** `src/systems/terrain/GLBHeroScatterer.test.ts` — 6 tests (scatter+register, water/slope rejection, no-hero palette, teardown-no-leak, walk-away eviction, per-frame impostor update).
+- `src/systems/terrain/TerrainVegetationRuntime.ts` — owns a dedicated `StaticImpostorSystem` + the hero scatterer; new per-frame `update(dt)` for impostor LOD.
+- `src/systems/terrain/TerrainSystem.ts` — passes `scene`+`camera` to the runtime; calls `vegetationRuntime.update(dt)` every frame.
+- `src/systems/assets/ModelLoader.ts` — **NEW** `loadModelFromUrl(servedUrl)` (served-URL GLBs outside `public/models/`); shared load core.
+- `src/systems/world/staticImpostors/StaticImpostorSystem.ts` — **NEW** `archetypes` option (per-instance archetype override, resolved before the global registry).
+- `src/config/biomes.ts` — `jungle-tree` palette entries on `denseJungle` (0.2), `ashauJungle` (0.15), `riverbank` (0.28).
+
+### Design deviations from the plan (justified)
+1. **No global archetype merge (revised task #3).** The plan said to merge `vegetationLibraryStaticArchetypes()` into the global `STATIC_IMPOSTOR_ARCHETYPES`. That breaks `check:static-impostors`: its browser fixture loads **every** global archetype via `modelLoader.loadModel(modelPath)` (which prepends `./models/`), but the hero modelPath is a served `/assets/vegetation/...` URL. It would also pollute that gate's SSIM/draw-call fixture. Instead the hero archetypes are injected into a **dedicated, vegetation-owned `StaticImpostorSystem`** (via the new `archetypes` option). This keeps the global registry, the WorldFeatureSystem path, and the gate untouched — and is more isolated (vegetation owns its own impostor batching). Disjoint archetypes (jungle-tree vs props/vehicles) → no atlas duplication.
+2. **Dedicated impostor instance, not WorldFeatureSystem's.** `WorldFeatureSystem` is constructed AFTER `TerrainSystem` and owns its own `StaticImpostorSystem`; sharing it would need SystemInitializer ordering surgery + injection. The dedicated instance (constructed + updated + disposed by `TerrainVegetationRuntime`) avoids touching SystemInitializer/WorldFeatureSystem and honors the AVOID-WorldFeatureSystem rule harder.
+3. **Biomes: `ashauJungle` not `trailEdge`.** `trailEdge` is not a real biome; A Shau's canopy biome is `ashauJungle` (and the denseJungle/ashauJungle palettes must keep equal id-sets per an existing test — entries added to both).
+4. **`ModelLoader.loadModelFromUrl`.** The plan assumed `loadModel` could load the hero; it hardcodes `./models/`. Added a served-URL sibling sharing the same cache/clone/dispose.
+
+### Validation results
+- typecheck ✓ · lint ✓ · lint:budget ✓ (0 fail; TerrainSystem kept under its snapshot) · check:fence ✓ · check:vegetation-adapter ✓ · knip:ci ✓ · `test:run` ✓ (466 files / 6715 tests, incl. 6 new).
+- **Headless integration render proof** (real GLB + real dedicated `StaticImpostorSystem`): `registered:true`; near (60m) `activeImpostors:0` (real mesh); far (240m, >180m promotion) `activeImpostors:1` (octa impostor); 0 console errors. Screenshots `artifacts/veg-glb-hero-scatter/hero-near-mesh.png` + `hero-far-impostor.png`.
+- **Near-field bound:** density 0.2 → effective spacing ≈58m → ~3-4 heroes/cell → ≈30-40 real meshes (shared geometry) within the 153m demotion radius; everything beyond promotes to the 2-tri impostor batch.
+- **Perf:** off the combat hot path (terrain vegetation streaming stream, sparse heroes). Full combat120/A Shau A-B capture deferred to the owner walk (hardware-local, non-gating; CURRENT.md has no tracked baseline).
+- **NOT deployed.** Game-feel (density/readability) → owner playtest required first; row queued in `docs/PLAYTEST_PENDING.md`.

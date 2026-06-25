@@ -61,6 +61,9 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
   groundTileScale: 0.14,
   groundRoughness: 0.85,
   vegetationPalette: [
+    // GLB canopy hero (Phase II): scattered as a real mesh near, octa impostor far.
+    // typeId matches the vegetation-library asset id / static-impostor archetype slug.
+    { typeId: 'jungle-tree',  densityMultiplier: 0.2 },
     { typeId: 'fern',          densityMultiplier: 1.15 },
     { typeId: 'elephantEar',   densityMultiplier: 1.1 },
     { typeId: 'fanPalm',      densityMultiplier: 1.0 },
@@ -77,6 +80,7 @@ const BIOME_ASHAU_JUNGLE: BiomeConfig = {
   groundTileScale: 0.14,
   groundRoughness: 0.85,
   vegetationPalette: [
+    { typeId: 'jungle-tree',  densityMultiplier: 0.15 },
     { typeId: 'fern',          densityMultiplier: 0.45 },
     { typeId: 'elephantEar',   densityMultiplier: 0.58 },
     { typeId: 'fanPalm',      densityMultiplier: 0.78 },
@@ -119,6 +123,7 @@ const BIOME_RIVERBANK: BiomeConfig = {
   groundTileScale: 0.1,
   groundRoughness: 0.9,
   vegetationPalette: [
+    { typeId: 'jungle-tree',  densityMultiplier: 0.28 },
     { typeId: 'elephantEar',   densityMultiplier: 1.45 },
     { typeId: 'fanPalm',      densityMultiplier: 1.35 },
     { typeId: 'coconut',      densityMultiplier: 1.25 },
