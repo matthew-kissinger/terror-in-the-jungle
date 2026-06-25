@@ -1,0 +1,114 @@
+{
+  "$comment": [
+    "CANONICAL RIG CONTRACT — the single source of truth for the articulation",
+    "vocabulary shared between asset GENERATION (Kiln / pixel-forge) and TIJ",
+    "RUNTIME CONSUMERS. Loaded by scripts/import-war-catalog.ts.",
+    "",
+    "Why this exists (and why it replaced per-asset rename lists): asset",
+    "generators emit internally-inconsistent joint names for the same physical",
+    "part (Kiln ships Joint_Rotor on the Huey but Joint_MainRotor on the OH-6;",
+    "Joint_PropLeft on the AC-47 but Joint_PropL on the OV-10; Joint_Gun on the",
+    "M48 but the consumer wants Joint_MainGun). The old rig-grafts.json carried a",
+    "hand-authored rename per asset, reverse-engineered from whatever the last",
+    "batch happened to produce — a treadmill that broke on every re-roll.",
+    "",
+    "This file inverts that: the IMPORTER auto-detects every Joint_* node, maps",
+    "its generator-native name to ONE canonical name + semantic role via the",
+    "alias table below, renames the GLB node, and records {name,type,spinAxis} in",
+    "the generated catalog. Consumers read ONLY canonical names. A new batch that",
+    "renames a part again Just Works as long as the new name is added to that",
+    "role's `aliases` (a one-line vocabulary edit, not a per-asset graft).",
+    "",
+    "spinAxis is role-constant and follows from two fixed facts: (1) the source",
+    "art is +X-forward (kiln/pixel-forge world convention) and (2) the importer",
+    "wraps every asset in a single +X->+Z axis-normalize rotation about Y. In the",
+    "joint's post-wrap local frame that makes a vertical rotor spin about Y, a",
+    "side-facing tail rotor about Z, and a forward-facing propeller about X. The",
+    "importer cross-checks each declared spinAxis against the joint's geometric",
+    "thin-axis and WARNS on disagreement, so a future frame change is caught at",
+    "import, not in a playtest.",
+    "",
+    "CONSUMER CONTRACT (what reads these — keep in sync):",
+    "  - HelicopterGeometry.wireRotorJoints: resolves catalog joints of",
+    "    type mainBlades|tailBlades by name, stamps userData.type/spinAxis.",
+    "  - FixedWingConfigs.catalogPropellers: filters catalog joints whose name",
+    "    startsWith 'Joint_Propeller' -> propeller canonicals MUST keep that prefix.",
+    "  - VehicleGlbVisuals.applyM48TankGlbVisual: getObjectByName('Joint_Turret')",
+    "    + getObjectByName('Joint_MainGun') (exact).",
+    "  - WeaponRigManager: reads catalog magazineNodes/muzzleNodes mesh lists."
+  ],
+
+  "jointRoles": [
+    { "role": "main-rotor",  "canonical": "Joint_MainRotor",  "type": "mainBlades", "spinAxis": "y",
+      "aliases": ["Joint_MainRotor", "Joint_Rotor"],
+      "doc": "Primary lifting rotor disc; spins about world-up." },
+    { "role": "tail-rotor",  "canonical": "Joint_TailRotor",  "type": "tailBlades", "spinAxis": "z",
+      "aliases": ["Joint_TailRotor"],
+      "doc": "Anti-torque tail rotor; vertical disc spinning about the lateral axis." },
+    { "role": "front-rotor", "canonical": "Joint_FrontRotor", "type": "mainBlades", "spinAxis": "y",
+      "aliases": ["Joint_FrontRotor"],
+      "doc": "Forward rotor of a tandem-rotor helicopter (CH-47)." },
+    { "role": "rear-rotor",  "canonical": "Joint_RearRotor",  "type": "mainBlades", "spinAxis": "y",
+      "aliases": ["Joint_RearRotor"],
+      "doc": "Aft rotor of a tandem-rotor helicopter (CH-47)." },
+    { "role": "propeller-left",  "canonical": "Joint_PropellerL", "type": "mainBlades", "spinAxis": "x",
+      "aliases": ["Joint_PropellerL", "Joint_PropLeft", "Joint_PropL"],
+      "doc": "Port engine propeller (multi-engine prop aircraft). Name keeps the Joint_Propeller prefix the fixed-wing consumer filters on." },
+    { "role": "propeller-right", "canonical": "Joint_PropellerR", "type": "mainBlades", "spinAxis": "x",
+      "aliases": ["Joint_PropellerR", "Joint_PropRight", "Joint_PropR"],
+      "doc": "Starboard engine propeller (multi-engine prop aircraft)." },
+    { "role": "propeller", "canonical": "Joint_Propeller", "type": "mainBlades", "spinAxis": "x",
+      "aliases": ["Joint_Propeller"],
+      "doc": "Single nose propeller (single-engine prop aircraft)." },
+    { "role": "turret", "canonical": "Joint_Turret",
+      "aliases": ["Joint_Turret"],
+      "doc": "Rotating tank turret bulk. Re-seated on the TankTurret yaw rig by VehicleGlbVisuals; no procedural spin (slaved to crew aim)." },
+    { "role": "main-gun", "canonical": "Joint_MainGun",
+      "aliases": ["Joint_MainGun", "Joint_Gun"],
+      "doc": "Tank main gun mantlet + barrel. Re-seated on the TankTurret pitch rig; elevates with crew aim." }
+  ],
+
+  "ignoreJointPattern": "^Joint_(Airframe|PlaneBody|Body|Fuselage|Wing[LR]?|Canopy|Rudder|Elevator|Aileron|Flap|Stabilizer|Gear.*|Door.*|Hatch.*|Strut.*|Wheel.*|TailWheel|SpareWheel|Windshield|BladePivot_.*|TBladePivot_.*)$",
+
+  "rigProfiles": {
+    "single-rotor-heli": ["main-rotor", "tail-rotor"],
+    "tandem-rotor-heli": ["front-rotor", "rear-rotor"],
+    "twin-prop": ["propeller-left", "propeller-right"],
+    "single-prop": ["propeller"],
+    "gun-tank": ["turret", "main-gun"]
+  },
+
+  "assetRigProfiles": {
+    "uh1-huey": "single-rotor-heli",
+    "uh1c-gunship": "single-rotor-heli",
+    "ah1-cobra": "single-rotor-heli",
+    "oh6-kiowa-scout": "single-rotor-heli",
+    "hh3e-jolly-green-giant": "single-rotor-heli",
+    "ch47-chinook": "tandem-rotor-heli",
+    "a1-skyraider": "single-prop",
+    "ac47-spooky": "twin-prop",
+    "ov10-bronco": "twin-prop",
+    "m48-patton": "gun-tank",
+    "t54-tank": "gun-tank"
+  },
+
+  "weaponNodes": {
+    "$comment": [
+      "Mesh-name classification rules for weapon magazine + muzzle anchors,",
+      "applied to every weapon-class asset. Patterns are matched case-insensitively.",
+      "magazine = the detachable magazine BODY that drops on reload; the receiver",
+      "well and the release catch stay welded to the gun, so they are excluded.",
+      "muzzle = the forward muzzle device (flash hider / brake / suppressor / bore",
+      "opening); the bare barrel is NOT listed (WeaponRigManager already falls back",
+      "to Mesh_Barrel for the tip). `overrides` pins the handful the rules cannot",
+      "decide (e.g. the M79's only barrel mesh, or weapons with no muzzle device)."
+    ],
+    "magazineIncludePattern": "^Mesh_(Mag|Magazine|Drum)",
+    "magazineExcludePattern": "(Magwell|MagWell|MagazineWell|MagRelease|MagCatch|MagButton)",
+    "muzzleIncludePattern": "(FlashHider|FlashSuppressor|MuzzleBrake|MuzzleSlant|MuzzleTip|MuzzleBore|MuzzleHole|Birdcage|^Mesh_Bore$)",
+    "overrides": {
+      "m79": { "muzzleNodes": ["Mesh_Mesh_Barrel"] },
+      "rpg7": { "magazineNodes": [], "muzzleNodes": [] }
+    }
+  }
+}

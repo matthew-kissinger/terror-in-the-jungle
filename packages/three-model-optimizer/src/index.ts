@@ -410,14 +410,33 @@ function getGeometryLayoutKey(geometry: THREE.BufferGeometry): string {
   });
 }
 
+/**
+ * Quantization step for the continuous PBR scalars in the material merge key.
+ * Two materials whose roughness/metalness differ by less than this share a
+ * bucket (and so one draw). Color is already 8-bit quantized via getHexString.
+ *
+ * This is the "material signature canonicalization" lever: the bucket key is
+ * value-based, not identity-based, so palette-cohesive art collapses to a small
+ * set of buckets. A batch generated against a fixed palette (the war assets snap
+ * 113 flat materials to 19 signatures) already collapses with exact compares;
+ * quantization makes that robust to a future generator emitting 0.8999 vs 0.9
+ * instead of fragmenting into separate draws. 1e-3 is far below perceptual
+ * threshold, so the merged material is visually identical to each source.
+ */
+const MERGE_KEY_SCALAR_STEP = 1e-3;
+
+function quantizeScalar(value: number | undefined): number {
+  return Math.round((value ?? 0) / MERGE_KEY_SCALAR_STEP) * MERGE_KEY_SCALAR_STEP;
+}
+
 function getMaterialMergeKey(material: THREE.Material): string {
   const materialRecord = material as unknown as MaterialRecord;
   const commonKey = {
     type: material.type,
     transparent: material.transparent,
-    alphaTest: material.alphaTest,
+    alphaTest: quantizeScalar(material.alphaTest),
     side: material.side,
-    opacity: material.opacity,
+    opacity: quantizeScalar(material.opacity),
     depthWrite: material.depthWrite,
     depthTest: material.depthTest,
     blending: material.blending,
@@ -434,9 +453,9 @@ function getMaterialMergeKey(material: THREE.Material): string {
     ? {
         color: material.color.getHexString(),
         emissive: material.emissive.getHexString(),
-        roughness: material.roughness,
-        metalness: material.metalness,
-        emissiveIntensity: material.emissiveIntensity,
+        roughness: quantizeScalar(material.roughness),
+        metalness: quantizeScalar(material.metalness),
+        emissiveIntensity: quantizeScalar(material.emissiveIntensity),
       }
     : {
         color: 'color' in material && material.color instanceof THREE.Color

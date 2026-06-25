@@ -35,6 +35,68 @@ describe('optimizeStaticModelDrawCalls', () => {
     expect(root.children[0]?.name).toBe('crate_0');
   });
 
+  it('collapses distinct material INSTANCES that share palette values into one bucket', () => {
+    // The bucket key is value-based, not identity-based: separately-constructed
+    // materials with the same color/roughness/metalness must co-batch. This is
+    // the material-signature canonicalization that lets a palette-cohesive batch
+    // (war assets: 113 flat materials -> 19 signatures) collapse to a few draws.
+    // Locking it here guards against a regression to uuid/identity keying.
+    const root = new THREE.Group();
+    for (let i = 0; i < 5; i++) {
+      root.add(makeMesh(`prop-${i}`, new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.6, metalness: 0 })));
+    }
+
+    const result = optimizeStaticModelDrawCalls(root, { strategy: 'merge' });
+
+    expect(result.sourceMeshCount).toBe(5);
+    expect(result.bucketCount).toBe(1);
+    expect(result.optimizedMeshCount).toBe(1);
+  });
+
+  it('merges materials whose scalars differ below the quantization step', () => {
+    // 0.900 vs 0.9004 roughness is below MERGE_KEY_SCALAR_STEP (1e-3) and far
+    // below perceptual threshold, so they share a bucket instead of fragmenting
+    // into two draws (robustness against generator float drift).
+    const root = new THREE.Group();
+    root.add(makeMesh('a', new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.9, metalness: 0 })));
+    root.add(makeMesh('b', new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.9004, metalness: 0 })));
+
+    const result = optimizeStaticModelDrawCalls(root, { strategy: 'merge' });
+
+    expect(result.bucketCount).toBe(1);
+    expect(result.optimizedMeshCount).toBe(1);
+  });
+
+  it('keeps genuinely different colors in separate buckets', () => {
+    const root = new THREE.Group();
+    root.add(makeMesh('olive-a', new THREE.MeshStandardMaterial({ color: 0x7a6430, roughness: 0.95 })));
+    root.add(makeMesh('olive-b', new THREE.MeshStandardMaterial({ color: 0x7a6430, roughness: 0.95 })));
+    root.add(makeMesh('rust-a', new THREE.MeshStandardMaterial({ color: 0x320604, roughness: 0.8 })));
+    root.add(makeMesh('rust-b', new THREE.MeshStandardMaterial({ color: 0x320604, roughness: 0.8 })));
+
+    const result = optimizeStaticModelDrawCalls(root, { strategy: 'merge' });
+
+    // Two palette colors -> two buckets -> two merged draws (not one, not four).
+    expect(result.bucketCount).toBe(2);
+    expect(result.optimizedMeshCount).toBe(2);
+  });
+
+  it('keeps differently-textured materials in separate buckets (atlasing is out of scope)', () => {
+    // A single draw binds one texture, so meshes with different maps CANNOT
+    // merge without a texture atlas. The key must stay texture-aware; collapsing
+    // them is the atlasing lever (a later move), not a bucket-key change.
+    const root = new THREE.Group();
+    const texA = new THREE.Texture();
+    const texB = new THREE.Texture();
+    root.add(makeMesh('hut', new THREE.MeshStandardMaterial({ color: 0xffffff, map: texA })));
+    root.add(makeMesh('barn', new THREE.MeshStandardMaterial({ color: 0xffffff, map: texB })));
+
+    const result = optimizeStaticModelDrawCalls(root, { strategy: 'merge' });
+
+    expect(result.bucketCount).toBe(2);
+    expect(result.optimizedMeshCount).toBe(0); // each bucket has 1 entry -> nothing to merge
+  });
+
   it('keeps meshes selected by the preserve predicate', () => {
     const root = new THREE.Group();
     const material = new THREE.MeshStandardMaterial({ color: 0x44aa66 });
