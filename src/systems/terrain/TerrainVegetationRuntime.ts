@@ -31,11 +31,31 @@ export interface TerrainVegetationRuntimeDebugInfo {
   glbHeroes: GLBHeroScattererDebugInfo;
 }
 
+/**
+ * GLB hero scatter (jungle-tree canopy) is gated OFF by default. The near-field
+ * mesh tier currently adds one THREE.Object3D per tree sub-mesh, and at canopy
+ * density that pushes three.js's WebGPU per-object uniform buffer past the 64KB
+ * binding limit (bindGroup_object 131072 > 65536) — the asset still needs a
+ * single-material atlas + an InstancedMesh near tier before it can ship. Enable
+ * for local testing via `?vegHeroes=1` or `window.__vegHeroScatter = true`
+ * (read once at runtime construction). See docs/rearch/VEGETATION_PHASE_II_*.
+ */
+function heroScatterEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as { __vegHeroScatter?: boolean };
+  if (w.__vegHeroScatter === true) return true;
+  try {
+    return new URLSearchParams(window.location.search).get('vegHeroes') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export class TerrainVegetationRuntime {
   private vegetationScatterer: VegetationScatterer;
   private jungleGroundRing: JungleGroundRing;
-  private heroImpostors: StaticImpostorSystem;
-  private glbHeroScatterer: GLBHeroScatterer;
+  private heroImpostors: StaticImpostorSystem | null = null;
+  private glbHeroScatterer: GLBHeroScatterer | null = null;
 
   constructor(
     billboardSystem: GlobalBillboardSystem,
@@ -45,6 +65,10 @@ export class TerrainVegetationRuntime {
   ) {
     this.vegetationScatterer = new VegetationScatterer(billboardSystem, vegetationCellSize);
     this.jungleGroundRing = new JungleGroundRing(billboardSystem);
+
+    if (!heroScatterEnabled()) {
+      return;
+    }
 
     // Dedicated, vegetation-owned static-impostor system. The hero archetypes
     // (from the vegetation-library adapter) are injected here rather than merged
@@ -76,7 +100,7 @@ export class TerrainVegetationRuntime {
   setWorldBounds(worldSize: number, visualMargin: number): void {
     this.vegetationScatterer.setWorldBounds(worldSize, visualMargin);
     this.jungleGroundRing.setWorldBounds(worldSize, visualMargin);
-    this.glbHeroScatterer.setWorldBounds(worldSize, visualMargin);
+    this.glbHeroScatterer?.setWorldBounds(worldSize, visualMargin);
   }
 
   configure(
@@ -97,7 +121,7 @@ export class TerrainVegetationRuntime {
       biomePalettes,
       biomeRules,
     );
-    this.glbHeroScatterer.configure(defaultBiomeId, biomePalettes, biomeRules);
+    this.glbHeroScatterer?.configure(defaultBiomeId, biomePalettes, biomeRules);
   }
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
@@ -120,15 +144,15 @@ export class TerrainVegetationRuntime {
     // Hero GLB streaming shares the same cell budget. Heroes are sparse, so the
     // per-frame add/remove caps comfortably cover their churn; the async GLB
     // loads are naturally throttled by the loader.
-    const heroDidWork = this.glbHeroScatterer.updateBudgeted(playerPosition, {
+    const heroDidWork = this.glbHeroScatterer?.updateBudgeted(playerPosition, {
       maxAddsPerFrame: frameBudget.maxAddsPerFrame,
       maxRemovalsPerFrame: frameBudget.maxRemovalsPerFrame,
-    });
+    }) ?? false;
 
     const didWork = scattererDidWork || heroDidWork;
     const pending = this.vegetationScatterer.getPendingCounts();
     const ringPending = this.jungleGroundRing.getPendingCounts();
-    const heroPending = this.glbHeroScatterer.getPendingCounts();
+    const heroPending = this.glbHeroScatterer?.getPendingCounts() ?? { adds: 0, removals: 0 };
 
     return {
       didWork,
@@ -145,33 +169,36 @@ export class TerrainVegetationRuntime {
    * independent of the streaming budget.
    */
   update(deltaTime: number): void {
-    this.glbHeroScatterer.updateImpostors(deltaTime);
+    this.glbHeroScatterer?.updateImpostors(deltaTime);
   }
 
   getDebugInfo(): TerrainVegetationRuntimeDebugInfo {
     return {
       vegetation: this.vegetationScatterer.getDebugInfo(),
       jungleGroundRing: this.jungleGroundRing.getDebugInfo(),
-      glbHeroes: this.glbHeroScatterer.getDebugInfo(),
+      glbHeroes: this.glbHeroScatterer?.getDebugInfo() ?? {
+        activeCells: 0, targetCells: 0, pendingAdditions: 0,
+        pendingRemovals: 0, registeredInstances: 0, inFlightLoads: 0,
+      },
     };
   }
 
   regenerateAll(): void {
     this.vegetationScatterer.regenerateAll();
     this.jungleGroundRing.clear();
-    this.glbHeroScatterer.clear();
+    this.glbHeroScatterer?.clear();
   }
 
   async regenerateAllAsync(onProgress?: (done: number, total: number) => void): Promise<void> {
     await this.vegetationScatterer.regenerateAllAsync(onProgress);
     this.jungleGroundRing.clear();
-    this.glbHeroScatterer.clear();
+    this.glbHeroScatterer?.clear();
   }
 
   dispose(): void {
     this.vegetationScatterer.dispose();
     this.jungleGroundRing.dispose();
-    this.glbHeroScatterer.dispose();
-    this.heroImpostors.dispose();
+    this.glbHeroScatterer?.dispose();
+    this.heroImpostors?.dispose();
   }
 }
