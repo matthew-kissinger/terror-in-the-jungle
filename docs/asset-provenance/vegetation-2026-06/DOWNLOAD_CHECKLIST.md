@@ -71,9 +71,10 @@ Order follows the manifest's "Acquisition order" (matches implementation phases)
   - URL: https://sketchfab.com/search?q=mangrove&type=models  (pick 2-3 CC-BY)
   - Dest: `public/assets/vegetation/source/mangrove-hero/`
   - Note: capture each author handle + model URL. CC-BY → credit required when shipped.
-- [x] **Poly Haven Dead Tree Trunk 01+02 / Stumps 01-02** (DONE 2k gltf x4) — `CC0`
-  - URL: https://polyhaven.com/models?search=dead%20tree
-  - Dest: `public/assets/vegetation/source/polyhaven-dead-tree/`
+- [x] **Poly Haven Dead Tree Trunk + Trunk 02** (DONE 1k gltf x2, 2026-06-25) — `CC0`
+  - URL: https://polyhaven.com/a/dead_tree_trunk · https://polyhaven.com/a/dead_tree_trunk_02
+  - Dest: `public/assets/vegetation/source/polyhaven-dead-tree-trunk{,-02}/`
+  - Catalog: `jungle-deadfall` (sourceStaged). Stumps 01-02 not yet pulled (optional).
 
 ## Step 5 — Rice / bamboo / fern fill (Phase 3/5 as needed)
 
