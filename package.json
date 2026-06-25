@@ -25,6 +25,9 @@
   "license": "AGPL-3.0-or-later",
   "private": true,
   "version": "0.1.0",
+  "workspaces": [
+    "packages/*"
+  ],
   "knip": {
     "entry": [
       "index.html",
@@ -228,10 +231,10 @@
     "@fontsource/caveat": "^5.2.8",
     "@fontsource/courier-prime": "^5.2.8",
     "@fontsource/special-elite": "^5.2.8",
-    "@game-field-kits/event-bus": "file:../game-field-kits/packages/event-bus",
-    "@game-field-kits/frame-scheduler": "file:../game-field-kits/packages/frame-scheduler",
-    "@game-field-kits/three-effect-pool": "file:../game-field-kits/packages/three-effect-pool",
-    "@game-field-kits/three-model-optimizer": "file:../game-field-kits/packages/three-model-optimizer",
+    "@game-field-kits/event-bus": "*",
+    "@game-field-kits/frame-scheduler": "*",
+    "@game-field-kits/three-effect-pool": "*",
+    "@game-field-kits/three-model-optimizer": "*",
     "@preact/signals-core": "^1.14.1",
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/generators": "^0.43.0",

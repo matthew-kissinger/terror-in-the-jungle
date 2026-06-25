@@ -49,9 +49,7 @@ push to master
 manual trigger (you decide when)
   -> .github/workflows/deploy.yml     (workflow_dispatch)
        - checkout ref (default: master)
-       - checkout ../game-field-kits with GAME_FIELD_KITS_DEPLOY_KEY
-       - build consumed @game-field-kits packages
-       - npm ci
+       - npm ci   (links in-repo packages/* workspaces; no external clone)
        - npm run build
        - npm run cloudflare:assets:upload
        - cloudflare/wrangler-action@v3
@@ -89,11 +87,10 @@ current Cloudflare/GitHub action guidance before changing action versions.
 Key facts:
 
 - The deploy workflow runs `cloudflare/wrangler-action@v3`, not Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
-- The deploy workflow must clone the private sibling repo
-  `matthew-kissinger/game-field-kits` with `GAME_FIELD_KITS_DEPLOY_KEY`, then
-  build the consumed `@game-field-kits/*` packages before TIJ runs `npm ci`.
-  If that key, clone path, or sibling build fails, deploy is blocked before
-  Pages upload.
+- The `@game-field-kits/*` packages are vendored in-repo as `packages/*`
+  workspaces (folded back 2026-06-25); `npm ci` links them with no external
+  clone or build step. The former `GAME_FIELD_KITS_DEPLOY_KEY` secret is no
+  longer used and can be removed from the repo settings.
 - The Pages project has no build step configured on Cloudflare's side. The build is reproducible from `package-lock.json` plus `npm ci` inside the GitHub runner.
 - The deploy workflow does a fresh checkout, `npm ci`, and `npm run build` every run. It does not rely on a CI artifact.
 - `npm run build` writes a preview `dist/asset-manifest.json` from local or pinned R2 metadata so local retail previews can resolve required A Shau assets. After that, the deploy workflow runs `npm run cloudflare:assets:upload` with `TITJ_SKIP_R2_UPLOAD=1`, overwrites/refreshes `dist/asset-manifest.json`, and validates public size/content-type/cache/CORS before Pages upload.
