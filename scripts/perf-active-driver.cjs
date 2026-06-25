@@ -1504,11 +1504,16 @@
     const interruptDistance = Math.max(acquisitionDistance, maxFireDistance);
     if (targetDistance <= interruptDistance && canSeeTarget) return true;
     if (!sameLockedTarget) return false;
-    if (botState !== 'ALERT' && botState !== 'ENGAGE' && botState !== 'ADVANCE') return false;
+    if (botState !== 'ENGAGE') return false;
+    const timeInStateMs = Number(opts && opts.timeInStateMs);
+    const occludedHoldMs = Math.max(0, Number(opts && opts.occludedHoldMs || 0));
+    if (!Number.isFinite(timeInStateMs) || timeInStateMs >= occludedHoldMs) return false;
     // Close-pressure fights can momentarily occlude the locked target behind
     // another NPC or a terrain/cover sample. Hold the lock through that short
     // flicker so the driver does not yaw 180 degrees between nearby candidates
-    // on every decision tick.
+    // on every decision tick. This must stay bounded; otherwise large-map
+    // captures can sit in ENGAGE against terrain-occluded targets and generate
+    // fake low-trust combat pressure.
     return targetDistance <= maxFireDistance;
   }
 
@@ -4017,6 +4022,8 @@
         objective: objectiveForTargetGate,
         playerPos: playerPos,
         botState: state.botState,
+        timeInStateMs: state.timeInStateMs,
+        occludedHoldMs: botConfig.minEngageStateMs,
         acquisitionDistance: botConfig.targetAcquisitionDistance,
         maxFireDistance: botConfig.maxFireDistance,
         canSeeTarget: losClosure,

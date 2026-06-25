@@ -292,6 +292,23 @@ describe('AIStateEngage', () => {
       expect(aiStateEngage.getCloseEngagementTelemetry().suppressionTransitions).toBe(1);
     });
 
+    it('advances instead of recreating a recently terrain-blocked suppressive lane', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      combatant.target = target;
+      combatant.suppressionTerrainBlockedUntil = Date.now() + 1000;
+      combatant.suppressionTerrainBlockedPoint = target.position.clone();
+      canSeeTarget.mockReturnValue(false);
+
+      invokeHandleEngaging(combatant);
+
+      expect(combatant.state).toBe(CombatantState.ADVANCING);
+      expect(combatant.isFullAuto).toBe(false);
+      expect(combatant.destinationPoint?.distanceTo(target.position)).toBeLessThan(0.001);
+      expect(combatant.lastKnownTargetPos?.distanceTo(target.position)).toBeLessThan(0.001);
+      expect(aiStateEngage.getCloseEngagementTelemetry().suppressionTransitions).toBe(0);
+    });
+
     describe('suppression visibility cadence', () => {
       afterEach(() => {
         vi.useRealTimers();

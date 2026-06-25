@@ -2805,10 +2805,32 @@ describe('route objective-progress recovery', () => {
       objective: { kind: 'zone', position: { x: 100, y: 0, z: 0 }, priority: 1 },
       playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
       botState: 'ENGAGE',
+      timeInStateMs: 250,
+      occludedHoldMs: config.minEngageStateMs,
       acquisitionDistance: config.targetAcquisitionDistance,
       maxFireDistance: config.maxFireDistance,
       canSeeTarget: () => false,
     })).toBe(true);
+  });
+
+  it('releases an occluded active target after the LOS-flicker grace window', () => {
+    const config = botConfigForProfile(profileForMode('zone_control'));
+    const target = makeBotTarget({
+      id: 'locked_target',
+      position: { x: 0, y: 0, z: -30 },
+    });
+    expect(shouldUseTargetForCurrentObjective({
+      target,
+      currentTarget: target,
+      objective: { kind: 'zone', position: { x: 100, y: 0, z: 0 }, priority: 1 },
+      playerPos: { x: 0, y: PLAYER_EYE_HEIGHT, z: 0 },
+      botState: 'ENGAGE',
+      timeInStateMs: config.minEngageStateMs,
+      occludedHoldMs: config.minEngageStateMs,
+      acquisitionDistance: config.targetAcquisitionDistance,
+      maxFireDistance: config.maxFireDistance,
+      canSeeTarget: () => false,
+    })).toBe(false);
   });
 });
 

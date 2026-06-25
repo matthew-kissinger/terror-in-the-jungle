@@ -18,6 +18,7 @@ import {
   EmplacementMountTracker,
   EmplacementCandidateCache,
 } from './EmplacementSeekHelper'
+import { enterSuppressionState, redirectRecentTerrainBlockedSuppression } from './SuppressionLaneRecovery'
 
 const _toTarget = new THREE.Vector3()
 const _flankingPos = new THREE.Vector3()
@@ -637,13 +638,9 @@ export class AIStateEngage {
     if (!this.measureEngageMethod('engage.suppression.lineOfSight', () =>
       this.hasSuppressionLineOfSight(combatant, target, playerPosition, canSeeTarget)
     )) {
+      if (redirectRecentTerrainBlockedSuppression(combatant, targetPos)) return
       this.telemetry.suppressionTransitions++
-      combatant.lastKnownTargetPos = target.position.clone()
-      combatant.state = CombatantState.SUPPRESSING
-      combatant.isFullAuto = true
-      combatant.skillProfile.burstLength = SUPPRESSION_BURST
-      combatant.skillProfile.burstPauseMs = SUPPRESSION_PAUSE_MS
-      combatant.inCover = false
+      enterSuppressionState(combatant, target.position, SUPPRESSION_BURST, SUPPRESSION_PAUSE_MS)
       return
     }
 

@@ -21,6 +21,7 @@ import {
   recordCombatFireTerrainBlocked,
   tryConsumeCombatFireRaycast,
 } from './ai/CombatFireRaycastBudget';
+import { redirectTerrainBlockedSuppression } from './ai/SuppressionLaneRecovery';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 // Extracted modules
 import { CombatantBallistics } from './CombatantBallistics';
@@ -318,6 +319,7 @@ export class CombatantCombat {
     }
 
     if (this.isNpcFireBlockedByTerrain(combatant, targetPos, 'suppressive')) {
+      redirectTerrainBlockedSuppression(combatant, targetPos);
       return;
     }
 
