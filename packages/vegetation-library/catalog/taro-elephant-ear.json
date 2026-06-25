@@ -1,0 +1,45 @@
+{
+  "id": "taro-elephant-ear",
+  "commonName": "Taro / elephant ear",
+  "species": "Monstera/Colocasia-like broadleaf",
+  "tags": ["taro", "elephant-ear", "broadleaf", "midLevel", "understory", "jungle"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "mozzarellaARC",
+    "url": "https://sketchfab.com/3d-models/tropical-plants-pack-m02p",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 2516,
+    "notes": "Extracted from Tropical Plants Pack M02P (SM_MZRa_Monstera_B073 variant; the cleanest 2-bucket elephant-ear of four). Subtree pruned, world transform baked, normalized to ground-center pivot. 4 textures webp-compressed. Credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-taro",
+      "role": "instanced",
+      "path": "taro-elephant-ear/taro-elephant-ear.glb",
+      "tris": 2516,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 1.18, 0], "size": [3.46, 2.37, 3.23], "radius": 2.64 },
+      "budget": { "trisPerInstance": 2516, "drawCallsPerBatch": 2, "textureMb": 3.5 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+card-far",
+    "rationale": "Large elephant-ear leaves are a distinct understory silhouette up close (real mesh), flattening to an alpha card past ~28m. Far band is a planned ground card; a 2.4m broadleaf clump does not warrant an impostor.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 28, "representationId": "mesh-taro", "budget": { "trisPerInstance": 2516, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 28, "maxDistanceMeters": 65, "representationId": null, "plannedKind": "groundCard", "notes": "Bake a front-view alpha card of the leaf clump from the normalized mesh." }
+    ]
+  },
+  "ecology": {
+    "tier": "midLevel",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.35,
+    "slopeRangeDeg": [0, 26],
+    "cluster": { "min": 2, "max": 6, "radiusMeters": 3 }
+  }
+}

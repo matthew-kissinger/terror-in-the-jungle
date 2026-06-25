@@ -1,11 +1,13 @@
 {
   "slug": "rice-plant",
-  "provider": "dario-scaramuzza (Sketchfab)",
+  "provider": "Sketchfab",
   "sourceUrl": "https://sketchfab.com/search?q=rice+plant&type=models",
-  "license": "CC-BY",
-  "sourceTriangles": null,
-  "status": "pending-download",
-  "localPath": "public/assets/vegetation/source/rice-plant/",
+  "license": "CC-BY-4.0",
+  "sourceTriangles": 3876,
+  "status": "normalized",
+  "localPath": "public/assets/vegetation/source/rice-plant/rice_plant.glb",
+  "normalizedPath": "public/assets/vegetation/rice-paddy/rice-paddy.glb",
   "attributionRequired": true,
-  "notes": "Tier 3 #10 — search 'rice plant' CC-BY on Sketchfab. ricePaddyPlants close detail (paddy/riverbank); ambientCG cards fill the field. Capture exact author handle + model URL + license version on download."
+  "author": "verify",
+  "notes": "Tier 3 #10 — staged 'rice_plant.glb' (3876 tris, vertex-colored, 0 textures). Normalized 2026-06-25 (step 2): pivot-only ground-center (no webp — vertex-colored, no textures), ~2.44m tall. Descriptor: packages/vegetation-library/catalog/rice-paddy.json (status:ready). Author handle still to be confirmed from the staged model's metadata."
 }

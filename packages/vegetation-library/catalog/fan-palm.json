@@ -1,0 +1,45 @@
+{
+  "id": "fan-palm",
+  "commonName": "Fan palm",
+  "species": "Licuala-like fan palm",
+  "tags": ["palm", "canopy", "midLevel", "jungle"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "mozzarellaARC",
+    "url": "https://sketchfab.com/3d-models/tropical-plants-pack-m02p",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 4080,
+    "notes": "Extracted from Tropical Plants Pack M02P (SM_MZRa_Palm_B082 variant; the cleanest of three palm duplicates). Subtree pruned to its own meshes/materials, world transform baked, normalized to ground-center pivot (+Y up, -Z fwd, meters). 4 textures webp-compressed. Credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-fan-palm",
+      "role": "instanced",
+      "path": "fan-palm/fan-palm.glb",
+      "tris": 4080,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 3.49, 0], "size": [4.43, 6.98, 4.0], "radius": 4.59 },
+      "budget": { "trisPerInstance": 4080, "drawCallsPerBatch": 2, "textureMb": 3.7 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+billboard-far",
+    "rationale": "A ~7m fan palm reads as a distinct fronded silhouette up close, so the near band is the real mesh. Past ~120m the fronds collapse to a flat profile, so the far band is a planned multi-view billboard atlas (not a ground card — it has real vertical height a canopy plant should keep). Atlas not yet baked.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 120, "representationId": "mesh-fan-palm", "budget": { "trisPerInstance": 4080, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 120, "maxDistanceMeters": null, "representationId": null, "plannedKind": "billboardAtlas", "notes": "Bake a lat-lon billboard atlas (e.g. 4x2) from the normalized fan-palm mesh for distant scatter." }
+    ]
+  },
+  "ecology": {
+    "tier": "midLevel",
+    "preferredBiomes": ["denseJungle", "trailEdge", "riverbank"],
+    "density": 0.18,
+    "slopeRangeDeg": [0, 22],
+    "cluster": { "min": 1, "max": 3, "radiusMeters": 6 }
+  }
+}

@@ -25,14 +25,25 @@
       "materialBuckets": [],
       "bounds": { "center": [0, 15.75, 0], "size": [29.58, 31.51, 28.31], "radius": 25.8 },
       "budget": { "trisPerInstance": 30720, "drawCallsPerBatch": 9, "textureMb": 4.9 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-jungle",
+      "baseColorPath": "jungle-tree/impostor/atlas.base-color.png",
+      "normalPath": "jungle-tree/impostor/atlas.normal.png",
+      "depthPath": "jungle-tree/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 15.75, 0], "size": [29.58, 31.51, 28.31], "radius": 25.8 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 12.0 }
     }
   ],
   "lod": {
     "label": "mesh-near+octa-far",
-    "rationale": "Canopy hero placed sparsely. Close mesh keeps the aerial-root/vine silhouette the owner liked; beyond ~180m it collapses to an octahedral impostor. A decimated mid mesh (~12k) is a planned optimization but not required to ship. Impostor not yet baked.",
+    "rationale": "Canopy hero placed sparsely. Close mesh keeps the aerial-root/vine silhouette the owner liked; beyond ~180m it collapses to an octahedral impostor. A decimated mid mesh (~12k) is a planned optimization but not required to ship. Far band now backed by a baked 8x3 octahedral impostor.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 180, "representationId": "mesh-jungle", "budget": { "trisPerInstance": 30720, "drawCallsPerBatch": 9 } },
-      { "minDistanceMeters": 180, "maxDistanceMeters": null, "representationId": null, "plannedKind": "octaImpostor", "notes": "Bake an 8x3 octahedral impostor from the normalized jungle-tree mesh." }
+      { "minDistanceMeters": 180, "maxDistanceMeters": null, "representationId": "octa-jungle", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 12.0 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized jungle-tree mesh via scripts/bake-vegetation-impostor.mjs (base-color + normal + depth)." }
     ]
   },
   "ecology": {

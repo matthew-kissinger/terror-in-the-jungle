@@ -1,0 +1,62 @@
+{
+  "id": "rubber-b",
+  "commonName": "Rubber tree (tall whippy bole)",
+  "species": "Hevea brasiliensis (stylized)",
+  "tags": ["tree", "canopy", "hardwood", "rubber", "plantation", "eztree", "procedural"],
+  "status": "ready",
+  "provenance": {
+    "source": "EZ-Tree",
+    "author": "Daniel Greenheck (dgreenheck)",
+    "url": "https://github.com/dgreenheck/ez-tree",
+    "license": "MIT",
+    "attributionRequired": false,
+    "sourceTris": 8962,
+    "notes": "Generated headless with @dgreenheck/ez-tree@1.1.0 (Oak Large base, seed 80614; tallest, slimmest bole with slight droop, smallest crown). Native EZ-Tree oak bark + oak leaf textures bound (NOT FAL); leaf is alphaClip. Scaled to ~19m, ground-center pivot. EZ-Tree is MIT; credited in THIRD-PARTY-ASSETS.md as courtesy."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [
+    {
+      "id": "bark",
+      "blend": "opaque",
+      "maps": {
+        "baseColor": "textures/eztree-bark-oak_basecolor.webp",
+        "normal": "textures/eztree-bark-oak_normal.webp",
+        "roughness": "textures/eztree-bark-oak_roughness.webp"
+      },
+      "factors": { "roughness": 1, "metalness": 0 }
+    },
+    {
+      "id": "leaf",
+      "blend": "alphaClip",
+      "maps": { "baseColor": "textures/eztree-leaf-oak_basecolor.webp" },
+      "factors": { "roughness": 0.85, "metalness": 0, "alphaCutoff": 0.5 }
+    }
+  ],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-rubber-b",
+      "role": "hero",
+      "path": "rubber-b/rubber-b.glb",
+      "tris": 8962,
+      "materialBuckets": ["bark", "leaf"],
+      "bounds": { "center": [0, 9.5, 0], "size": [18.45, 19, 17.89], "radius": 15.98 },
+      "budget": { "trisPerInstance": 8962, "drawCallsPerBatch": 2, "textureMb": 0.7 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+octa-far",
+    "rationale": "Procedural plantation hardwood, the tallest/slimmest of the rubber pair; shared EZ-Tree bark/leaf buckets. Near mesh (<9k tris) under ~150m, then a planned octahedral impostor (not yet baked).",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 150, "representationId": "mesh-rubber-b", "budget": { "trisPerInstance": 8962, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 150, "maxDistanceMeters": null, "representationId": null, "plannedKind": "octaImpostor", "notes": "Bake an 8x3 octahedral impostor from the normalized rubber-b mesh." }
+    ]
+  },
+  "ecology": {
+    "tier": "canopy",
+    "preferredBiomes": ["plantation", "trailEdge", "denseJungle"],
+    "density": 0.09,
+    "slopeRangeDeg": [0, 18],
+    "cluster": { "min": 2, "max": 5, "radiusMeters": 12 }
+  }
+}

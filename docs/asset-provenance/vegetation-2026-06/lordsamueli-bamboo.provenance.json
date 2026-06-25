@@ -1,11 +1,13 @@
 {
   "slug": "lordsamueli-bamboo",
-  "provider": "LordSamueliSolo (Sketchfab)",
+  "provider": "Sketchfab (free bamboo set)",
   "sourceUrl": "https://sketchfab.com/search?q=bamboo&type=models",
-  "license": "CC-BY",
-  "sourceTriangles": null,
-  "status": "pending-download",
-  "localPath": "public/assets/vegetation/source/lordsamueli-bamboo/",
+  "license": "CC-BY-4.0",
+  "sourceTriangles": 37834,
+  "status": "normalized",
+  "localPath": "public/assets/vegetation/source/bamboo-set/free_bamboo_set.glb",
+  "normalizedPath": "public/assets/vegetation/bamboo-grove/bamboo-grove.glb",
   "attributionRequired": true,
-  "notes": "Tier 3 #11 — search 'bamboo' CC-BY on Sketchfab; ships alpha leaf PNGs. bambooGrove alt (M02P bamboo is primary). Capture exact author handle + model URL + license version on download."
+  "author": "verify",
+  "notes": "Tier 3 #11 — staged 'free_bamboo_set.glb' (30 culms, 37834 tris). Normalized 2026-06-25 (step 2): extracted a representative 3-culm clump (bambooBlock 008/011/009 = 9162 tris), re-clustered tight, uniform 0.34 scale to a realistic ~14.3m height, ground-center pivot, 12 textures webp-compressed (5.12MB -> 2.0MB). Descriptor: packages/vegetation-library/catalog/bamboo-grove.json (status:ready). Author handle still to be confirmed from the staged set's metadata."
 }

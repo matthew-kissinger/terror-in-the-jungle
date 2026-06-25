@@ -1,0 +1,45 @@
+{
+  "id": "rice-paddy",
+  "commonName": "Rice paddy plant",
+  "species": "Oryza sativa",
+  "tags": ["groundcover", "rice", "paddy", "riverbank", "vertex-colored"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "verify",
+    "url": "https://sketchfab.com/search?q=rice+plant&type=models",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 3876,
+    "notes": "Single rice plant, vertex-colored (2 materials, 0 textures) so webp compression is skipped. Pivot-only normalization to ground-center (~2.44m tall). Author handle pending verification on the staged model; credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-rice",
+      "role": "instanced",
+      "path": "rice-paddy/rice-paddy.glb",
+      "tris": 3876,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 1.22, 0], "size": [1.393, 2.441, 1.099], "radius": 1.509 },
+      "budget": { "trisPerInstance": 3876, "drawCallsPerBatch": 2, "textureMb": 0 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+card-far",
+    "rationale": "A rice plant is dense thin blades — vertex-colored, no textures. Up close it reads as real 3D fronds (cheap mesh), but past ~25m it is indistinguishable from a flat clump, so the far band is a planned ground card, not an impostor. Mirrors the elephant-grass strategy: ground cover never warrants an octahedral impostor and culls before any far horizon band.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 25, "representationId": "mesh-rice", "budget": { "trisPerInstance": 3876, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 25, "maxDistanceMeters": 50, "representationId": null, "plannedKind": "groundCard", "notes": "Bake a single front-view vertex-color-baked alpha ground card from the normalized rice mesh; fades out by 50m." }
+    ]
+  },
+  "ecology": {
+    "tier": "groundCover",
+    "preferredBiomes": ["riverbank", "paddy", "clearingEdge"],
+    "density": 0.7,
+    "slopeRangeDeg": [0, 8],
+    "cluster": { "min": 8, "max": 32, "radiusMeters": 5 }
+  }
+}
