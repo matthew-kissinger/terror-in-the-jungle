@@ -1,0 +1,14 @@
+{
+  "slug": "ambientcg-foliage001",
+  "displayName": "ambientCG Foliage001",
+  "provider": "ambientCG",
+  "author": null,
+  "sourceUrl": "https://ambientcg.com/view?id=Foliage001",
+  "license": "CC0-1.0",
+  "attributionRequired": false,
+  "resolution": "2K-PNG",
+  "acquiredAt": "2026-06-25",
+  "stagedPath": "public/assets/vegetation/source/ambientcg-foliage001",
+  "intendedSpecies": "liana-vines / general foliage cards",
+  "notes": "CC0 foliage atlas with Opacity (alpha) map - usable as alpha card source for vines/understory fill. Auto-downloaded via ambientCG zip API + extracted."
+}
