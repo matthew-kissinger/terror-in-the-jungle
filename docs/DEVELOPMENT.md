@@ -34,12 +34,11 @@ Renderer backend is chosen by `src/core/RendererBackend.ts`
   `WebGLNodesHandler` shim so TSL node materials still resolve. Pre-KONVEYER
   parity check, not the production path.
 
-TIJ currently consumes local `file:` packages from the sibling workspace
-`../game-field-kits`. For a fresh checkout or after moving that sibling repo,
-run `npm ci` and `npm run build --workspaces --if-present` in
-`../game-field-kits` before trusting TIJ validation. CI and deploy perform the
-same bootstrap through `.github/scripts/checkout-game-field-kits.sh` and
-`.github/scripts/build-game-field-kits.sh`.
+The `@game-field-kits/*` packages are vendored in-repo as npm workspaces under
+`packages/*` (folded back from the former sibling repo on 2026-06-25). They are
+consumed directly from TypeScript source — no separate build step, no external
+clone. A plain `npm ci` at the repo root links them; CI and deploy need nothing
+extra. (History/archive: `matthew-kissinger/game-field-kits`.)
 
 If `npm ls` reports invalid dependency versions after a dependency bump landed,
 reset the workspace with `npm ci`. Do not assume an existing `node_modules/`

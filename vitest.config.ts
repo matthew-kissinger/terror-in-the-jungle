@@ -6,6 +6,7 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/**/*.{test,spec}.ts',
+      'packages/*/src/**/*.{test,spec}.ts',
       'scripts/*.{test,spec}.ts',
       'scripts/perf-harness/**/*.{test,spec}.{js,ts}',
       'docs/**/*.{test,spec}.ts',
