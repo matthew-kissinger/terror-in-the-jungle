@@ -1,0 +1,33 @@
+{
+  "id": "fern",
+  "commonName": "Tropical fern",
+  "tags": ["groundcover", "fern", "understory"],
+  "status": "sourceStaged",
+  "provenance": {
+    "source": "Poly Haven",
+    "author": null,
+    "url": "https://polyhaven.com/a/fern_02",
+    "license": "CC0-1.0",
+    "attributionRequired": false,
+    "sourceTris": null,
+    "notes": "fern_02 2K GLB staged under source/polyhaven-fern-02 (diff/nor/arm). Real LOD0 mesh near; flattens to a card past a few metres."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [],
+  "lod": {
+    "label": "mesh-near+card-far",
+    "rationale": "An understory fern reads as real 3D fronds up close (cheap mesh, a few hundred tris) but is indistinguishable from a single alpha card past ~12m, so the far band is a ground card — no impostor needed.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 12, "representationId": null, "plannedKind": "mesh", "notes": "Normalize fern_02 GLB (axis/pivot/scale) + weld; target <800 tris." },
+      { "minDistanceMeters": 12, "maxDistanceMeters": 40, "representationId": null, "plannedKind": "groundCard", "notes": "Bake a single front-view alpha card from the normalized mesh." }
+    ]
+  },
+  "ecology": {
+    "tier": "groundCover",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.6,
+    "slopeRangeDeg": [0, 28],
+    "cluster": { "min": 3, "max": 10, "radiusMeters": 3 }
+  }
+}
