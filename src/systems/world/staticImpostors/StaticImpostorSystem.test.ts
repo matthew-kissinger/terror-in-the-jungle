@@ -9,7 +9,10 @@ import {
   type LoadedStaticImpostorAtlas,
   type StaticImpostorTextureProvider,
 } from './StaticImpostorSystem';
-import type { StaticImpostorNodeMaterial } from './StaticImpostorMaterial';
+import {
+  STATIC_IMPOSTOR_FOLIAGE_EXPOSURE,
+  type StaticImpostorNodeMaterial,
+} from './StaticImpostorMaterial';
 import type { StaticImpostorArchetype } from '../../../config/staticImpostorArchetypes';
 import { Logger } from '../../../utils/Logger';
 import { LightingRigConfig } from '../../environment/LightingRig';
@@ -287,6 +290,31 @@ describe('StaticImpostorSystem', () => {
     } finally {
       LightingRigConfig.enabled = previousRigState;
     }
+  });
+
+  it('applies explicit material tuning only when provided by the caller', async () => {
+    const provider = makeProvider();
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      materialTuning: {
+        fogStrength: 0.62,
+        foliageExposureScale: 0.9,
+      },
+    });
+    const object = makeStaticObject(new THREE.Vector3(220, 0, 0));
+    scene.add(object);
+
+    system.registerInstance({ id: 'review_tuned_static', modelPath: StructureModels.FUEL_DRUM, object });
+    await flushPromises();
+    system.update(0.016);
+
+    const material = getBatchMaterial(scene);
+    expect(material.uniforms.fogStrength.value).toBeCloseTo(0.62);
+    expect(material.uniforms.foliageExposure.value).toBeCloseTo(STATIC_IMPOSTOR_FOLIAGE_EXPOSURE * 0.9);
+    expect(system.getDebugInfo().batches['fuel-drum']).toEqual(expect.objectContaining({
+      fogStrength: 0.62,
+      foliageExposure: material.uniforms.foliageExposure.value,
+    }));
   });
 
   it('ignores model paths that have not been assigned offline atlases', () => {

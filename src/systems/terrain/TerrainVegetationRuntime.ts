@@ -15,6 +15,7 @@ import {
   StaticImpostorSystem,
   type StaticImpostorDebugInfo,
 } from '../world/staticImpostors/StaticImpostorSystem';
+import type { StaticImpostorMaterialTuning } from '../world/staticImpostors/StaticImpostorMaterial';
 import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 import { getHeightQueryCache } from './HeightQueryCache';
 import { GLBHeroScatterer, type GLBHeroScattererDebugInfo } from './GLBHeroScatterer';
@@ -88,6 +89,31 @@ function groundCardsEnabled(): boolean {
     return new URLSearchParams(window.location.search).get('vegGroundCards') !== '0';
   } catch {
     return true;
+  }
+}
+
+function readFiniteQueryNumber(params: URLSearchParams, name: string, min: number, max: number): number | undefined {
+  const raw = params.get(name);
+  if (raw === null || raw.trim().length === 0) return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return undefined;
+  return Math.min(max, Math.max(min, value));
+}
+
+function vegetationImpostorReviewTuning(): StaticImpostorMaterialTuning | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fogStrength = readFiniteQueryNumber(params, 'vegImpostorFogStrength', 0, 1.5);
+    const foliageExposureScale = readFiniteQueryNumber(params, 'vegImpostorExposureScale', 0, 2);
+    if (fogStrength === undefined && foliageExposureScale === undefined) return undefined;
+    if (fogStrength !== undefined && foliageExposureScale !== undefined) {
+      return { fogStrength, foliageExposureScale };
+    }
+    if (fogStrength !== undefined) return { fogStrength };
+    return { foliageExposureScale };
+  } catch {
+    return undefined;
   }
 }
 
@@ -175,6 +201,7 @@ export class TerrainVegetationRuntime {
       archetypes: heroArchetypesByModelPath,
       batchCapacity: VEGETATION_HERO_IMPOSTOR_BATCH_CAPACITY,
       debugSource: 'vegetation',
+      materialTuning: vegetationImpostorReviewTuning(),
     });
     this.glbHeroScatterer = new GLBHeroScatterer(
       {

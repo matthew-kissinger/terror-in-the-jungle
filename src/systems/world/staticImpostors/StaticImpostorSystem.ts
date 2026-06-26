@@ -10,6 +10,7 @@ import { Logger } from '../../../utils/Logger';
 import { isLightingRigEnabled, lightingRigBindings } from '../../environment/LightingRig';
 import {
   createStaticImpostorNodeMaterial,
+  type StaticImpostorMaterialTuning,
   type StaticImpostorMaterialTextures,
   type StaticImpostorNodeMaterial,
 } from './StaticImpostorMaterial';
@@ -85,6 +86,8 @@ export interface StaticImpostorDebugInfo {
     lightingProfile: StaticImpostorArchetype['lightingProfile'] | 'surface-normal';
     promotionDistanceMeters: number;
     demotionDistanceMeters: number;
+    fogStrength: number;
+    foliageExposure: number;
   }>;
 }
 
@@ -109,6 +112,11 @@ export interface StaticImpostorSystemOptions {
    * without splitting the material implementation.
    */
   debugSource?: string;
+  /**
+   * Optional visual-review tuning for the material graph. Production callers
+   * omit this so default impostor lighting/fog remains the shipped path.
+   */
+  materialTuning?: StaticImpostorMaterialTuning;
 }
 
 class ThreeStaticImpostorTextureProvider implements StaticImpostorTextureProvider {
@@ -160,6 +168,7 @@ class StaticImpostorBatch {
     atlas: LoadedStaticImpostorAtlas,
     private readonly capacity: number,
     private readonly source: string,
+    materialTuning?: StaticImpostorMaterialTuning,
   ) {
     const plane = new THREE.PlaneGeometry(1, 1);
     this.geometry = new THREE.InstancedBufferGeometry();
@@ -192,6 +201,7 @@ class StaticImpostorBatch {
       this.positionAttribute,
       this.scaleAttribute,
       this.yawAttribute,
+      materialTuning,
     );
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.name = `StaticImpostorBatch_${archetype.slug}`;
@@ -321,6 +331,8 @@ class StaticImpostorBatch {
       lightingProfile: this.archetype.lightingProfile ?? 'surface-normal',
       promotionDistanceMeters: this.archetype.promotionDistanceMeters,
       demotionDistanceMeters: this.archetype.demotionDistanceMeters,
+      fogStrength: this.material.uniforms.fogStrength.value,
+      foliageExposure: this.material.uniforms.foliageExposure.value,
     };
   }
 
@@ -364,6 +376,7 @@ export class StaticImpostorSystem {
   private readonly atlasRecords = new Map<string, StaticImpostorAtlasRecord>();
   private readonly batches = new Map<string, StaticImpostorBatch>();
   private readonly debugSource: string;
+  private readonly materialTuning: StaticImpostorMaterialTuning | undefined;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -374,6 +387,7 @@ export class StaticImpostorSystem {
     this.batchCapacity = options.batchCapacity ?? DEFAULT_BATCH_CAPACITY;
     this.archetypeOverrides = options.archetypes ?? {};
     this.debugSource = options.debugSource ?? 'world';
+    this.materialTuning = options.materialTuning;
   }
 
   private resolveArchetype(modelPath: string): StaticImpostorArchetype | undefined {
@@ -556,6 +570,7 @@ export class StaticImpostorSystem {
         record.atlas,
         this.batchCapacity,
         this.debugSource,
+        this.materialTuning,
       );
       this.batches.set(instance.archetype.slug, batch);
     }

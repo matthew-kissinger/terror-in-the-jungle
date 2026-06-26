@@ -197,7 +197,7 @@ async function captureReview(
   if (state.previewMeshCount <= 0) reasons.push('far representation rendered no meshes');
 
   const expectedColumns = entry.kind === 'octaImpostor'
-    ? ['source', 'surface-normal', 'foliage-card']
+    ? ['source', 'surface-normal', 'foliage-card', 'foliage-card-soft-fog']
     : ['source', 'ground-card'];
   for (const expected of expectedColumns) {
     if (!state.columns.includes(expected)) reasons.push(`missing column ${expected}`);

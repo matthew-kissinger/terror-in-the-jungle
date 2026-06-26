@@ -42,7 +42,7 @@ import { Logger } from '../../utils/Logger';
 
 type LoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
 type ReviewStage = 'daylight' | 'low-sun' | 'humid-fog';
-type ReviewColumn = 'source' | 'surface-normal' | 'foliage-card' | 'ground-card';
+type ReviewColumn = 'source' | 'surface-normal' | 'foliage-card' | 'foliage-card-soft-fog' | 'ground-card';
 
 interface ReviewLightingPreset {
   readonly label: string;
@@ -122,11 +122,14 @@ const COLUMN_LABELS: Record<ReviewColumn, string> = {
   source: 'source GLB',
   'surface-normal': 'old surface-normal impostor',
   'foliage-card': 'current foliage-card impostor',
+  'foliage-card-soft-fog': 'review reduced-fog/exposure impostor',
   'ground-card': 'current ground card',
 };
 
 const STAGES = Object.keys(PRESETS) as ReviewStage[];
 const HUMAN_REFERENCE_HEIGHT = 1.8;
+const REDUCED_FOG_REVIEW_STRENGTH = 0.62;
+const REDUCED_FOG_REVIEW_EXPOSURE_SCALE = 0.86;
 
 export class VegetationLodReviewApp {
   private readonly scene = new THREE.Scene();
@@ -239,14 +242,18 @@ export class VegetationLodReviewApp {
         return;
       }
       this.currentSource = source;
-      this.prepareSourceModel(source, -spacing);
-      this.sourceRoot.add(source);
-      this.columns.push('source');
 
       if (entry.kind === 'octaImpostor' && entry.staticArchetype) {
-        await this.addStaticImpostorPreview(entry.staticArchetype, 0, 'surface-normal');
-        await this.addStaticImpostorPreview(entry.staticArchetype, spacing, 'foliage-card');
+        this.prepareSourceModel(source, -spacing * 1.5);
+        this.sourceRoot.add(source);
+        this.columns.push('source');
+        await this.addStaticImpostorPreview(entry.staticArchetype, -spacing * 0.5, 'surface-normal');
+        await this.addStaticImpostorPreview(entry.staticArchetype, spacing * 0.5, 'foliage-card');
+        await this.addStaticImpostorPreview(entry.staticArchetype, spacing * 1.5, 'foliage-card-soft-fog');
       } else if (entry.kind === 'groundCard' && entry.groundCard) {
+        this.prepareSourceModel(source, -spacing);
+        this.sourceRoot.add(source);
+        this.columns.push('source');
         await this.addGroundCardPreview(entry.groundCard, 0);
       }
 
@@ -372,7 +379,7 @@ export class VegetationLodReviewApp {
   private async addStaticImpostorPreview(
     archetype: StaticImpostorArchetype,
     x: number,
-    column: Extract<ReviewColumn, 'surface-normal' | 'foliage-card'>,
+    column: Extract<ReviewColumn, 'surface-normal' | 'foliage-card' | 'foliage-card-soft-fog'>,
   ): Promise<void> {
     const textures = await this.loadStaticTextures(archetype);
     const geometry = buildInstancedPlaneGeometry();
@@ -393,7 +400,7 @@ export class VegetationLodReviewApp {
 
     const reviewArchetype: StaticImpostorArchetype = {
       ...archetype,
-      lightingProfile: column === 'foliage-card' ? 'foliage-card' : 'surface-normal',
+      lightingProfile: column === 'surface-normal' ? 'surface-normal' : 'foliage-card',
     };
     const material = createStaticImpostorNodeMaterial(
       reviewArchetype,
@@ -403,6 +410,7 @@ export class VegetationLodReviewApp {
       yawAttribute,
     );
     this.applyFogUniforms(material);
+    this.applyReviewTuning(material, column);
     this.staticMaterials.push(material);
     this.ownedMaterials.push(material);
 
@@ -489,7 +497,7 @@ export class VegetationLodReviewApp {
     const size = entry.staticArchetype?.bounds.size ?? entry.groundCard?.bounds.size ?? [3, 3, 3];
     this.boundsSize.set(size[0], size[1], size[2]);
     const height = Math.max(this.boundsSize.y, 1);
-    const span = entry.kind === 'octaImpostor' ? spacing * 2 : spacing;
+    const span = entry.kind === 'octaImpostor' ? spacing * 3 : spacing;
     const radius = Math.max(span * 0.8, height * 1.8, 6);
     this.controls.target.set(0, height * 0.48, 0);
     // Keep the comparison columns nearly equidistant from the camera so fog
@@ -520,6 +528,18 @@ export class VegetationLodReviewApp {
     material.uniforms.fogEnabled.value = true;
     material.uniforms.fogColor.value.copy(toColor(preset.fogColor));
     material.uniforms.fogDensity.value = preset.fogDensity;
+  }
+
+  private applyReviewTuning(
+    material: StaticImpostorNodeMaterial,
+    column: Extract<ReviewColumn, 'surface-normal' | 'foliage-card' | 'foliage-card-soft-fog'>,
+  ): void {
+    if (column !== 'foliage-card-soft-fog') {
+      material.uniforms.fogStrength.value = 1;
+      return;
+    }
+    material.uniforms.fogStrength.value = REDUCED_FOG_REVIEW_STRENGTH;
+    material.uniforms.foliageExposure.value *= REDUCED_FOG_REVIEW_EXPOSURE_SCALE;
   }
 
   private step(_deltaSeconds: number): void {

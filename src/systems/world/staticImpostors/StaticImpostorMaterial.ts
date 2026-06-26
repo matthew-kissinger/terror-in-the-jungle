@@ -57,6 +57,8 @@ interface StaticImpostorMaterialUniforms {
   fogHeightFalloff: StaticImpostorMaterialUniform<number>;
   fogStartDistance: StaticImpostorMaterialUniform<number>;
   fogEnabled: StaticImpostorMaterialUniform<boolean>;
+  fogStrength: StaticImpostorMaterialUniform<number>;
+  foliageExposure: StaticImpostorMaterialUniform<number>;
 }
 
 export type StaticImpostorNodeMaterial = MeshBasicNodeMaterial & {
@@ -68,6 +70,11 @@ export interface StaticImpostorMaterialTextures {
   baseColorMap: THREE.Texture;
   normalMap: THREE.Texture;
   depthMap: THREE.Texture;
+}
+
+export interface StaticImpostorMaterialTuning {
+  readonly fogStrength?: number;
+  readonly foliageExposureScale?: number;
 }
 
 type TslNode = any;
@@ -83,7 +90,7 @@ const STATIC_IMPOSTOR_TILE_UV_MARGIN_PIXELS = 1.5;
 // Hero-tree impostor atlases are baked from full GLBs and read brighter than
 // the legacy hand-authored billboard sheets. Keep the shared foliage tint and
 // rig response, but trim the static hero exposure so LOD snaps do not bloom pale.
-const STATIC_IMPOSTOR_FOLIAGE_EXPOSURE = HUMID_JUNGLE_VEGETATION_EXPOSURE * 0.68;
+export const STATIC_IMPOSTOR_FOLIAGE_EXPOSURE = HUMID_JUNGLE_VEGETATION_EXPOSURE * 0.68;
 
 const tslFloat = (value: number): TslNode => float(value) as TslNode;
 const tslVec2 = (...args: TslNode[]): TslNode => (vec2 as (...values: TslNode[]) => TslNode)(...args);
@@ -99,16 +106,24 @@ const tslInstancedBufferAttribute = (
   type: string,
 ): TslNode => instancedBufferAttribute(attribute, type) as TslNode;
 
+const clampFinite = (value: number | undefined, fallback: number, min: number, max: number): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+};
+
 export function createStaticImpostorNodeMaterial(
   archetype: StaticImpostorArchetype,
   textures: StaticImpostorMaterialTextures,
   positionAttribute: THREE.InstancedBufferAttribute,
   scaleAttribute: THREE.InstancedBufferAttribute,
   yawAttribute: THREE.InstancedBufferAttribute,
+  tuning: StaticImpostorMaterialTuning = {},
 ): StaticImpostorNodeMaterial {
   configureStaticImpostorTexture(textures.baseColorMap, THREE.SRGBColorSpace);
   configureStaticImpostorTexture(textures.normalMap, THREE.NoColorSpace);
   configureStaticImpostorTexture(textures.depthMap, THREE.NoColorSpace);
+  const foliageExposureScale = clampFinite(tuning.foliageExposureScale, 1, 0, 2);
 
   const uniforms: StaticImpostorMaterialUniforms = {
     baseColorMap: { value: textures.baseColorMap },
@@ -123,6 +138,8 @@ export function createStaticImpostorNodeMaterial(
     fogHeightFalloff: { value: STATIC_IMPOSTOR_FOG_HEIGHT_FALLOFF },
     fogStartDistance: { value: STATIC_IMPOSTOR_FOG_START_DISTANCE },
     fogEnabled: { value: false },
+    fogStrength: { value: clampFinite(tuning.fogStrength, 1, 0, 1.5) },
+    foliageExposure: { value: STATIC_IMPOSTOR_FOLIAGE_EXPOSURE * foliageExposureScale },
   };
 
   const material = new MeshBasicNodeMaterial({
@@ -179,7 +196,7 @@ export function createStaticImpostorNodeMaterial(
   const cameraDistance = length(cameraPosition.sub(instancePosition));
   const worldY = instancePosition.y.add(positionGeometry.y.mul(instanceScale.y));
   const exposure = archetype.lightingProfile === 'foliage-card'
-    ? tslFloat(STATIC_IMPOSTOR_FOLIAGE_EXPOSURE)
+    ? tslReference('float', uniforms.foliageExposure)
     : tslFloat(1);
   const foggedColor = createStaticImpostorFogNode(
     litColor.mul(exposure),
@@ -363,9 +380,11 @@ function createStaticImpostorFogNode(
   const fogDensity = tslReference('float', uniforms.fogDensity);
   const fogHeightFalloff = tslReference('float', uniforms.fogHeightFalloff);
   const fogStartDistance = tslReference('float', uniforms.fogStartDistance);
+  const fogStrength = tslReference('float', uniforms.fogStrength);
   const heightFactor = exp(fogHeightFalloff.negate().mul(tslMax(tslFloat(0), worldY)));
   const effectiveDistance = tslMax(tslFloat(0), cameraDistance.sub(fogStartDistance));
   const distanceFactor = tslFloat(1).sub(exp(fogDensity.negate().mul(effectiveDistance)));
   const fogFactor = tslClamp(heightFactor.mul(distanceFactor), tslFloat(0), tslFloat(1));
-  return tslSelect(fogEnabled, tslMix(baseColor, fogColor, fogFactor.mul(alpha)), baseColor) as TslNode;
+  const weightedFogFactor = tslClamp(fogFactor.mul(fogStrength), tslFloat(0), tslFloat(1));
+  return tslSelect(fogEnabled, tslMix(baseColor, fogColor, weightedFogFactor.mul(alpha)), baseColor) as TslNode;
 }

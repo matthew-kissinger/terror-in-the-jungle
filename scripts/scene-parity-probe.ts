@@ -141,6 +141,8 @@ interface ProbeReport {
     headed: boolean;
     port: number;
     forceBuild: boolean;
+    vegetationImpostorFogStrength: number | null;
+    vegetationImpostorExposureScale: number | null;
   };
   files: {
     summary: string;
@@ -181,6 +183,20 @@ function parseNumberFlag(name: string, fallback: number): number {
   const raw = parseStringFlag(name, String(fallback));
   const parsed = Number(raw);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseOptionalNumberFlag(name: string, min: number, max: number): number | null {
+  const eqArg = process.argv.find(arg => arg.startsWith(`--${name}=`));
+  const idx = process.argv.indexOf(`--${name}`);
+  const raw = eqArg
+    ? eqArg.split('=')[1]
+    : idx >= 0 && idx + 1 < process.argv.length
+      ? process.argv[idx + 1]
+      : null;
+  if (raw === null) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 function hasFlag(name: string): boolean {
@@ -770,11 +786,14 @@ async function capturePose(page: Page, modeDir: string, kind: ProbePoseKind): Pr
   await page.waitForTimeout(kind === 'finite-edge' ? 900 : 650);
   const screenshotPath = join(modeDir, `${kind}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: false });
-  const [renderSubmissions, sceneAttribution, metrics] = await Promise.all([
+  const [renderSubmissions, sceneAttributionRaw, metrics] = await Promise.all([
     page.evaluate(() => (window as any).__projekt143RenderSubmissionAttribution?.drain?.() ?? null),
     page.evaluate(PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE),
     imageMetrics(screenshotPath),
   ]);
+  const sceneAttribution = Array.isArray(sceneAttributionRaw)
+    ? sceneAttributionRaw as Record<string, unknown>[]
+    : null;
   return {
     kind,
     screenshot: relative(process.cwd(), screenshotPath),
@@ -820,10 +839,29 @@ function topCategoriesForFrame(frame: Record<string, unknown> | null | undefined
     : [];
 }
 
-async function runModeProbe(page: Page, artifactDir: string, mode: string, renderer: string): Promise<ModeProbe> {
+async function runModeProbe(
+  page: Page,
+  artifactDir: string,
+  mode: string,
+  renderer: string,
+  vegetationImpostorFogStrength: number | null,
+  vegetationImpostorExposureScale: number | null,
+): Promise<ModeProbe> {
   const modeDir = join(artifactDir, mode);
   mkdirSync(modeDir, { recursive: true });
-  const url = `http://${HOST}:${parseNumberFlag('port', DEFAULT_PORT)}/?perf=1&diag=1&renderer=${encodeURIComponent(renderer)}&logLevel=warn`;
+  const params = new URLSearchParams({
+    perf: '1',
+    diag: '1',
+    renderer,
+    logLevel: 'warn',
+  });
+  if (vegetationImpostorFogStrength !== null) {
+    params.set('vegImpostorFogStrength', String(vegetationImpostorFogStrength));
+  }
+  if (vegetationImpostorExposureScale !== null) {
+    params.set('vegImpostorExposureScale', String(vegetationImpostorExposureScale));
+  }
+  const url = `http://${HOST}:${parseNumberFlag('port', DEFAULT_PORT)}/?${params.toString()}`;
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on('console', msg => {
@@ -950,6 +988,11 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
           name: probe.name,
           category: probe.category,
           staticImpostor: probe.staticImpostor,
+          uniforms: {
+            fogStrength: probe.uniforms.fogStrength ?? null,
+            foliageExposure: probe.uniforms.foliageExposure ?? null,
+            fogDensity: probe.uniforms.fogDensity ?? null,
+          },
           textureMetrics: probe.textureMetrics,
         })),
     },
@@ -1106,6 +1149,7 @@ function renderMarkdown(report: ProbeReport): string {
     `Created: ${report.createdAt}`,
     `Status: ${report.status}`,
     `Renderer: ${report.options.renderer}`,
+    `Vegetation impostor candidate: fogStrength=${report.options.vegetationImpostorFogStrength ?? 'default'} exposureScale=${report.options.vegetationImpostorExposureScale ?? 'default'}`,
     `Git SHA: ${report.sourceGitSha}`,
     '',
     '## Decisions',
@@ -1154,7 +1198,7 @@ function renderMarkdown(report: ProbeReport): string {
 
 async function main(): Promise<void> {
   if (hasFlag('help')) {
-    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed');
+    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed [--veg-impostor-fog-strength 0.62] [--veg-impostor-exposure-scale 0.95]');
     return;
   }
   const modes = normalizeModes(parseStringFlag('modes', 'open_frontier,zone_control'));
@@ -1163,6 +1207,8 @@ async function main(): Promise<void> {
   const headed = hasFlag('headed');
   const port = parseNumberFlag('port', DEFAULT_PORT);
   const forceBuild = hasFlag('force-build');
+  const vegetationImpostorFogStrength = parseOptionalNumberFlag('veg-impostor-fog-strength', 0, 1.5);
+  const vegetationImpostorExposureScale = parseOptionalNumberFlag('veg-impostor-exposure-scale', 0, 2);
   if (!forceBuild && !existsSync(join(process.cwd(), 'dist-perf', 'index.html'))) {
     throw new Error('dist-perf/index.html not found. Run `npm run build:perf` or pass --force-build.');
   }
@@ -1199,7 +1245,14 @@ async function main(): Promise<void> {
     for (const mode of modes) {
       const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
       try {
-        modeReports.push(await runModeProbe(page, artifactDir, mode, renderer));
+        modeReports.push(await runModeProbe(
+          page,
+          artifactDir,
+          mode,
+          renderer,
+          vegetationImpostorFogStrength,
+          vegetationImpostorExposureScale,
+        ));
       } catch (error) {
         modeReports.push({
           mode,
@@ -1234,7 +1287,15 @@ async function main(): Promise<void> {
         .filter(Boolean),
       source: 'scripts/scene-parity-probe.ts',
       status: aggregateStatus(modeReports),
-      options: { modes, renderer, headed, port, forceBuild },
+      options: {
+        modes,
+        renderer,
+        headed,
+        port,
+        forceBuild,
+        vegetationImpostorFogStrength,
+        vegetationImpostorExposureScale,
+      },
       files: {
         summary: relative(process.cwd(), summaryPath),
         markdown: relative(process.cwd(), markdownPath),

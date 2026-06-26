@@ -35,7 +35,14 @@ The route renders:
 - source GLB
 - old surface-normal impostor comparison, for octahedral hero assets
 - current foliage-card impostor candidate, for octahedral hero assets
+- review-only reduced-fog/exposure foliage-card candidate, for octahedral hero
+  assets
 - current ground-card candidate, for dense cover assets
+
+The reduced-fog column uses the same atlas, lighting profile, and source GLB as
+the current runtime path. Only the custom static-impostor material's
+`fogStrength` and `foliageExposure` uniforms are reduced for review comparison;
+normal launches keep the default shipped values.
 
 ## Proof Commands
 
@@ -43,6 +50,7 @@ The route renders:
 npm run assets:bleed-vegetation-atlases -- --check
 npm run check:vegetation-lod-review -- --only jungle-tree,fan-palm,understory-fern --stages daylight,low-sun,humid-fog
 npm run check:vegetation-lod-review
+npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --veg-impostor-fog-strength 0.62 --veg-impostor-exposure-scale 0.86
 ```
 
 Latest useful candidate artifacts:
@@ -93,6 +101,13 @@ Current review risk: the candidate intentionally favors darker, less shiny
 foliage than the rejected path. Some mid-distance bamboo / A Shau focus shots
 can still read pale because they are participating in scene fog; owner review
 decides whether that is acceptable or needs another exposure/fog variant.
+
+Reduced-fog/exposure review path: use the fourth octa-impostor review column and
+the scene-parity `--veg-impostor-fog-strength 0.62
+--veg-impostor-exposure-scale 0.86` flags to compare whether less fog mix and a
+modest exposure trim keep the source silhouette/color closer in humid shots and
+dark live terrain without making daylight/low-sun cards look pasted on. This is
+evidence-generation only, not the accepted shipped default.
 
 Do not deploy this as accepted until the owner confirms the current far
 representation is the chosen path. If rejected, use the review route to compare
