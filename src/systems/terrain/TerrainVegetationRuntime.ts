@@ -32,22 +32,29 @@ export interface TerrainVegetationRuntimeDebugInfo {
 }
 
 /**
- * GLB hero scatter (jungle-tree canopy) is gated OFF by default. The near-field
- * mesh tier currently adds one THREE.Object3D per tree sub-mesh, and at canopy
- * density that pushes three.js's WebGPU per-object uniform buffer past the 64KB
- * binding limit (bindGroup_object 131072 > 65536) — the asset still needs a
- * single-material atlas + an InstancedMesh near tier before it can ship. Enable
- * for local testing via `?vegHeroes=1` or `window.__vegHeroScatter = true`
- * (read once at runtime construction). See docs/rearch/VEGETATION_PHASE_II_*.
+ * GLB canopy hero scatter (jungle-tree + rubber/teak hardwoods) ships ON by default.
+ *
+ * It was previously gated OFF on a MISDIAGNOSIS: a `bindGroup_object 131072 > 65536`
+ * WebGPU error was blamed on per-object uniform pressure from the hero meshes, but
+ * 131072 == 2048*64 was the CDLOD terrain InstancedMesh instance-matrix overflow
+ * (fixed in the r185 terrain repair). A combat120 A/B (heroes off vs on, denseJungle)
+ * then measured the real cost as modest and draw-call-neutral: +~67k tris (+22%),
+ * +0 draws/frame (impostor batching + shared materials hold), +~28MB heap, and 0
+ * console errors under WebGPU. So it ships ON.
+ *
+ * Opt out at runtime with `?vegHeroes=0` or `window.__vegHeroScatter = false`
+ * (read once at construction). No window (SSR / node tests) keeps the path inert.
  */
 function heroScatterEnabled(): boolean {
   if (typeof window === 'undefined') return false;
   const w = window as unknown as { __vegHeroScatter?: boolean };
-  if (w.__vegHeroScatter === true) return true;
+  // Explicit runtime override wins: true forces on, false forces off.
+  if (typeof w.__vegHeroScatter === 'boolean') return w.__vegHeroScatter;
   try {
-    return new URLSearchParams(window.location.search).get('vegHeroes') === '1';
+    // Default ON in a real browser; opt out with ?vegHeroes=0.
+    return new URLSearchParams(window.location.search).get('vegHeroes') !== '0';
   } catch {
-    return false;
+    return true;
   }
 }
 
