@@ -61,24 +61,28 @@ normal launches keep the default shipped values.
 npm run assets:bleed-vegetation-atlases -- --check
 npm run check:vegetation-lod-review -- --only jungle-tree,fan-palm,understory-fern --stages daylight,low-sun,humid-fog
 npm run check:vegetation-lod-review
-npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --veg-impostor-fog-strength 0.62 --veg-impostor-exposure-scale 0.86 --veg-impostor-transition-meters 28
+npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --force-build --veg-impostor-transition-meters 28
 ```
 
 Latest useful candidate artifacts:
 
-- `artifacts/perf/2026-06-26T19-50-19-966Z/scene-parity/scene-parity.md`
-  - dirty-source Open Frontier + A Shau strict-WebGPU focused scene pass after
-    capture-normal transform, fog compression, and source-like direct lighting
-  - Open Frontier static impostor fog is compressed from the rig color to
-    `rgb(0.620, 0.700, 0.740)` before manual card fog mixing
-  - still `warn` only because finite-edge evidence is screenshot-review based
-- `artifacts/vegetation-lod-review/2026-06-26T19-49-13-051Z`
-  - focused bamboo-grove + fan-palm daylight / humid-fog matrix after the same
-    normal, fog, and direct-light candidate changes
-- `artifacts/vegetation-lod-review/2026-06-26T18-12-44-039Z`
-  - clean-head full-catalog matrix for `cfa260aa481b17ae84c8190ac738c8a0ef0fad94`
+- `artifacts/vegetation-lod-review/2026-06-26T20-07-47-999Z`
+  - clean-head full-catalog matrix for `35d8e8913d6cdb2c5dc20a911fa60ed961327794`
   - `summary.json` records `sourceGitStatus: []`
   - 39/39 pass across 13 vegetation assets x daylight / low-sun / humid-fog
+- `artifacts/perf/2026-06-26T20-05-50-152Z/scene-parity/scene-parity.md`
+  - clean-head Open Frontier + A Shau strict-WebGPU focused scene pass for
+    `35d8e8913d6cdb2c5dc20a911fa60ed961327794`
+  - Open Frontier static impostor fog is compressed from the rig color to
+    `rgb(0.620, 0.700, 0.740)` before manual card fog mixing
+  - vegetation focus metrics record Open Frontier `luma=0.213`,
+    `saturation=0.655`, `overexposed=0.000`; A Shau `luma=0.250`,
+    `saturation=0.406`, `overexposed=0.000`
+  - still `warn` only because finite-edge evidence is screenshot-review based
+- `artifacts/vegetation-lod-review/2026-06-26T20-04-15-125Z`
+  - clean-head focused matrix for bamboo-grove, fan-palm, jungle-tree, and
+    understory-fern after the capture-normal, fog, and direct-light candidate
+    changes
 - `scripts/scene-parity-probe.ts`
   - live-scene proof now includes a `vegetation-focus` screenshot in addition to
     ground / elevated / skyward / finite-edge poses
@@ -86,6 +90,12 @@ Latest useful candidate artifacts:
     and records the selected slug, source position, promotion distance, demotion
     distance, transition fade width, active mesh/impostor/crossfade state, luma,
     saturation, and overexposure metrics
+- `artifacts/perf/2026-06-26T19-50-19-966Z/scene-parity/scene-parity.md`
+  - superseded dirty-source Open Frontier + A Shau pass from before the
+    `35d8e891` commit; useful only as provenance for the normal/fog fix
+- `artifacts/vegetation-lod-review/2026-06-26T18-12-44-039Z`
+  - superseded clean-head full-catalog matrix from before the capture-normal and
+    fog-compression follow-up
 - `artifacts/perf/2026-06-26T17-56-45-512Z/scene-parity/scene-parity.md`
   - superseded by the focused-pose probe for final owner review, but useful
     provenance for the first strict-WebGPU live-scene pass
@@ -103,9 +113,9 @@ Latest useful candidate artifacts:
 Owner review should cover both surfaces:
 
 - isolated source-vs-far matrix:
-  `artifacts/vegetation-lod-review/2026-06-26T18-12-44-039Z`
+  `artifacts/vegetation-lod-review/2026-06-26T20-07-47-999Z`
 - live scene focus captures from:
-  `npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley`
+  `artifacts/perf/2026-06-26T20-05-50-152Z/scene-parity/scene-parity.md`
 
 Accept this path only if:
 
@@ -121,9 +131,11 @@ Accept this path only if:
   the crossfade band rather than only proving binary mesh/impostor state
 
 Current review risk: the candidate intentionally favors darker, less shiny
-foliage than the rejected path. Some mid-distance bamboo / A Shau focus shots
-can still read pale because they are participating in scene fog; owner review
-decides whether that is acceptable or needs another exposure/fog variant.
+foliage than the rejected path. Open Frontier still has some pale mid/far tree
+clumps against dark terrain, and A Shau still depends heavily on scene fog and
+terrain exposure. The latest probes show zero overexposed vegetation-focus
+pixels, but owner review decides whether the remaining pale clumps are
+acceptable integration or need another exposure/fog/bake variant.
 
 Reduced-fog/exposure review path: use the fourth octa-impostor review column and
 the scene-parity `--veg-impostor-fog-strength 0.62
