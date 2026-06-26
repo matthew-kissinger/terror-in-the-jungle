@@ -11,7 +11,10 @@ import {
 } from '../../config/vegetation/vegetationLibraryAdapter';
 import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { modelLoader } from '../assets/ModelLoader';
-import { StaticImpostorSystem } from '../world/staticImpostors/StaticImpostorSystem';
+import {
+  StaticImpostorSystem,
+  type StaticImpostorDebugInfo,
+} from '../world/staticImpostors/StaticImpostorSystem';
 import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 import { getHeightQueryCache } from './HeightQueryCache';
 import { GLBHeroScatterer, type GLBHeroScattererDebugInfo } from './GLBHeroScatterer';
@@ -37,6 +40,7 @@ export interface TerrainVegetationRuntimeDebugInfo {
   vegetation: VegetationScattererDebugInfo;
   jungleGroundRing: JungleGroundRingDebugInfo;
   glbHeroes: GLBHeroScattererDebugInfo;
+  heroImpostors: StaticImpostorDebugInfo | null;
   groundCards: GroundCardScattererDebugInfo;
 }
 
@@ -170,6 +174,7 @@ export class TerrainVegetationRuntime {
     this.heroImpostors = new StaticImpostorSystem(scene, camera, {
       archetypes: heroArchetypesByModelPath,
       batchCapacity: VEGETATION_HERO_IMPOSTOR_BATCH_CAPACITY,
+      debugSource: 'vegetation',
     });
     this.glbHeroScatterer = new GLBHeroScatterer(
       {
@@ -278,6 +283,7 @@ export class TerrainVegetationRuntime {
         activeCells: 0, targetCells: 0, pendingAdditions: 0,
         pendingRemovals: 0, registeredInstances: 0, inFlightLoads: 0,
       },
+      heroImpostors: this.heroImpostors?.getDebugInfo() ?? null,
       groundCards: this.groundCardScatterer?.getDebugInfo() ?? {
         activeCells: 0, targetCells: 0, pendingAdditions: 0, pendingRemovals: 0,
         cardBatches: 0, cardInstances: 0, visibleBatches: 0, nearMeshes: 0, inFlightNearLoads: 0,

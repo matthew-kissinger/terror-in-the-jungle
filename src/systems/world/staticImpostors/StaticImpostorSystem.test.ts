@@ -191,6 +191,77 @@ describe('StaticImpostorSystem', () => {
     warnSpy.mockRestore();
   });
 
+  it('labels vegetation-owned batches and reports per-archetype LOD distances', async () => {
+    const provider = makeProvider();
+    const vegetationArchetype: StaticImpostorArchetype = {
+      slug: 'jungle-tree',
+      modelPath: '/assets/vegetation/jungle-tree/jungle-tree.glb',
+      maps: {
+        baseColor: '/assets/vegetation/jungle-tree/impostor/atlas.base-color.png',
+        normal: '/assets/vegetation/jungle-tree/impostor/atlas.normal.png',
+        depth: '/assets/vegetation/jungle-tree/impostor/atlas.depth.png',
+      },
+      atlasSize: [2048, 768],
+      tileSize: [256, 256],
+      columns: 8,
+      rows: 3,
+      azimuthFrames: 8,
+      elevationFrames: 3,
+      maxTextureSize: 2048,
+      planePaddingScale: 1.16,
+      bounds: { center: [0, 1, 0], size: [2, 4, 2], radius: 2.5 },
+      promotionDistanceMeters: 160,
+      demotionDistanceMeters: 136,
+      parallaxStrength: 0.04,
+      lightingProfile: 'foliage-card',
+    };
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      archetypes: { [vegetationArchetype.modelPath]: vegetationArchetype },
+      debugSource: 'vegetation',
+    });
+    const object = makeStaticObject(new THREE.Vector3(220, 0, 0));
+    scene.add(object);
+
+    system.registerInstance({
+      id: 'vegetation_jungle_tree_far',
+      modelPath: vegetationArchetype.modelPath,
+      object,
+    });
+    await flushPromises();
+    system.update(0.016);
+
+    const batch = scene.children.find(
+      (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name === 'StaticImpostorBatch_jungle-tree',
+    );
+    expect(batch?.userData).toEqual(expect.objectContaining({
+      staticImpostorSource: 'vegetation',
+      staticImpostorSlug: 'jungle-tree',
+      staticImpostorLightingProfile: 'foliage-card',
+      staticImpostorPromotionDistanceMeters: 160,
+      staticImpostorDemotionDistanceMeters: 136,
+    }));
+
+    const debug = system.getDebugInfo();
+    expect(debug.source).toBe('vegetation');
+    expect(debug.batches['jungle-tree']).toEqual(expect.objectContaining({
+      source: 'vegetation',
+      lightingProfile: 'foliage-card',
+      promotionDistanceMeters: 160,
+      demotionDistanceMeters: 136,
+      active: 1,
+    }));
+    expect(debug.archetypes['jungle-tree']).toEqual(expect.objectContaining({
+      registeredInstances: 1,
+      activeImpostors: 1,
+      meshFallbacks: 0,
+      promotionDistanceMeters: 160,
+      demotionDistanceMeters: 136,
+      lightingProfile: 'foliage-card',
+    }));
+    expect(debug.archetypes['jungle-tree'].nearestImpostorDistanceMeters).toBeGreaterThan(160);
+  });
+
   it('forwards scene fog into the custom static impostor material and clamps density', async () => {
     const previousRigState = LightingRigConfig.enabled;
     LightingRigConfig.enabled = false;

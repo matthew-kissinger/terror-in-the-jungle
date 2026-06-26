@@ -44,6 +44,13 @@ interface MaterialProbe {
   type: string;
   objectName: string;
   category: string;
+  staticImpostor: {
+    source: string | null;
+    slug: string | null;
+    lightingProfile: string | null;
+    promotionDistanceMeters: number | null;
+    demotionDistanceMeters: number | null;
+  } | null;
   uniforms: Record<string, unknown>;
   textureMetrics: Record<string, unknown>;
 }
@@ -82,6 +89,7 @@ interface PoseMetrics {
     terrainLod: TerrainLodSummary | null;
     horizonRing: Record<string, unknown> | null;
     billboardDebug: Record<string, unknown> | null;
+    vegetationDebug: Record<string, unknown> | null;
   };
   rendererInfo: {
     calls: number | null;
@@ -387,6 +395,24 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
       if (Object.prototype.hasOwnProperty.call(uniforms, 'npcExposure')) return 'npc_imposters';
       return 'unattributed';
     };
+    const staticImpostorFor = (object: any, material: any): MaterialProbe['staticImpostor'] => {
+      if (!material?.isStaticImpostorNodeMaterial && object?.userData?.isStaticImpostorBatch !== true) {
+        return null;
+      }
+      return {
+        source: typeof object?.userData?.staticImpostorSource === 'string' ? object.userData.staticImpostorSource : null,
+        slug: typeof object?.userData?.staticImpostorSlug === 'string' ? object.userData.staticImpostorSlug : null,
+        lightingProfile: typeof object?.userData?.staticImpostorLightingProfile === 'string'
+          ? object.userData.staticImpostorLightingProfile
+          : null,
+        promotionDistanceMeters: Number.isFinite(object?.userData?.staticImpostorPromotionDistanceMeters)
+          ? Number(object.userData.staticImpostorPromotionDistanceMeters)
+          : null,
+        demotionDistanceMeters: Number.isFinite(object?.userData?.staticImpostorDemotionDistanceMeters)
+          ? Number(object.userData.staticImpostorDemotionDistanceMeters)
+          : null,
+      };
+    };
     const seen = new Set<string>();
     const probes: MaterialProbe[] = [];
     scene.traverse((object: any) => {
@@ -394,16 +420,21 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
       for (const material of materialArray(object.material)) {
         if (!material) continue;
         const uniforms = material.uniforms ?? {};
-        const surface = Object.prototype.hasOwnProperty.call(uniforms, 'vegetationExposure')
+        const staticImpostor = staticImpostorFor(object, material);
+        const staticSource = staticImpostor?.source ?? null;
+        const staticLightingProfile = staticImpostor?.lightingProfile ?? null;
+        const surface = staticSource === 'vegetation' || staticLightingProfile === 'foliage-card'
+          ? 'vegetation'
+          : Object.prototype.hasOwnProperty.call(uniforms, 'vegetationExposure')
           ? 'vegetation'
           : Object.prototype.hasOwnProperty.call(uniforms, 'npcExposure')
             ? 'npc'
             : null;
         if (!surface) continue;
-        const key = `${surface}:${material.uuid ?? material.name ?? probes.length}`;
+        const key = `${surface}:${staticImpostor?.slug ?? material.uuid ?? material.name ?? probes.length}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const mapTexture = uniforms.map?.value ?? material.map ?? null;
+        const mapTexture = uniforms.map?.value ?? uniforms.baseColorMap?.value ?? material.map ?? null;
         const normalTexture = uniforms.normalMap?.value ?? material.normalMap ?? null;
         probes.push({
           surface,
@@ -411,6 +442,7 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
           type: String(material.type ?? '(unknown)'),
           objectName: String(object.name ?? '(unnamed)'),
           category: categoryFor(object, material),
+          staticImpostor,
           uniforms: serializeUniforms(uniforms),
           textureMetrics: {
             map: sampleTexture(mapTexture),
@@ -435,6 +467,12 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
     const atmosphere = engine?.systemManager?.atmosphereSystem;
     const billboards = engine?.systemManager?.globalBillboardSystem;
     const threeRenderer = rendererHost?.threeRenderer ?? rendererHost?.renderer ?? rendererHost;
+    const streamingMetrics = typeof terrain?.getStreamingMetrics === 'function'
+      ? terrain.getStreamingMetrics()
+      : null;
+    const vegetationMetric = Array.isArray(streamingMetrics)
+      ? streamingMetrics.find((metric: any) => metric?.name === 'vegetation')
+      : null;
     if (!camera?.clone) throw new Error('camera_unavailable');
     const playableWorldSize = Number(terrain?.getPlayableWorldSize?.() ?? terrain?.getWorldSize?.() ?? NaN);
     const visualMargin = Number(terrain?.getVisualMargin?.() ?? NaN);
@@ -618,6 +656,7 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
         terrainLod: summarizeTerrainLod(),
         horizonRing: terrain?.getHorizonRingDebugInfo?.() ?? null,
         billboardDebug: billboards?.getDebugInfo?.() ?? terrain?.getBillboardDebugInfo?.() ?? null,
+        vegetationDebug: vegetationMetric?.debug ?? null,
       },
       rendererInfo: {
         calls: Number(threeRenderer?.info?.render?.calls ?? null),
@@ -721,6 +760,62 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
 
   const vegetationProbeCount = materialProbes.filter(probe => probe.surface === 'vegetation').length;
   const npcProbeCount = materialProbes.filter(probe => probe.surface === 'npc').length;
+  const vegetationStaticProbeCount = materialProbes.filter(probe =>
+    probe.surface === 'vegetation' && probe.staticImpostor !== null
+  ).length;
+  const vegetationLodEvidence = poses.map(pose => {
+    const debug = pose.poseMetrics.world.vegetationDebug as any;
+    const heroImpostors = debug?.heroImpostors ?? null;
+    const groundCards = debug?.groundCards ?? null;
+    const archetypes = heroImpostors?.archetypes && typeof heroImpostors.archetypes === 'object'
+      ? Object.entries(heroImpostors.archetypes as Record<string, any>).map(([slug, value]) => ({
+          slug,
+          registeredInstances: Number(value?.registeredInstances ?? 0),
+          activeImpostors: Number(value?.activeImpostors ?? 0),
+          meshFallbacks: Number(value?.meshFallbacks ?? 0),
+          promotionDistanceMeters: Number(value?.promotionDistanceMeters ?? NaN),
+          demotionDistanceMeters: Number(value?.demotionDistanceMeters ?? NaN),
+          nearestDistanceMeters: Number.isFinite(value?.nearestDistanceMeters) ? Number(value.nearestDistanceMeters) : null,
+          nearestMeshDistanceMeters: Number.isFinite(value?.nearestMeshDistanceMeters) ? Number(value.nearestMeshDistanceMeters) : null,
+          nearestImpostorDistanceMeters: Number.isFinite(value?.nearestImpostorDistanceMeters) ? Number(value.nearestImpostorDistanceMeters) : null,
+        }))
+      : [];
+    return {
+      pose: pose.kind,
+      heroImpostors: heroImpostors
+        ? {
+            registeredInstances: Number(heroImpostors.registeredInstances ?? 0),
+            activeImpostors: Number(heroImpostors.activeImpostors ?? 0),
+            meshFallbacks: Number(heroImpostors.meshFallbacks ?? 0),
+            archetypes,
+          }
+        : null,
+      groundCards: groundCards
+        ? {
+            cardBatches: Number(groundCards.cardBatches ?? 0),
+            cardInstances: Number(groundCards.cardInstances ?? 0),
+            visibleBatches: Number(groundCards.visibleBatches ?? 0),
+            nearMeshes: Number(groundCards.nearMeshes ?? 0),
+          }
+        : null,
+    };
+  });
+  const hasHeroLodDistanceEvidence = vegetationLodEvidence.some(entry =>
+    (entry.heroImpostors?.archetypes ?? []).some(archetype =>
+      archetype.registeredInstances > 0
+      && Number.isFinite(archetype.promotionDistanceMeters)
+      && Number.isFinite(archetype.demotionDistanceMeters)
+      && archetype.nearestDistanceMeters !== null
+    )
+  );
+  const hasHeroSnapStateEvidence = vegetationLodEvidence.some(entry =>
+    (entry.heroImpostors?.activeImpostors ?? 0) > 0
+    || (entry.heroImpostors?.meshFallbacks ?? 0) > 0
+  );
+  const hasGroundCardDistanceEvidence = vegetationLodEvidence.some(entry =>
+    (entry.groundCards?.cardInstances ?? 0) > 0
+    || (entry.groundCards?.nearMeshes ?? 0) > 0
+  );
   const cdlodPoseEvidence = (['ground', 'elevated', 'skyward'] as const).map(kind => {
     const pose = poses.find(candidate => candidate.kind === kind);
     const terrainLod = pose?.poseMetrics.world.terrainLod ?? null;
@@ -754,6 +849,29 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
       message: vegetationProbeCount > 0
         ? `Captured ${vegetationProbeCount} vegetation material probe(s).`
         : 'No vegetation material probes were found in the live scene.',
+    },
+    {
+      id: 'vegetation-static-impostor-probes',
+      status: vegetationStaticProbeCount > 0 ? 'pass' : 'warn',
+      message: vegetationStaticProbeCount > 0
+        ? `Captured ${vegetationStaticProbeCount} vegetation static-impostor material probe(s).`
+        : 'No vegetation static-impostor batches were identified in the live scene.',
+      value: materialProbes
+        .filter(probe => probe.surface === 'vegetation' && probe.staticImpostor !== null)
+        .map(probe => ({
+          name: probe.name,
+          category: probe.category,
+          staticImpostor: probe.staticImpostor,
+          textureMetrics: probe.textureMetrics,
+        })),
+    },
+    {
+      id: 'vegetation-lod-transition-evidence',
+      status: hasHeroLodDistanceEvidence && hasHeroSnapStateEvidence && hasGroundCardDistanceEvidence ? 'pass' : 'warn',
+      message: hasHeroLodDistanceEvidence && hasHeroSnapStateEvidence && hasGroundCardDistanceEvidence
+        ? 'Captured vegetation hero impostor promotion/demotion distances plus active snap state, and ground-card distance LOD state.'
+        : 'Vegetation LOD transition evidence is incomplete for one or more live scene poses.',
+      value: vegetationLodEvidence,
     },
     {
       id: 'npc-material-probes',
@@ -853,6 +971,34 @@ function terrainLodLine(pose: PoseProbe | undefined): string {
   return `tiles=${terrainLod.tileCount} saturated=${String(terrainLod.tileSelectionSaturated)} singleSubmitTri=${terrainLod.triangleEstimate} lods=${lods || 'none'} rings=${rings || 'none'}`;
 }
 
+function vegetationLodLine(pose: PoseProbe | undefined): string {
+  const debug = pose?.poseMetrics.world.vegetationDebug as any;
+  if (!debug) return 'missing';
+  const hero = debug.heroImpostors;
+  const heroArchetypes = hero?.archetypes && typeof hero.archetypes === 'object'
+    ? Object.entries(hero.archetypes as Record<string, any>)
+      .map(([slug, value]) => {
+        const active = Number(value?.activeImpostors ?? 0);
+        const mesh = Number(value?.meshFallbacks ?? 0);
+        const promotion = Number(value?.promotionDistanceMeters ?? NaN);
+        const demotion = Number(value?.demotionDistanceMeters ?? NaN);
+        const nearestMesh = Number.isFinite(value?.nearestMeshDistanceMeters)
+          ? Number(value.nearestMeshDistanceMeters).toFixed(1)
+          : 'none';
+        const nearestImpostor = Number.isFinite(value?.nearestImpostorDistanceMeters)
+          ? Number(value.nearestImpostorDistanceMeters).toFixed(1)
+          : 'none';
+        return `${slug}:mesh=${mesh}/imp=${active}/prom=${promotion}/demote=${demotion}/nearestMesh=${nearestMesh}/nearestImp=${nearestImpostor}`;
+      })
+      .join('; ')
+    : 'none';
+  const ground = debug.groundCards;
+  const groundLine = ground
+    ? `cards=${Number(ground.cardInstances ?? 0)} visible=${Number(ground.visibleBatches ?? 0)} nearMeshes=${Number(ground.nearMeshes ?? 0)}`
+    : 'cards=missing';
+  return `heroSource=${hero?.source ?? 'missing'} registered=${Number(hero?.registeredInstances ?? 0)} activeImp=${Number(hero?.activeImpostors ?? 0)} mesh=${Number(hero?.meshFallbacks ?? 0)} archetypes=[${heroArchetypes}] ${groundLine}`;
+}
+
 function renderMarkdown(report: ProbeReport): string {
   const lines: string[] = [
     '# Scene Parity Probe',
@@ -884,6 +1030,8 @@ function renderMarkdown(report: ProbeReport): string {
       `- CDLOD ground: ${terrainLodLine(ground)}`,
       `- CDLOD elevated: ${terrainLodLine(elevated)}`,
       `- CDLOD skyward: ${terrainLodLine(skyward)}`,
+      `- Vegetation LOD ground: ${vegetationLodLine(ground)}`,
+      `- Vegetation LOD elevated: ${vegetationLodLine(elevated)}`,
       `- Skyward screenshot: ${skyward?.screenshot ?? 'missing'}; luma=${skyward?.imageMetrics.lumaMean.toFixed(3) ?? 'n/a'} saturation=${skyward?.imageMetrics.saturationMean.toFixed(3) ?? 'n/a'} overexposed=${skyward?.imageMetrics.overexposedRatio.toFixed(3) ?? 'n/a'}`,
       `- Skyward peak frame: frame=${String(skywardRenderSummary.peakFrame?.frameCount ?? 'missing')} triangles=${String(skywardRenderSummary.peakFrame?.triangles ?? 'missing')} draws=${String(skywardRenderSummary.peakFrame?.drawSubmissions ?? 'missing')}`,
       `- Skyward peak categories: ${topSkyward.map(entry => `${entry.category}:${entry.triangles} (${JSON.stringify(entry.passTypes ?? {})})`).join(', ') || 'missing'}`,

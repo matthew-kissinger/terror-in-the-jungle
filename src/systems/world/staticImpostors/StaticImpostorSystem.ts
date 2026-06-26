@@ -55,17 +55,36 @@ interface RegisteredStaticImpostorInstance {
   state: StaticImpostorRenderState;
 }
 
+export interface StaticImpostorArchetypeDebugInfo {
+  registeredInstances: number;
+  activeImpostors: number;
+  meshFallbacks: number;
+  promotionDistanceMeters: number;
+  demotionDistanceMeters: number;
+  lightingProfile: StaticImpostorArchetype['lightingProfile'] | 'surface-normal';
+  nearestDistanceMeters: number | null;
+  farthestDistanceMeters: number | null;
+  nearestMeshDistanceMeters: number | null;
+  nearestImpostorDistanceMeters: number | null;
+}
+
 export interface StaticImpostorDebugInfo {
+  source: string;
   registeredInstances: number;
   activeImpostors: number;
   meshFallbacks: number;
   atlasesReady: number;
   atlasesLoading: number;
   atlasesFailed: number;
+  archetypes: Record<string, StaticImpostorArchetypeDebugInfo>;
   batches: Record<string, {
     active: number;
     highWater: number;
     free: number;
+    source: string;
+    lightingProfile: StaticImpostorArchetype['lightingProfile'] | 'surface-normal';
+    promotionDistanceMeters: number;
+    demotionDistanceMeters: number;
   }>;
 }
 
@@ -84,6 +103,12 @@ export interface StaticImpostorSystemOptions {
    * world-feature path untouched. See docs/rearch/VEGETATION_PHASE_II_*.
    */
   archetypes?: Readonly<Record<string, StaticImpostorArchetype>>;
+  /**
+   * Debug/source label surfaced on batches and getDebugInfo(). It lets runtime
+   * evidence distinguish vegetation-owned impostors from authored world props
+   * without splitting the material implementation.
+   */
+  debugSource?: string;
 }
 
 class ThreeStaticImpostorTextureProvider implements StaticImpostorTextureProvider {
@@ -134,6 +159,7 @@ class StaticImpostorBatch {
     private readonly archetype: StaticImpostorArchetype,
     atlas: LoadedStaticImpostorAtlas,
     private readonly capacity: number,
+    private readonly source: string,
   ) {
     const plane = new THREE.PlaneGeometry(1, 1);
     this.geometry = new THREE.InstancedBufferGeometry();
@@ -170,6 +196,12 @@ class StaticImpostorBatch {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.name = `StaticImpostorBatch_${archetype.slug}`;
     this.mesh.userData.perfCategory = STATIC_IMPOSTOR_PERF_CATEGORY;
+    this.mesh.userData.isStaticImpostorBatch = true;
+    this.mesh.userData.staticImpostorSource = source;
+    this.mesh.userData.staticImpostorSlug = archetype.slug;
+    this.mesh.userData.staticImpostorLightingProfile = archetype.lightingProfile ?? 'surface-normal';
+    this.mesh.userData.staticImpostorPromotionDistanceMeters = archetype.promotionDistanceMeters;
+    this.mesh.userData.staticImpostorDemotionDistanceMeters = archetype.demotionDistanceMeters;
     this.mesh.frustumCulled = false;
     this.mesh.visible = false;
     this.mesh.matrixAutoUpdate = false;
@@ -280,11 +312,15 @@ class StaticImpostorBatch {
     this.material.dispose();
   }
 
-  getDebugInfo(): { active: number; highWater: number; free: number } {
+  getDebugInfo(): StaticImpostorDebugInfo['batches'][string] {
     return {
       active: this.liveCount,
       highWater: this.highWaterMark,
       free: this.freeSlots.size,
+      source: this.source,
+      lightingProfile: this.archetype.lightingProfile ?? 'surface-normal',
+      promotionDistanceMeters: this.archetype.promotionDistanceMeters,
+      demotionDistanceMeters: this.archetype.demotionDistanceMeters,
     };
   }
 
@@ -327,6 +363,7 @@ export class StaticImpostorSystem {
   private readonly instances = new Map<string, RegisteredStaticImpostorInstance>();
   private readonly atlasRecords = new Map<string, StaticImpostorAtlasRecord>();
   private readonly batches = new Map<string, StaticImpostorBatch>();
+  private readonly debugSource: string;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -336,6 +373,7 @@ export class StaticImpostorSystem {
     this.textureProvider = options.textureProvider ?? new ThreeStaticImpostorTextureProvider();
     this.batchCapacity = options.batchCapacity ?? DEFAULT_BATCH_CAPACITY;
     this.archetypeOverrides = options.archetypes ?? {};
+    this.debugSource = options.debugSource ?? 'world';
   }
 
   private resolveArchetype(modelPath: string): StaticImpostorArchetype | undefined {
@@ -422,12 +460,43 @@ export class StaticImpostorSystem {
   getDebugInfo(): StaticImpostorDebugInfo {
     let activeImpostors = 0;
     let meshFallbacks = 0;
+    const archetypes: Record<string, StaticImpostorArchetypeDebugInfo> = {};
     for (const instance of this.instances.values()) {
+      const slug = instance.archetype.slug;
+      const distance = this.camera.position.distanceTo(instance.center);
+      const entry = archetypes[slug] ?? {
+        registeredInstances: 0,
+        activeImpostors: 0,
+        meshFallbacks: 0,
+        promotionDistanceMeters: instance.archetype.promotionDistanceMeters,
+        demotionDistanceMeters: instance.archetype.demotionDistanceMeters,
+        lightingProfile: instance.archetype.lightingProfile ?? 'surface-normal',
+        nearestDistanceMeters: null,
+        farthestDistanceMeters: null,
+        nearestMeshDistanceMeters: null,
+        nearestImpostorDistanceMeters: null,
+      };
+      entry.registeredInstances++;
+      entry.nearestDistanceMeters = entry.nearestDistanceMeters === null
+        ? distance
+        : Math.min(entry.nearestDistanceMeters, distance);
+      entry.farthestDistanceMeters = entry.farthestDistanceMeters === null
+        ? distance
+        : Math.max(entry.farthestDistanceMeters, distance);
       if (instance.state === 'impostor') {
         activeImpostors++;
+        entry.activeImpostors++;
+        entry.nearestImpostorDistanceMeters = entry.nearestImpostorDistanceMeters === null
+          ? distance
+          : Math.min(entry.nearestImpostorDistanceMeters, distance);
       } else {
         meshFallbacks++;
+        entry.meshFallbacks++;
+        entry.nearestMeshDistanceMeters = entry.nearestMeshDistanceMeters === null
+          ? distance
+          : Math.min(entry.nearestMeshDistanceMeters, distance);
       }
+      archetypes[slug] = entry;
     }
 
     const atlasStates = [...this.atlasRecords.values()];
@@ -437,12 +506,14 @@ export class StaticImpostorSystem {
     }
 
     return {
+      source: this.debugSource,
       registeredInstances: this.instances.size,
       activeImpostors,
       meshFallbacks,
       atlasesReady: atlasStates.filter((record) => record.state === 'ready').length,
       atlasesLoading: atlasStates.filter((record) => record.state === 'loading').length,
       atlasesFailed: atlasStates.filter((record) => record.state === 'failed').length,
+      archetypes,
       batches,
     };
   }
@@ -484,6 +555,7 @@ export class StaticImpostorSystem {
         instance.archetype,
         record.atlas,
         this.batchCapacity,
+        this.debugSource,
       );
       this.batches.set(instance.archetype.slug, batch);
     }

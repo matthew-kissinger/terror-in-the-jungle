@@ -47,6 +47,11 @@ npm run check:vegetation-lod-review
 
 Latest useful candidate artifacts:
 
+- `artifacts/perf/2026-06-26T17-56-45-512Z/scene-parity/scene-parity.md`
+  - strict-WebGPU live-scene probe for Open Frontier + A Shau; captures
+    vegetation static-impostor material probes, source labels, promotion /
+    demotion distances, mesh-vs-impostor snap state, ground-card LOD state,
+    terrain LOD rings, and screenshots
 - `artifacts/vegetation-lod-review/2026-06-26T17-43-20-798Z`
   - current full-catalog matrix, 13 vegetation assets x 3 lighting/fog stages
 - `artifacts/vegetation-lod-review/2026-06-26T17-33-54-195Z`
