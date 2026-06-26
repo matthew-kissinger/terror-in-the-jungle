@@ -7,6 +7,8 @@ import {
   type PixelForgeNpcClipId,
   type PixelForgeNpcFactionAsset,
 } from '../../config/pixelForgeAssets';
+import { getWeaponArtMode, type WeaponArtMode } from '../../config/weaponArtMode';
+import { WeaponModels } from '../assets/modelPaths';
 import { Combatant, CombatantState, Faction, isBlufor } from './types';
 
 export type PixelForgeNpcPoolKey = Faction | 'SQUAD';
@@ -163,20 +165,18 @@ export const PIXEL_FORGE_NPC_CLOSE_MODEL_INITIAL_POOL_PER_FACTION = 4;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_TOP_UP_BATCH = 2;
 export const PIXEL_FORGE_NPC_CLOSE_MODEL_LAZY_LOAD_FLAG = '__TIJ_ALLOW_NPC_CLOSE_MODEL_LAZY_LOAD__';
 
-// Grip / support / muzzle / stock node names re-derived from the normalized
-// repaint weapon GLB node vocabularies (R1 import pipeline). The earlier names
-// (Joint_PistolGrip, Mesh_HandguardBotL, Mesh_StockButt, Mesh_TriggerGuardBot,
-// Mesh_ButtPad, Mesh_Receiver, …) matched the pre-repaint models and resolve to
-// nothing in the new GLBs — findNamed then fell through to defaults, mis-seating
-// the NPC hold. These lists name real meshes in the shipped m16a1.glb /
-// ak47.glb so the close model grips at the pistol grip, supports at the
-// handguard, points the muzzle down the barrel, and anchors the stock in the
-// shoulder pocket. findNamed takes the first hit, so each list is ordered
-// best-anchor-first with a coarser fallback behind it.
-export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig> = {
+// Grip / support / muzzle / stock node names re-derived per art mode from the
+// shipped weapon GLB node vocabularies (verified by parsing each GLB JSON
+// chunk). findNamed takes the FIRST matching name in each list, so each list is
+// ordered best-anchor-first with a coarser fallback behind it: the close model
+// grips at the pistol grip, supports at the handguard, points the muzzle down
+// the barrel, and anchors the stock in the shoulder pocket. A name that resolves
+// to nothing makes findNamed fall through to a default offset and the gun
+// floats, so every first entry below is a node verified present in that GLB.
+const PIXEL_FORGE_NPC_WEAPONS_LEGACY: Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig> = {
   m16a1: {
     id: 'm16a1',
-    modelPath: 'weapons/m16a1.glb',
+    modelPath: WeaponModels.M16A1,
     lengthMeters: 0.99,
     gripNames: ['Mesh_PistolGrip', 'Mesh_PistolGripBase', 'Mesh_LowerReceiver', 'Mesh_TriggerGuardBottom'],
     supportNames: ['Mesh_HandguardBody', 'Mesh_DeltaRing', 'Mesh_HandguardCap'],
@@ -189,7 +189,7 @@ export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNp
   },
   ak47: {
     id: 'ak47',
-    modelPath: 'weapons/ak47.glb',
+    modelPath: WeaponModels.AK47,
     lengthMeters: 0.9,
     gripNames: ['Mesh_PistolGrip', 'Mesh_GripPlate', 'Mesh_ReceiverMain', 'Mesh_GuardBottom'],
     supportNames: ['Mesh_LowerHandguard', 'Mesh_UpperHandguard', 'Mesh_Barrel'],
@@ -201,6 +201,56 @@ export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNp
     socketMode: 'shouldered-forward',
   },
 };
+
+// Kiln gen-2 repaint art (default). Node names verified against
+// public/models/weapons/kiln-war-2026-06/{m16a1-2,ak-47}.glb; lengthMeters track
+// the catalog forward extents (m16a1-2 1.15 m, ak-47 0.92 m).
+const PIXEL_FORGE_NPC_WEAPONS_KILN: Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig> = {
+  m16a1: {
+    id: 'm16a1',
+    modelPath: WeaponModels.M16A1_2,
+    lengthMeters: 1.15,
+    gripNames: ['Mesh_PistolGrip', 'Mesh_LowerReceiver', 'Mesh_TriggerGuard'],
+    supportNames: ['Mesh_Handguard', 'Mesh_DeltaRing', 'Mesh_Barrel'],
+    muzzleNames: ['Mesh_FlashHider', 'Mesh_MuzzleHole', 'Mesh_FrontSightPost', 'Mesh_Barrel'],
+    stockNames: ['Mesh_Stock', 'Mesh_Buttplate'],
+    pitchTrimDeg: 5,
+    forwardHold: 0.11,
+    gripOffset: 0,
+    socketMode: 'shouldered-forward',
+  },
+  ak47: {
+    id: 'ak47',
+    modelPath: WeaponModels.AK_47,
+    lengthMeters: 0.92,
+    gripNames: ['Mesh_PistolGrip', 'Mesh_Receiver', 'Mesh_TriggerGuardBottom'],
+    supportNames: ['Mesh_LowerHandguard', 'Mesh_UpperHandguard', 'Mesh_Barrel'],
+    muzzleNames: ['Mesh_MuzzleBrake', 'Mesh_MuzzleSlant', 'Mesh_FrontSightPost', 'Mesh_Barrel'],
+    stockNames: ['Mesh_Buttplate', 'Mesh_StockBody', 'Mesh_StockWrist'],
+    pitchTrimDeg: 5,
+    forwardHold: 0.11,
+    gripOffset: 0,
+    socketMode: 'shouldered-forward',
+  },
+};
+
+const PIXEL_FORGE_NPC_WEAPONS_BY_MODE: Record<
+  WeaponArtMode,
+  Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig>
+> = {
+  legacy: PIXEL_FORGE_NPC_WEAPONS_LEGACY,
+  kiln: PIXEL_FORGE_NPC_WEAPONS_KILN,
+};
+
+/**
+ * Active held-weapon config table. Bound once at module load so the close-model
+ * preload (CombatantRenderer iterating PIXEL_FORGE_NPC_RUNTIME_FACTIONS) and the
+ * per-pool load (getPixelForgeNpcRuntimeFaction) always agree on the art — no
+ * mid-session desync. Flip with `?weaponArt=legacy` (read from the URL at load)
+ * or pre-set `window.__weaponArt = 'legacy'`.
+ */
+export const PIXEL_FORGE_NPC_WEAPONS: Record<PixelForgeNpcWeaponId, PixelForgeNpcWeaponRuntimeConfig> =
+  PIXEL_FORGE_NPC_WEAPONS_BY_MODE[getWeaponArtMode()];
 
 const RUNTIME_FACTION_VALUES: Record<PixelForgeNpcFactionAsset['runtimeFaction'], Faction> = {
   US: Faction.US,

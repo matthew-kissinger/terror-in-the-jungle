@@ -112,6 +112,7 @@ vi.mock('../../assets/ModelLoader', () => {
 
 vi.mock('../../assets/modelPaths', () => ({
   WeaponModels: {
+    // Legacy first-gen art.
     M16A1: 'weapons/m16a1.glb',
     AK47: 'weapons/ak47.glb',
     ITHACA37: 'weapons/ithaca37.glb',
@@ -119,11 +120,37 @@ vi.mock('../../assets/modelPaths', () => ({
     M1911: 'weapons/m1911.glb',
     M60: 'weapons/m60.glb',
     M79: 'weapons/m79.glb',
+    // Kiln gen-2 repaint art (default selected by the kill-switch).
+    M16A1_2: 'weapons/kiln-war-2026-06/m16a1-2.glb',
+    AK_47: 'weapons/kiln-war-2026-06/ak-47.glb',
+    ITHACA_37_PUMP_ACTION: 'weapons/kiln-war-2026-06/ithaca-37-pump-action.glb',
+    M3A1_GREASE_GUN: 'weapons/kiln-war-2026-06/m3a1-grease-gun.glb',
+    M1911A1_COLT: 'weapons/kiln-war-2026-06/m1911a1-colt.glb',
+    M60_PIG_GENERAL_PURPOSE: 'weapons/kiln-war-2026-06/m60-pig-general-purpose.glb',
+    M79_THUMPER_40MM_GRENADE: 'weapons/kiln-war-2026-06/m79-thumper-40mm-grenade.glb',
   },
   // Minimal catalog slice mirroring the magazine/muzzle node metadata the rig
   // reads. Mirrors the shape of the generated warAssetCatalog without pulling
-  // the full table into the mock.
+  // the full table into the mock. Default art is kiln, so the kiln slugs carry
+  // the live magazine/muzzle metadata.
   warAssetCatalog: {
+    // Kiln gen-2 slugs (default).
+    'm16a1-2': {
+      slug: 'm16a1-2',
+      magazineNodes: ['Mesh_MagSeg1', 'Mesh_MagSeg2', 'Mesh_MagSeg3'],
+      muzzleNodes: ['Mesh_FlashHider', 'Mesh_MuzzleHole'],
+    },
+    'ak-47': {
+      slug: 'ak-47',
+      magazineNodes: ['Mesh_MagSeg1', 'Mesh_MagSeg2', 'Mesh_MagSeg3', 'Mesh_MagBase', 'Mesh_MagRib1L', 'Mesh_MagRib1R'],
+      muzzleNodes: ['Mesh_MuzzleBrake', 'Mesh_MuzzleSlant'],
+    },
+    'ithaca-37-pump-action': { slug: 'ithaca-37-pump-action', magazineNodes: ['Mesh_MagTube', 'Mesh_MagCap'] },
+    'm3a1-grease-gun': { slug: 'm3a1-grease-gun', magazineNodes: ['Mesh_Magazine', 'Mesh_MagRibL', 'Mesh_MagRibR'], muzzleNodes: ['Mesh_MuzzleTip'] },
+    'm1911a1-colt': { slug: 'm1911a1-colt', magazineNodes: ['Mesh_MagBase'], muzzleNodes: ['Mesh_Bore'] },
+    'm60-pig-general-purpose': { slug: 'm60-pig-general-purpose', muzzleNodes: ['Mesh_FlashHider'] },
+    'm79-thumper-40mm-grenade': { slug: 'm79-thumper-40mm-grenade' },
+    // Legacy slugs (used when ?weaponArt=legacy).
     m16a1: {
       slug: 'm16a1',
       magazineNodes: ['Mesh_MagSeg1', 'Mesh_MagSeg2', 'Mesh_MagSeg3', 'Mesh_MagFloor'],
