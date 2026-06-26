@@ -23,6 +23,10 @@ lighting, fog, and LOD snap distances before production deploy.
   Open Frontier daylight.
 - GLB-backed vegetation impostors use a source-like clamped direct-light term
   instead of the wrapped billboard foliage term that over-lifted backfaces.
+- GLB-backed vegetation impostors apply a stronger source-match foliage color
+  curve (`foliageColorGamma=1.75`, `foliageSaturation=1.0`) before rig
+  lighting. Scene A/B showed fog/exposure-only and alpha-ramp experiments did
+  not materially solve the pale-card failure; the color response did.
 - Vegetation-owned hero impostors now use a mesh-to-impostor crossfade band at
   the LOD boundary, so the source GLB and far card overlap during promotion and
   demotion instead of hard-snapping visibility in one frame.
@@ -55,6 +59,12 @@ the current runtime path. Only the custom static-impostor material's
 `fogStrength` and `foliageExposure` uniforms are reduced for review comparison;
 normal launches keep the default shipped values.
 
+Live-scene review variants can also tune the color response without code edits:
+`scripts/scene-parity-probe.ts` accepts `--veg-impostor-color-gamma` and
+`--veg-impostor-saturation` in addition to the fog, exposure, and transition
+flags. Use those flags for owner A/B screenshots; do not treat a variant as
+accepted until it is promoted to the default and rerun clean.
+
 ## Proof Commands
 
 ```bash
@@ -66,6 +76,30 @@ npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes 
 
 Latest useful candidate artifacts:
 
+- `artifacts/vegetation-lod-review/2026-06-26T21-01-52-536Z`
+  - clean-head focused source-vs-impostor matrix for
+    `b02cd5cfc4241d922fa4ae017df3a2c4a4a11ad2`
+  - `summary.json` records `sourceGitStatus: []`
+  - 12/12 pass across the pale-risk review set:
+    fan-palm, jungle-tree, rubber-a, and teak-a x daylight / low-sun /
+    humid-fog
+- `artifacts/perf/2026-06-26T21-03-04-836Z/scene-parity/scene-parity.md`
+  - clean-head Open Frontier + A Shau strict-WebGPU focused scene pass for
+    `b02cd5cfc4241d922fa4ae017df3a2c4a4a11ad2`
+  - `scene-parity.json` records `sourceGitStatus: []`
+  - material probes confirm the default static-impostor batches use
+    `foliageColorGamma=1.75`, `foliageSaturation=1`, default fog/exposure, and
+    `transitionMeters=28`
+  - per-archetype vegetation-focus screenshots were captured for all seven
+    active GLB-backed vegetation impostors in both Open Frontier and A Shau
+  - Open Frontier worst remaining pale-risk samples: rubber-a
+    `luma=0.396`, `saturation=0.528`, `pale=0.405`, `overexposed=0.000`;
+    teak-a `luma=0.338`, `saturation=0.574`, `pale=0.316`,
+    `overexposed=0.000`
+  - A Shau samples stayed integrated with the terrain/fog; rubber-a
+    `luma=0.288`, `saturation=0.510`, `pale=0.240`, `overexposed=0.000`
+  - still `warn` only because finite-edge evidence remains screenshot-review
+    based
 - `artifacts/vegetation-lod-review/2026-06-26T20-07-47-999Z`
   - clean-head full-catalog matrix for `35d8e8913d6cdb2c5dc20a911fa60ed961327794`
   - `summary.json` records `sourceGitStatus: []`
@@ -124,9 +158,9 @@ Latest useful candidate artifacts:
 Owner review should cover both surfaces:
 
 - isolated source-vs-far matrix:
-  `artifacts/vegetation-lod-review/2026-06-26T20-07-47-999Z`
+  `artifacts/vegetation-lod-review/2026-06-26T21-01-52-536Z`
 - live scene focus captures from:
-  `artifacts/perf/2026-06-26T20-05-50-152Z/scene-parity/scene-parity.md`
+  `artifacts/perf/2026-06-26T21-03-04-836Z/scene-parity/scene-parity.md`
 
 Accept this path only if:
 
@@ -141,12 +175,14 @@ Accept this path only if:
 - the focused live-scene LOD pose shows whether any vegetation instances are in
   the crossfade band rather than only proving binary mesh/impostor state
 
-Current review risk: the candidate intentionally favors darker, less shiny
-foliage than the rejected path. Open Frontier still has some pale mid/far tree
-clumps against dark terrain, and A Shau still depends heavily on scene fog and
-terrain exposure. The latest probes show zero overexposed vegetation-focus
-pixels, but owner review decides whether the remaining pale clumps are
-acceptable integration or need another exposure/fog/bake variant.
+Current review risk: the candidate intentionally favors darker, more saturated
+foliage than the rejected path because that is what moves the live scene away
+from fog-bleached cards. Open Frontier rubber-a still has some pale lower-canopy
+detail against dark terrain, even though it no longer reads like the washed old
+surface-normal column. A Shau still depends heavily on scene fog and terrain
+exposure. The latest probes show zero overexposed vegetation-focus pixels, but
+owner review decides whether the remaining pale clumps are acceptable
+integration or need another bake/material variant.
 
 Reduced-fog/exposure review path: the fourth octa-impostor review column and the
 scene-parity `--veg-impostor-fog-strength 0.62
@@ -154,6 +190,7 @@ scene-parity `--veg-impostor-fog-strength 0.62
 accepted shipped default. The clean A/B scene pass above shows this variant is
 not a strong fix for the remaining Open Frontier / A Shau pale-clump risk; keep
 it available for owner comparison, but do not ship it as the answer by default.
+The color-curve default is the current production candidate.
 
 LOD snap review path: normal vegetation launches use a 28 m transition band
 (`vegImpostorTransitionMeters=28`) around the hero impostor promotion/demotion
