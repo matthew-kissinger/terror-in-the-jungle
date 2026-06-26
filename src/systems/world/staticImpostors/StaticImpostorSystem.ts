@@ -120,6 +120,7 @@ class StaticImpostorBatch {
   private pendingPositionUpdate = false;
   private pendingScaleUpdate = false;
   private pendingYawUpdate = false;
+  private capacityWarningLogged = false;
 
   constructor(
     scene: THREE.Scene,
@@ -177,10 +178,17 @@ class StaticImpostorBatch {
       this.freeSlots.delete(slot);
     } else {
       if (this.highWaterMark >= this.capacity) {
-        Logger.warn(
-          'world',
-          `Static impostor capacity reached for ${this.archetype.slug} (${this.capacity})`,
-        );
+        // Overflow is re-attempted every frame (the instance keeps a null slot),
+        // so warn AT MOST ONCE per batch instead of once per attempt — otherwise a
+        // dense archetype storms the log hundreds of thousands of times a second.
+        if (!this.capacityWarningLogged) {
+          this.capacityWarningLogged = true;
+          Logger.warn(
+            'world',
+            `Static impostor capacity reached for ${this.archetype.slug} (${this.capacity}); `
+            + 'suppressing further overflow warnings for this batch',
+          );
+        }
         return null;
       }
       slot = this.highWaterMark++;

@@ -10,6 +10,7 @@ import {
   type StaticImpostorTextureProvider,
 } from './StaticImpostorSystem';
 import type { StaticImpostorArchetype } from '../../../config/staticImpostorArchetypes';
+import { Logger } from '../../../utils/Logger';
 
 function makeAtlas(): LoadedStaticImpostorAtlas {
   return {
@@ -124,6 +125,60 @@ describe('StaticImpostorSystem', () => {
     expect(registered).toBe(false);
     expect(provider.loadAtlas).not.toHaveBeenCalled();
     expect(system.getDebugInfo().registeredInstances).toBe(0);
+  });
+
+  it('warns at most once per batch when capacity is exceeded, despite per-frame overflow retries', async () => {
+    const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+    const provider = makeProvider();
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      batchCapacity: 2,
+    });
+    // Four far drums share ONE archetype batch ('fuel-drum'); capacity 2 -> two overflow.
+    for (let i = 0; i < 4; i++) {
+      const object = makeStaticObject(new THREE.Vector3(200 + i * 10, 0, 0));
+      scene.add(object);
+      system.registerInstance({ id: `fuel_drum_${i}`, modelPath: StructureModels.FUEL_DRUM, object });
+    }
+    await flushPromises();
+
+    // Overflow instances keep a null slot, so they re-attempt every frame. Without the
+    // warn-once guard this would log on every frame for every overflow instance.
+    system.update(0.016);
+    system.update(0.016);
+    system.update(0.016);
+
+    const capacityWarnings = warnSpy.mock.calls.filter(
+      ([, message]) => typeof message === 'string' && message.includes('capacity reached'),
+    );
+    expect(capacityWarnings).toHaveLength(1);
+    expect(system.getDebugInfo().batches['fuel-drum'].highWater).toBe(2);
+
+    warnSpy.mockRestore();
+  });
+
+  it('honors a generous batchCapacity so dense archetypes fit without overflowing', async () => {
+    const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+    const provider = makeProvider();
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      batchCapacity: 8,
+    });
+    for (let i = 0; i < 6; i++) {
+      const object = makeStaticObject(new THREE.Vector3(200 + i * 10, 0, 0));
+      scene.add(object);
+      system.registerInstance({ id: `fuel_drum_${i}`, modelPath: StructureModels.FUEL_DRUM, object });
+    }
+    await flushPromises();
+    system.update(0.016);
+
+    const capacityWarnings = warnSpy.mock.calls.filter(
+      ([, message]) => typeof message === 'string' && message.includes('capacity reached'),
+    );
+    expect(capacityWarnings).toHaveLength(0);
+    expect(system.getDebugInfo().batches['fuel-drum'].highWater).toBe(6);
+
+    warnSpy.mockRestore();
   });
 
   it('ignores model paths that have not been assigned offline atlases', () => {
