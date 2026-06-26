@@ -60,7 +60,8 @@ describe('vegetationLibraryAdapter', () => {
     const archetypes = vegetationLibraryStaticArchetypes();
     // banyans are shelved; their far impostors are unbaked -> skipped.
     expect(archetypes['banyan-large']).toBeUndefined();
-    // banana-plant is still mesh-near + planned groundCard (not baked) -> skipped.
+    // banana-plant's far rep is a baked groundCard (not an octa impostor), so it never
+    // reaches the static (per-clone hero) archetype path either.
     expect(archetypes['banana-plant']).toBeUndefined();
   });
 
@@ -99,6 +100,24 @@ describe('vegetationLibraryGroundCards', () => {
       expect(card.bounds.radius).toBeGreaterThan(0);
       expect(card.maxSlopeDeg).toBeGreaterThan(0);
     }
+  });
+
+  it('emits the freshly baked banana-plant ground card (mesh-near + card-far)', () => {
+    const cards = vegetationLibraryGroundCards();
+    const banana = cards['banana-plant'];
+    expect(banana).toBeDefined();
+    expect(banana.meshPath).toBe(`${VEGETATION_ASSET_ROOT}/banana-plant/banana-plant.glb`);
+    expect(banana.card.baseColor).toBe(`${VEGETATION_ASSET_ROOT}/banana-plant/card/atlas.base-color.png`);
+    expect(banana.card.normal).toContain('banana-plant/card/atlas.normal.png');
+    // Catalog LOD: real mesh 0-30m, baked alpha card 30-70m (hard-culled).
+    expect(banana.meshFarEdgeMeters).toBe(30);
+    expect(banana.cullDistanceMeters).toBe(70);
+    expect(banana.cullDistanceMeters).toBeGreaterThan(banana.meshFarEdgeMeters);
+    // Footprint + ground anchor sane; slope cap from the catalog ecology.
+    expect(banana.cardWorldSize[0]).toBeGreaterThan(0);
+    expect(banana.cardWorldSize[1]).toBeGreaterThan(0);
+    expect(banana.yOffset).toBeCloseTo(banana.cardWorldSize[1] * 0.5, 5);
+    expect(banana.maxSlopeDeg).toBe(25);
   });
 
   it('matches the catalog LOD band distances (fern 14->40, taro 28->65, rice 25->50)', () => {

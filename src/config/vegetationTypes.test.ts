@@ -215,8 +215,8 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     const denseGroundCoverMultiplier = denseJungle.vegetationPalette
       .filter((entry) => entry.typeId === 'understory-fern' || entry.typeId === 'taro-elephant-ear')
       .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
-    const highlandFernMultiplier =
-      getBiome('highland').vegetationPalette.find((entry) => entry.typeId === 'fern')?.densityMultiplier ?? 0;
+    const highlandGroundCoverMultiplier =
+      getBiome('highland').vegetationPalette.find((entry) => entry.typeId === 'understory-fern')?.densityMultiplier ?? 0;
 
     // The old fanPalm/bambooGrove billboards are gone from the jungle palette (promoted to heroes).
     expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'fanPalm')).toBe(false);
@@ -226,9 +226,10 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'elephantEar')).toBe(false);
     // The tall palm hero is denser than the bamboo hero (palm is the prominent mid feature).
     expect(fanPalmHero).toBeGreaterThan(bambooHero);
-    // Card ground cover is still the dense understory backbone (highland keeps its fern billboard).
+    // Card ground cover is still the dense understory backbone (highland now carries the same
+    // understory-fern ground card instead of the retired fern billboard).
     expect(denseGroundCoverMultiplier).toBeGreaterThan(1.0);
-    expect(highlandFernMultiplier).toBeGreaterThan(0.7);
+    expect(highlandGroundCoverMultiplier).toBeGreaterThan(0.7);
     // The bamboo billboard config (still used by the dense bambooGrove biome) stays clustered.
     expect(bamboo?.poissonMinDistance).toBeLessThan(8);
     expect(bamboo?.cluster?.scale).toBeGreaterThan(200);
@@ -292,5 +293,57 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       expect(ids).not.toContain('fern');
       expect(ids).not.toContain('elephantEar');
     }
+  });
+
+  it('finishes the fern/elephantEar ground-card cutover in tallGrass + bambooGrove', () => {
+    const groundCards = vegetationLibraryGroundCards();
+    const tallGrass = getBiome('tallGrass').vegetationPalette;
+    const bambooGrove = getBiome('bambooGrove').vegetationPalette;
+
+    for (const palette of [tallGrass, bambooGrove]) {
+      const ids = palette.map((entry) => entry.typeId);
+      // The old camelCase fern/elephantEar billboards are gone, replaced by baked cards.
+      expect(ids).not.toContain('fern');
+      expect(ids).not.toContain('elephantEar');
+      expect(ids).toContain('understory-fern');
+      expect(ids).toContain('taro-elephant-ear');
+      // Both swapped ids resolve to a baked ground-card archetype (live, not a dangling id).
+      expect(groundCards['understory-fern']).toBeDefined();
+      expect(groundCards['taro-elephant-ear']).toBeDefined();
+    }
+
+    // The dense bamboo grove (2.8) stays on its billboard id: promoting it to the GLB hero
+    // path would keep one clone per instance — a memory blowup at this density.
+    const denseBamboo = bambooGrove.find((entry) => entry.typeId === 'bambooGrove');
+    expect(denseBamboo?.densityMultiplier).toBe(2.8);
+  });
+
+  it('leaves no old fern/elephantEar/bananaPlant billboard id in any biome palette', () => {
+    // The fern/elephantEar ground cards and the freshly baked banana-plant card now cover
+    // these everywhere. coconut (no replacement asset) and the dense bambooGrove billboard
+    // are the documented camelCase holdouts.
+    const biomeIds = [
+      'ashauJungle', 'denseJungle', 'highland', 'ricePaddy', 'riverbank',
+      'cleared', 'tallGrass', 'mudTrail', 'bambooGrove', 'swamp', 'defoliated',
+    ];
+    for (const biomeId of biomeIds) {
+      const ids = getBiome(biomeId).vegetationPalette.map((entry) => entry.typeId);
+      expect(ids, biomeId).not.toContain('fern');
+      expect(ids, biomeId).not.toContain('elephantEar');
+      expect(ids, biomeId).not.toContain('bananaPlant');
+    }
+  });
+
+  it('wires the baked banana-plant ground card into the jungle/riverbank/tallGrass palettes', () => {
+    const groundCards = vegetationLibraryGroundCards();
+    expect(groundCards['banana-plant']).toBeDefined();
+    for (const biomeId of ['denseJungle', 'ashauJungle', 'riverbank', 'tallGrass', 'ricePaddy', 'swamp']) {
+      const ids = getBiome(biomeId).vegetationPalette.map((entry) => entry.typeId);
+      expect(ids, biomeId).toContain('banana-plant');
+    }
+    // Dual-namespace: the kebab banana-plant card id never collides with the camelCase
+    // bananaPlant billboard id, so the billboard scatterer ignores it.
+    const billboardIds = new Set(VEGETATION_TYPES.map((type) => type.id));
+    expect(billboardIds.has('banana-plant')).toBe(false);
   });
 });

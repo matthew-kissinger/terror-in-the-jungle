@@ -265,12 +265,14 @@ describe('GroundCardScatterer real-config wiring', () => {
     settle(scatterer, new THREE.Vector3(0, 0, 0));
     await settleNearMeshes(scatterer);
 
-    // denseJungle wires understory-fern + taro-elephant-ear cards (rice-paddy is riverbank-only).
+    // denseJungle wires understory-fern + taro-elephant-ear + banana-plant cards
+    // (rice-paddy is riverbank-only).
     const slugs = new Set(
       cardMeshes(scene).map((m) => m.name.split(':')[1]),
     );
     expect(slugs.has('understory-fern')).toBe(true);
     expect(slugs.has('taro-elephant-ear')).toBe(true);
+    expect(slugs.has('banana-plant')).toBe(true);
     expect(slugs.has('rice-paddy')).toBe(false);
     // Nothing outside the ground-card archetype set ever produces a card batch.
     expect([...slugs].every((s) => s in archetypes)).toBe(true);
