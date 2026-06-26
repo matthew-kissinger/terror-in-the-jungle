@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { getBiome } from './biomes';
 import { VEGETATION_TYPES } from './vegetationTypes';
+import { vegetationLibraryGroundCards } from './vegetation/vegetationLibraryAdapter';
 import {
   PIXEL_FORGE_BLOCKED_VEGETATION_IDS,
   PIXEL_FORGE_RETIRED_VEGETATION_IDS,
@@ -252,5 +253,34 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(coconut).toBeDefined();
     expect(coconut?.imposterAtlas?.stableAzimuthColumn).toBe(2);
     expect(coconut?.imposterAtlas?.maxElevationRow).toBe(2);
+  });
+
+  it('wires the library ground-cover cards into the jungle + riverbank palettes (dual-namespace)', () => {
+    const groundCards = vegetationLibraryGroundCards();
+    const denseIds = getBiome('denseJungle').vegetationPalette.map((entry) => entry.typeId);
+    const ashauIds = getBiome('ashauJungle').vegetationPalette.map((entry) => entry.typeId);
+    const riverbankIds = getBiome('riverbank').vegetationPalette.map((entry) => entry.typeId);
+
+    // The new kebab ground-card ids are present and resolve to a baked archetype.
+    for (const slug of ['understory-fern', 'taro-elephant-ear']) {
+      expect(groundCards[slug], slug).toBeDefined();
+      expect(denseIds).toContain(slug);
+      expect(ashauIds).toContain(slug);
+    }
+    expect(groundCards['rice-paddy']).toBeDefined();
+    expect(riverbankIds).toContain('rice-paddy');
+
+    // Dual-namespace: kebab ground-card ids never collide with the camelCase Pixel
+    // Forge billboard ids, so the billboard scatterer leaves them alone.
+    const billboardIds = new Set(VEGETATION_TYPES.map((type) => type.id));
+    for (const slug of Object.keys(groundCards)) {
+      expect(billboardIds.has(slug)).toBe(false);
+    }
+
+    // The old Pixel Forge fern/elephantEar billboards are intentionally NOT trimmed
+    // yet (no live ground-card scatterer to replace them), so dense ground cover is
+    // not regressed in the meantime.
+    expect(denseIds).toContain('fern');
+    expect(denseIds).toContain('elephantEar');
   });
 });

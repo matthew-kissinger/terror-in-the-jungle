@@ -17,6 +17,7 @@ import {
   VEGETATION_ASSET_ROOT,
   vegetationLibraryAttributions,
   vegetationLibraryBillboardAssets,
+  vegetationLibraryGroundCards,
   vegetationLibraryStaticArchetypes,
 } from '../src/config/vegetation/vegetationLibraryAdapter';
 
@@ -60,6 +61,21 @@ for (const b of billboards) {
   note(`${b.id}: ${b.tilesX}x${b.tilesY}@${b.tileSize}, world ${b.worldSize}m`);
 }
 
+// 2b. Ground cards (Path C): mesh-near + INSTANCED card-far. Both binaries exist,
+//     distances coherent, bounds valid.
+const groundCards = vegetationLibraryGroundCards();
+console.log(`\nground cards: ${Object.keys(groundCards).length}`);
+for (const [slug, c] of Object.entries(groundCards)) {
+  mustExist(c.meshPath, `ground card ${slug} meshPath`);
+  mustExist(c.card.baseColor, `ground card ${slug} baseColor`);
+  if (c.card.normal) mustExist(c.card.normal, `ground card ${slug} normal`);
+  if (c.cullDistanceMeters <= c.meshFarEdgeMeters) {
+    errors.push(`ground card ${slug}: cull (${c.cullDistanceMeters}) must exceed mesh far edge (${c.meshFarEdgeMeters})`);
+  }
+  if (!(c.bounds.radius > 0)) errors.push(`ground card ${slug}: bounds.radius must be > 0`);
+  note(`${slug}: mesh+card OK, mesh<${c.meshFarEdgeMeters}m card<${c.cullDistanceMeters}m, world ${c.cardWorldSize[0].toFixed(2)}x${c.cardWorldSize[1].toFixed(2)}m`);
+}
+
 // 3. Attribution coverage: every ready, attribution-required asset must be credited.
 const credits = vegetationLibraryAttributions();
 const creditedIds = new Set(credits.map((c) => c.id));
@@ -75,9 +91,10 @@ const placementOnly: string[] = [];
 for (const a of ready as VegetationAsset[]) {
   const inArch = a.id in archetypes;
   const inBill = billboards.some((b) => b.id === a.id);
-  if (!inArch && !inBill) placementOnly.push(a.id);
+  const inCard = a.id in groundCards;
+  if (!inArch && !inBill && !inCard) placementOnly.push(a.id);
 }
-console.log(`\ncoverage: ${Object.keys(archetypes).length} archetype, ${billboards.length} billboard, ${placementOnly.length} placement-only (near-mesh, far band not yet baked):`);
+console.log(`\ncoverage: ${Object.keys(archetypes).length} archetype, ${billboards.length} billboard, ${Object.keys(groundCards).length} ground-card, ${placementOnly.length} placement-only (near-mesh, far band not yet baked):`);
 note(placementOnly.join(', ') || '(none)');
 
 if (errors.length) {

@@ -78,6 +78,12 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
     // Dense understory billboards (fill-rate bound): fern -30% / elephantEar -20% for headroom.
     { typeId: 'fern',          densityMultiplier: 0.8 },
     { typeId: 'elephantEar',   densityMultiplier: 0.88 },
+    // Library ground-cover cards (kebab ids): real cheap mesh near, INSTANCED alpha
+    // card far, hard-culled. Consumed by the instanced ground-card scatterer (keyed on
+    // these slugs via vegetationLibraryGroundCards()); inert for the billboard + hero
+    // scatterers, which do not recognise the slug. Dual-namespace, purely additive.
+    { typeId: 'understory-fern',   densityMultiplier: 0.5 },
+    { typeId: 'taro-elephant-ear', densityMultiplier: 0.3 },
     { typeId: 'coconut',      densityMultiplier: 0.8 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.5 },
   ],
@@ -99,6 +105,10 @@ const BIOME_ASHAU_JUNGLE: BiomeConfig = {
     { typeId: 'bamboo-grove', densityMultiplier: 0.13 },
     { typeId: 'fern',          densityMultiplier: 0.32 },
     { typeId: 'elephantEar',   densityMultiplier: 0.46 },
+    // Library ground-cover cards (lighter than denseJungle; same id set so the two
+    // jungle palettes stay comparable). See denseJungle for the dual-namespace note.
+    { typeId: 'understory-fern',   densityMultiplier: 0.25 },
+    { typeId: 'taro-elephant-ear', densityMultiplier: 0.18 },
     { typeId: 'coconut',      densityMultiplier: 0.55 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.28 },
   ],
@@ -145,6 +155,11 @@ const BIOME_RIVERBANK: BiomeConfig = {
     { typeId: 'coconut',      densityMultiplier: 1.25 },
     { typeId: 'fern',         densityMultiplier: 0.45 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.45 },
+    // Library ground-cover cards: rice paddy thrives on the wet riverbank. See
+    // denseJungle for the dual-namespace note (inert until the ground-card scatterer).
+    { typeId: 'understory-fern',   densityMultiplier: 0.4 },
+    { typeId: 'taro-elephant-ear', densityMultiplier: 0.3 },
+    { typeId: 'rice-paddy',        densityMultiplier: 0.5 },
   ],
 };
 

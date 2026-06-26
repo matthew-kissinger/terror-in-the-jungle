@@ -1,0 +1,30 @@
+{
+  "generator": "scripts/bake-veg-card.mjs",
+  "generatedAt": "2026-06-26T09:32:14.404Z",
+  "id": "understory-fern",
+  "modelUrl": "/assets/vegetation/understory-fern/understory-fern.glb",
+  "projection": "single-front-card",
+  "crossQuadCapable": true,
+  "elevationDeg": 12,
+  "worldSize": [
+    2.4979402613521624,
+    0.6880742311477661
+  ],
+  "tileSize": [
+    512,
+    140
+  ],
+  "bounds": {
+    "center": [
+      0,
+      0.34403711557388306,
+      0
+    ],
+    "size": [
+      1.7827191352844238,
+      0.6880742311477661,
+      1.7497479915618896
+    ],
+    "radius": 1.295487523758305
+  }
+}

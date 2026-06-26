@@ -32,6 +32,7 @@ import {
 } from '@game-field-kits/vegetation-library';
 import type { PixelForgeVegetationAsset } from '../pixelForgeAssets';
 import type { StaticImpostorArchetype } from '../staticImpostorArchetypes';
+import type { VegetationGroundCardArchetype } from './groundCardArchetypes';
 
 /** Where the consumer serves the vegetation binaries. Vite serves public/ at '/'. */
 export const VEGETATION_ASSET_ROOT = '/assets/vegetation';
@@ -112,6 +113,69 @@ export function vegetationLibraryStaticArchetypes(
       promotionDistanceMeters: promotion,
       demotionDistanceMeters: Math.round(promotion * DEMOTION_FRACTION),
       parallaxStrength: DEFAULT_PARALLAX,
+    };
+  }
+  return out;
+}
+
+/** The band (for distances) whose backed representation is of `kind`, or null. */
+function bandWithRepKind(asset: VegetationAsset, kind: Representation['kind']) {
+  for (const band of asset.lod.bands) {
+    if (band.representationId === null) continue;
+    const rep = asset.representations.find((r) => r.id === band.representationId);
+    if (rep?.kind === kind) return { band, rep };
+  }
+  return null;
+}
+
+/**
+ * Catalog-derived dense ground-cover archetypes (mesh-near + INSTANCED card-far).
+ *
+ * One per ready asset that has BOTH a backed near `mesh` band AND a backed far
+ * `groundCard` band (e.g. understory-fern, taro-elephant-ear, rice-paddy after their
+ * cards are baked by `scripts/bake-veg-card.mjs`). Keyed by slug, so an instanced
+ * ground-card scatterer drops in by filtering a biome palette to entries whose typeId
+ * is a known ground-card archetype.
+ *
+ * Deliberately SEPARATE from `vegetationLibraryStaticArchetypes()`: that feeds the
+ * GLBHeroScatterer, which keeps one full GLB clone per instance — fine for sparse
+ * heroes, a memory blowup at ground-cover densities. Ground cards never reach the hero
+ * path; they are their own cheap instanced representation.
+ */
+export function vegetationLibraryGroundCards(
+  assets: readonly VegetationAsset[] = readyVegetation(),
+): Record<string, VegetationGroundCardArchetype> {
+  const out: Record<string, VegetationGroundCardArchetype> = {};
+  for (const asset of assets) {
+    const resolved = resolveAsset(VEGETATION_ASSET_ROOT, asset);
+    const meshHit = bandWithRepKind(resolved, 'mesh');
+    const cardHit = bandWithRepKind(resolved, 'groundCard');
+    if (!meshHit || meshHit.rep.kind !== 'mesh' || !cardHit || cardHit.rep.kind !== 'groundCard') {
+      continue;
+    }
+
+    const meshFarEdge = meshHit.band.maxDistanceMeters ?? 20;
+    const cull = cardHit.band.maxDistanceMeters ?? meshFarEdge * 3;
+    const cardWorldSize = cardHit.rep.worldSize;
+    out[asset.id] = {
+      slug: asset.id,
+      meshPath: meshHit.rep.path,
+      card: {
+        baseColor: cardHit.rep.baseColorPath,
+        normal: cardHit.rep.normalPath,
+      },
+      cardWorldSize,
+      bounds: {
+        center: meshHit.rep.bounds.center,
+        size: meshHit.rep.bounds.size,
+        radius: meshHit.rep.bounds.radius,
+      },
+      meshFarEdgeMeters: meshFarEdge,
+      cullDistanceMeters: cull,
+      yOffset: cardWorldSize[1] * 0.5,
+      tier: asset.ecology.tier,
+      density: asset.ecology.density ?? 0.5,
+      maxSlopeDeg: asset.ecology.slopeRangeDeg?.[1] ?? 30,
     };
   }
   return out;

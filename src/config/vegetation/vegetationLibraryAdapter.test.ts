@@ -6,6 +6,7 @@ import {
   VEGETATION_ASSET_ROOT,
   vegetationLibraryAttributions,
   vegetationLibraryBillboardAssets,
+  vegetationLibraryGroundCards,
   vegetationLibraryStaticArchetypes,
 } from './vegetationLibraryAdapter';
 
@@ -76,5 +77,49 @@ describe('vegetationLibraryAdapter', () => {
     expect(jungle!.license).toBe('CC-BY-4.0');
     // CC0 assets (none currently ready) would not require attribution; CC-BY-SA banyans do.
     expect(credits.every((c) => c.license.startsWith('CC-BY'))).toBe(true);
+  });
+});
+
+describe('vegetationLibraryGroundCards', () => {
+  it('emits mesh-near + baked-card-far archetypes for the dense ground-cover species', () => {
+    const cards = vegetationLibraryGroundCards();
+    for (const slug of ['understory-fern', 'taro-elephant-ear', 'rice-paddy']) {
+      const card = cards[slug];
+      expect(card, slug).toBeDefined();
+      // Near mesh + far card both resolve to served public/ urls.
+      expect(card.meshPath).toBe(`${VEGETATION_ASSET_ROOT}/${slug}/${slug}.glb`);
+      expect(card.card.baseColor).toBe(`${VEGETATION_ASSET_ROOT}/${slug}/card/atlas.base-color.png`);
+      expect(card.card.normal).toContain('card/atlas.normal.png');
+      // The card is hard-culled past the near mesh band (LOD makes sense).
+      expect(card.cullDistanceMeters).toBeGreaterThan(card.meshFarEdgeMeters);
+      // Footprint + ground anchor are sane.
+      expect(card.cardWorldSize[0]).toBeGreaterThan(0);
+      expect(card.cardWorldSize[1]).toBeGreaterThan(0);
+      expect(card.yOffset).toBeCloseTo(card.cardWorldSize[1] * 0.5, 5);
+      expect(card.bounds.radius).toBeGreaterThan(0);
+      expect(card.maxSlopeDeg).toBeGreaterThan(0);
+    }
+  });
+
+  it('matches the catalog LOD band distances (fern 14->40, taro 28->65, rice 25->50)', () => {
+    const cards = vegetationLibraryGroundCards();
+    expect(cards['understory-fern'].meshFarEdgeMeters).toBe(14);
+    expect(cards['understory-fern'].cullDistanceMeters).toBe(40);
+    expect(cards['taro-elephant-ear'].meshFarEdgeMeters).toBe(28);
+    expect(cards['taro-elephant-ear'].cullDistanceMeters).toBe(65);
+    expect(cards['rice-paddy'].meshFarEdgeMeters).toBe(25);
+    expect(cards['rice-paddy'].cullDistanceMeters).toBe(50);
+  });
+
+  it('keeps ground cards OFF the per-clone hero (static-impostor) path', () => {
+    // Dense ground cover must never reach vegetationLibraryStaticArchetypes() — that
+    // feeds the GLBHeroScatterer, which keeps one GLB clone per instance.
+    const archetypes = vegetationLibraryStaticArchetypes();
+    const cards = vegetationLibraryGroundCards();
+    for (const slug of Object.keys(cards)) {
+      expect(archetypes[slug], slug).toBeUndefined();
+    }
+    // ...and ground cards never leak into the billboard seam either.
+    expect(vegetationLibraryBillboardAssets()).toEqual([]);
   });
 });

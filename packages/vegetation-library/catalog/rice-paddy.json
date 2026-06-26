@@ -25,14 +25,22 @@
       "materialBuckets": [],
       "bounds": { "center": [0, 1.22, 0], "size": [1.393, 2.441, 1.099], "radius": 1.509 },
       "budget": { "trisPerInstance": 3876, "drawCallsPerBatch": 2, "textureMb": 0 }
+    },
+    {
+      "kind": "groundCard",
+      "id": "card-rice",
+      "baseColorPath": "rice-paddy/card/atlas.base-color.png",
+      "normalPath": "rice-paddy/card/atlas.normal.png",
+      "worldSize": [1.774, 2.441],
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.5 }
     }
   ],
   "lod": {
     "label": "mesh-near+card-far",
-    "rationale": "A rice plant is dense thin blades — vertex-colored, no textures. Up close it reads as real 3D fronds (cheap mesh), but past ~25m it is indistinguishable from a flat clump, so the far band is a planned ground card, not an impostor. Mirrors the elephant-grass strategy: ground cover never warrants an octahedral impostor and culls before any far horizon band.",
+    "rationale": "A rice plant is dense thin blades — vertex-colored, no textures. Up close it reads as real 3D fronds (cheap mesh), but past ~25m it is indistinguishable from a flat clump, so the far band is a baked vertex-color ground card, not an impostor. Mirrors the elephant-grass strategy: ground cover never warrants an octahedral impostor and culls before any far horizon band.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 25, "representationId": "mesh-rice", "budget": { "trisPerInstance": 3876, "drawCallsPerBatch": 2 } },
-      { "minDistanceMeters": 25, "maxDistanceMeters": 50, "representationId": null, "plannedKind": "groundCard", "notes": "Bake a single front-view vertex-color-baked alpha ground card from the normalized rice mesh; fades out by 50m." }
+      { "minDistanceMeters": 25, "maxDistanceMeters": 50, "representationId": "card-rice", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view vertex-color alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 50m." }
     ]
   },
   "ecology": {
