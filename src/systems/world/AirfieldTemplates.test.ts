@@ -22,9 +22,10 @@ describe('AirfieldTemplates', () => {
     const countOf = (modelPath: string) =>
       parkedAircraft.filter((p) => p === modelPath).length;
 
-    expect(countOf(AircraftModels.A1_SKYRAIDER)).toBe(1);
-    expect(countOf(AircraftModels.AC47_SPOOKY)).toBe(1);
-    expect(countOf(AircraftModels.F4_PHANTOM)).toBe(1);
+    // Default art is Kiln (kiln-war-2026-06); the spots repoint to the Kiln GLBs.
+    expect(countOf(AircraftModels.A_1_SKYRAIDER_SPAD)).toBe(1);
+    expect(countOf(AircraftModels.AC_47_SPOOKY_GUNSHIP)).toBe(1);
+    expect(countOf(AircraftModels.F_4_PHANTOM_II)).toBe(1);
 
     // None of the main-airbase parking spots may carry an NPC auto-flight
     // mission — auto-launching on boot strands the player at an empty field.

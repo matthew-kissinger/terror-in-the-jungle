@@ -24,12 +24,15 @@ import * as THREE from 'three';
  * route through the shared combatant hitscan path — only origin / direction /
  * spread / cadence / magazine differ per airframe.
  *
- * Muzzle offsets are re-banded to the repaint catalog airframe dims
- * (cycle-2026-06-11): A-1 14.1 m span / 12.51 m length, F-4 18.82 m length,
- * AC-47 26.3 m span / 20.21 m length. (The war-asset catalog carries explicit
+ * Muzzle offsets are re-banded to the Kiln catalog airframe dims
+ * (kiln-war-2026-06): A-1 13.42 m span / 10.28 m length, F-4 14.12 m length,
+ * AC-47 28.4 m span / 21.15 m length. (The war-asset catalog carries explicit
  * `muzzleNodes` only for hand weapons; aircraft armament is positioned off the
  * measured airframe bbox, not a per-node anchor — the muzzles sit on the wing
- * roots / nose / left fuselage of the larger airframes.)
+ * roots / nose / left fuselage of the larger airframes.) The
+ * `?aircraftArt=legacy` escape hatch reuses these Kiln-tuned offsets on the
+ * legacy GLBs as a best-effort approximation (close enough that the tracer
+ * origin still reads on-airframe).
  */
 export interface FixedWingWeaponConfig {
   /** HUD-facing weapon name. */
@@ -69,13 +72,13 @@ const A1_WING_CANNONS: FixedWingWeaponConfig = {
   spreadDeg: 0.5,
   tracerInterval: 2,
   fireAxis: [0, 0, -1],
-  // Two cannons per wing on the 14.1 m-span wing, firing from the leading edge
-  // ahead of the 12.51 m fuselage origin.
+  // Two cannons per wing on the 13.42 m-span Kiln wing, firing from the leading
+  // edge ahead of the 10.28 m fuselage origin (nose ~-5.1 m).
   muzzles: [
-    [-3.2, -0.4, -3.6],
-    [-1.9, -0.4, -3.6],
-    [1.9, -0.4, -3.6],
-    [3.2, -0.4, -3.6],
+    [-3.0, -0.4, -3.0],
+    [-1.8, -0.4, -3.0],
+    [1.8, -0.4, -3.0],
+    [3.0, -0.4, -3.0],
   ],
 };
 
@@ -91,9 +94,9 @@ const F4_NOSE_ROTARY: FixedWingWeaponConfig = {
   spreadDeg: 0.8,
   tracerInterval: 3,
   fireAxis: [0, 0, -1],
-  // Nose gun pushed forward to the nose of the longer 18.82 m airframe (origin
-  // near the wing; nose tip is ~-9 m, so -6.5 m clears the radome).
-  muzzles: [[0, -0.3, -6.5]],
+  // Nose gun pushed forward to the nose of the 14.12 m Kiln airframe (origin near
+  // the wing; nose tip is ~-7 m, so -5.0 m clears the radome).
+  muzzles: [[0, -0.3, -5.0]],
 };
 
 /**
@@ -109,12 +112,12 @@ const AC47_BROADSIDE_BATTERY: FixedWingWeaponConfig = {
   spreadDeg: 1.2,
   tracerInterval: 1,
   fireAxis: [-1, 0, 0],
-  // Three windows down the left fuselage of the 20.21 m-long airframe; the guns
-  // poke out the left side (-X) and walk fore-to-aft along the cabin (Z).
+  // Three windows down the left fuselage of the 21.15 m-long Kiln airframe; the
+  // guns poke out the left side (-X) and walk fore-to-aft along the cabin (Z).
   muzzles: [
-    [-1.9, -0.3, 3.0],
-    [-1.9, -0.3, 0.0],
-    [-1.9, -0.3, -3.0],
+    [-2.0, -0.3, 3.2],
+    [-2.0, -0.3, 0.0],
+    [-2.0, -0.3, -3.2],
   ],
 };
 
@@ -176,33 +179,35 @@ export interface FixedWingCameraFit {
   readonly broadside?: FixedWingBroadsideView;
 }
 
-// Chase distances re-banded to the repaint catalog airframe dims
-// (cycle-2026-06-11): the larger airframes need a touch more standoff to frame.
-// Ordering a1 < f4 < ac47 is preserved (agile prop closest, gunship widest).
+// Chase distances re-banded to the Kiln catalog airframe dims (kiln-war-2026-06):
+// dominant framing dim A-1 13.42 m < F-4 14.12 m < AC-47 28.4 m. Ordering
+// a1 < f4 < ac47 is preserved (agile prop closest, gunship widest). The
+// sightConvergenceRange values are gunnery boresight references (not airframe
+// dims) and are left unchanged.
 const A1_CAMERA_FIT: FixedWingCameraFit = {
-  chaseDistance: 32,
+  chaseDistance: 30,
   chaseHeight: 8,
   fovWidenEnabled: false,
   sightConvergenceRange: 320,
 };
 
 const F4_CAMERA_FIT: FixedWingCameraFit = {
-  chaseDistance: 40,
+  chaseDistance: 36,
   chaseHeight: 9,
   fovWidenEnabled: true,
   sightConvergenceRange: 420,
 };
 
 const AC47_CAMERA_FIT: FixedWingCameraFit = {
-  chaseDistance: 48,
+  chaseDistance: 50,
   chaseHeight: 13,
   fovWidenEnabled: false,
   sightConvergenceRange: 360,
-  // Gunner view sits off the right side (+X) of the 26.3 m-span airframe and
-  // looks across at the left-fuselage broadside battery; widened to clear the
-  // larger half-span.
+  // Gunner view sits off the right side (+X) of the 28.4 m-span Kiln airframe
+  // and looks across at the left-fuselage broadside battery; widened to clear
+  // the larger half-span (~14.2 m).
   broadside: {
-    lateralOffset: 30,
+    lateralOffset: 32,
     heightOffset: 11,
     aftOffset: 5,
   },
