@@ -1,0 +1,16 @@
+{
+  "slug": "usmc-ka-bar-fighting",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/usmc-ka-bar-fighting.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.664Z",
+  "sourcePrompt": "A USMC KA-BAR fighting knife, about thirty centimeters end to end. A classic combat knife: a long clip-point blade with a shallow fuller groove, a small oval steel crossguard, a stacked leather-washer handle with fine ring ridges, and a flat steel pommel cap. Dark parkerized blade, warm brown leather grip, simple and timeless. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 3c7b271e-2b9f-4800-a30e-11bf637a1499",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

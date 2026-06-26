@@ -1,0 +1,16 @@
+{
+  "slug": "field-medical-aid-station",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/field-medical-aid-station.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.856Z",
+  "sourcePrompt": "A field medical aid station tent about six meters long. A canvas field tent with both entrance flaps tied wide open revealing folding cots and stacked medical chests inside, a large red cross on white painted on the roof and another on the side wall, guy ropes staked out, and supply crates by the entrance. Olive-drab canvas and red crosses. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 8f96c48a-a694-4a54-9381-3018154f33df",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

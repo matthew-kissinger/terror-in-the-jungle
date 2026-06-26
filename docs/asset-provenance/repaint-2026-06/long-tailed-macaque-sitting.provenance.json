@@ -1,0 +1,16 @@
+{
+  "slug": "long-tailed-macaque-sitting",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/long-tailed-macaque-sitting.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.739Z",
+  "sourcePrompt": "A long-tailed macaque sitting on its haunches, about half a meter tall seated, with a tail longer than its body curling behind. A small monkey leaning slightly forward, hands resting in front, with a round expressive pinkish face under a cap of swept fur and close-set watchful eyes. Short tan-brown fur shading paler at the chest, compact and inquisitive. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 466671d0-35e9-4f3e-b4d3-36dd5921d25b",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "battle-damaged-vietnamese-shophouse",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/battle-damaged-vietnamese-shophouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.235Z",
+  "sourcePrompt": "A battle-damaged Vietnamese shophouse - the same narrow two-story colonial building, shelled. A ragged hole has collapsed one upper corner, exposing floor edges and interior wall; shutters hang skewed, the balcony rail is bent, scorch marks streak up the stucco above the openings, and rubble piles against the shopfront. The far half still. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 39bd305b-5212-4f58-8899-4a3659defd6a",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

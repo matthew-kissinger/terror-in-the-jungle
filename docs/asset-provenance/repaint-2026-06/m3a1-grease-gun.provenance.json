@@ -1,0 +1,16 @@
+{
+  "slug": "m3a1-grease-gun",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m3a1-grease-gun.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.699Z",
+  "sourcePrompt": "An M3A1 \"Grease Gun\" .45 submachine gun issued to US armored crews, about three quarters of a meter with its wire stock extended. A crude stamped-steel cylindrical body like a mechanic's grease gun, a stubby barrel, a long straight box magazine hanging from the underside, a simple pistol grip, and a thin collapsible wire shoulder stock of two parallel rods.. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 75b71880-450b-451a-8dc1-2ecf98a84460",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

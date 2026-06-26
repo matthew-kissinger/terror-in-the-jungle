@@ -1,0 +1,16 @@
+{
+  "slug": "chinese-pond-heron-standing",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/chinese-pond-heron-standing.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.747Z",
+  "sourcePrompt": "A Chinese pond heron standing hunched at the water's edge, about half a meter tall. A compact heron with its neck drawn in so the streaked brown head sits low on the shoulders, a straight pointed bill angled slightly down, folded white wings under a buff-streaked breast, and sturdy yellow legs. Brown streaks over white, quiet and watchful. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 87128411-8b9b-4505-8de9-bfd71725b896",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

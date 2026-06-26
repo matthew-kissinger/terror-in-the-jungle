@@ -1,0 +1,16 @@
+{
+  "slug": "55-gallon-steel-fuel",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/55-gallon-steel-fuel.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.928Z",
+  "sourcePrompt": "A 55-gallon steel fuel drum, about ninety centimeters tall. A straight cylinder with two raised rolling ribs around the body, a flat top with two small bung caps, stenciled fuel markings on the side, and scattered dents and rust streaks down from the rim. Olive-drab paint gone rusty at the seams, ubiquitous and grimy. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 87b2146a-c0b0-485b-b523-28927ad11772",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

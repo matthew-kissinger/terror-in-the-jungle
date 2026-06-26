@@ -1,0 +1,16 @@
+{
+  "slug": "an-prc-25-field",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/an-prc-25-field.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.978Z",
+  "sourcePrompt": "An AN/PRC-25 field-radio stack for a command post, about half a meter tall on its crate. A boxy olive-drab radio set with a dialed control face, a coiled handset cable hanging to a handset hooked on the side, a long whip antenna rising well overhead, and a spare battery box stacked beneath. Olive-drab metal, black dials and a thin whip, field. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 1b8fd4e1-a31f-40a3-841f-3138787f608c",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

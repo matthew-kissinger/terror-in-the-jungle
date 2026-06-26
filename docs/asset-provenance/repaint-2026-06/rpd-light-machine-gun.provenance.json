@@ -1,0 +1,16 @@
+{
+  "slug": "rpd-light-machine-gun",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/rpd-light-machine-gun.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.722Z",
+  "sourcePrompt": "An RPD light machine gun, an NVA belt-fed squad automatic, just over a meter long. A wood-stocked machine gun with a long plain barrel, a folding bipod at the muzzle, a wooden buttstock, pistol grip and fore-grip, and its signature round sheet-metal drum hanging centered beneath the receiver carrying the belt. Wood furniture and blued steel, low-slung. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 2827c47c-d59e-45b4-8c0d-4135aac5f02e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

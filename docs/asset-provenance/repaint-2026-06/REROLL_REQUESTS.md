@@ -8,6 +8,7 @@ Re-rolled assets re-enter through the same importer (idempotent).
 |---|---|---:|---:|---|---:|
 | ammo-bunker | structures | 35456 | 201.9 | 35456 tris > 20k hard cap | 2500 |
 | barbed-wire-fence | structures | 8520 | 375 | 375KB > 300KB hard cap; mass-placed 8520 tris > 6k cap | 2500 |
+| burmese-python-rest | animals | 22152 | 582.5 | 22152 tris > 20k hard cap; 582.5KB > 300KB hard cap (Kiln war-export 2026-06-25) | 5538 |
 | concertina-wire | structures | 14948 | 464.2 | 464.2KB > 300KB hard cap; mass-placed 14948 tris > 6k cap | 2500 |
 | egret | animals | 8230 | 512.6 | 512.6KB > 300KB hard cap | 2057 |
 | helipad | structures | 41704 | 84.6 | 41704 tris > 20k hard cap; helipad footprint 26m / height 4.44m breaks 14m flat-pad landing contract | 2500 |

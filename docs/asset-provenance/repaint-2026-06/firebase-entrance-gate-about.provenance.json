@@ -1,0 +1,18 @@
+{
+  "slug": "firebase-entrance-gate-about",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/firebase-entrance-gate-about.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.907Z",
+  "sourcePrompt": "A firebase entrance gate about five meters wide. Two stout timber posts carry a horizontal lifting cross-pole barrier, a hand-painted unit sign board hangs from the crossbar, and a small sandbagged guard position with a tin roof hunches to one side. Rough timber, sandbags and stenciled paint, the way in. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 9ae61b8a-c764-47c2-bc80-084d53c49db4",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4904 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

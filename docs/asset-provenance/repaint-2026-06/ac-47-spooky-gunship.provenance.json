@@ -1,0 +1,29 @@
+{
+  "slug": "ac-47-spooky-gunship",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/ac-47-spooky-gunship.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.400Z",
+  "sourcePrompt": "An AC-47 \"Spooky\" gunship, a Douglas C-47 transport turned side-firing gunship, about twenty meters long with a wingspan wider still, sitting tail-down on taildragger gear. A rounded nose and stepped cockpit lead a fat cigar fuselage; two radial engines with propellers hang on broad low wings; a tall rounded tail fin rises aft.. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 8bf1d15f-40dc-438d-b4cd-09041adc41f6",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_PropellerL",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 4
+    },
+    {
+      "name": "Joint_PropellerR",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 4
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

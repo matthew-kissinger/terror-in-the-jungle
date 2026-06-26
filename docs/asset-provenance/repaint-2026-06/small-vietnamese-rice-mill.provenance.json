@@ -1,0 +1,16 @@
+{
+  "slug": "small-vietnamese-rice-mill",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/small-vietnamese-rice-mill.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.202Z",
+  "sourcePrompt": "A small Vietnamese rice mill, a working shed about eight meters long with one long side open. A timber frame under a rusted corrugated-tin roof with a small roof vent, the open side revealing a chunky milling machine with a hopper and belt wheel inside, and plump grain sacks stacked on a low loading platform out front. Weathered gray wood. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 8804d408-11aa-4809-8342-e47184239d2c",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

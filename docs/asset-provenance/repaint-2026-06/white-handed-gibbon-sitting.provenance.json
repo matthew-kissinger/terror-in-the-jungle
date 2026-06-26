@@ -1,0 +1,16 @@
+{
+  "slug": "white-handed-gibbon-sitting",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/white-handed-gibbon-sitting.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.723Z",
+  "sourcePrompt": "A white-handed gibbon sitting upright, about ninety centimeters tall, its folded arms still reaching past its feet - arms half again the length of its body. A slender tailless ape with a small round head, a pale ring framing a dark face, pale hands and feet against shaggy dark chocolate fur, knees drawn up. Lithe, long-limbed and gentle-looking. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 3e74e55c-dd56-4a52-8898-055ccf8ff136",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

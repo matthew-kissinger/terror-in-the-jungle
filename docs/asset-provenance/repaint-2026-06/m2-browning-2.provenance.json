@@ -1,0 +1,18 @@
+{
+  "slug": "m2-browning-2",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m2-browning-2.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.693Z",
+  "sourcePrompt": "An M2 Browning .50 caliber \"Ma Deuce\" heavy machine gun mounted low on its ground tripod. A massive boxy receiver feeding a thick barrel inside a perforated jacket, more than one and a half meters of gun, with big spade grips and a butterfly trigger at the rear, sitting on a splayed three-legged tripod whose front legs reach forward. Gunmetal gray, brutally. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 59a43d49-a337-44df-ba35-588d08da6a5e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "1992 tris over 1,500 weapon budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

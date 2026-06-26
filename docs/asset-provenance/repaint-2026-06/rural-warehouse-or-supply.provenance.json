@@ -1,0 +1,18 @@
+{
+  "slug": "rural-warehouse-or-supply",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/rural-warehouse-or-supply.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.273Z",
+  "sourcePrompt": "A rural warehouse or supply depot, a long low building about fifteen meters by eight. Cinder-block walls to waist height with corrugated-metal sheeting above, a corrugated gable roof with shallow pitch, a pair of large sliding cargo doors on the long face hung from an exterior rail, and a few small high windows. Rust-streaked silver steel. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 1b03f3e3-8c77-4650-887d-6b9b520d289a",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2624 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

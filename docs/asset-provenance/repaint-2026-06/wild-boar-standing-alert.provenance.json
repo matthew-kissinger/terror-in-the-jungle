@@ -1,0 +1,16 @@
+{
+  "slug": "wild-boar-standing-alert",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/wild-boar-standing-alert.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.787Z",
+  "sourcePrompt": "A wild boar standing alert, about a meter and a half long and low-slung. A stocky forest pig with its weight piled into a humped muscular shoulder that tapers to lean hindquarters, a long wedge snout with short upturned tusks, upright ears, a bristled ridge along the spine, and short sturdy legs. Coarse dark brown bristle all over, compact and tough. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 19ff7573-5fd4-4988-ac22-dc563a861b82",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

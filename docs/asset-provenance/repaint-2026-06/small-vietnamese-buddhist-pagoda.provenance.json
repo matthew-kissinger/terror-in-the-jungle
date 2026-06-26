@@ -1,0 +1,16 @@
+{
+  "slug": "small-vietnamese-buddhist-pagoda",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/small-vietnamese-buddhist-pagoda.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.187Z",
+  "sourcePrompt": "A small Vietnamese Buddhist pagoda in the Mahayana style, about six meters square under roughly eight meters of stacked roof. Two tiers of green glazed-tile roofs with dramatically upturned eave corners and ornamental ridge finials, red-lacquered columns framing an open raised entrance up a short flight of steps, and white stucco side walls. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation ec404da1-3b20-4588-a111-7bf0067f34b4",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

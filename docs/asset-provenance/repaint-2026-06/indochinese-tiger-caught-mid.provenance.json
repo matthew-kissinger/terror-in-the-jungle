@@ -1,0 +1,16 @@
+{
+  "slug": "indochinese-tiger-caught-mid",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/indochinese-tiger-caught-mid.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.755Z",
+  "sourcePrompt": "An Indochinese tiger caught mid-stalk, about two and a half meters nose to tail-tip. A big cat pressed low and forward, shoulders rolling above a dipped spine, head level and fixed ahead, the long tail trailing in a shallow curve, all four paws planted wide and silent. A broad white-cheeked face, and the classic coat: burnt orange banded with black stripes. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 43ec44a5-5a3f-4700-a28a-30f27f86010d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

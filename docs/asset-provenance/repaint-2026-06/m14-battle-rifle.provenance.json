@@ -1,0 +1,16 @@
+{
+  "slug": "m14-battle-rifle",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m14-battle-rifle.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.670Z",
+  "sourcePrompt": "An M14 battle rifle, early-war US issue, about one point one meters long and traditional in profile. A full-length rifle with a one-piece walnut stock and handguard running most of its length, a long barrel ending in a slotted flash suppressor, a twenty-round box magazine below the receiver, and iron sights front and rear. Walnut wood and parkerized steel. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 62a58a11-f153-4451-9815-6c8bc878c3f7",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

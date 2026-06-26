@@ -1,0 +1,16 @@
+{
+  "slug": "military-ammunition-crate-about",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/military-ammunition-crate-about.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.864Z",
+  "sourcePrompt": "A military ammunition crate about eighty centimeters long. A sturdy rectangular wooden box with a hinged lid, rope loop handles on each end, metal reinforcing strips at the corners, and stenciled white markings along the side. Olive-drab painted wood with darker metal banding, dense and regulation. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation c063f050-f1a7-43aa-a27f-637212dc61da",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

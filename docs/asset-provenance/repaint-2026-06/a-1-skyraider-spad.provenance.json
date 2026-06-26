@@ -1,0 +1,23 @@
+{
+  "slug": "a-1-skyraider-spad",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/a-1-skyraider-spad.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.391Z",
+  "sourcePrompt": "An A-1 Skyraider \"Spad\", a burly single-engine attack aircraft about twelve meters long, sitting tail-low on taildragger gear. A big radial engine cowl with a four-bladed propeller fills the nose, a framed bubble canopy sits over mid-fuselage, and straight broad wings carry rows of underwing hardpoints loaded with bombs. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation c8089568-63de-4f30-a8ba-fb355868791a",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_Propeller",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 9
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

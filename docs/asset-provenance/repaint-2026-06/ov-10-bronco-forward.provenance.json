@@ -1,0 +1,29 @@
+{
+  "slug": "ov-10-bronco-forward",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/ov-10-bronco-forward.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.522Z",
+  "sourcePrompt": "An OV-10 Bronco forward-air-control aircraft, about thirteen meters long with its strangest feature in plan view: two slim booms run back from the wing-mounted turboprop engines to a single high tailplane bridging them, framing open air behind the short central pod. That pod carries a huge greenhouse canopy up front and sponson. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 42bd854a-036e-4177-a002-0694f9d2143a",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_PropellerL",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 7
+    },
+    {
+      "name": "Joint_PropellerR",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 7
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "open-air-vietnamese-street",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/open-air-vietnamese-street.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.179Z",
+  "sourcePrompt": "An open-air Vietnamese street market stall, about three meters wide and head-high. A simple wooden stand: four rough poles holding up a single slanted awning of faded tarp, a plank counter across the front loaded with produce and goods, and woven baskets and a stacked crate or two at its feet. No walls, all structure. Weathered wood. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation ea7e8f83-abd5-460c-b55b-647ad072161f",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2644 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

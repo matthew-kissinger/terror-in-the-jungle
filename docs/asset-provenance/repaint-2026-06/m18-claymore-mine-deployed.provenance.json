@@ -1,0 +1,16 @@
+{
+  "slug": "m18-claymore-mine-deployed",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/m18-claymore-mine-deployed.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.886Z",
+  "sourcePrompt": "An M18 Claymore mine deployed on its legs, a small curved rectangular block about twenty-two centimeters wide. The olive-drab plastic body bows convex toward the front with raised embossed lettering, two pairs of thin scissor legs splay into the soil beneath, and a blasting-cap well with a wire stub sits on top. Olive-drab plastic, small. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 22faf389-3ae7-4fbb-93f7-234cbb32cd3e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

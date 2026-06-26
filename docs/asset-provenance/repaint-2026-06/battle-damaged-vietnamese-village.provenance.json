@@ -1,0 +1,16 @@
+{
+  "slug": "battle-damaged-vietnamese-village",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/battle-damaged-vietnamese-village.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.265Z",
+  "sourcePrompt": "A battle-damaged Vietnamese village hut - the same small bamboo-and-thatch home on short posts, wrecked by shelling. Half the thatched roof has collapsed inward leaving charred rafters open to the sky, one bamboo wall is blown out into splintered staves, and broken thatch and bamboo debris lie around the breach. The standing half remains. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation b282392f-2fbb-4822-b5bb-3f6c75006dba",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

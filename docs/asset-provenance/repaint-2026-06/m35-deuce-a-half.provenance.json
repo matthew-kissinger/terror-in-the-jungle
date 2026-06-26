@@ -1,0 +1,16 @@
+{
+  "slug": "m35-deuce-a-half",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/m35-deuce-a-half.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.475Z",
+  "sourcePrompt": "An M35 \"Deuce and a Half\" six-wheel cargo truck, about six and a half meters long, sitting high on its axles. A round-fendered hooded cab with a flat split windshield leads; behind it a long cargo bed rides on the frame under arched bows carrying a canvas tarp roof. One axle under the cab, two close-set at the rear with big. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 994a6429-a151-4fc0-ba07-8f47cfecbd45",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "ak-47",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/ak-47.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.637Z",
+  "sourcePrompt": "An AK-47, the iconic rifle of the NVA and Viet Cong, just under a meter long and lying level. A rugged rifle with a deep banana magazine curving down from the middle, a warm reddish-brown wood handguard, pistol grip and buttstock, a gas tube riding above the barrel, a front sight post, and a slanted muzzle cut. Blued steel and weathered wood, purposeful. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 3ad9d6a9-182d-4fb6-81de-70dd74a16a4d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

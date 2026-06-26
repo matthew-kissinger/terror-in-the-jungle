@@ -1,0 +1,16 @@
+{
+  "slug": "sa-2-guideline-surface",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/sa-2-guideline-surface.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.985Z",
+  "sourcePrompt": "An SA-2 Guideline surface-to-air missile on its launcher, the missile alone over ten meters long. A slender two-stage missile - cruciform fins at the tail of a flared booster, smaller fins mid-body and at the pointed nose - angled steeply skyward on a single launch rail atop a rotating pedestal with a trailer-style base. White missile. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 540ed88c-3f96-4e79-8601-6b25ebd54241",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}
