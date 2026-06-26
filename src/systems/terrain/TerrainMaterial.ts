@@ -67,6 +67,16 @@ const tslMix = (...args: TslNode[]): TslNode => (mix as (...values: TslNode[]) =
 const tslFloat = (value: number): TslNode => float(value) as TslNode;
 const tslReference = (type: string, uniform: UniformSlot): TslNode => reference('value', type, uniform) as TslNode;
 const tslTexture = (source: THREE.Texture, sampleUv: TslNode): TslNode => tslTextureNode(source, sampleUv) as TslNode;
+// Vertex-stage texture sampling. WGSL forbids implicit-LOD sampling
+// (`textureSample`) outside the fragment stage — there are no screen-space
+// derivatives — so it must use an explicit mip level (`textureSampleLevel`),
+// which `.level(0)` selects. three.js r184's WebGPU backend tolerated an
+// implicit-LOD fetch in the vertex shader; r185 does not, and the terrain
+// height fetch (which runs in the vertex shader) then silently returns 0,
+// collapsing every CDLOD tile to Y=0 so the terrain renders far below the
+// camera and reads as invisible. WebGL has no such restriction.
+const tslTextureLod0 = (source: THREE.Texture, sampleUv: TslNode): TslNode =>
+  (tslTextureNode(source, sampleUv) as unknown as { level: (lod: TslNode) => TslNode }).level(float(0) as TslNode) as TslNode;
 const tslClamp = (...args: TslNode[]): TslNode => (tslClampBase as (...values: TslNode[]) => TslNode)(...args);
 const tslLength = (value: TslNode): TslNode => (tslLengthBase as (node: TslNode) => TslNode)(value);
 const tslMax = (...args: TslNode[]): TslNode => (tslMaxBase as (...values: TslNode[]) => TslNode)(...args);
@@ -211,14 +221,19 @@ function createTerrainPositionNode(uniforms: TerrainUniforms): TslNode {
     tileCenterZ.add(morphedZ.mul(tileSize)),
   );
   const worldUv = createTerrainWorldUvNode(uniforms, worldPos);
-  const terrainHeight = tslTexture(uniformTexture(uniforms, 'terrainHeightmap'), worldUv).r;
+  // Vertex-stage fetch needs explicit LOD under WebGPU (see tslTextureLod0).
+  const terrainHeight = tslTextureLod0(uniformTexture(uniforms, 'terrainHeightmap'), worldUv).r;
   const skirtDrop = tslMax(tslFloat(2), lodLevel.add(1).mul(4));
-  // Return tile-local X/Z: InstancedMesh applies the tile matrix after
-  // positionNode. Height is already world-space Y because instance Y scale is 1.
+  // Output FULL WORLD position. The InstancedMesh instance matrix is identity
+  // (see CDLODRenderer.writeTileInstance): r185's WebGPU backend does not apply
+  // the per-instance matrix uniform for this mesh — tiles collapsed to the world
+  // origin and the terrain rendered invisible. r184 used the instanced-attribute
+  // path, which still works, so tile placement is driven by the tileParams0
+  // attribute (tileCenterX/Z + tileSize) here instead of the instance matrix.
   return tslVec3(
-    morphedX,
+    worldPos.x,
     terrainHeight.sub(step(tslFloat(0.5), isSkirt).mul(skirtDrop)),
-    morphedZ,
+    worldPos.z,
   );
 }
 
