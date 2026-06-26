@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import type { StaticImpostorArchetype } from '../../config/staticImpostorArchetypes';
-import type { BiomeVegetationEntry } from '../../config/biomes';
+import { getBiome, type BiomeVegetationEntry } from '../../config/biomes';
+import { vegetationLibraryStaticArchetypes } from '../../config/vegetation/vegetationLibraryAdapter';
 import {
   GLBHeroScatterer,
   type HeroImpostorRegistrar,
@@ -174,5 +175,53 @@ describe('GLBHeroScatterer', () => {
     scatterer.updateImpostors(0.016);
     scatterer.updateImpostors(0.016);
     expect(impostors.updates).toBe(2);
+  });
+});
+
+describe('GLBHeroScatterer real-config wiring', () => {
+  // Regression guard for the asset cutover: proves the live catalog -> adapter ->
+  // biome palette chain actually streams the baked canopy heroes, and that the
+  // billboard-only palette ids (fern, fanPalm, ...) never reach the GLB loader.
+  it('streams the baked library canopy heroes from the real denseJungle palette', async () => {
+    const archetypes = vegetationLibraryStaticArchetypes();
+    const palette = getBiome('denseJungle').vegetationPalette;
+
+    const requested: string[] = [];
+    const loader: HeroModelLoader = {
+      async loadModelFromUrl(url: string): Promise<THREE.Group> {
+        requested.push(url);
+        return new THREE.Group();
+      },
+      disposeInstance(o: THREE.Object3D): void {
+        o.removeFromParent();
+      },
+    };
+    const impostors = new FakeImpostors();
+    const scatterer = new GLBHeroScatterer(
+      {
+        scene: new THREE.Scene(),
+        modelLoader: loader,
+        impostors,
+        getHeight: () => 10,
+        archetypes,
+      },
+      128,
+      3, // wide enough residency that every wired species samples many cells
+    );
+    scatterer.setWorldBounds(100_000, 200);
+    scatterer.configure('denseJungle', new Map([['denseJungle', palette]]), []);
+    await settle(scatterer, new THREE.Vector3(0, 0, 0));
+
+    // Distinct asset slugs actually streamed to the loader.
+    const slugs = new Set(
+      requested.map((u) => u.split('/assets/vegetation/')[1]?.split('/')[0]),
+    );
+    // Every baked canopy hero wired into denseJungle places.
+    for (const s of ['jungle-tree', 'rubber-a', 'rubber-b', 'teak-a', 'teak-b']) {
+      expect(slugs.has(s), s).toBe(true);
+    }
+    // Nothing outside the hero archetype set ever reaches the GLB loader.
+    expect([...slugs].every((s) => s in archetypes)).toBe(true);
+    expect(impostors.registered.size).toBeGreaterThan(0);
   });
 });

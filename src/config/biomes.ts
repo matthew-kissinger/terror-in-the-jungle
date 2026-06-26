@@ -61,9 +61,15 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
   groundTileScale: 0.14,
   groundRoughness: 0.85,
   vegetationPalette: [
-    // GLB canopy hero (Phase II): scattered as a real mesh near, octa impostor far.
+    // GLB canopy heroes (Phase II): scattered as a real mesh near, octa impostor far.
     // typeId matches the vegetation-library asset id / static-impostor archetype slug.
+    // Ignored by the billboard scatterer (no matching VegetationTypeConfig); picked up
+    // only by the GLBHeroScatterer when hero scatter is enabled.
     { typeId: 'jungle-tree',  densityMultiplier: 0.2 },
+    { typeId: 'teak-a',       densityMultiplier: 0.1 },
+    { typeId: 'teak-b',       densityMultiplier: 0.08 },
+    { typeId: 'rubber-a',     densityMultiplier: 0.1 },
+    { typeId: 'rubber-b',     densityMultiplier: 0.08 },
     { typeId: 'fern',          densityMultiplier: 1.15 },
     { typeId: 'elephantEar',   densityMultiplier: 1.1 },
     { typeId: 'fanPalm',      densityMultiplier: 1.0 },
@@ -81,6 +87,10 @@ const BIOME_ASHAU_JUNGLE: BiomeConfig = {
   groundRoughness: 0.85,
   vegetationPalette: [
     { typeId: 'jungle-tree',  densityMultiplier: 0.15 },
+    { typeId: 'teak-a',       densityMultiplier: 0.08 },
+    { typeId: 'teak-b',       densityMultiplier: 0.06 },
+    { typeId: 'rubber-a',     densityMultiplier: 0.06 },
+    { typeId: 'rubber-b',     densityMultiplier: 0.05 },
     { typeId: 'fern',          densityMultiplier: 0.45 },
     { typeId: 'elephantEar',   densityMultiplier: 0.58 },
     { typeId: 'fanPalm',      densityMultiplier: 0.78 },
@@ -124,6 +134,8 @@ const BIOME_RIVERBANK: BiomeConfig = {
   groundRoughness: 0.9,
   vegetationPalette: [
     { typeId: 'jungle-tree',  densityMultiplier: 0.28 },
+    { typeId: 'teak-a',       densityMultiplier: 0.08 },
+    { typeId: 'rubber-a',     densityMultiplier: 0.06 },
     { typeId: 'elephantEar',   densityMultiplier: 1.45 },
     { typeId: 'fanPalm',      densityMultiplier: 1.35 },
     { typeId: 'coconut',      densityMultiplier: 1.25 },

@@ -42,14 +42,25 @@
       "materialBuckets": ["bark", "leaf"],
       "bounds": { "center": [0, 11, 0], "size": [20.76, 22, 20.62], "radius": 18.3 },
       "budget": { "trisPerInstance": 9522, "drawCallsPerBatch": 2, "textureMb": 0.7 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-teak-a",
+      "baseColorPath": "teak-a/impostor/atlas.base-color.png",
+      "normalPath": "teak-a/impostor/atlas.normal.png",
+      "depthPath": "teak-a/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 11, 0], "size": [20.76, 22, 20.62], "radius": 18.3 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 2.7 }
     }
   ],
   "lod": {
     "label": "mesh-near+octa-far",
-    "rationale": "Procedural hardwood canopy hero with shared EZ-Tree bark/leaf buckets. Near mesh (<10k tris) keeps the broad-crown silhouette; beyond ~160m it should collapse to an octahedral impostor (not yet baked).",
+    "rationale": "Procedural hardwood canopy hero with shared EZ-Tree bark/leaf buckets. Near mesh (<10k tris) keeps the broad-crown silhouette; beyond ~160m it collapses to an 8x3 octahedral impostor baked from the normalized mesh.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 160, "representationId": "mesh-teak-a", "budget": { "trisPerInstance": 9522, "drawCallsPerBatch": 2 } },
-      { "minDistanceMeters": 160, "maxDistanceMeters": null, "representationId": null, "plannedKind": "octaImpostor", "notes": "Bake an 8x3 octahedral impostor from the normalized teak-a mesh." }
+      { "minDistanceMeters": 160, "maxDistanceMeters": null, "representationId": "octa-teak-a", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 2.7 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized teak-a mesh via scripts/bake-vegetation-impostor.mjs (base-color + normal + depth)." }
     ]
   },
   "ecology": {
