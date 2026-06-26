@@ -79,6 +79,17 @@ Latest useful candidate artifacts:
     `saturation=0.655`, `overexposed=0.000`; A Shau `luma=0.250`,
     `saturation=0.406`, `overexposed=0.000`
   - still `warn` only because finite-edge evidence is screenshot-review based
+- `artifacts/perf/2026-06-26T20-19-28-599Z/scene-parity/scene-parity.md`
+  - clean-head A/B pass with `vegImpostorFogStrength=0.62`,
+    `vegImpostorExposureScale=0.86`, and `vegImpostorTransitionMeters=28`
+  - material probes confirm the variant reached the static-impostor batches
+    (`fogStrength=0.62`, `foliageExposure=0.479536`)
+  - screenshot crop sampling did not show a meaningful visual move versus the
+    default: Open Frontier pale-pixel ratio changed `0.0445 -> 0.0428`; A Shau
+    changed `0.3041 -> 0.3036`
+  - conclusion: do not promote the reduced-fog/exposure variant as a default
+    fix without owner preference; the remaining pale clumps are not primarily
+    solved by these two material uniforms
 - `artifacts/vegetation-lod-review/2026-06-26T20-04-15-125Z`
   - clean-head focused matrix for bamboo-grove, fan-palm, jungle-tree, and
     understory-fern after the capture-normal, fog, and direct-light candidate
@@ -137,12 +148,12 @@ terrain exposure. The latest probes show zero overexposed vegetation-focus
 pixels, but owner review decides whether the remaining pale clumps are
 acceptable integration or need another exposure/fog/bake variant.
 
-Reduced-fog/exposure review path: use the fourth octa-impostor review column and
-the scene-parity `--veg-impostor-fog-strength 0.62
---veg-impostor-exposure-scale 0.86` flags to compare whether less fog mix and a
-modest exposure trim keep the source silhouette/color closer in humid shots and
-dark live terrain without making daylight/low-sun cards look pasted on. This is
-evidence-generation only, not the accepted shipped default.
+Reduced-fog/exposure review path: the fourth octa-impostor review column and the
+scene-parity `--veg-impostor-fog-strength 0.62
+--veg-impostor-exposure-scale 0.86` flags are evidence-generation only, not the
+accepted shipped default. The clean A/B scene pass above shows this variant is
+not a strong fix for the remaining Open Frontier / A Shau pale-clump risk; keep
+it available for owner comparison, but do not ship it as the answer by default.
 
 LOD snap review path: normal vegetation launches use a 28 m transition band
 (`vegImpostorTransitionMeters=28`) around the hero impostor promotion/demotion
