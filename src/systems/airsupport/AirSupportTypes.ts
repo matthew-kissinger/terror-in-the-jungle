@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import type { Faction } from '../combat/types';
+import { pickAircraftArt } from '../../config/aircraftArt';
 
 export type AirSupportType = 'spooky' | 'napalm' | 'rocket_run' | 'recon' | 'arclight';
 
@@ -47,12 +48,17 @@ interface AirSupportConfig {
   speed: number;
 }
 
+// Strike-aircraft model keys repoint to the Kiln art (kiln-war-2026-06) by
+// default; `?aircraftArt=legacy` restores the cycle-2026-06-11 repaint keys.
+// AirSupportManager resolves these via AircraftModels[key] and applies a 2x
+// visibility scale (the Kiln strikers are similar true-scale to the legacy ones,
+// so the bump still reads correctly). The B-52 is HELD on legacy below.
 export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
   spooky: {
     delay: 10,
     duration: 90,
     cooldown: 180,
-    modelKey: 'AC47_SPOOKY',
+    modelKey: pickAircraftArt('AC_47_SPOOKY_GUNSHIP', 'AC47_SPOOKY'),
     altitude: 300,
     speed: 40,
   },
@@ -60,7 +66,7 @@ export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
     delay: 15,
     duration: 8,
     cooldown: 90,
-    modelKey: 'F4_PHANTOM',
+    modelKey: pickAircraftArt('F_4_PHANTOM_II', 'F4_PHANTOM'),
     altitude: 100,
     speed: 120,
   },
@@ -68,7 +74,7 @@ export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
     delay: 10,
     duration: 6,
     cooldown: 60,
-    modelKey: 'AH1_COBRA',
+    modelKey: pickAircraftArt('AH_1G_COBRA_ATTACK', 'AH1_COBRA'),
     altitude: 80,
     speed: 60,
   },
@@ -76,7 +82,7 @@ export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
     delay: 8,
     duration: 30,
     cooldown: 45,
-    modelKey: 'A1_SKYRAIDER',
+    modelKey: pickAircraftArt('A_1_SKYRAIDER_SPAD', 'A1_SKYRAIDER'),
     altitude: 200,
     speed: 50,
   },
@@ -87,6 +93,12 @@ export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
   // run-in. The `duration` is the active bomb-walk window; the airframe then
   // continues outbound. Faster than the prop strikers but slower than the F-4
   // fast jet, reflecting a heavy-bomber cruise.
+  //
+  // HELD on legacy art regardless of `__aircraftArt`: the Kiln B-52D GLB is
+  // scale-defective (~21 m vs the true-scale legacy ~47.85 m), and the
+  // arclight-only native-scale (1x) bump lives in AirSupportManager (outside this
+  // stream's scope), so repointing would render a tiny bomber. Re-roll the Kiln
+  // B-52D before cutting it over.
   arclight: {
     delay: 20,
     duration: 10,

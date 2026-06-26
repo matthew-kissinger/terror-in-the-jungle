@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import type { MapFeatureDefinition, StaticModelPlacementConfig } from '../../config/gameModeTypes';
-import { AircraftModels, AnimalModels, BuildingModels, GroundVehicleModels, StructureModels } from '../assets/modelPaths';
+import { AircraftModels, AnimalModels, BuildingModels, GroundVehicleModels, PropModels, StructureModels } from '../assets/modelPaths';
 
 interface WorldFeaturePrefabDefinition {
   placements: StaticModelPlacementConfig[];
@@ -18,6 +18,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.COMMAND_TENT, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI },
       { modelPath: StructureModels.AMMO_BUNKER, offset: new THREE.Vector3(-15, 0, -8), yaw: Math.PI * 0.5 },
       { modelPath: StructureModels.AID_STATION, offset: new THREE.Vector3(15, 0, -8), yaw: -Math.PI * 0.5 },
+      // kiln-war-2026-06 repaint guard tower (asset-gameplay-integration): SE perimeter watchpost.
+      { modelPath: StructureModels.FIREBASE_GUARD_TOWER_ABOUT, offset: new THREE.Vector3(20, 0, -16), yaw: -Math.PI * 0.7, registerCollision: true },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(-11, 0, 7), yaw: Math.PI * 0.5 },
       { modelPath: StructureModels.WATER_TOWER, offset: new THREE.Vector3(14, 0, 6), yaw: 0, registerCollision: true },
       { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(-5, 0, 12), yaw: 0 },
@@ -41,6 +43,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   firebase_artillery_small: {
     placements: [
       { modelPath: StructureModels.ARTILLERY_PIT, offset: new THREE.Vector3(0, 0, -7.5), yaw: Math.PI },
+      // kiln-war-2026-06 repaint mortar emplacement (asset-gameplay-integration): infantry mortar on the line.
+      { modelPath: StructureModels._81MM_MORTAR_EMPLACEMENT, offset: new THREE.Vector3(10, 0, -8), yaw: Math.PI * 0.1, registerCollision: true },
       { modelPath: StructureModels.COMMAND_TENT, offset: new THREE.Vector3(0, 0, 10), yaw: 0 },
       { modelPath: StructureModels.GUARD_TOWER, offset: new THREE.Vector3(-13.75, 0, 12.5), yaw: Math.PI * 0.25, registerCollision: true },
       { modelPath: StructureModels.GUARD_TOWER, offset: new THREE.Vector3(13.75, 0, 12.5), yaw: -Math.PI * 0.25, registerCollision: true },
@@ -62,6 +66,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   nva_bunker_cluster_small: {
     placements: [
       { modelPath: BuildingModels.BUNKER_NVA, offset: new THREE.Vector3(0, 0, 0), yaw: Math.PI, registerCollision: true },
+      // kiln-war-2026-06 repaint earthen bunker (asset-gameplay-integration): second fighting position.
+      { modelPath: StructureModels.NVA_EARTHEN_BUNKER, offset: new THREE.Vector3(9, 0, -10), yaw: Math.PI * 0.15, registerCollision: true },
       { modelPath: StructureModels.FOXHOLE, offset: new THREE.Vector3(-7.5, 0, 5), yaw: Math.PI * 0.2 },
       { modelPath: StructureModels.FOXHOLE, offset: new THREE.Vector3(8.75, 0, 3.75), yaw: -Math.PI * 0.15 },
       { modelPath: StructureModels.PUNJI_TRAP, offset: new THREE.Vector3(-5, 0, 12.5), yaw: 0 },
@@ -72,6 +78,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   nva_aa_site_small: {
     placements: [
       { modelPath: StructureModels.ZPU4_AA, offset: new THREE.Vector3(0, 0, 0), yaw: Math.PI * 0.75, registerCollision: true },
+      // kiln-war-2026-06 repaint AA piece (asset-gameplay-integration): a 37mm gun beside the ZPU-4.
+      { modelPath: StructureModels._37MM_ANTI_AIRCRAFT_GUN, offset: new THREE.Vector3(-11, 0, -7), yaw: Math.PI * 0.6, registerCollision: true },
       { modelPath: StructureModels.FOXHOLE, offset: new THREE.Vector3(-8.75, 0, 6.25), yaw: Math.PI * 0.2 },
       { modelPath: StructureModels.FOXHOLE, offset: new THREE.Vector3(8.75, 0, 6.25), yaw: -Math.PI * 0.2 },
       { modelPath: StructureModels.AMMO_CRATE, offset: new THREE.Vector3(-3.75, 0, -5), yaw: 0 },
@@ -113,6 +121,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.VILLAGE_HUT, offset: new THREE.Vector3(10, 0, 5), yaw: -Math.PI * 0.3, registerCollision: true },
       { modelPath: BuildingModels.STILT_HOUSE, offset: new THREE.Vector3(-13, 0, -6), yaw: Math.PI * 0.4, registerCollision: true },
       { modelPath: BuildingModels.FARMHOUSE, offset: new THREE.Vector3(2.5, 0, 9.5), yaw: Math.PI, registerCollision: true },
+      // kiln-war-2026-06 repaint dwelling (asset-gameplay-integration): extra hut on the east edge.
+      { modelPath: StructureModels.TRADITIONAL_VIETNAMESE_VILLAGE_HUT, offset: new THREE.Vector3(13, 0, -7), yaw: -Math.PI * 0.35, registerCollision: true },
     ],
   },
   // Market town — civic + commercial buildings. Schoolhouse is the back-center
@@ -154,6 +164,10 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   supply_depot_small: {
     placements: [
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -7.5), yaw: Math.PI, registerCollision: true },
+      // kiln-war-2026-06 repaint supply dressing (asset-gameplay-integration): new crates + barrel prop.
+      { modelPath: StructureModels.MILITARY_AMMUNITION_CRATE_ABOUT, offset: new THREE.Vector3(-7.5, 0, 8), yaw: Math.PI * 0.15 },
+      { modelPath: StructureModels.WOODEN_SUPPLY_CRATE_ABOUT, offset: new THREE.Vector3(-5, 0, 9.5), yaw: -Math.PI * 0.1 },
+      { modelPath: PropModels.COOPERED_WOODEN_BARREL_STANDING, offset: new THREE.Vector3(8, 0, 8), yaw: 0 },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(-10, 0, 2.5), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: StructureModels.RADIO_STACK, offset: new THREE.Vector3(10, 0, 5), yaw: 0, registerCollision: true },
       { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(13.75, 0, -2.5), yaw: Math.PI * 0.5, registerCollision: true },

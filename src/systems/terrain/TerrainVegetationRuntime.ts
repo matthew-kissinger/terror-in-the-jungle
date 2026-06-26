@@ -5,13 +5,21 @@ import * as THREE from 'three';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
 import type { VegetationTypeConfig } from '../../config/vegetationTypes';
 import type { StaticImpostorArchetype } from '../../config/staticImpostorArchetypes';
-import { vegetationLibraryStaticArchetypes } from '../../config/vegetation/vegetationLibraryAdapter';
+import {
+  vegetationLibraryGroundCards,
+  vegetationLibraryStaticArchetypes,
+} from '../../config/vegetation/vegetationLibraryAdapter';
 import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { modelLoader } from '../assets/ModelLoader';
 import { StaticImpostorSystem } from '../world/staticImpostors/StaticImpostorSystem';
 import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 import { getHeightQueryCache } from './HeightQueryCache';
 import { GLBHeroScatterer, type GLBHeroScattererDebugInfo } from './GLBHeroScatterer';
+import {
+  GroundCardScatterer,
+  type GroundCardScattererDebugInfo,
+  type GroundCardTextureProvider,
+} from './GroundCardScatterer';
 import { JungleGroundRing, type JungleGroundRingDebugInfo } from './JungleGroundRing';
 import { VegetationScatterer, type VegetationScattererDebugInfo } from './VegetationScatterer';
 
@@ -29,6 +37,7 @@ export interface TerrainVegetationRuntimeDebugInfo {
   vegetation: VegetationScattererDebugInfo;
   jungleGroundRing: JungleGroundRingDebugInfo;
   glbHeroes: GLBHeroScattererDebugInfo;
+  groundCards: GroundCardScattererDebugInfo;
 }
 
 /**
@@ -58,11 +67,64 @@ function heroScatterEnabled(): boolean {
   }
 }
 
+/**
+ * Dense ground-cover cards (understory-fern / taro-elephant-ear / rice-paddy) ship ON by
+ * default in a browser. They replace the old fern/elephantEar billboards in the jungle +
+ * riverbank palettes with a cheap INSTANCED far card + a real near GLB mesh, world-anchored
+ * per cell (NOT the rejected camera-following ground ring).
+ *
+ * Opt out at runtime with `?vegGroundCards=0` or `window.__vegGroundCards = false`
+ * (read once at construction). No window (SSR / node tests) keeps the path inert.
+ */
+function groundCardsEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as { __vegGroundCards?: boolean };
+  if (typeof w.__vegGroundCards === 'boolean') return w.__vegGroundCards;
+  try {
+    return new URLSearchParams(window.location.search).get('vegGroundCards') !== '0';
+  } catch {
+    return true;
+  }
+}
+
+/** Browser texture provider for the baked ground-card atlases (mipmapped, anisotropic). */
+function createCardTextureProvider(): GroundCardTextureProvider {
+  const loader = new THREE.TextureLoader();
+  return {
+    load(url: string, colorSpace: THREE.ColorSpace): THREE.Texture {
+      const texture = loader.load(url);
+      texture.colorSpace = colorSpace;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.anisotropy = 4;
+      texture.generateMipmaps = true;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      return texture;
+    },
+  };
+}
+
+/**
+ * Per-archetype impostor batch capacity for the vegetation-owned scatterer.
+ *
+ * The authored world-feature props (WorldFeatureSystem) are sparse and hand-placed,
+ * so the StaticImpostorSystem default of 256 is plenty there. The vegetation heroes
+ * are different: they are scattered PROCEDURALLY at biome density across the whole
+ * streaming radius, and the dense mid-heroes (fan-palm ~0.55, bamboo-grove ~0.28)
+ * generate far more than 256 impostor instances inside that radius. Sizing every
+ * veg-hero batch generously lets those distant plants actually render instead of
+ * overflowing the batch (each instance is ~8 floats, so 8192 ≈ 256KB per archetype —
+ * cheap, and the sparse heroes never come close to filling it).
+ */
+const VEGETATION_HERO_IMPOSTOR_BATCH_CAPACITY = 8192;
+
 export class TerrainVegetationRuntime {
   private vegetationScatterer: VegetationScatterer;
   private jungleGroundRing: JungleGroundRing;
   private heroImpostors: StaticImpostorSystem | null = null;
   private glbHeroScatterer: GLBHeroScatterer | null = null;
+  private groundCardScatterer: GroundCardScatterer | null = null;
 
   constructor(
     billboardSystem: GlobalBillboardSystem,
@@ -72,6 +134,22 @@ export class TerrainVegetationRuntime {
   ) {
     this.vegetationScatterer = new VegetationScatterer(billboardSystem, vegetationCellSize);
     this.jungleGroundRing = new JungleGroundRing(billboardSystem);
+
+    // Dense ground-cover cards stream on their own flag (independent of the hero canopy).
+    // Archetypes come from the vegetation-library adapter and stay isolated from the
+    // global STATIC_IMPOSTOR_ARCHETYPES registry, exactly like the hero archetypes.
+    if (scene && groundCardsEnabled()) {
+      this.groundCardScatterer = new GroundCardScatterer(
+        {
+          scene,
+          modelLoader,
+          getHeight: (x, z) => getHeightQueryCache().getHeightAt(x, z),
+          archetypes: vegetationLibraryGroundCards(),
+          textureProvider: createCardTextureProvider(),
+        },
+        vegetationCellSize,
+      );
+    }
 
     if (!heroScatterEnabled()) {
       return;
@@ -91,6 +169,7 @@ export class TerrainVegetationRuntime {
     }
     this.heroImpostors = new StaticImpostorSystem(scene, camera, {
       archetypes: heroArchetypesByModelPath,
+      batchCapacity: VEGETATION_HERO_IMPOSTOR_BATCH_CAPACITY,
     });
     this.glbHeroScatterer = new GLBHeroScatterer(
       {
@@ -108,6 +187,7 @@ export class TerrainVegetationRuntime {
     this.vegetationScatterer.setWorldBounds(worldSize, visualMargin);
     this.jungleGroundRing.setWorldBounds(worldSize, visualMargin);
     this.glbHeroScatterer?.setWorldBounds(worldSize, visualMargin);
+    this.groundCardScatterer?.setWorldBounds(worldSize, visualMargin);
   }
 
   configure(
@@ -129,11 +209,13 @@ export class TerrainVegetationRuntime {
       biomeRules,
     );
     this.glbHeroScatterer?.configure(defaultBiomeId, biomePalettes, biomeRules);
+    this.groundCardScatterer?.configure(defaultBiomeId, biomePalettes, biomeRules);
   }
 
   setExclusionZones(zones: TerrainExclusionZone[]): void {
     this.vegetationScatterer.setExclusionZones(zones);
     this.jungleGroundRing.setExclusionZones(zones);
+    this.groundCardScatterer?.setExclusionZones(zones);
   }
 
   updateBudgeted(
@@ -155,28 +237,37 @@ export class TerrainVegetationRuntime {
       maxAddsPerFrame: frameBudget.maxAddsPerFrame,
       maxRemovalsPerFrame: frameBudget.maxRemovalsPerFrame,
     }) ?? false;
+    // Dense ground-cover cards share the same cell budget. Each cell is one instanced
+    // batch per species, so its add/remove cost is cheap relative to the billboard cells.
+    const groundCardDidWork = this.groundCardScatterer?.updateBudgeted(playerPosition, {
+      maxAddsPerFrame: frameBudget.maxAddsPerFrame,
+      maxRemovalsPerFrame: frameBudget.maxRemovalsPerFrame,
+    }) ?? false;
 
-    const didWork = scattererDidWork || heroDidWork;
+    const didWork = scattererDidWork || heroDidWork || groundCardDidWork;
     const pending = this.vegetationScatterer.getPendingCounts();
     const ringPending = this.jungleGroundRing.getPendingCounts();
     const heroPending = this.glbHeroScatterer?.getPendingCounts() ?? { adds: 0, removals: 0 };
+    const cardPending = this.groundCardScatterer?.getPendingCounts() ?? { adds: 0, removals: 0 };
 
     return {
       didWork,
       pendingUnits:
         pending.adds + pending.removals
         + ringPending.adds + ringPending.removals
-        + heroPending.adds + heroPending.removals,
+        + heroPending.adds + heroPending.removals
+        + cardPending.adds + cardPending.removals,
     };
   }
 
   /**
    * Per-frame, non-budgeted update: drives the hero static-impostor LOD swap
-   * (mesh <-> impostor by camera distance), which must run every frame
-   * independent of the streaming budget.
+   * (mesh <-> impostor by camera distance) and the ground-card per-cell culling +
+   * near-mesh LOD, which must run every frame independent of the streaming budget.
    */
   update(deltaTime: number): void {
     this.glbHeroScatterer?.updateImpostors(deltaTime);
+    this.groundCardScatterer?.updateLod(deltaTime);
   }
 
   getDebugInfo(): TerrainVegetationRuntimeDebugInfo {
@@ -187,6 +278,10 @@ export class TerrainVegetationRuntime {
         activeCells: 0, targetCells: 0, pendingAdditions: 0,
         pendingRemovals: 0, registeredInstances: 0, inFlightLoads: 0,
       },
+      groundCards: this.groundCardScatterer?.getDebugInfo() ?? {
+        activeCells: 0, targetCells: 0, pendingAdditions: 0, pendingRemovals: 0,
+        cardBatches: 0, cardInstances: 0, visibleBatches: 0, nearMeshes: 0, inFlightNearLoads: 0,
+      },
     };
   }
 
@@ -194,12 +289,14 @@ export class TerrainVegetationRuntime {
     this.vegetationScatterer.regenerateAll();
     this.jungleGroundRing.clear();
     this.glbHeroScatterer?.clear();
+    this.groundCardScatterer?.clear();
   }
 
   async regenerateAllAsync(onProgress?: (done: number, total: number) => void): Promise<void> {
     await this.vegetationScatterer.regenerateAllAsync(onProgress);
     this.jungleGroundRing.clear();
     this.glbHeroScatterer?.clear();
+    this.groundCardScatterer?.clear();
   }
 
   dispose(): void {
@@ -207,5 +304,6 @@ export class TerrainVegetationRuntime {
     this.jungleGroundRing.dispose();
     this.glbHeroScatterer?.dispose();
     this.heroImpostors?.dispose();
+    this.groundCardScatterer?.dispose();
   }
 }

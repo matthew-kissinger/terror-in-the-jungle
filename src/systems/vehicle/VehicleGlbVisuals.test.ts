@@ -1,15 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { applyM151JeepGlbVisual, applyM48TankGlbVisual } from './VehicleGlbVisuals';
+import { applyM151JeepGlbVisual, applyM48TankGlbVisual, vehicleArtMode } from './VehicleGlbVisuals';
 import type { TurretRigSource, VehicleModelLoader } from './VehicleGlbVisuals';
 import { buildM151JeepMesh } from './M151JeepSpawn';
 import { buildM48ChassisMesh } from './M48TankSpawn';
 
 function loaderResolving(glb: THREE.Group): VehicleModelLoader {
   return { loadModel: () => Promise.resolve(glb) };
+}
+
+/** Loader that records every requested model path so art-mode routing is provable. */
+function capturingLoader(glb: THREE.Group): { loader: VehicleModelLoader; requested: string[] } {
+  const requested: string[] = [];
+  return {
+    loader: {
+      loadModel: (path: string) => {
+        requested.push(path);
+        return Promise.resolve(glb);
+      },
+    },
+    requested,
+  };
 }
 
 const failingLoader: VehicleModelLoader = {
@@ -114,7 +128,64 @@ function collectMeshes(root: THREE.Object3D): THREE.Mesh[] {
   return meshes;
 }
 
+describe('vehicleArtMode kill-switch', () => {
+  type WindowHost = { window?: unknown };
+  const host = globalThis as unknown as WindowHost;
+  const original = host.window;
+
+  afterEach(() => {
+    if (original === undefined) delete host.window;
+    else host.window = original;
+  });
+
+  it('defaults to the Kiln art in a browser', () => {
+    host.window = { location: { search: '' } };
+    expect(vehicleArtMode()).toBe('kiln');
+  });
+
+  it('honours ?vehicleArt=legacy', () => {
+    host.window = { location: { search: '?vehicleArt=legacy' } };
+    expect(vehicleArtMode()).toBe('legacy');
+  });
+
+  it('honours an explicit window.__vehicleArt override', () => {
+    host.window = { location: { search: '' }, __vehicleArt: 'legacy' };
+    expect(vehicleArtMode()).toBe('legacy');
+  });
+
+  it('resolves to legacy with no window (headless / node)', () => {
+    delete host.window;
+    expect(vehicleArtMode()).toBe('legacy');
+  });
+});
+
 describe('applyM151JeepGlbVisual', () => {
+  it('loads the Kiln MUTT GLB scaled up under kiln art', async () => {
+    const root = buildM151JeepMesh();
+    const glb = new THREE.Group();
+    glb.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 3), new THREE.MeshStandardMaterial()));
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM151JeepGlbVisual(root, loader, 'kiln');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('m151-mutt');
+    expect(glb.scale.x).toBeCloseTo(1.32);
+  });
+
+  it('loads the legacy jeep GLB at the tuned legacy scale under legacy art', async () => {
+    const root = buildM151JeepMesh();
+    const glb = new THREE.Group();
+    glb.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 3), new THREE.MeshStandardMaterial()));
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM151JeepGlbVisual(root, loader, 'legacy');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('m151-jeep');
+    expect(glb.scale.x).toBeCloseTo(1.15);
+  });
+
   it('replaces the procedural meshes with the GLB and enables shadows', async () => {
     const root = buildM151JeepMesh();
     const glb = new THREE.Group();
@@ -171,6 +242,32 @@ describe('applyM151JeepGlbVisual', () => {
 });
 
 describe('applyM48TankGlbVisual', () => {
+  it('loads the Kiln Patton main-battle GLB under kiln art', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig } = fakeTurretRig();
+    const { glb } = fakeM48Glb();
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM48TankGlbVisual(root, rig, loader, 'kiln');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('m48-patton-main-battle');
+  });
+
+  it('loads the legacy Patton GLB under legacy art', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig } = fakeTurretRig();
+    const { glb } = fakeM48Glb();
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM48TankGlbVisual(root, rig, loader, 'legacy');
+
+    expect(ok).toBe(true);
+    // Legacy path is the bare m48-patton.glb, not the kiln main-battle variant.
+    expect(requested[0]).toContain('m48-patton.glb');
+    expect(requested[0]).not.toContain('main-battle');
+  });
+
   it('splits the GLB across chassis root + turret rig nodes', async () => {
     const root = buildM48ChassisMesh();
     const { rig, yawNode, pitchNode } = fakeTurretRig();

@@ -222,7 +222,43 @@ function makeChunk(type: number, payload: Buffer): Buffer {
   return Buffer.concat([header, payload], 8 + payload.length);
 }
 
+/**
+ * Fail loudly if any embedded image's declared mimeType disagrees with its
+ * actual byte signature. Guards against the `canonicalizeBuffers` class of bug
+ * where `image.bufferView` is mis-remapped onto geometry (palette PNGs read as
+ * index-buffer bytes -> "GLTFLoader: Couldn't load texture blob" at runtime).
+ */
+function assertImageBytesValid(file: string, json: GlbJson, bin: Buffer | null): void {
+  if (!bin) return;
+  const bvs = json.bufferViews ?? [];
+  const images = (json.images ?? []) as Array<{ bufferView?: number; mimeType?: string; name?: string }>;
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    if (typeof img.bufferView !== 'number') continue;
+    const bv = bvs[img.bufferView];
+    if (!bv) continue;
+    const d = bin.subarray(bv.byteOffset ?? 0, (bv.byteOffset ?? 0) + Math.min(16, bv.byteLength ?? 0));
+    const mime = img.mimeType ?? '';
+    const isPng = d[0] === 0x89 && d[1] === 0x50 && d[2] === 0x4e && d[3] === 0x47;
+    const isJpeg = d[0] === 0xff && d[1] === 0xd8;
+    const isWebp = d.subarray(0, 4).toString('ascii') === 'RIFF' && d.subarray(8, 12).toString('ascii') === 'WEBP';
+    const ok =
+      (mime === 'image/png' && isPng) ||
+      (mime === 'image/jpeg' && isJpeg) ||
+      (mime === 'image/webp' && isWebp) ||
+      (mime !== 'image/png' && mime !== 'image/jpeg' && mime !== 'image/webp');
+    if (!ok) {
+      throw new Error(
+        `Texture integrity check failed for ${file}: image[${i}] (${img.name ?? ''}) declares ` +
+          `${mime} but bytes start 0x${d.subarray(0, 4).toString('hex')} — canonicalizeBuffers likely ` +
+          `mis-remapped image.bufferView onto geometry.`,
+      );
+    }
+  }
+}
+
 function writeGlb(file: string, json: GlbJson, bin: Buffer | null): void {
+  assertImageBytesValid(file, json, bin);
   const jsonText = JSON.stringify(json);
   const jsonPad = (4 - (Buffer.byteLength(jsonText) % 4)) % 4;
   const jsonBuf = Buffer.from(`${jsonText}${' '.repeat(jsonPad)}`, 'utf-8');
@@ -409,6 +445,17 @@ function canonicalizeBuffers(json: GlbJson, bin: Buffer | null): Buffer | null {
     return bvIdx;
   };
 
+  // Snapshot which bufferViews the accessors reference BEFORE step 1 reassigns
+  // `accessor.bufferView` to its new tight index. Step 2 needs the ORIGINAL index
+  // space to tell geometry views (now repacked) apart from image views (copied
+  // verbatim + remapped). Building this set AFTER step 1 compared pre-repack
+  // bufferView indices against post-repack ones, mis-skipped the texture views,
+  // and left `image.bufferView` aimed at geometry — palette PNGs were read as
+  // index-buffer bytes, surfacing at runtime as
+  // "THREE.GLTFLoader: Couldn't load texture blob:...".
+  const accessorBufferViews = new Set<number>();
+  for (const a of accessors) if (a.bufferView !== undefined) accessorBufferViews.add(a.bufferView);
+
   // 1. Repack every accessor that references a bufferView into its own tight view.
   for (let ai = 0; ai < accessors.length; ai++) {
     const a = accessors[ai];
@@ -438,9 +485,9 @@ function canonicalizeBuffers(json: GlbJson, bin: Buffer | null): Buffer | null {
   }
 
   // 2. Copy any bufferView not referenced by an accessor byte-exact (embedded
-  //    texture image data), remapping the references that point at it.
-  const referenced = new Set<number>();
-  for (const a of accessors) if (a.bufferView !== undefined) referenced.add(a.bufferView);
+  //    texture image data), remapping the references that point at it. Uses the
+  //    pre-repack snapshot so image views are never mistaken for geometry.
+  const referenced = accessorBufferViews;
   const remap = new Map<number, number>();
   for (let bv = 0; bv < bufferViews.length; bv++) {
     if (referenced.has(bv)) continue;

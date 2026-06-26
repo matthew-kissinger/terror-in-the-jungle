@@ -31,11 +31,19 @@ export interface AircraftWeaponMount {
   ammoCapacity: number;
   /**
    * Mount offset in the weapon-system frame (+Z forward, +X right, +Y up),
-   * applied with the airframe quaternion. Re-banded to the repaint GLB dims
-   * (cycle-2026-06-11-war-asset-repaint) so the tracer/muzzle origin sits on
-   * the airframe rather than floating inside the smaller legacy hull. Source
-   * dims (model axes [w, h, length], `warAssetCatalog`): UH-1C
-   * [3.71, 3.96, 13.86], AH-1 Cobra [3.74, 3.82, 14.34].
+   * applied with the airframe quaternion, so the tracer/muzzle origin sits on
+   * the airframe rather than floating inside the hull. Source dims (model axes
+   * [w, h, length], `warAssetCatalog`):
+   *
+   *  - UH-1C gunship door gun is banded to the LEGACY repaint hull
+   *    [3.71, 3.96, 13.86]: the UH-1C is HELD on legacy art (its Kiln GLB is
+   *    half-scale), so its mount stays tuned to the legacy width.
+   *  - AH-1 Cobra is repointed to the Kiln art (kiln-war-2026-06) and its
+   *    minigun/rocket mounts are re-banded to the Kiln dims [2.84, 2.95, 13.45]
+   *    (narrower + slightly shorter than the legacy [3.74, 3.82, 14.34]). The
+   *    `?aircraftArt=legacy` escape hatch reuses these Kiln-tuned mounts as a
+   *    best-effort approximation on the legacy GLB (the two hulls are close
+   *    enough that the muzzle still reads on-airframe).
    */
   localPosition: [number, number, number];
   fireRate: number;          // rounds per second
@@ -120,14 +128,14 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     seats: 1,
     role: 'attack',
     weapons: [
-      // Chin-turret minigun under the nose. Forward offset reaches the longer
-      // ~14.3m fuselage's nose; dropped slightly so the muzzle reads under the
-      // gunner station (Mesh_ChinTurret / Mesh_Minigun region).
-      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000, localPosition: [0, -0.45, 3.3], fireRate: 50, damage: 15, spreadDeg: 2.5, tracerInterval: 3 },
+      // Chin-turret minigun under the nose. Forward offset reaches the Kiln
+      // ~13.45m fuselage's nose (Joint_Turret region); dropped slightly so the
+      // muzzle reads under the gunner station.
+      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000, localPosition: [0, -0.45, 3.1], fireRate: 50, damage: 15, spreadDeg: 2.5, tracerInterval: 3 },
       // Stub-wing rocket pods. fireProjectile() alternates the ±side offset, so
       // localPosition carries the height/forward seat; pods sit just ahead of
-      // CG on the stub wings of the ~3.7m-wide airframe.
-      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14, localPosition: [-1.4, -0.25, 1.2], fireRate: 3.3, damage: 150, damageRadius: 8, projectileSpeed: 150 },
+      // CG on the stub wings of the ~2.84m-wide Kiln airframe (half-width ~1.42).
+      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14, localPosition: [-1.05, -0.25, 1.1], fireRate: 3.3, damage: 150, damageRadius: 8, projectileSpeed: 150 },
     ],
   },
 };

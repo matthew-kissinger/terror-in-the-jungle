@@ -31,15 +31,24 @@ export interface WildlifeSpecies {
 }
 
 /**
- * MVP roster: four iconic ground animals. Birds, reptiles, and the gibbon stay
- * catalog/gallery-only this cycle (see brief Non-goals). Buffalo is the slow
- * heavyweight; the macaque is the small skittish one.
+ * Ambient roster: the four original ground mammals plus three jungle repaint
+ * additions from the kiln-war-2026-06 catalog (asset-gameplay-integration), so
+ * the newly imported fauna actually appears in-world. Buffalo is the slow
+ * heavyweight; heron and macaque are the small skittish ones. Only
+ * ground-plausible, neutral-pose species are rostered — the catalog's gecko
+ * (clinging), flying-fox (volant), and reared cobra are pose-mismatched for a
+ * ground wander/flee loop and stay catalog/gallery-only. All animals are drawn
+ * at importer real-meter scale (displayScale 1.0).
  */
 export const WILDLIFE_ROSTER: readonly WildlifeSpecies[] = [
   { id: 'tiger', modelPath: AnimalModels.TIGER, displayScale: 1.0, wanderSpeed: 1.6, fleeSpeedMultiplier: 4.0 },
   { id: 'water-buffalo', modelPath: AnimalModels.WATER_BUFFALO, displayScale: 1.0, wanderSpeed: 0.8, fleeSpeedMultiplier: 2.6 },
   { id: 'wild-boar', modelPath: AnimalModels.WILD_BOAR, displayScale: 1.0, wanderSpeed: 1.3, fleeSpeedMultiplier: 3.4 },
   { id: 'macaque', modelPath: AnimalModels.MACAQUE, displayScale: 1.0, wanderSpeed: 1.1, fleeSpeedMultiplier: 4.2 },
+  // kiln-war-2026-06 repaint additions: ground-plausible jungle species.
+  { id: 'water-monitor', modelPath: AnimalModels.WATER_MONITOR_LIZARD_STANDING, displayScale: 1.0, wanderSpeed: 0.9, fleeSpeedMultiplier: 3.2 },
+  { id: 'pond-heron', modelPath: AnimalModels.CHINESE_POND_HERON_STANDING, displayScale: 1.0, wanderSpeed: 0.7, fleeSpeedMultiplier: 3.6 },
+  { id: 'gibbon', modelPath: AnimalModels.WHITE_HANDED_GIBBON_SITTING, displayScale: 1.0, wanderSpeed: 1.2, fleeSpeedMultiplier: 4.2 },
 ] as const;
 
 /** Modes that get ambient wildlife. Combat-stress harnesses are excluded. */

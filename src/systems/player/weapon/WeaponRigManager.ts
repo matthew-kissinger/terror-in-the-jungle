@@ -8,6 +8,7 @@ import type { IAmmoManager, IAudioManager, IHUDSystem } from '../../../types/Sys
 import { modelLoader } from '../../assets/ModelLoader'
 import { WeaponModels, warAssetCatalog } from '../../assets/modelPaths'
 import { Faction, isBlufor } from '../../combat/types'
+import { getWeaponArtMode, type WeaponArtMode } from '../../../config/weaponArtMode'
 
 /**
  * Per-rig catalog slug, so magazine/muzzle node discovery reads the normalized
@@ -17,8 +18,56 @@ import { Faction, isBlufor } from '../../combat/types'
  * search would wrongly capture Mesh_Magwell), so the catalog is the single
  * source of truth for which nodes the reload animation may move. Weapons with
  * no catalog magazine/muzzle metadata fall back to the bbox max-Z marker.
+ *
+ * Both the legacy first-gen slugs and the Kiln gen-2 repaint slugs are listed;
+ * `WEAPON_RIG_ART` picks one slug set per `getWeaponArtMode()`. The catalog
+ * carries magazine/muzzle nodes for both, so the rig stays catalog-driven.
  */
-type WeaponRigSlug = 'm16a1' | 'ak47' | 'ithaca37' | 'm3-grease-gun' | 'm1911' | 'm60' | 'm79'
+type WeaponRigSlug =
+  | 'm16a1' | 'ak47' | 'ithaca37' | 'm3-grease-gun' | 'm1911' | 'm60' | 'm79'
+  | 'm16a1-2' | 'ak-47' | 'ithaca-37-pump-action' | 'm3a1-grease-gun'
+  | 'm1911a1-colt' | 'm60-pig-general-purpose' | 'm79-thumper-40mm-grenade'
+
+interface WeaponRigArtEntry {
+  model: string
+  slug: WeaponRigSlug
+}
+
+/**
+ * First-person rig model + catalog-slug pairs per art mode. The Kiln gen-2
+ * repaint GLBs (default) carry their own magazine/muzzle node metadata in the
+ * generated warAssetCatalog, so swapping art needs only the model path + slug;
+ * `prepareWeaponRig` reads the per-slug nodes. Flip to the legacy art with
+ * `?weaponArt=legacy` or `window.__weaponArt = 'legacy'`.
+ */
+const WEAPON_RIG_ART: Record<WeaponArtMode, {
+  m16: WeaponRigArtEntry
+  ak: WeaponRigArtEntry
+  shotgun: WeaponRigArtEntry
+  smg: WeaponRigArtEntry
+  pistol: WeaponRigArtEntry
+  m60: WeaponRigArtEntry
+  m79: WeaponRigArtEntry
+}> = {
+  legacy: {
+    m16: { model: WeaponModels.M16A1, slug: 'm16a1' },
+    ak: { model: WeaponModels.AK47, slug: 'ak47' },
+    shotgun: { model: WeaponModels.ITHACA37, slug: 'ithaca37' },
+    smg: { model: WeaponModels.M3_GREASE_GUN, slug: 'm3-grease-gun' },
+    pistol: { model: WeaponModels.M1911, slug: 'm1911' },
+    m60: { model: WeaponModels.M60, slug: 'm60' },
+    m79: { model: WeaponModels.M79, slug: 'm79' },
+  },
+  kiln: {
+    m16: { model: WeaponModels.M16A1_2, slug: 'm16a1-2' },
+    ak: { model: WeaponModels.AK_47, slug: 'ak-47' },
+    shotgun: { model: WeaponModels.ITHACA_37_PUMP_ACTION, slug: 'ithaca-37-pump-action' },
+    smg: { model: WeaponModels.M3A1_GREASE_GUN, slug: 'm3a1-grease-gun' },
+    pistol: { model: WeaponModels.M1911A1_COLT, slug: 'm1911a1-colt' },
+    m60: { model: WeaponModels.M60_PIG_GENERAL_PURPOSE, slug: 'm60-pig-general-purpose' },
+    m79: { model: WeaponModels.M79_THUMPER_40MM_GRENADE, slug: 'm79-thumper-40mm-grenade' },
+  },
+}
 
 /**
  * Manages weapon model creation and switching between rifle/shotgun/SMG
@@ -122,47 +171,50 @@ export class WeaponRigManager {
   }
 
   async init(): Promise<void> {
+    // Pick the gen-2 Kiln art (default) or legacy art for every rig slot.
+    const art = WEAPON_RIG_ART[getWeaponArtMode()]
+
     // Load GLB weapon models in parallel
     const [m16Scene, akScene, shotgunScene, smgScene, pistolScene, m60Scene, m79Scene] = await Promise.all([
-      modelLoader.loadModel(WeaponModels.M16A1),
-      modelLoader.loadModel(WeaponModels.AK47),
-      modelLoader.loadModel(WeaponModels.ITHACA37),
-      modelLoader.loadModel(WeaponModels.M3_GREASE_GUN),
-      modelLoader.loadModel(WeaponModels.M1911),
-      modelLoader.loadModel(WeaponModels.M60),
-      modelLoader.loadModel(WeaponModels.M79),
+      modelLoader.loadModel(art.m16.model),
+      modelLoader.loadModel(art.ak.model),
+      modelLoader.loadModel(art.shotgun.model),
+      modelLoader.loadModel(art.smg.model),
+      modelLoader.loadModel(art.pistol.model),
+      modelLoader.loadModel(art.m60.model),
+      modelLoader.loadModel(art.m79.model),
     ])
 
-    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false, 'm16a1')
+    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false, art.m16.slug)
     this.m16RifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.weaponScene.add(this.m16RifleRig)
 
-    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false, 'ak47')
+    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false, art.ak.slug)
     this.akRifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.akRifleRig.visible = false
     this.weaponScene.add(this.akRifleRig)
 
-    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true, 'ithaca37')
+    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true, art.shotgun.slug)
     this.shotgunRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.shotgunRig.visible = false
     this.weaponScene.add(this.shotgunRig)
 
-    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false, 'm3-grease-gun')
+    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false, art.smg.slug)
     this.smgRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.smgRig.visible = false
     this.weaponScene.add(this.smgRig)
 
-    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false, 'm1911')
+    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false, art.pistol.slug)
     this.pistolRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.pistolRig.visible = false
     this.weaponScene.add(this.pistolRig)
 
-    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false, 'm60')
+    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false, art.m60.slug)
     this.m60Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.m60Rig.visible = false
     this.weaponScene.add(this.m60Rig)
 
-    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false, 'm79')
+    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false, art.m79.slug)
     this.m79Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.m79Rig.visible = false
     this.weaponScene.add(this.m79Rig)

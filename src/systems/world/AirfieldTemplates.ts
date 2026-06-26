@@ -4,6 +4,16 @@
 import { StructureModels, AircraftModels, GroundVehicleModels, BuildingModels } from '../assets/modelPaths';
 import type { TerrainSurfaceKind } from '../terrain/TerrainFeatureTypes';
 import { getFixedWingConfigForModelPath } from '../vehicle/FixedWingConfigs';
+import { pickAircraftArt } from '../../config/aircraftArt';
+
+// Parked aircraft repoint to the Kiln art (kiln-war-2026-06) by default;
+// `?aircraftArt=legacy` restores the prior cycle-2026-06-11 repaint GLBs. Both
+// paths resolve a flight config via FIXED_WING_MODEL_TO_KEY, so claiming +
+// runway compatibility hold either way.
+const PARKED_A1 = pickAircraftArt(AircraftModels.A_1_SKYRAIDER_SPAD, AircraftModels.A1_SKYRAIDER);
+const PARKED_AC47 = pickAircraftArt(AircraftModels.AC_47_SPOOKY_GUNSHIP, AircraftModels.AC47_SPOOKY);
+const PARKED_F4 = pickAircraftArt(AircraftModels.F_4_PHANTOM_II, AircraftModels.F4_PHANTOM);
+const PARKED_UH1 = pickAircraftArt(AircraftModels.UH_1H_HUEY_TRANSPORT, AircraftModels.UH1_HUEY);
 
 export type AirfieldZone = 'runway_side' | 'dispersal' | 'perimeter' | 'parking';
 
@@ -243,7 +253,7 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       // keeps every aircraft inside the apron with consistent visual ordering.
       {
         standId: 'stand_a1',
-        modelPath: AircraftModels.A1_SKYRAIDER,
+        modelPath: PARKED_A1,
         offsetAlongRunway: 70,
         offsetLateral: 105,
         // Yaw is computed at spawn time from the first taxi-route point.
@@ -254,7 +264,7 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       },
       {
         standId: 'stand_ac47',
-        modelPath: AircraftModels.AC47_SPOOKY,
+        modelPath: PARKED_AC47,
         offsetAlongRunway: -70,
         offsetLateral: 105,
         clearanceRadius: 30,
@@ -263,7 +273,7 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       },
       {
         standId: 'stand_f4',
-        modelPath: AircraftModels.F4_PHANTOM,
+        modelPath: PARKED_F4,
         offsetAlongRunway: 0,
         offsetLateral: 105,
         clearanceRadius: 24,
@@ -357,14 +367,14 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     ],
     parkingSpots: [
       {
-        modelPath: AircraftModels.UH1_HUEY,
+        modelPath: PARKED_UH1,
         offsetAlongRunway: 0,
         offsetLateral: 24,
         clearanceRadius: 14,
       },
       {
         standId: 'strip_a1',
-        modelPath: AircraftModels.A1_SKYRAIDER,
+        modelPath: PARKED_A1,
         offsetAlongRunway: -48,
         offsetLateral: 54,
         clearanceRadius: 20,
