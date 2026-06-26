@@ -153,7 +153,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
-  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles', loc: 1182, methods: 0 },
+  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles; +10 LOC task/veg-glb-hero-scatter r185 WebGPU terrain-render restore', loc: 1192, methods: 0 },
   // Snapshot raised 898 → 904 / 69 → 75 (ashau-load-freeze, 2026-06-10): six
   // markStartup statements bracketing propagateTerrainSourceChanges phases —
   // the instrumentation that attributed the 47s A Shau load freeze to the

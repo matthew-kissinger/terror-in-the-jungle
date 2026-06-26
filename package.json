@@ -64,7 +64,10 @@
       "scripts/perf-tsl-shader-cost.ts",
       "scripts/real-device-validation.ts",
       "scripts/bake-vegetation-impostor.mjs",
+      "scripts/bake-veg-card.mjs",
+      "scripts/stage-kiln-war-export.mjs",
       "tools/kiln-asset-batch/build-packs.mjs",
+      "tools/weapon/capture-ads-align.mjs",
       "src/systems/assets/PixelForgePropCatalog.ts",
       "src/systems/combat/weapons/NpcM2HBAdapter.ts"
     ],
