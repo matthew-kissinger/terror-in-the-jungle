@@ -179,7 +179,7 @@ PR-sized, each with its acceptance gate. Branch `task/<slug>`, descriptive slugs
 | `src/config/staticImpostorArchetypes.ts` | register banyan/mangrove/teak/rubber/coconut/deadfall GLBs |
 | `src/config/biomes.ts` | biome palettes: which species scatter where |
 | `src/ui/AttributionNotice.ts` | CC-BY credits |
-| `scripts/bake-vegetation-atlases.ts` (new, Phase 2) | veg-atlas-layout adapter over the static baker |
+| `scripts/bake-veg-card.mjs` (new) | bakes alpha ground-cards from normalized GLBs over the static baker |
 | `docs/asset-provenance/vegetation-2026-06/` | per-asset provenance (provider, prompt/source, tris, license) |
 
 ---
