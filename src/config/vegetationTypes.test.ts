@@ -200,24 +200,29 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(VEGETATION_TYPES.find((type) => type.id === 'elephantEar')?.maxSlopeDeg).toBeLessThanOrEqual(22);
   });
 
-  it('biases the jungle mix toward the tall palm and ground cover while keeping bamboo clustered', () => {
-    const fanPalm = VEGETATION_TYPES.find((type) => type.id === 'fanPalm');
+  it('promotes the tall palm + bamboo to GLB heroes and keeps trimmed ground cover', () => {
     const bamboo = VEGETATION_TYPES.find((type) => type.id === 'bambooGrove');
     const denseJungle = getBiome('denseJungle');
-    const bambooJungleMultiplier =
-      denseJungle.vegetationPalette.find((entry) => entry.typeId === 'bambooGrove')?.densityMultiplier ?? 0;
-    const fanPalmJungleMultiplier =
-      denseJungle.vegetationPalette.find((entry) => entry.typeId === 'fanPalm')?.densityMultiplier ?? 0;
+    // Palms + bamboo are now GLB hero archetypes (kebab library ids), not billboards.
+    const fanPalmHero =
+      denseJungle.vegetationPalette.find((entry) => entry.typeId === 'fan-palm')?.densityMultiplier ?? 0;
+    const bambooHero =
+      denseJungle.vegetationPalette.find((entry) => entry.typeId === 'bamboo-grove')?.densityMultiplier ?? 0;
     const denseGroundCoverMultiplier = denseJungle.vegetationPalette
       .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
       .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
     const highlandFernMultiplier =
       getBiome('highland').vegetationPalette.find((entry) => entry.typeId === 'fern')?.densityMultiplier ?? 0;
 
-    expect((fanPalm?.baseDensity ?? 0) * fanPalmJungleMultiplier)
-      .toBeGreaterThan((bamboo?.baseDensity ?? 0) * bambooJungleMultiplier);
-    expect(denseGroundCoverMultiplier).toBeGreaterThan(2.2);
+    // The old fanPalm/bambooGrove billboards are gone from the jungle palette (promoted to heroes).
+    expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'fanPalm')).toBe(false);
+    expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'bambooGrove')).toBe(false);
+    // The tall palm hero is denser than the bamboo hero (palm is the prominent mid feature).
+    expect(fanPalmHero).toBeGreaterThan(bambooHero);
+    // Ground cover trimmed for fill-rate headroom but still the understory backbone.
+    expect(denseGroundCoverMultiplier).toBeGreaterThan(1.5);
     expect(highlandFernMultiplier).toBeGreaterThan(0.7);
+    // The bamboo billboard config (still used by the dense bambooGrove biome) stays clustered.
     expect(bamboo?.poissonMinDistance).toBeLessThan(8);
     expect(bamboo?.cluster?.scale).toBeGreaterThan(200);
     expect(bamboo?.cluster?.threshold).toBeGreaterThan(0.7);
@@ -238,7 +243,7 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(ashauIds).toEqual(denseIds);
     expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier);
     expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier * 0.5);
-    expect(ashauGroundCoverMultiplier).toBeGreaterThan(0.9);
+    expect(ashauGroundCoverMultiplier).toBeGreaterThan(0.6);
   });
 
   it('quarantines the broken low-angle coconut atlas row and trunk cross-fade', () => {

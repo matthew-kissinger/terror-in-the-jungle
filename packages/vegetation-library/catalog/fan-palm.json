@@ -25,14 +25,25 @@
       "materialBuckets": [],
       "bounds": { "center": [0, 3.49, 0], "size": [4.43, 6.98, 4.0], "radius": 4.59 },
       "budget": { "trisPerInstance": 4080, "drawCallsPerBatch": 2, "textureMb": 3.7 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-fan-palm",
+      "baseColorPath": "fan-palm/impostor/atlas.base-color.png",
+      "normalPath": "fan-palm/impostor/atlas.normal.png",
+      "depthPath": "fan-palm/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 3.49, 0], "size": [4.43, 6.98, 4.0], "radius": 4.59 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.9 }
     }
   ],
   "lod": {
-    "label": "mesh-near+billboard-far",
-    "rationale": "A ~7m fan palm reads as a distinct fronded silhouette up close, so the near band is the real mesh. Past ~120m the fronds collapse to a flat profile, so the far band is a planned multi-view billboard atlas (not a ground card — it has real vertical height a canopy plant should keep). Atlas not yet baked.",
+    "label": "mesh-near+octa-far",
+    "rationale": "A ~7m fan palm reads as a distinct fronded silhouette up close, so the near band is the real mesh. Understory reads flat sooner than canopy, so the mesh band ends at ~70m and collapses to an 8x3 octahedral impostor baked from the normalized mesh.",
     "bands": [
-      { "minDistanceMeters": 0, "maxDistanceMeters": 120, "representationId": "mesh-fan-palm", "budget": { "trisPerInstance": 4080, "drawCallsPerBatch": 2 } },
-      { "minDistanceMeters": 120, "maxDistanceMeters": null, "representationId": null, "plannedKind": "billboardAtlas", "notes": "Bake a lat-lon billboard atlas (e.g. 4x2) from the normalized fan-palm mesh for distant scatter." }
+      { "minDistanceMeters": 0, "maxDistanceMeters": 70, "representationId": "mesh-fan-palm", "budget": { "trisPerInstance": 4080, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 70, "maxDistanceMeters": null, "representationId": "octa-fan-palm", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.9 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized fan-palm mesh via scripts/bake-vegetation-impostor.mjs (base-color + normal + depth)." }
     ]
   },
   "ecology": {

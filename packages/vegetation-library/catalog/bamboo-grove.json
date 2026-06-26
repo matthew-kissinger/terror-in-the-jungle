@@ -25,14 +25,25 @@
       "materialBuckets": [],
       "bounds": { "center": [0, 7.151, 0], "size": [8.686, 14.301, 9.755], "radius": 9.684 },
       "budget": { "trisPerInstance": 9162, "drawCallsPerBatch": 4, "textureMb": 2.0 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-grove",
+      "baseColorPath": "bamboo-grove/impostor/atlas.base-color.png",
+      "normalPath": "bamboo-grove/impostor/atlas.normal.png",
+      "depthPath": "bamboo-grove/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 7.151, 0], "size": [8.686, 14.301, 9.755], "radius": 9.684 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.7 }
     }
   ],
   "lod": {
-    "label": "mesh-near+billboard-far",
-    "rationale": "A mid-level bamboo clump reads as distinct vertical culms with alpha leaf fans up close, so the near band is the real mesh. Past ~120m the silhouette flattens to a tall thin stand, so the far band is a planned billboard atlas (not an octahedral impostor — the form is near-flat and dense, a single lat-lon card set captures it cheaply). Atlas not yet baked.",
+    "label": "mesh-near+octa-far",
+    "rationale": "A mid-level bamboo clump reads as distinct vertical culms with alpha leaf fans up close, so the near band is the real mesh to ~100m, then it collapses to an 8x3 octahedral impostor baked from the normalized mesh (the existing octa baker captures the tall culm silhouette; a flatter lat-lon card was the original plan but octa needs no new tooling).",
     "bands": [
-      { "minDistanceMeters": 0, "maxDistanceMeters": 120, "representationId": "mesh-grove", "budget": { "trisPerInstance": 9162, "drawCallsPerBatch": 4 } },
-      { "minDistanceMeters": 120, "maxDistanceMeters": null, "representationId": null, "plannedKind": "billboardAtlas", "notes": "Bake a lat-lon billboard atlas from the normalized bamboo-grove mesh (tall narrow stand; a 4x2 view sphere suffices)." }
+      { "minDistanceMeters": 0, "maxDistanceMeters": 100, "representationId": "mesh-grove", "budget": { "trisPerInstance": 9162, "drawCallsPerBatch": 4 } },
+      { "minDistanceMeters": 100, "maxDistanceMeters": null, "representationId": "octa-grove", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.7 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized bamboo-grove mesh via scripts/bake-vegetation-impostor.mjs (base-color + normal + depth)." }
     ]
   },
   "ecology": {

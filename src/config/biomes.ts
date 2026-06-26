@@ -70,11 +70,15 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
     { typeId: 'teak-b',       densityMultiplier: 0.08 },
     { typeId: 'rubber-a',     densityMultiplier: 0.1 },
     { typeId: 'rubber-b',     densityMultiplier: 0.08 },
-    { typeId: 'fern',          densityMultiplier: 1.15 },
-    { typeId: 'elephantEar',   densityMultiplier: 1.1 },
-    { typeId: 'fanPalm',      densityMultiplier: 1.0 },
+    // GLB mid heroes (promoted understory): full-res mesh near, octa impostor far.
+    // Replace the old fanPalm/bambooGrove billboards; sparse so the per-instance GLB
+    // clone cost stays bounded (NOT placed in the dense bambooGrove biome).
+    { typeId: 'fan-palm',     densityMultiplier: 0.55 },
+    { typeId: 'bamboo-grove', densityMultiplier: 0.28 },
+    // Dense understory billboards (fill-rate bound): fern -30% / elephantEar -20% for headroom.
+    { typeId: 'fern',          densityMultiplier: 0.8 },
+    { typeId: 'elephantEar',   densityMultiplier: 0.88 },
     { typeId: 'coconut',      densityMultiplier: 0.8 },
-    { typeId: 'bambooGrove',  densityMultiplier: 0.25 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.5 },
   ],
 };
@@ -91,11 +95,11 @@ const BIOME_ASHAU_JUNGLE: BiomeConfig = {
     { typeId: 'teak-b',       densityMultiplier: 0.06 },
     { typeId: 'rubber-a',     densityMultiplier: 0.06 },
     { typeId: 'rubber-b',     densityMultiplier: 0.05 },
-    { typeId: 'fern',          densityMultiplier: 0.45 },
-    { typeId: 'elephantEar',   densityMultiplier: 0.58 },
-    { typeId: 'fanPalm',      densityMultiplier: 0.78 },
+    { typeId: 'fan-palm',     densityMultiplier: 0.45 },
+    { typeId: 'bamboo-grove', densityMultiplier: 0.13 },
+    { typeId: 'fern',          densityMultiplier: 0.32 },
+    { typeId: 'elephantEar',   densityMultiplier: 0.46 },
     { typeId: 'coconut',      densityMultiplier: 0.55 },
-    { typeId: 'bambooGrove',  densityMultiplier: 0.14 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.28 },
   ],
 };
@@ -136,10 +140,10 @@ const BIOME_RIVERBANK: BiomeConfig = {
     { typeId: 'jungle-tree',  densityMultiplier: 0.28 },
     { typeId: 'teak-a',       densityMultiplier: 0.08 },
     { typeId: 'rubber-a',     densityMultiplier: 0.06 },
-    { typeId: 'elephantEar',   densityMultiplier: 1.45 },
-    { typeId: 'fanPalm',      densityMultiplier: 1.35 },
+    { typeId: 'fan-palm',     densityMultiplier: 0.6 },
+    { typeId: 'elephantEar',   densityMultiplier: 1.16 },
     { typeId: 'coconut',      densityMultiplier: 1.25 },
-    { typeId: 'fern',         densityMultiplier: 0.65 },
+    { typeId: 'fern',         densityMultiplier: 0.45 },
     { typeId: 'bananaPlant',  densityMultiplier: 0.45 },
   ],
 };

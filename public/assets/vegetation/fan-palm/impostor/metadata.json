@@ -1,0 +1,34 @@
+{
+  "generator": "scripts/bake-vegetation-impostor.mjs",
+  "generatedAt": "2026-06-26T08:52:34.461Z",
+  "modelUrl": "http://localhost:8765/assets/vegetation/fan-palm/fan-palm.glb",
+  "columns": 8,
+  "rows": 3,
+  "tileSize": [
+    256,
+    256
+  ],
+  "atlasSize": [
+    2048,
+    768
+  ],
+  "projection": "octahedral-upper-hemisphere",
+  "elevationRowsDeg": [
+    14,
+    43,
+    72
+  ],
+  "bounds": {
+    "center": [
+      0,
+      3.492089033126831,
+      0
+    ],
+    "size": [
+      4.428614616394043,
+      6.984178066253662,
+      4.0006866455078125
+    ],
+    "radius": 4.593388300514726
+  }
+}

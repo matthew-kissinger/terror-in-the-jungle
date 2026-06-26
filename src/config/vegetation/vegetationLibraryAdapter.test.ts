@@ -45,12 +45,21 @@ describe('vegetationLibraryAdapter', () => {
     expect(archetypes['teak-a'].promotionDistanceMeters).toBe(160);
   });
 
+  it('emits archetypes for the promoted fan-palm + bamboo-grove mid heroes', () => {
+    const archetypes = vegetationLibraryStaticArchetypes();
+    expect(archetypes['fan-palm']).toBeDefined();
+    expect(archetypes['bamboo-grove']).toBeDefined();
+    // Short mesh ranges: understory reads flat sooner than canopy.
+    expect(archetypes['fan-palm'].promotionDistanceMeters).toBe(70);
+    expect(archetypes['bamboo-grove'].promotionDistanceMeters).toBe(100);
+    expect(archetypes['fan-palm'].maps.baseColor).toContain('fan-palm/impostor/atlas.base-color.png');
+  });
+
   it('does NOT emit archetypes for assets whose far representation is only planned', () => {
     const archetypes = vegetationLibraryStaticArchetypes();
     // banyans are shelved; their far impostors are unbaked -> skipped.
     expect(archetypes['banyan-large']).toBeUndefined();
-    // mid/ground species are mesh-near + planned billboard/card far (not octa) -> skipped here.
-    expect(archetypes['fan-palm']).toBeUndefined();
+    // banana-plant is still mesh-near + planned groundCard (not baked) -> skipped.
     expect(archetypes['banana-plant']).toBeUndefined();
   });
 
