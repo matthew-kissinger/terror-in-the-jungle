@@ -16,7 +16,7 @@ import {
 import { startServer, stopServer, type ServerHandle } from './preview-server';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
-type ProbePoseKind = 'ground' | 'elevated' | 'skyward' | 'finite-edge';
+type ProbePoseKind = 'ground' | 'elevated' | 'skyward' | 'finite-edge' | 'vegetation-focus';
 
 interface RendererCapabilities {
   requestedMode?: string;
@@ -90,6 +90,7 @@ interface PoseMetrics {
     horizonRing: Record<string, unknown> | null;
     billboardDebug: Record<string, unknown> | null;
     vegetationDebug: Record<string, unknown> | null;
+    vegetationFocus: Record<string, unknown> | null;
   };
   rendererInfo: {
     calls: number | null;
@@ -482,6 +483,67 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
       const y = Number(terrain?.getHeightAt?.(x, z) ?? 0);
       return Number.isFinite(y) ? y : 0;
     };
+    const findVegetationFocus = (): Record<string, number | string> | null => {
+      const candidates: Array<Record<string, number | string>> = [];
+      scene?.traverse?.((object: any) => {
+        if (
+          object?.userData?.isStaticImpostorBatch !== true
+          || object.userData.staticImpostorSource !== 'vegetation'
+        ) {
+          return;
+        }
+        const positions = object.geometry?.getAttribute?.('instancePosition');
+        const scales = object.geometry?.getAttribute?.('instanceScale');
+        if (!positions?.getX || !positions?.getY || !positions?.getZ || !scales?.getX || !scales?.getY) {
+          return;
+        }
+        const count = Math.min(
+          Number(object.geometry?.instanceCount ?? positions.count ?? 0),
+          Number(positions.count ?? 0),
+        );
+        const slug = String(object.userData.staticImpostorSlug ?? object.name ?? 'vegetation');
+        const promotion = Number(object.userData.staticImpostorPromotionDistanceMeters ?? 140);
+        const demotion = Number(object.userData.staticImpostorDemotionDistanceMeters ?? promotion * 0.85);
+        for (let i = 0; i < count; i++) {
+          const scaleX = Number(scales.getX(i));
+          const scaleY = Number(scales.getY(i));
+          if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || Math.abs(scaleX) + Math.abs(scaleY) <= 0.01) {
+            continue;
+          }
+          const x = Number(positions.getX(i));
+          const y = Number(positions.getY(i));
+          const z = Number(positions.getZ(i));
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+            continue;
+          }
+          const terrainOk = typeof terrain?.hasTerrainAt === 'function' ? Boolean(terrain.hasTerrainAt(x, z)) : true;
+          if (!terrainOk) {
+            continue;
+          }
+          candidates.push({
+            slug,
+            x,
+            y,
+            z,
+            scaleX,
+            scaleY,
+            promotion,
+            demotion,
+            distanceFromOrigin: Math.hypot(x, z),
+          });
+        }
+      });
+      const targetRadius = Math.min(900, Math.max(320, halfWorld * 0.38));
+      const maxRadius = Math.max(targetRadius * 1.7, targetRadius + 220);
+      const reviewBand = candidates.filter(candidate => Number(candidate.distanceFromOrigin) <= maxRadius);
+      const reviewCandidates = reviewBand.length > 0 ? reviewBand : candidates;
+      reviewCandidates.sort((a, b) => {
+        const aDistance = Math.abs(Number(a.distanceFromOrigin) - targetRadius);
+        const bDistance = Math.abs(Number(b.distanceFromOrigin) - targetRadius);
+        return aDistance - bDistance || Number(b.scaleY) - Number(a.scaleY);
+      });
+      return reviewCandidates[0] ?? null;
+    };
     let cameraX = 0;
     let cameraZ = -180;
     let targetX = 0;
@@ -512,6 +574,30 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
       targetZ = 0;
       cameraY = terrainYAt(cameraX, cameraZ) + 150;
       targetY = terrainYAt(halfWorld - 1, targetZ) + 30;
+    } else if (poseKind === 'vegetation-focus') {
+      const focus = findVegetationFocus();
+      if (focus) {
+        targetX = Number(focus.x);
+        targetZ = Number(focus.z);
+        const promotion = Number(focus.promotion);
+        const scaleY = Number(focus.scaleY);
+        const focusDistance = Math.min(240, Math.max(90, promotion + 24));
+        const offsets = [
+          { x: focusDistance * 0.35, z: -focusDistance },
+          { x: -focusDistance * 0.35, z: -focusDistance },
+          { x: focusDistance, z: 0 },
+          { x: -focusDistance, z: 0 },
+        ];
+        const chosen = offsets.find(offset =>
+          typeof terrain?.hasTerrainAt === 'function'
+            ? terrain.hasTerrainAt(targetX + offset.x, targetZ + offset.z)
+            : true
+        ) ?? offsets[0];
+        cameraX = targetX + chosen.x;
+        cameraZ = targetZ + chosen.z;
+        cameraY = terrainYAt(cameraX, cameraZ) + Math.min(45, Math.max(8, scaleY * 0.65 + 6));
+        targetY = Number(focus.y) + Math.min(18, Math.max(2, scaleY * 0.42));
+      }
     }
     const override = camera.clone();
     override.near = 0.1;
@@ -657,6 +743,7 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
         horizonRing: terrain?.getHorizonRingDebugInfo?.() ?? null,
         billboardDebug: billboards?.getDebugInfo?.() ?? terrain?.getBillboardDebugInfo?.() ?? null,
         vegetationDebug: vegetationMetric?.debug ?? null,
+        vegetationFocus: poseKind === 'vegetation-focus' ? findVegetationFocus() : null,
       },
       rendererInfo: {
         calls: Number(threeRenderer?.info?.render?.calls ?? null),
@@ -754,7 +841,7 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
   const capabilities = await page.evaluate(() => (window as any).__rendererBackendCapabilities?.() ?? null) as RendererCapabilities | null;
   const materialProbes = await collectMaterialProbes(page);
   const poses: PoseProbe[] = [];
-  for (const kind of ['ground', 'elevated', 'skyward', 'finite-edge'] as const) {
+  for (const kind of ['ground', 'elevated', 'vegetation-focus', 'skyward', 'finite-edge'] as const) {
     poses.push(await capturePose(page, modeDir, kind));
   }
 
@@ -835,6 +922,7 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
     && Object.keys(entry.countsByLod).length > 0
   );
   const skyward = poses.find(pose => pose.kind === 'skyward');
+  const vegetationFocus = poses.find(pose => pose.kind === 'vegetation-focus');
   const finite = poses.find(pose => pose.kind === 'finite-edge');
   const skywardRenderSummary = summarizeRenderSubmissions(skyward?.renderSubmissions);
   const topSkywardCategories = topCategoriesForFrame(skywardRenderSummary.peakFrame);
@@ -872,6 +960,18 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
         ? 'Captured vegetation hero impostor promotion/demotion distances plus active snap state, and ground-card distance LOD state.'
         : 'Vegetation LOD transition evidence is incomplete for one or more live scene poses.',
       value: vegetationLodEvidence,
+    },
+    {
+      id: 'vegetation-focus-screenshot',
+      status: vegetationFocus?.poseMetrics.world.vegetationFocus ? 'pass' : 'warn',
+      message: vegetationFocus?.poseMetrics.world.vegetationFocus
+        ? 'Captured a live-scene vegetation-focused screenshot from a current static-impostor batch.'
+        : 'Could not derive a live-scene vegetation-focused camera from active static-impostor batches.',
+      value: {
+        screenshot: vegetationFocus?.screenshot ?? null,
+        focus: vegetationFocus?.poseMetrics.world.vegetationFocus ?? null,
+        imageMetrics: vegetationFocus?.imageMetrics ?? null,
+      },
     },
     {
       id: 'npc-material-probes',
@@ -1018,6 +1118,7 @@ function renderMarkdown(report: ProbeReport): string {
     const npcCount = mode.materialProbes.filter(probe => probe.surface === 'npc').length;
     const ground = mode.poses.find(pose => pose.kind === 'ground');
     const elevated = mode.poses.find(pose => pose.kind === 'elevated');
+    const vegetationFocus = mode.poses.find(pose => pose.kind === 'vegetation-focus');
     const skyward = mode.poses.find(pose => pose.kind === 'skyward');
     const finite = mode.poses.find(pose => pose.kind === 'finite-edge');
     const skywardRenderSummary = summarizeRenderSubmissions(skyward?.renderSubmissions);
@@ -1032,6 +1133,7 @@ function renderMarkdown(report: ProbeReport): string {
       `- CDLOD skyward: ${terrainLodLine(skyward)}`,
       `- Vegetation LOD ground: ${vegetationLodLine(ground)}`,
       `- Vegetation LOD elevated: ${vegetationLodLine(elevated)}`,
+      `- Vegetation focus screenshot: ${vegetationFocus?.screenshot ?? 'missing'}; focus=${JSON.stringify(vegetationFocus?.poseMetrics.world.vegetationFocus ?? null)}; luma=${vegetationFocus?.imageMetrics.lumaMean.toFixed(3) ?? 'n/a'} saturation=${vegetationFocus?.imageMetrics.saturationMean.toFixed(3) ?? 'n/a'} overexposed=${vegetationFocus?.imageMetrics.overexposedRatio.toFixed(3) ?? 'n/a'}`,
       `- Skyward screenshot: ${skyward?.screenshot ?? 'missing'}; luma=${skyward?.imageMetrics.lumaMean.toFixed(3) ?? 'n/a'} saturation=${skyward?.imageMetrics.saturationMean.toFixed(3) ?? 'n/a'} overexposed=${skyward?.imageMetrics.overexposedRatio.toFixed(3) ?? 'n/a'}`,
       `- Skyward peak frame: frame=${String(skywardRenderSummary.peakFrame?.frameCount ?? 'missing')} triangles=${String(skywardRenderSummary.peakFrame?.triangles ?? 'missing')} draws=${String(skywardRenderSummary.peakFrame?.drawSubmissions ?? 'missing')}`,
       `- Skyward peak categories: ${topSkyward.map(entry => `${entry.category}:${entry.triangles} (${JSON.stringify(entry.passTypes ?? {})})`).join(', ') || 'missing'}`,
