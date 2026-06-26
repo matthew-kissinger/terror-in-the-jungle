@@ -1,6 +1,7 @@
 # Vegetation LOD Visual Acceptance
 
-Status: candidate branch, owner acceptance pending, not deployed.
+Status: accepted by owner for production test, merged, deployed, and live
+release-proved.
 
 Goal: make vegetation far representations match their GLB/source assets across
 lighting, fog, and LOD snap distances before production deploy.
@@ -74,7 +75,16 @@ npm run check:vegetation-lod-review
 npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --force-build --veg-impostor-transition-meters 28
 ```
 
-Latest useful candidate artifacts:
+Latest useful shipped artifacts:
+
+- `artifacts/perf/2026-06-26T21-23-21-426Z/projekt-143-live-release-proof/release-proof.json`
+  - production proof for merge commit
+    `e6e881a4bf9a1d50028b6f8262cbad6315d45b6a`
+  - exact-head CI run `28265843418` passed
+  - deploy run `28265866588` passed
+  - live `/asset-manifest.json` reports the same merge commit SHA
+  - Pages headers, R2 A Shau DEM headers, service-worker surface, and live
+    browser smoke all passed
 
 - `artifacts/vegetation-lod-review/2026-06-26T21-01-52-536Z`
   - clean-head focused source-vs-impostor matrix for
@@ -155,7 +165,11 @@ Latest useful candidate artifacts:
 
 ## Acceptance
 
-Owner review should cover both surfaces:
+Owner accepted the current candidate as good enough to merge and test in
+production on 2026-06-26. Final subjective notes can still come from the live
+production walk, but the accepted path is shipped.
+
+Owner review covered both surfaces:
 
 - isolated source-vs-far matrix:
   `artifacts/vegetation-lod-review/2026-06-26T21-01-52-536Z`
@@ -175,7 +189,7 @@ Accept this path only if:
 - the focused live-scene LOD pose shows whether any vegetation instances are in
   the crossfade band rather than only proving binary mesh/impostor state
 
-Current review risk: the candidate intentionally favors darker, more saturated
+Current production-review risk: the candidate intentionally favors darker, more saturated
 foliage than the rejected path because that is what moves the live scene away
 from fog-bleached cards. Open Frontier rubber-a still has some pale lower-canopy
 detail against dark terrain, even though it no longer reads like the washed old
@@ -198,8 +212,8 @@ thresholds. Use `vegImpostorTransitionMeters=0` for an A/B capture against the
 old binary snap, or widen/narrow the value in scene parity to test whether
 overlap hides the material delta without making far cards look doubled.
 
-Do not deploy this as accepted until the owner confirms the current far
-representation is the chosen path. If rejected, use the review route to compare
-additional exposure, fog, alpha, or bake variants before changing production
-defaults, then rerun the clean-head review matrix and the Open Frontier + A Shau
-scene-parity focused proof.
+If live production testing rejects the current shipped look, use the review
+route to compare additional exposure, fog, alpha, color-response, or bake
+variants before changing production defaults, then rerun the clean-head review
+matrix, the Open Frontier + A Shau scene-parity focused proof, and live release
+proof after deployment.
