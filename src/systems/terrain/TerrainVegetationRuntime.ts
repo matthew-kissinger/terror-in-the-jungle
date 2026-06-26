@@ -11,7 +11,11 @@ import {
 } from '../../config/vegetation/vegetationLibraryAdapter';
 import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { modelLoader } from '../assets/ModelLoader';
-import { StaticImpostorSystem } from '../world/staticImpostors/StaticImpostorSystem';
+import {
+  StaticImpostorSystem,
+  type StaticImpostorDebugInfo,
+} from '../world/staticImpostors/StaticImpostorSystem';
+import type { StaticImpostorMaterialTuning } from '../world/staticImpostors/StaticImpostorMaterial';
 import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 import { getHeightQueryCache } from './HeightQueryCache';
 import { GLBHeroScatterer, type GLBHeroScattererDebugInfo } from './GLBHeroScatterer';
@@ -37,6 +41,7 @@ export interface TerrainVegetationRuntimeDebugInfo {
   vegetation: VegetationScattererDebugInfo;
   jungleGroundRing: JungleGroundRingDebugInfo;
   glbHeroes: GLBHeroScattererDebugInfo;
+  heroImpostors: StaticImpostorDebugInfo | null;
   groundCards: GroundCardScattererDebugInfo;
 }
 
@@ -84,6 +89,55 @@ function groundCardsEnabled(): boolean {
     return new URLSearchParams(window.location.search).get('vegGroundCards') !== '0';
   } catch {
     return true;
+  }
+}
+
+function readFiniteQueryNumber(params: URLSearchParams, name: string, min: number, max: number): number | undefined {
+  const raw = params.get(name);
+  if (raw === null || raw.trim().length === 0) return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return undefined;
+  return Math.min(max, Math.max(min, value));
+}
+
+interface VegetationImpostorReviewOptions {
+  readonly materialTuning?: StaticImpostorMaterialTuning;
+  readonly transitionFadeMeters: number;
+}
+
+const DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS = 28;
+
+function vegetationImpostorReviewOptions(): VegetationImpostorReviewOptions {
+  const defaults: VegetationImpostorReviewOptions = {
+    transitionFadeMeters: DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS,
+  };
+  if (typeof window === 'undefined') return defaults;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fogStrength = readFiniteQueryNumber(params, 'vegImpostorFogStrength', 0, 1.5);
+    const foliageExposureScale = readFiniteQueryNumber(params, 'vegImpostorExposureScale', 0, 2);
+    const foliageColorGamma = readFiniteQueryNumber(params, 'vegImpostorColorGamma', 0.6, 2.5);
+    const foliageSaturation = readFiniteQueryNumber(params, 'vegImpostorSaturation', 0, 1.25);
+    const transitionFadeMeters = readFiniteQueryNumber(
+      params,
+      'vegImpostorTransitionMeters',
+      0,
+      80,
+    ) ?? DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS;
+    const materialTuning = fogStrength === undefined
+      && foliageExposureScale === undefined
+      && foliageColorGamma === undefined
+      && foliageSaturation === undefined
+      ? undefined
+      : {
+          ...(fogStrength !== undefined ? { fogStrength } : {}),
+          ...(foliageExposureScale !== undefined ? { foliageExposureScale } : {}),
+          ...(foliageColorGamma !== undefined ? { foliageColorGamma } : {}),
+          ...(foliageSaturation !== undefined ? { foliageSaturation } : {}),
+        };
+    return { materialTuning, transitionFadeMeters };
+  } catch {
+    return defaults;
   }
 }
 
@@ -167,9 +221,13 @@ export class TerrainVegetationRuntime {
     for (const archetype of Object.values(heroArchetypesBySlug)) {
       heroArchetypesByModelPath[archetype.modelPath] = archetype;
     }
+    const impostorReviewOptions = vegetationImpostorReviewOptions();
     this.heroImpostors = new StaticImpostorSystem(scene, camera, {
       archetypes: heroArchetypesByModelPath,
       batchCapacity: VEGETATION_HERO_IMPOSTOR_BATCH_CAPACITY,
+      debugSource: 'vegetation',
+      materialTuning: impostorReviewOptions.materialTuning,
+      transitionFadeMeters: impostorReviewOptions.transitionFadeMeters,
     });
     this.glbHeroScatterer = new GLBHeroScatterer(
       {
@@ -278,6 +336,7 @@ export class TerrainVegetationRuntime {
         activeCells: 0, targetCells: 0, pendingAdditions: 0,
         pendingRemovals: 0, registeredInstances: 0, inFlightLoads: 0,
       },
+      heroImpostors: this.heroImpostors?.getDebugInfo() ?? null,
       groundCards: this.groundCardScatterer?.getDebugInfo() ?? {
         activeCells: 0, targetCells: 0, pendingAdditions: 0, pendingRemovals: 0,
         cardBatches: 0, cardInstances: 0, visibleBatches: 0, nearMeshes: 0, inFlightNearLoads: 0,

@@ -22,6 +22,7 @@ describe('vegetationLibraryAdapter', () => {
     expect(jungle.maps.depth).toContain('impostor/atlas.depth.png');
     expect(jungle.columns).toBe(8);
     expect(jungle.rows).toBe(3);
+    expect(jungle.lightingProfile).toBe('foliage-card');
     // promotion comes from the mesh band far edge; demotion sits below it (hysteresis).
     expect(jungle.promotionDistanceMeters).toBe(180);
     expect(jungle.demotionDistanceMeters).toBeLessThan(jungle.promotionDistanceMeters);
@@ -39,6 +40,7 @@ describe('vegetationLibraryAdapter', () => {
       expect(arc.maps.depth).toContain('impostor/atlas.depth.png');
       expect(arc.columns).toBe(8);
       expect(arc.rows).toBe(3);
+      expect(arc.lightingProfile).toBe('foliage-card');
       expect(arc.demotionDistanceMeters).toBeLessThan(arc.promotionDistanceMeters);
     }
     // promotion == mesh-band far edge: rubber 150m, teak 160m.

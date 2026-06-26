@@ -113,6 +113,7 @@ export function vegetationLibraryStaticArchetypes(
       promotionDistanceMeters: promotion,
       demotionDistanceMeters: Math.round(promotion * DEMOTION_FRACTION),
       parallaxStrength: DEFAULT_PARALLAX,
+      lightingProfile: 'foliage-card',
     };
   }
   return out;

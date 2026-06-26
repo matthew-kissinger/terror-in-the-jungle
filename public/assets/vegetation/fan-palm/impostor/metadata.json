@@ -1,7 +1,7 @@
 {
   "generator": "scripts/bake-vegetation-impostor.mjs",
-  "generatedAt": "2026-06-26T08:52:34.461Z",
-  "modelUrl": "http://localhost:8765/assets/vegetation/fan-palm/fan-palm.glb",
+  "generatedAt": "2026-06-26T17:25:48.418Z",
+  "modelUrl": "http://127.0.0.1:8765/assets/vegetation/fan-palm/fan-palm.glb",
   "columns": 8,
   "rows": 3,
   "tileSize": [
