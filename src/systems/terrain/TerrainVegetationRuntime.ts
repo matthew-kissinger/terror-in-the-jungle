@@ -100,20 +100,37 @@ function readFiniteQueryNumber(params: URLSearchParams, name: string, min: numbe
   return Math.min(max, Math.max(min, value));
 }
 
-function vegetationImpostorReviewTuning(): StaticImpostorMaterialTuning | undefined {
-  if (typeof window === 'undefined') return undefined;
+interface VegetationImpostorReviewOptions {
+  readonly materialTuning?: StaticImpostorMaterialTuning;
+  readonly transitionFadeMeters: number;
+}
+
+const DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS = 28;
+
+function vegetationImpostorReviewOptions(): VegetationImpostorReviewOptions {
+  const defaults: VegetationImpostorReviewOptions = {
+    transitionFadeMeters: DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS,
+  };
+  if (typeof window === 'undefined') return defaults;
   try {
     const params = new URLSearchParams(window.location.search);
     const fogStrength = readFiniteQueryNumber(params, 'vegImpostorFogStrength', 0, 1.5);
     const foliageExposureScale = readFiniteQueryNumber(params, 'vegImpostorExposureScale', 0, 2);
-    if (fogStrength === undefined && foliageExposureScale === undefined) return undefined;
-    if (fogStrength !== undefined && foliageExposureScale !== undefined) {
-      return { fogStrength, foliageExposureScale };
-    }
-    if (fogStrength !== undefined) return { fogStrength };
-    return { foliageExposureScale };
+    const transitionFadeMeters = readFiniteQueryNumber(
+      params,
+      'vegImpostorTransitionMeters',
+      0,
+      80,
+    ) ?? DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS;
+    const materialTuning = fogStrength === undefined && foliageExposureScale === undefined
+      ? undefined
+      : {
+          ...(fogStrength !== undefined ? { fogStrength } : {}),
+          ...(foliageExposureScale !== undefined ? { foliageExposureScale } : {}),
+        };
+    return { materialTuning, transitionFadeMeters };
   } catch {
-    return undefined;
+    return defaults;
   }
 }
 
@@ -197,11 +214,13 @@ export class TerrainVegetationRuntime {
     for (const archetype of Object.values(heroArchetypesBySlug)) {
       heroArchetypesByModelPath[archetype.modelPath] = archetype;
     }
+    const impostorReviewOptions = vegetationImpostorReviewOptions();
     this.heroImpostors = new StaticImpostorSystem(scene, camera, {
       archetypes: heroArchetypesByModelPath,
       batchCapacity: VEGETATION_HERO_IMPOSTOR_BATCH_CAPACITY,
       debugSource: 'vegetation',
-      materialTuning: vegetationImpostorReviewTuning(),
+      materialTuning: impostorReviewOptions.materialTuning,
+      transitionFadeMeters: impostorReviewOptions.transitionFadeMeters,
     });
     this.glbHeroScatterer = new GLBHeroScatterer(
       {

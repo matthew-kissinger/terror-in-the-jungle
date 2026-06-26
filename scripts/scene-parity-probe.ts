@@ -143,6 +143,7 @@ interface ProbeReport {
     forceBuild: boolean;
     vegetationImpostorFogStrength: number | null;
     vegetationImpostorExposureScale: number | null;
+    vegetationImpostorTransitionMeters: number | null;
   };
   files: {
     summary: string;
@@ -846,6 +847,7 @@ async function runModeProbe(
   renderer: string,
   vegetationImpostorFogStrength: number | null,
   vegetationImpostorExposureScale: number | null,
+  vegetationImpostorTransitionMeters: number | null,
 ): Promise<ModeProbe> {
   const modeDir = join(artifactDir, mode);
   mkdirSync(modeDir, { recursive: true });
@@ -860,6 +862,9 @@ async function runModeProbe(
   }
   if (vegetationImpostorExposureScale !== null) {
     params.set('vegImpostorExposureScale', String(vegetationImpostorExposureScale));
+  }
+  if (vegetationImpostorTransitionMeters !== null) {
+    params.set('vegImpostorTransitionMeters', String(vegetationImpostorTransitionMeters));
   }
   const url = `http://${HOST}:${parseNumberFlag('port', DEFAULT_PORT)}/?${params.toString()}`;
   const consoleErrors: string[] = [];
@@ -898,11 +903,14 @@ async function runModeProbe(
           registeredInstances: Number(value?.registeredInstances ?? 0),
           activeImpostors: Number(value?.activeImpostors ?? 0),
           meshFallbacks: Number(value?.meshFallbacks ?? 0),
+          transitioningInstances: Number(value?.transitioningInstances ?? 0),
           promotionDistanceMeters: Number(value?.promotionDistanceMeters ?? NaN),
           demotionDistanceMeters: Number(value?.demotionDistanceMeters ?? NaN),
+          transitionFadeMeters: Number(value?.transitionFadeMeters ?? NaN),
           nearestDistanceMeters: Number.isFinite(value?.nearestDistanceMeters) ? Number(value.nearestDistanceMeters) : null,
           nearestMeshDistanceMeters: Number.isFinite(value?.nearestMeshDistanceMeters) ? Number(value.nearestMeshDistanceMeters) : null,
           nearestImpostorDistanceMeters: Number.isFinite(value?.nearestImpostorDistanceMeters) ? Number(value.nearestImpostorDistanceMeters) : null,
+          nearestTransitionDistanceMeters: Number.isFinite(value?.nearestTransitionDistanceMeters) ? Number(value.nearestTransitionDistanceMeters) : null,
         }))
       : [];
     return {
@@ -912,6 +920,7 @@ async function runModeProbe(
             registeredInstances: Number(heroImpostors.registeredInstances ?? 0),
             activeImpostors: Number(heroImpostors.activeImpostors ?? 0),
             meshFallbacks: Number(heroImpostors.meshFallbacks ?? 0),
+            transitioningInstances: Number(heroImpostors.transitioningInstances ?? 0),
             archetypes,
           }
         : null,
@@ -930,6 +939,7 @@ async function runModeProbe(
       archetype.registeredInstances > 0
       && Number.isFinite(archetype.promotionDistanceMeters)
       && Number.isFinite(archetype.demotionDistanceMeters)
+      && Number.isFinite(archetype.transitionFadeMeters)
       && archetype.nearestDistanceMeters !== null
     )
   );
@@ -1000,7 +1010,7 @@ async function runModeProbe(
       id: 'vegetation-lod-transition-evidence',
       status: hasHeroLodDistanceEvidence && hasHeroSnapStateEvidence && hasGroundCardDistanceEvidence ? 'pass' : 'warn',
       message: hasHeroLodDistanceEvidence && hasHeroSnapStateEvidence && hasGroundCardDistanceEvidence
-        ? 'Captured vegetation hero impostor promotion/demotion distances plus active snap state, and ground-card distance LOD state.'
+        ? 'Captured vegetation hero impostor promotion/demotion distances, transition fade width, active snap/crossfade state, and ground-card distance LOD state.'
         : 'Vegetation LOD transition evidence is incomplete for one or more live scene poses.',
       value: vegetationLodEvidence,
     },
@@ -1123,15 +1133,20 @@ function vegetationLodLine(pose: PoseProbe | undefined): string {
       .map(([slug, value]) => {
         const active = Number(value?.activeImpostors ?? 0);
         const mesh = Number(value?.meshFallbacks ?? 0);
+        const transitioning = Number(value?.transitioningInstances ?? 0);
         const promotion = Number(value?.promotionDistanceMeters ?? NaN);
         const demotion = Number(value?.demotionDistanceMeters ?? NaN);
+        const transitionFade = Number(value?.transitionFadeMeters ?? NaN);
         const nearestMesh = Number.isFinite(value?.nearestMeshDistanceMeters)
           ? Number(value.nearestMeshDistanceMeters).toFixed(1)
           : 'none';
         const nearestImpostor = Number.isFinite(value?.nearestImpostorDistanceMeters)
           ? Number(value.nearestImpostorDistanceMeters).toFixed(1)
           : 'none';
-        return `${slug}:mesh=${mesh}/imp=${active}/prom=${promotion}/demote=${demotion}/nearestMesh=${nearestMesh}/nearestImp=${nearestImpostor}`;
+        const nearestTransition = Number.isFinite(value?.nearestTransitionDistanceMeters)
+          ? Number(value.nearestTransitionDistanceMeters).toFixed(1)
+          : 'none';
+        return `${slug}:mesh=${mesh}/imp=${active}/blend=${transitioning}/prom=${promotion}/demote=${demotion}/fade=${transitionFade}/nearestMesh=${nearestMesh}/nearestImp=${nearestImpostor}/nearestBlend=${nearestTransition}`;
       })
       .join('; ')
     : 'none';
@@ -1139,7 +1154,7 @@ function vegetationLodLine(pose: PoseProbe | undefined): string {
   const groundLine = ground
     ? `cards=${Number(ground.cardInstances ?? 0)} visible=${Number(ground.visibleBatches ?? 0)} nearMeshes=${Number(ground.nearMeshes ?? 0)}`
     : 'cards=missing';
-  return `heroSource=${hero?.source ?? 'missing'} registered=${Number(hero?.registeredInstances ?? 0)} activeImp=${Number(hero?.activeImpostors ?? 0)} mesh=${Number(hero?.meshFallbacks ?? 0)} archetypes=[${heroArchetypes}] ${groundLine}`;
+  return `heroSource=${hero?.source ?? 'missing'} registered=${Number(hero?.registeredInstances ?? 0)} activeImp=${Number(hero?.activeImpostors ?? 0)} mesh=${Number(hero?.meshFallbacks ?? 0)} blend=${Number(hero?.transitioningInstances ?? 0)} archetypes=[${heroArchetypes}] ${groundLine}`;
 }
 
 function renderMarkdown(report: ProbeReport): string {
@@ -1149,7 +1164,7 @@ function renderMarkdown(report: ProbeReport): string {
     `Created: ${report.createdAt}`,
     `Status: ${report.status}`,
     `Renderer: ${report.options.renderer}`,
-    `Vegetation impostor candidate: fogStrength=${report.options.vegetationImpostorFogStrength ?? 'default'} exposureScale=${report.options.vegetationImpostorExposureScale ?? 'default'}`,
+    `Vegetation impostor candidate: fogStrength=${report.options.vegetationImpostorFogStrength ?? 'default'} exposureScale=${report.options.vegetationImpostorExposureScale ?? 'default'} transitionMeters=${report.options.vegetationImpostorTransitionMeters ?? 'default'}`,
     `Git SHA: ${report.sourceGitSha}`,
     '',
     '## Decisions',
@@ -1198,7 +1213,7 @@ function renderMarkdown(report: ProbeReport): string {
 
 async function main(): Promise<void> {
   if (hasFlag('help')) {
-    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed [--veg-impostor-fog-strength 0.62] [--veg-impostor-exposure-scale 0.95]');
+    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed [--veg-impostor-fog-strength 0.62] [--veg-impostor-exposure-scale 0.95] [--veg-impostor-transition-meters 28]');
     return;
   }
   const modes = normalizeModes(parseStringFlag('modes', 'open_frontier,zone_control'));
@@ -1209,6 +1224,7 @@ async function main(): Promise<void> {
   const forceBuild = hasFlag('force-build');
   const vegetationImpostorFogStrength = parseOptionalNumberFlag('veg-impostor-fog-strength', 0, 1.5);
   const vegetationImpostorExposureScale = parseOptionalNumberFlag('veg-impostor-exposure-scale', 0, 2);
+  const vegetationImpostorTransitionMeters = parseOptionalNumberFlag('veg-impostor-transition-meters', 0, 80);
   if (!forceBuild && !existsSync(join(process.cwd(), 'dist-perf', 'index.html'))) {
     throw new Error('dist-perf/index.html not found. Run `npm run build:perf` or pass --force-build.');
   }
@@ -1252,6 +1268,7 @@ async function main(): Promise<void> {
           renderer,
           vegetationImpostorFogStrength,
           vegetationImpostorExposureScale,
+          vegetationImpostorTransitionMeters,
         ));
       } catch (error) {
         modeReports.push({
@@ -1295,6 +1312,7 @@ async function main(): Promise<void> {
         forceBuild,
         vegetationImpostorFogStrength,
         vegetationImpostorExposureScale,
+        vegetationImpostorTransitionMeters,
       },
       files: {
         summary: relative(process.cwd(), summaryPath),

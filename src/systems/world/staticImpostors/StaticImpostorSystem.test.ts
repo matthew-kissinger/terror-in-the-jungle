@@ -49,6 +49,47 @@ function getBatchMaterial(scene: THREE.Scene): StaticImpostorNodeMaterial {
   return mesh!.material as StaticImpostorNodeMaterial;
 }
 
+function getBatchMesh(scene: THREE.Scene, slug = 'fuel-drum'): THREE.Mesh {
+  const mesh = scene.children.find(
+    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name === `StaticImpostorBatch_${slug}`,
+  );
+  expect(mesh).toBeDefined();
+  return mesh!;
+}
+
+function getFirstBatchOpacity(scene: THREE.Scene, slug = 'fuel-drum'): number {
+  const mesh = getBatchMesh(scene, slug);
+  const attribute = mesh.geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute | undefined;
+  expect(attribute).toBeDefined();
+  return Number(attribute!.array[0]);
+}
+
+function makeVegetationArchetype(overrides: Partial<StaticImpostorArchetype> = {}): StaticImpostorArchetype {
+  return {
+    slug: 'jungle-tree',
+    modelPath: '/assets/vegetation/jungle-tree/jungle-tree.glb',
+    maps: {
+      baseColor: '/assets/vegetation/jungle-tree/impostor/atlas.base-color.png',
+      normal: '/assets/vegetation/jungle-tree/impostor/atlas.normal.png',
+      depth: '/assets/vegetation/jungle-tree/impostor/atlas.depth.png',
+    },
+    atlasSize: [2048, 768],
+    tileSize: [256, 256],
+    columns: 8,
+    rows: 3,
+    azimuthFrames: 8,
+    elevationFrames: 3,
+    maxTextureSize: 2048,
+    planePaddingScale: 1.16,
+    bounds: { center: [0, 1, 0], size: [2, 4, 2], radius: 2.5 },
+    promotionDistanceMeters: 160,
+    demotionDistanceMeters: 136,
+    parallaxStrength: 0.04,
+    lightingProfile: 'foliage-card',
+    ...overrides,
+  };
+}
+
 function flushPromises(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -196,28 +237,7 @@ describe('StaticImpostorSystem', () => {
 
   it('labels vegetation-owned batches and reports per-archetype LOD distances', async () => {
     const provider = makeProvider();
-    const vegetationArchetype: StaticImpostorArchetype = {
-      slug: 'jungle-tree',
-      modelPath: '/assets/vegetation/jungle-tree/jungle-tree.glb',
-      maps: {
-        baseColor: '/assets/vegetation/jungle-tree/impostor/atlas.base-color.png',
-        normal: '/assets/vegetation/jungle-tree/impostor/atlas.normal.png',
-        depth: '/assets/vegetation/jungle-tree/impostor/atlas.depth.png',
-      },
-      atlasSize: [2048, 768],
-      tileSize: [256, 256],
-      columns: 8,
-      rows: 3,
-      azimuthFrames: 8,
-      elevationFrames: 3,
-      maxTextureSize: 2048,
-      planePaddingScale: 1.16,
-      bounds: { center: [0, 1, 0], size: [2, 4, 2], radius: 2.5 },
-      promotionDistanceMeters: 160,
-      demotionDistanceMeters: 136,
-      parallaxStrength: 0.04,
-      lightingProfile: 'foliage-card',
-    };
+    const vegetationArchetype = makeVegetationArchetype();
     const system = new StaticImpostorSystem(scene, camera, {
       textureProvider: provider,
       archetypes: { [vegetationArchetype.modelPath]: vegetationArchetype },
@@ -263,6 +283,80 @@ describe('StaticImpostorSystem', () => {
       lightingProfile: 'foliage-card',
     }));
     expect(debug.archetypes['jungle-tree'].nearestImpostorDistanceMeters).toBeGreaterThan(160);
+  });
+
+  it('crossfades opted-in vegetation meshes without mutating shared source materials', async () => {
+    camera.position.set(0, 0, 0);
+    const provider = makeProvider();
+    const vegetationArchetype = makeVegetationArchetype({
+      promotionDistanceMeters: 100,
+      demotionDistanceMeters: 80,
+    });
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      archetypes: { [vegetationArchetype.modelPath]: vegetationArchetype },
+      debugSource: 'vegetation',
+      transitionFadeMeters: 20,
+    });
+    const object = new THREE.Group();
+    object.position.set(110, 0, 0);
+    const sharedMaterial = new THREE.MeshStandardMaterial({ color: 0x335522 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), sharedMaterial);
+    object.add(mesh);
+    scene.add(object);
+
+    const registered = system.registerInstance({
+      id: 'vegetation_jungle_tree_transition',
+      modelPath: vegetationArchetype.modelPath,
+      object,
+    });
+    await flushPromises();
+    system.update(0.016);
+
+    expect(registered).toBe(true);
+    expect(object.visible).toBe(true);
+    expect(mesh.material).not.toBe(sharedMaterial);
+    expect(sharedMaterial.opacity).toBe(1);
+    expect(sharedMaterial.transparent).toBe(false);
+    expect((mesh.material as THREE.Material).opacity).toBeCloseTo(0.5, 1);
+    expect((mesh.material as THREE.Material).transparent).toBe(true);
+    expect(getFirstBatchOpacity(scene, 'jungle-tree')).toBeCloseTo(0.5, 1);
+    expect(system.getDebugInfo()).toEqual(expect.objectContaining({
+      activeImpostors: 1,
+      meshFallbacks: 0,
+      transitioningInstances: 1,
+    }));
+    expect(system.getDebugInfo().archetypes['jungle-tree']).toEqual(expect.objectContaining({
+      transitioningInstances: 1,
+      transitionFadeMeters: 20,
+    }));
+
+    camera.position.set(-10, 0, 0);
+    system.update(0.016);
+
+    expect(object.visible).toBe(false);
+    expect((mesh.material as THREE.Material).opacity).toBe(1);
+    expect(getFirstBatchOpacity(scene, 'jungle-tree')).toBe(1);
+
+    camera.position.set(40, 0, 0);
+    system.update(0.016);
+
+    expect(object.visible).toBe(true);
+    expect((mesh.material as THREE.Material).opacity).toBeCloseTo(0.5, 1);
+    expect(getFirstBatchOpacity(scene, 'jungle-tree')).toBeCloseTo(0.5, 1);
+
+    camera.position.set(55, 0, 0);
+    system.update(0.016);
+
+    expect(object.visible).toBe(true);
+    expect((mesh.material as THREE.Material).opacity).toBe(1);
+    expect(getFirstBatchOpacity(scene, 'jungle-tree')).toBe(0);
+
+    system.unregisterInstance('vegetation_jungle_tree_transition');
+
+    expect(mesh.material).toBe(sharedMaterial);
+    sharedMaterial.dispose();
+    mesh.geometry.dispose();
   });
 
   it('forwards scene fog into the custom static impostor material and clamps density', async () => {

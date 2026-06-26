@@ -7,22 +7,16 @@ import {
   type StaticImpostorArchetype,
 } from '../../../config/staticImpostorArchetypes';
 import { Logger } from '../../../utils/Logger';
-import { isLightingRigEnabled, lightingRigBindings } from '../../environment/LightingRig';
-import {
-  createStaticImpostorNodeMaterial,
-  type StaticImpostorMaterialTuning,
-  type StaticImpostorMaterialTextures,
-  type StaticImpostorNodeMaterial,
-} from './StaticImpostorMaterial';
+import type { StaticImpostorMaterialTuning, StaticImpostorMaterialTextures } from './StaticImpostorMaterial';
+import { StaticImpostorBatch, type StaticImpostorBatchDebugInfo } from './StaticImpostorBatch';
 
 type AtlasLoadState = 'loading' | 'ready' | 'failed';
-type StaticImpostorRenderState = 'mesh' | 'impostor';
+type StaticImpostorRenderState = 'mesh' | 'blend-to-impostor' | 'impostor' | 'blend-to-mesh';
 
-const STATIC_IMPOSTOR_PERF_CATEGORY = 'world_static_impostors';
 const STATIC_IMPOSTOR_CONTROLLED_KEY = '__staticImpostorControlled';
 const DEFAULT_BATCH_CAPACITY = 256;
-const DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY = 0.00055;
-const MAX_STATIC_IMPOSTOR_FOG_DENSITY = 0.002;
+const DEFAULT_TRANSITION_FADE_METERS = 0;
+const MAX_TRANSITION_FADE_METERS = 80;
 const _bounds = new THREE.Box3();
 const _center = new THREE.Vector3();
 const _size = new THREE.Vector3();
@@ -54,19 +48,23 @@ interface RegisteredStaticImpostorInstance {
   yaw: number;
   slot: number | null;
   state: StaticImpostorRenderState;
+  fadeMaterials: StaticImpostorFadeMaterialRecord[];
 }
 
 export interface StaticImpostorArchetypeDebugInfo {
   registeredInstances: number;
   activeImpostors: number;
   meshFallbacks: number;
+  transitioningInstances: number;
   promotionDistanceMeters: number;
   demotionDistanceMeters: number;
+  transitionFadeMeters: number;
   lightingProfile: StaticImpostorArchetype['lightingProfile'] | 'surface-normal';
   nearestDistanceMeters: number | null;
   farthestDistanceMeters: number | null;
   nearestMeshDistanceMeters: number | null;
   nearestImpostorDistanceMeters: number | null;
+  nearestTransitionDistanceMeters: number | null;
 }
 
 export interface StaticImpostorDebugInfo {
@@ -74,21 +72,12 @@ export interface StaticImpostorDebugInfo {
   registeredInstances: number;
   activeImpostors: number;
   meshFallbacks: number;
+  transitioningInstances: number;
   atlasesReady: number;
   atlasesLoading: number;
   atlasesFailed: number;
   archetypes: Record<string, StaticImpostorArchetypeDebugInfo>;
-  batches: Record<string, {
-    active: number;
-    highWater: number;
-    free: number;
-    source: string;
-    lightingProfile: StaticImpostorArchetype['lightingProfile'] | 'surface-normal';
-    promotionDistanceMeters: number;
-    demotionDistanceMeters: number;
-    fogStrength: number;
-    foliageExposure: number;
-  }>;
+  batches: Record<string, StaticImpostorBatchDebugInfo>;
 }
 
 export interface StaticImpostorTextureProvider {
@@ -117,6 +106,25 @@ export interface StaticImpostorSystemOptions {
    * omit this so default impostor lighting/fog remains the shipped path.
    */
   materialTuning?: StaticImpostorMaterialTuning;
+  /**
+   * Width in meters over which the source mesh and impostor overlap during LOD
+   * transitions. Defaults to 0 so existing authored static-prop impostors keep
+   * their binary switch unless a caller opts in.
+   */
+  transitionFadeMeters?: number;
+}
+
+interface StaticImpostorMaterialBaseline {
+  opacity: number;
+  transparent: boolean;
+  depthWrite: boolean;
+}
+
+interface StaticImpostorFadeMaterialRecord {
+  mesh: THREE.Mesh;
+  originalMaterial: THREE.Material | THREE.Material[];
+  fadeMaterial: THREE.Material | THREE.Material[];
+  baselines: StaticImpostorMaterialBaseline[];
 }
 
 class ThreeStaticImpostorTextureProvider implements StaticImpostorTextureProvider {
@@ -143,231 +151,6 @@ class ThreeStaticImpostorTextureProvider implements StaticImpostorTextureProvide
   }
 }
 
-class StaticImpostorBatch {
-  private readonly geometry: THREE.InstancedBufferGeometry;
-  private readonly material: StaticImpostorNodeMaterial;
-  private readonly mesh: THREE.Mesh;
-  private readonly positions: Float32Array;
-  private readonly activeScales: Float32Array;
-  private readonly visibleScales: Float32Array;
-  private readonly yaws: Float32Array;
-  private readonly positionAttribute: THREE.InstancedBufferAttribute;
-  private readonly scaleAttribute: THREE.InstancedBufferAttribute;
-  private readonly yawAttribute: THREE.InstancedBufferAttribute;
-  private readonly freeSlots = new Set<number>();
-  private highWaterMark = 0;
-  private liveCount = 0;
-  private pendingPositionUpdate = false;
-  private pendingScaleUpdate = false;
-  private pendingYawUpdate = false;
-  private capacityWarningLogged = false;
-
-  constructor(
-    private readonly scene: THREE.Scene,
-    private readonly archetype: StaticImpostorArchetype,
-    atlas: LoadedStaticImpostorAtlas,
-    private readonly capacity: number,
-    private readonly source: string,
-    materialTuning?: StaticImpostorMaterialTuning,
-  ) {
-    const plane = new THREE.PlaneGeometry(1, 1);
-    this.geometry = new THREE.InstancedBufferGeometry();
-    this.geometry.setIndex(plane.index);
-    Object.entries(plane.attributes).forEach(([name, attribute]) => {
-      this.geometry.setAttribute(name, attribute);
-    });
-    this.geometry.instanceCount = 0;
-    plane.dispose();
-
-    this.positions = new Float32Array(capacity * 3);
-    this.activeScales = new Float32Array(capacity * 2);
-    this.visibleScales = new Float32Array(capacity * 2);
-    this.yaws = new Float32Array(capacity);
-
-    this.positionAttribute = new THREE.InstancedBufferAttribute(this.positions, 3);
-    this.scaleAttribute = new THREE.InstancedBufferAttribute(this.visibleScales, 2);
-    this.yawAttribute = new THREE.InstancedBufferAttribute(this.yaws, 1);
-    this.positionAttribute.setUsage(THREE.DynamicDrawUsage);
-    this.scaleAttribute.setUsage(THREE.DynamicDrawUsage);
-    this.yawAttribute.setUsage(THREE.DynamicDrawUsage);
-
-    this.geometry.setAttribute('instancePosition', this.positionAttribute);
-    this.geometry.setAttribute('instanceScale', this.scaleAttribute);
-    this.geometry.setAttribute('instanceYaw', this.yawAttribute);
-
-    this.material = createStaticImpostorNodeMaterial(
-      archetype,
-      atlas.textures,
-      this.positionAttribute,
-      this.scaleAttribute,
-      this.yawAttribute,
-      materialTuning,
-    );
-    this.mesh = new THREE.Mesh(this.geometry, this.material);
-    this.mesh.name = `StaticImpostorBatch_${archetype.slug}`;
-    this.mesh.userData.perfCategory = STATIC_IMPOSTOR_PERF_CATEGORY;
-    this.mesh.userData.isStaticImpostorBatch = true;
-    this.mesh.userData.staticImpostorSource = source;
-    this.mesh.userData.staticImpostorSlug = archetype.slug;
-    this.mesh.userData.staticImpostorLightingProfile = archetype.lightingProfile ?? 'surface-normal';
-    this.mesh.userData.staticImpostorPromotionDistanceMeters = archetype.promotionDistanceMeters;
-    this.mesh.userData.staticImpostorDemotionDistanceMeters = archetype.demotionDistanceMeters;
-    this.mesh.frustumCulled = false;
-    this.mesh.visible = false;
-    this.mesh.matrixAutoUpdate = false;
-    this.mesh.matrixWorldAutoUpdate = false;
-    this.scene.add(this.mesh);
-  }
-
-  addInstance(instance: RegisteredStaticImpostorInstance): number | null {
-    let slot: number;
-    if (this.freeSlots.size > 0) {
-      const next = this.freeSlots.values().next();
-      slot = Number(next.value);
-      this.freeSlots.delete(slot);
-    } else {
-      if (this.highWaterMark >= this.capacity) {
-        // Overflow is re-attempted every frame (the instance keeps a null slot),
-        // so warn AT MOST ONCE per batch instead of once per attempt — otherwise a
-        // dense archetype storms the log hundreds of thousands of times a second.
-        if (!this.capacityWarningLogged) {
-          this.capacityWarningLogged = true;
-          Logger.warn(
-            'world',
-            `Static impostor capacity reached for ${this.archetype.slug} (${this.capacity}); `
-            + 'suppressing further overflow warnings for this batch',
-          );
-        }
-        return null;
-      }
-      slot = this.highWaterMark++;
-      this.geometry.instanceCount = this.highWaterMark;
-    }
-
-    const i3 = slot * 3;
-    const i2 = slot * 2;
-    this.positions[i3] = instance.center.x;
-    this.positions[i3 + 1] = instance.center.y;
-    this.positions[i3 + 2] = instance.center.z;
-    this.activeScales[i2] = instance.scale.x;
-    this.activeScales[i2 + 1] = instance.scale.y;
-    this.visibleScales[i2] = 0;
-    this.visibleScales[i2 + 1] = 0;
-    this.yaws[slot] = instance.yaw;
-    this.pendingPositionUpdate = true;
-    this.pendingScaleUpdate = true;
-    this.pendingYawUpdate = true;
-    return slot;
-  }
-
-  removeInstance(slot: number): void {
-    if (slot < 0 || slot >= this.highWaterMark) {
-      return;
-    }
-    const i2 = slot * 2;
-    if (this.visibleScales[i2] !== 0 || this.visibleScales[i2 + 1] !== 0) {
-      this.liveCount = Math.max(0, this.liveCount - 1);
-    }
-    this.activeScales[i2] = 0;
-    this.activeScales[i2 + 1] = 0;
-    this.visibleScales[i2] = 0;
-    this.visibleScales[i2 + 1] = 0;
-    this.freeSlots.add(slot);
-    this.pendingScaleUpdate = true;
-    this.compactHighWaterMark();
-  }
-
-  setActive(slot: number, active: boolean): void {
-    if (slot < 0 || slot >= this.highWaterMark) {
-      return;
-    }
-    const i2 = slot * 2;
-    const currentlyActive = this.visibleScales[i2] !== 0 || this.visibleScales[i2 + 1] !== 0;
-    if (currentlyActive === active) {
-      return;
-    }
-    if (active) {
-      this.visibleScales[i2] = this.activeScales[i2];
-      this.visibleScales[i2 + 1] = this.activeScales[i2 + 1];
-      this.liveCount++;
-    } else {
-      this.visibleScales[i2] = 0;
-      this.visibleScales[i2 + 1] = 0;
-      this.liveCount = Math.max(0, this.liveCount - 1);
-    }
-    this.mesh.visible = this.liveCount > 0;
-    this.pendingScaleUpdate = true;
-  }
-
-  update(camera: THREE.Camera): void {
-    this.material.uniforms.cameraPosition.value.copy(camera.position);
-    this.updateFogUniforms();
-    if (this.pendingPositionUpdate) {
-      this.positionAttribute.needsUpdate = true;
-      this.pendingPositionUpdate = false;
-    }
-    if (this.pendingScaleUpdate) {
-      this.scaleAttribute.needsUpdate = true;
-      this.pendingScaleUpdate = false;
-    }
-    if (this.pendingYawUpdate) {
-      this.yawAttribute.needsUpdate = true;
-      this.pendingYawUpdate = false;
-    }
-  }
-
-  dispose(scene: THREE.Scene): void {
-    scene.remove(this.mesh);
-    this.geometry.dispose();
-    this.material.dispose();
-  }
-
-  getDebugInfo(): StaticImpostorDebugInfo['batches'][string] {
-    return {
-      active: this.liveCount,
-      highWater: this.highWaterMark,
-      free: this.freeSlots.size,
-      source: this.source,
-      lightingProfile: this.archetype.lightingProfile ?? 'surface-normal',
-      promotionDistanceMeters: this.archetype.promotionDistanceMeters,
-      demotionDistanceMeters: this.archetype.demotionDistanceMeters,
-      fogStrength: this.material.uniforms.fogStrength.value,
-      foliageExposure: this.material.uniforms.foliageExposure.value,
-    };
-  }
-
-  private compactHighWaterMark(): void {
-    while (this.highWaterMark > 0) {
-      const lastSlot = this.highWaterMark - 1;
-      const i2 = lastSlot * 2;
-      if (this.activeScales[i2] !== 0 || this.activeScales[i2 + 1] !== 0) {
-        break;
-      }
-      this.highWaterMark--;
-      this.freeSlots.delete(lastSlot);
-    }
-    this.geometry.instanceCount = this.highWaterMark;
-    this.mesh.visible = this.liveCount > 0;
-  }
-
-  private updateFogUniforms(): void {
-    const fog = this.scene.fog;
-    if (fog && 'density' in fog) {
-      this.material.uniforms.fogEnabled.value = true;
-      const fogColor = isLightingRigEnabled() ? lightingRigBindings.fogColor.value : fog.color;
-      this.material.uniforms.fogColor.value.copy(fogColor);
-      this.material.uniforms.fogDensity.value = clampNumber(
-        Number.isFinite(fog.density) ? fog.density : DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY,
-        0,
-        MAX_STATIC_IMPOSTOR_FOG_DENSITY,
-      );
-    } else {
-      this.material.uniforms.fogEnabled.value = false;
-      this.material.uniforms.fogDensity.value = DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY;
-    }
-  }
-}
-
 export class StaticImpostorSystem {
   private readonly textureProvider: StaticImpostorTextureProvider;
   private readonly batchCapacity: number;
@@ -377,6 +160,7 @@ export class StaticImpostorSystem {
   private readonly batches = new Map<string, StaticImpostorBatch>();
   private readonly debugSource: string;
   private readonly materialTuning: StaticImpostorMaterialTuning | undefined;
+  private readonly transitionFadeMeters: number;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -388,6 +172,11 @@ export class StaticImpostorSystem {
     this.archetypeOverrides = options.archetypes ?? {};
     this.debugSource = options.debugSource ?? 'world';
     this.materialTuning = options.materialTuning;
+    this.transitionFadeMeters = clampNumber(
+      options.transitionFadeMeters ?? DEFAULT_TRANSITION_FADE_METERS,
+      0,
+      MAX_TRANSITION_FADE_METERS,
+    );
   }
 
   private resolveArchetype(modelPath: string): StaticImpostorArchetype | undefined {
@@ -415,6 +204,9 @@ export class StaticImpostorSystem {
     _worldEuler.setFromQuaternion(_worldQuaternion);
 
     tagStaticImpostorControlled(params.object, params.id);
+    const fadeMaterials = this.transitionFadeMeters > 0
+      ? prepareStaticImpostorFadeMaterials(params.object)
+      : [];
     const instance: RegisteredStaticImpostorInstance = {
       id: params.id,
       modelPath: params.modelPath,
@@ -428,6 +220,7 @@ export class StaticImpostorSystem {
       yaw: _worldEuler.y,
       slot: null,
       state: 'mesh',
+      fadeMaterials,
     };
     this.instances.set(params.id, instance);
     this.ensureAtlasLoading(archetype);
@@ -443,6 +236,7 @@ export class StaticImpostorSystem {
     if (instance.slot !== null) {
       this.batches.get(instance.archetype.slug)?.removeInstance(instance.slot);
     }
+    disposeStaticImpostorFadeMaterials(instance.fadeMaterials);
     this.instances.delete(id);
   }
 
@@ -474,21 +268,27 @@ export class StaticImpostorSystem {
   getDebugInfo(): StaticImpostorDebugInfo {
     let activeImpostors = 0;
     let meshFallbacks = 0;
+    let transitioningInstances = 0;
     const archetypes: Record<string, StaticImpostorArchetypeDebugInfo> = {};
     for (const instance of this.instances.values()) {
       const slug = instance.archetype.slug;
       const distance = this.camera.position.distanceTo(instance.center);
+      const isTransitioning = isStaticImpostorTransitionState(instance.state);
+      const impostorVisible = instance.state === 'impostor' || isTransitioning;
       const entry = archetypes[slug] ?? {
         registeredInstances: 0,
         activeImpostors: 0,
         meshFallbacks: 0,
+        transitioningInstances: 0,
         promotionDistanceMeters: instance.archetype.promotionDistanceMeters,
         demotionDistanceMeters: instance.archetype.demotionDistanceMeters,
+        transitionFadeMeters: this.transitionFadeMeters,
         lightingProfile: instance.archetype.lightingProfile ?? 'surface-normal',
         nearestDistanceMeters: null,
         farthestDistanceMeters: null,
         nearestMeshDistanceMeters: null,
         nearestImpostorDistanceMeters: null,
+        nearestTransitionDistanceMeters: null,
       };
       entry.registeredInstances++;
       entry.nearestDistanceMeters = entry.nearestDistanceMeters === null
@@ -497,13 +297,20 @@ export class StaticImpostorSystem {
       entry.farthestDistanceMeters = entry.farthestDistanceMeters === null
         ? distance
         : Math.max(entry.farthestDistanceMeters, distance);
-      if (instance.state === 'impostor') {
+      if (impostorVisible) {
         activeImpostors++;
         entry.activeImpostors++;
         entry.nearestImpostorDistanceMeters = entry.nearestImpostorDistanceMeters === null
           ? distance
           : Math.min(entry.nearestImpostorDistanceMeters, distance);
-      } else {
+      }
+      if (isTransitioning) {
+        transitioningInstances++;
+        entry.transitioningInstances++;
+        entry.nearestTransitionDistanceMeters = entry.nearestTransitionDistanceMeters === null
+          ? distance
+          : Math.min(entry.nearestTransitionDistanceMeters, distance);
+      } else if (instance.state === 'mesh') {
         meshFallbacks++;
         entry.meshFallbacks++;
         entry.nearestMeshDistanceMeters = entry.nearestMeshDistanceMeters === null
@@ -524,6 +331,7 @@ export class StaticImpostorSystem {
       registeredInstances: this.instances.size,
       activeImpostors,
       meshFallbacks,
+      transitioningInstances,
       atlasesReady: atlasStates.filter((record) => record.state === 'ready').length,
       atlasesLoading: atlasStates.filter((record) => record.state === 'loading').length,
       atlasesFailed: atlasStates.filter((record) => record.state === 'failed').length,
@@ -570,6 +378,7 @@ export class StaticImpostorSystem {
         record.atlas,
         this.batchCapacity,
         this.debugSource,
+        this.transitionFadeMeters,
         this.materialTuning,
       );
       this.batches.set(instance.archetype.slug, batch);
@@ -586,31 +395,76 @@ export class StaticImpostorSystem {
       return;
     }
 
-    const slot = instance.slot;
     const distance = this.camera.position.distanceTo(instance.center);
-    if (instance.state === 'impostor') {
-      if (distance <= instance.archetype.demotionDistanceMeters) {
+    const fade = this.transitionFadeMeters;
+    if (instance.state === 'impostor' || instance.state === 'blend-to-mesh') {
+      if (fade > 0 && distance <= instance.archetype.demotionDistanceMeters) {
+        const meshOpacity = clampNumber(
+          (instance.archetype.demotionDistanceMeters - distance) / fade,
+          0,
+          1,
+        );
+        if (meshOpacity >= 0.999) {
+          this.restoreMesh(instance);
+        } else {
+          this.applyBlend(instance, 1 - meshOpacity, meshOpacity, 'blend-to-mesh');
+        }
+      } else if (distance <= instance.archetype.demotionDistanceMeters) {
         this.restoreMesh(instance);
       } else {
-        batch.setActive(slot, true);
-        instance.object.visible = false;
+        this.applyImpostor(instance);
       }
       return;
     }
 
     if (distance >= instance.archetype.promotionDistanceMeters) {
-      instance.object.visible = false;
-      batch.setActive(slot, true);
-      instance.state = 'impostor';
+      if (fade > 0) {
+        const impostorOpacity = clampNumber(
+          (distance - instance.archetype.promotionDistanceMeters) / fade,
+          0,
+          1,
+        );
+        if (impostorOpacity >= 0.999) {
+          this.applyImpostor(instance);
+        } else {
+          this.applyBlend(instance, impostorOpacity, 1 - impostorOpacity, 'blend-to-impostor');
+        }
+      } else {
+        this.applyImpostor(instance);
+      }
     } else {
       this.restoreMesh(instance);
     }
   }
 
+  private applyImpostor(instance: RegisteredStaticImpostorInstance): void {
+    if (instance.slot !== null) {
+      this.batches.get(instance.archetype.slug)?.setOpacity(instance.slot, 1);
+    }
+    setStaticImpostorMeshFadeOpacity(instance.fadeMaterials, 1);
+    instance.object.visible = false;
+    instance.state = 'impostor';
+  }
+
+  private applyBlend(
+    instance: RegisteredStaticImpostorInstance,
+    impostorOpacity: number,
+    meshOpacity: number,
+    state: Extract<StaticImpostorRenderState, 'blend-to-impostor' | 'blend-to-mesh'>,
+  ): void {
+    if (instance.slot !== null) {
+      this.batches.get(instance.archetype.slug)?.setOpacity(instance.slot, impostorOpacity);
+    }
+    instance.object.visible = true;
+    setStaticImpostorMeshFadeOpacity(instance.fadeMaterials, meshOpacity);
+    instance.state = state;
+  }
+
   private restoreMesh(instance: RegisteredStaticImpostorInstance): void {
     if (instance.slot !== null) {
-      this.batches.get(instance.archetype.slug)?.setActive(instance.slot, false);
+      this.batches.get(instance.archetype.slug)?.setOpacity(instance.slot, 0);
     }
+    setStaticImpostorMeshFadeOpacity(instance.fadeMaterials, 1);
     instance.object.visible = true;
     instance.state = 'mesh';
   }
@@ -625,6 +479,62 @@ export function isStaticImpostorControlledMesh(mesh: THREE.Mesh): boolean {
     current = current.parent;
   }
   return false;
+}
+
+function isStaticImpostorTransitionState(state: StaticImpostorRenderState): boolean {
+  return state === 'blend-to-impostor' || state === 'blend-to-mesh';
+}
+
+function prepareStaticImpostorFadeMaterials(root: THREE.Object3D): StaticImpostorFadeMaterialRecord[] {
+  const records: StaticImpostorFadeMaterialRecord[] = [];
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const originalMaterial = child.material;
+    const originalArray = Array.isArray(originalMaterial) ? originalMaterial : [originalMaterial];
+    const fadeArray = originalArray.map((material) => material.clone());
+    const baselines = fadeArray.map((material) => ({
+      opacity: material.opacity,
+      transparent: material.transparent,
+      depthWrite: material.depthWrite,
+    }));
+    child.material = Array.isArray(originalMaterial) ? fadeArray : fadeArray[0];
+    records.push({
+      mesh: child,
+      originalMaterial,
+      fadeMaterial: child.material,
+      baselines,
+    });
+  });
+  return records;
+}
+
+function setStaticImpostorMeshFadeOpacity(
+  records: readonly StaticImpostorFadeMaterialRecord[],
+  opacity: number,
+): void {
+  const fade = clampNumber(opacity, 0, 1);
+  for (const record of records) {
+    const materials = Array.isArray(record.fadeMaterial) ? record.fadeMaterial : [record.fadeMaterial];
+    for (let i = 0; i < materials.length; i++) {
+      const material = materials[i];
+      const baseline = record.baselines[i];
+      if (!baseline) continue;
+      material.opacity = baseline.opacity * fade;
+      material.transparent = fade < 0.999 ? true : baseline.transparent;
+      material.depthWrite = fade < 0.999 ? false : baseline.depthWrite;
+      material.needsUpdate = true;
+    }
+  }
+}
+
+function disposeStaticImpostorFadeMaterials(records: readonly StaticImpostorFadeMaterialRecord[]): void {
+  for (const record of records) {
+    record.mesh.material = record.originalMaterial;
+    const materials = Array.isArray(record.fadeMaterial) ? record.fadeMaterial : [record.fadeMaterial];
+    for (const material of materials) {
+      material.dispose();
+    }
+  }
 }
 
 function tagStaticImpostorControlled(root: THREE.Object3D, instanceId: string): void {

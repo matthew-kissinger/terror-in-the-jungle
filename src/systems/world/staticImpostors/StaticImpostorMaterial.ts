@@ -118,6 +118,7 @@ export function createStaticImpostorNodeMaterial(
   positionAttribute: THREE.InstancedBufferAttribute,
   scaleAttribute: THREE.InstancedBufferAttribute,
   yawAttribute: THREE.InstancedBufferAttribute,
+  opacityAttribute?: THREE.InstancedBufferAttribute,
   tuning: StaticImpostorMaterialTuning = {},
 ): StaticImpostorNodeMaterial {
   configureStaticImpostorTexture(textures.baseColorMap, THREE.SRGBColorSpace);
@@ -163,6 +164,9 @@ export function createStaticImpostorNodeMaterial(
   const instancePosition = tslInstancedBufferAttribute(positionAttribute, 'vec3');
   const instanceScale = tslInstancedBufferAttribute(scaleAttribute, 'vec2');
   const instanceYaw = tslInstancedBufferAttribute(yawAttribute, 'float');
+  const instanceOpacity = opacityAttribute
+    ? tslInstancedBufferAttribute(opacityAttribute, 'float')
+    : tslFloat(1);
 
   const toCamera = cameraPosition.sub(instancePosition);
   const toCameraXZ = tslVec3(toCamera.x, 0, toCamera.z);
@@ -188,6 +192,7 @@ export function createStaticImpostorNodeMaterial(
     tslFloat(1),
     smoothstep(alphaCutoff, tslFloat(0.65), color.a),
   );
+  const visibleAlpha = hardenedAlpha.mul(tslClamp(instanceOpacity, tslFloat(0), tslFloat(1)));
   const normal = atlas.normal.rgb.mul(2).sub(1).normalize();
   const baseColor = archetype.lightingProfile === 'foliage-card'
     ? createStaticImpostorFoliageColorNode(color.rgb)
@@ -200,13 +205,13 @@ export function createStaticImpostorNodeMaterial(
     : tslFloat(1);
   const foggedColor = createStaticImpostorFogNode(
     litColor.mul(exposure),
-    color.a,
+    visibleAlpha,
     worldY,
     cameraDistance,
     uniforms,
   );
-  material.colorNode = foggedColor.mul(hardenedAlpha);
-  material.opacityNode = hardenedAlpha;
+  material.colorNode = foggedColor.mul(visibleAlpha);
+  material.opacityNode = visibleAlpha;
   material.alphaTestNode = alphaCutoff;
 
   return material;

@@ -15,6 +15,9 @@ lighting, fog, and LOD snap distances before production deploy.
   reduce mip/filter dark-edge contamination.
 - Static vegetation impostor atlases were rebaked from source GLBs after fixing
   the baker to preserve vertex colors in the base-color pass.
+- Vegetation-owned hero impostors now use a mesh-to-impostor crossfade band at
+  the LOD boundary, so the source GLB and far card overlap during promotion and
+  demotion instead of hard-snapping visibility in one frame.
 
 ## Review Surface
 
@@ -50,7 +53,7 @@ normal launches keep the default shipped values.
 npm run assets:bleed-vegetation-atlases -- --check
 npm run check:vegetation-lod-review -- --only jungle-tree,fan-palm,understory-fern --stages daylight,low-sun,humid-fog
 npm run check:vegetation-lod-review
-npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --veg-impostor-fog-strength 0.62 --veg-impostor-exposure-scale 0.86
+npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --veg-impostor-fog-strength 0.62 --veg-impostor-exposure-scale 0.86 --veg-impostor-transition-meters 28
 ```
 
 Latest useful candidate artifacts:
@@ -64,7 +67,8 @@ Latest useful candidate artifacts:
     ground / elevated / skyward / finite-edge poses
   - the focused pose is derived from active vegetation static-impostor batches
     and records the selected slug, source position, promotion distance, demotion
-    distance, luma, saturation, and overexposure metrics
+    distance, transition fade width, active mesh/impostor/crossfade state, luma,
+    saturation, and overexposure metrics
 - `artifacts/perf/2026-06-26T17-56-45-512Z/scene-parity/scene-parity.md`
   - superseded by the focused-pose probe for final owner review, but useful
     provenance for the first strict-WebGPU live-scene pass
@@ -96,6 +100,8 @@ Accept this path only if:
   integrated vegetation instead of pasted cards
 - hero impostor promotion/demotion distances and active mesh-vs-impostor state
   are present in the scene-parity report for both maps
+- the focused live-scene LOD pose shows whether any vegetation instances are in
+  the crossfade band rather than only proving binary mesh/impostor state
 
 Current review risk: the candidate intentionally favors darker, less shiny
 foliage than the rejected path. Some mid-distance bamboo / A Shau focus shots
@@ -108,6 +114,12 @@ the scene-parity `--veg-impostor-fog-strength 0.62
 modest exposure trim keep the source silhouette/color closer in humid shots and
 dark live terrain without making daylight/low-sun cards look pasted on. This is
 evidence-generation only, not the accepted shipped default.
+
+LOD snap review path: normal vegetation launches use a 28 m transition band
+(`vegImpostorTransitionMeters=28`) around the hero impostor promotion/demotion
+thresholds. Use `vegImpostorTransitionMeters=0` for an A/B capture against the
+old binary snap, or widen/narrow the value in scene parity to test whether
+overlap hides the material delta without making far cards look doubled.
 
 Do not deploy this as accepted until the owner confirms the current far
 representation is the chosen path. If rejected, use the review route to compare
