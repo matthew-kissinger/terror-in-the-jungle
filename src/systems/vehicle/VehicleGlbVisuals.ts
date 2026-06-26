@@ -17,9 +17,13 @@ import { Logger } from '../../utils/Logger';
  * failure the procedural placeholder simply stays — the same fallback the
  * original briefs allowed, now pointed the right way around.
  *
- * Both GLBs come through the war-asset import pipeline
- * (cycle-2026-06-11-war-asset-repaint), which wraps the source +X-forward art
- * in a `TIJ_AxisNormalize` node (a +90° Y rotation) so the loaded scene
+ * Which GLB pair loads is chosen by the `vehicleArtMode()` kill-switch: the new
+ * Kiln war-asset heroes (M151 MUTT + M48 Patton main-battle) by default, or the
+ * legacy GLBs via `?vehicleArt=legacy` / `window.__vehicleArt = 'legacy'`.
+ *
+ * Both GLB pairs come through the war-asset import pipeline, which wraps the
+ * source +X-forward art in a `TIJ_AxisNormalize` node (a +90° Y rotation) so the
+ * loaded scene
  * presents -Z-forward with the ground plane at y=0 — matching the
  * GroundVehiclePhysics / TrackedVehiclePhysics chassis conventions. Because
  * the whole GLB keeps that wrapper, the m151 swap needs no yaw or grounding
@@ -56,7 +60,54 @@ export interface TurretRigSource {
 /** Procedural turret parts mounted on the rig by `mountM48TurretMeshes`. */
 const PROCEDURAL_TURRET_MESHES = ['m48_turret', 'm48_turret_ring', 'm48_cupola'] as const;
 const PROCEDURAL_GUN_MESHES = ['m48_mantlet', 'm48_barrel', 'm48_muzzle_brake'] as const;
-const M151_RUNTIME_VISUAL_SCALE = 1.15;
+
+/**
+ * Drivable ground-vehicle hero art kill-switch.
+ *
+ * Defaults to the Kiln war-asset art (cycle kiln-war-2026-06): the M151 MUTT and
+ * the M48 Patton main-battle GLBs (both importer-normalized neg-z-forward,
+ * ground-at-origin, exposing the same `Joint_Turret` / `Joint_MainGun` rig
+ * joints the M48 re-seat path already targets). Opt back to the legacy GLBs at
+ * runtime with `?vehicleArt=legacy` or `window.__vehicleArt = 'legacy'` (read at
+ * swap time). No window (SSR / node tests) resolves to legacy so headless
+ * fixtures stay deterministic; production callers pass nothing and pick up the
+ * browser flag.
+ */
+export type VehicleArtMode = 'kiln' | 'legacy';
+
+export function vehicleArtMode(): VehicleArtMode {
+  if (typeof window === 'undefined') return 'legacy';
+  const w = window as unknown as { __vehicleArt?: VehicleArtMode };
+  if (w.__vehicleArt === 'legacy' || w.__vehicleArt === 'kiln') return w.__vehicleArt;
+  try {
+    return new URLSearchParams(window.location.search).get('vehicleArt') === 'legacy'
+      ? 'legacy'
+      : 'kiln';
+  } catch {
+    return 'kiln';
+  }
+}
+
+/** Drivable-hero GLB paths per art mode (kiln = new Kiln war-asset art). */
+const M151_MODEL_BY_ART: Record<VehicleArtMode, string> = {
+  kiln: GroundVehicleModels.M151_MUTT,
+  legacy: GroundVehicleModels.M151_JEEP,
+};
+const M48_MODEL_BY_ART: Record<VehicleArtMode, string> = {
+  kiln: GroundVehicleModels.M48_PATTON_MAIN_BATTLE,
+  legacy: GroundVehicleModels.M48_PATTON,
+};
+
+/**
+ * Runtime uniform scale applied to the loaded M151 GLB so its wheels sit on the
+ * chassis footprint the procedural placeholder + physics define. The Kiln MUTT
+ * measures 3.0m long vs the legacy jeep's ~3.5m, so it needs a ~+15% bump to
+ * present at the same on-ground size; the legacy jeep keeps its tuned 1.15.
+ */
+const M151_SCALE_BY_ART: Record<VehicleArtMode, number> = {
+  kiln: 1.32,
+  legacy: 1.15,
+};
 const GROUND_VEHICLE_PERF_CATEGORY = 'ground_vehicles';
 const M151_BODY_OPTIMIZED_RESOURCE_KEY = 'm151BodyOptimizedGeneratedResource';
 const M48_HULL_OPTIMIZED_RESOURCE_KEY = 'm48HullOptimizedGeneratedResource';
@@ -190,15 +241,16 @@ function removeProceduralMeshes(chassisRoot: THREE.Group): void {
 export async function applyM151JeepGlbVisual(
   chassisRoot: THREE.Group,
   loader: VehicleModelLoader = modelLoader,
+  artMode: VehicleArtMode = vehicleArtMode(),
 ): Promise<boolean> {
   let glb: THREE.Group;
   try {
-    glb = await loader.loadModel(GroundVehicleModels.M151_JEEP);
+    glb = await loader.loadModel(M151_MODEL_BY_ART[artMode]);
   } catch {
     return false; // keep the procedural placeholder
   }
   glb.name = 'm151_glb_visual';
-  glb.scale.setScalar(M151_RUNTIME_VISUAL_SCALE);
+  glb.scale.setScalar(M151_SCALE_BY_ART[artMode]);
   enableShadows(glb);
   markGroundVehiclePerfCategory(glb);
   optimizeM151StaticBodyDrawCalls(glb);
@@ -232,10 +284,11 @@ export async function applyM48TankGlbVisual(
   chassisRoot: THREE.Group,
   tank: TurretRigSource,
   loader: VehicleModelLoader = modelLoader,
+  artMode: VehicleArtMode = vehicleArtMode(),
 ): Promise<boolean> {
   let glb: THREE.Group;
   try {
-    glb = await loader.loadModel(GroundVehicleModels.M48_PATTON);
+    glb = await loader.loadModel(M48_MODEL_BY_ART[artMode]);
   } catch {
     return false; // keep the procedural placeholder
   }
