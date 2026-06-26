@@ -7,6 +7,7 @@ import {
   type StaticImpostorArchetype,
 } from '../../../config/staticImpostorArchetypes';
 import { Logger } from '../../../utils/Logger';
+import { isLightingRigEnabled, lightingRigBindings } from '../../environment/LightingRig';
 import {
   createStaticImpostorNodeMaterial,
   type StaticImpostorMaterialTextures,
@@ -19,11 +20,17 @@ type StaticImpostorRenderState = 'mesh' | 'impostor';
 const STATIC_IMPOSTOR_PERF_CATEGORY = 'world_static_impostors';
 const STATIC_IMPOSTOR_CONTROLLED_KEY = '__staticImpostorControlled';
 const DEFAULT_BATCH_CAPACITY = 256;
+const DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY = 0.00055;
+const MAX_STATIC_IMPOSTOR_FOG_DENSITY = 0.002;
 const _bounds = new THREE.Box3();
 const _center = new THREE.Vector3();
 const _size = new THREE.Vector3();
 const _worldQuaternion = new THREE.Quaternion();
 const _worldEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+const clampNumber = (value: number, min: number, max: number): number => (
+  Math.min(max, Math.max(min, value))
+);
 
 export interface LoadedStaticImpostorAtlas {
   textures: StaticImpostorMaterialTextures;
@@ -123,7 +130,7 @@ class StaticImpostorBatch {
   private capacityWarningLogged = false;
 
   constructor(
-    scene: THREE.Scene,
+    private readonly scene: THREE.Scene,
     private readonly archetype: StaticImpostorArchetype,
     atlas: LoadedStaticImpostorAtlas,
     private readonly capacity: number,
@@ -167,7 +174,7 @@ class StaticImpostorBatch {
     this.mesh.visible = false;
     this.mesh.matrixAutoUpdate = false;
     this.mesh.matrixWorldAutoUpdate = false;
-    scene.add(this.mesh);
+    this.scene.add(this.mesh);
   }
 
   addInstance(instance: RegisteredStaticImpostorInstance): number | null {
@@ -252,6 +259,7 @@ class StaticImpostorBatch {
 
   update(camera: THREE.Camera): void {
     this.material.uniforms.cameraPosition.value.copy(camera.position);
+    this.updateFogUniforms();
     if (this.pendingPositionUpdate) {
       this.positionAttribute.needsUpdate = true;
       this.pendingPositionUpdate = false;
@@ -292,6 +300,23 @@ class StaticImpostorBatch {
     }
     this.geometry.instanceCount = this.highWaterMark;
     this.mesh.visible = this.liveCount > 0;
+  }
+
+  private updateFogUniforms(): void {
+    const fog = this.scene.fog;
+    if (fog && 'density' in fog) {
+      this.material.uniforms.fogEnabled.value = true;
+      const fogColor = isLightingRigEnabled() ? lightingRigBindings.fogColor.value : fog.color;
+      this.material.uniforms.fogColor.value.copy(fogColor);
+      this.material.uniforms.fogDensity.value = clampNumber(
+        Number.isFinite(fog.density) ? fog.density : DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY,
+        0,
+        MAX_STATIC_IMPOSTOR_FOG_DENSITY,
+      );
+    } else {
+      this.material.uniforms.fogEnabled.value = false;
+      this.material.uniforms.fogDensity.value = DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY;
+    }
   }
 }
 

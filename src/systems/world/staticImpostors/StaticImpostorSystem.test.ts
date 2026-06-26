@@ -9,8 +9,10 @@ import {
   type LoadedStaticImpostorAtlas,
   type StaticImpostorTextureProvider,
 } from './StaticImpostorSystem';
+import type { StaticImpostorNodeMaterial } from './StaticImpostorMaterial';
 import type { StaticImpostorArchetype } from '../../../config/staticImpostorArchetypes';
 import { Logger } from '../../../utils/Logger';
+import { LightingRigConfig } from '../../environment/LightingRig';
 
 function makeAtlas(): LoadedStaticImpostorAtlas {
   return {
@@ -34,6 +36,14 @@ function makeStaticObject(position = new THREE.Vector3()): THREE.Group {
     new THREE.MeshStandardMaterial({ color: 0x556b2f }),
   ));
   return object;
+}
+
+function getBatchMaterial(scene: THREE.Scene): StaticImpostorNodeMaterial {
+  const mesh = scene.children.find(
+    (child): child is THREE.Mesh => child instanceof THREE.Mesh && child.name.startsWith('StaticImpostorBatch_'),
+  );
+  expect(mesh).toBeDefined();
+  return mesh!.material as StaticImpostorNodeMaterial;
 }
 
 function flushPromises(): Promise<void> {
@@ -179,6 +189,33 @@ describe('StaticImpostorSystem', () => {
     expect(system.getDebugInfo().batches['fuel-drum'].highWater).toBe(6);
 
     warnSpy.mockRestore();
+  });
+
+  it('forwards scene fog into the custom static impostor material and clamps density', async () => {
+    const previousRigState = LightingRigConfig.enabled;
+    LightingRigConfig.enabled = false;
+    try {
+      const provider = makeProvider();
+      scene.fog = new THREE.FogExp2(0x123456, 0.01);
+      const system = new StaticImpostorSystem(scene, camera, { textureProvider: provider });
+      const object = makeStaticObject(new THREE.Vector3(220, 0, 0));
+      scene.add(object);
+
+      system.registerInstance({ id: 'fogged_static', modelPath: StructureModels.FUEL_DRUM, object });
+      await flushPromises();
+      system.update(0.016);
+
+      const material = getBatchMaterial(scene);
+      expect(material.uniforms.fogEnabled.value).toBe(true);
+      expect(material.uniforms.fogDensity.value).toBe(0.002);
+      expect(material.uniforms.fogColor.value.getHex()).toBe(0x123456);
+
+      scene.fog = null;
+      system.update(0.016);
+      expect(material.uniforms.fogEnabled.value).toBe(false);
+    } finally {
+      LightingRigConfig.enabled = previousRigState;
+    }
   });
 
   it('ignores model paths that have not been assigned offline atlases', () => {

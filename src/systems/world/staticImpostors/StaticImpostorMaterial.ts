@@ -8,6 +8,7 @@ import {
   atan,
   cameraPosition,
   clamp as tslClamp,
+  exp,
   float,
   floor,
   fract,
@@ -28,7 +29,16 @@ import {
 } from 'three/tsl';
 import type { StaticImpostorArchetype } from '../../../config/staticImpostorArchetypes';
 import { lightingRigBindings } from '../../environment/LightingRig';
-import { RIG_HEMI_UP_SKY_WEIGHT, RIG_WRAP } from '../billboard/BillboardNodeMaterial';
+import {
+  HUMID_JUNGLE_VEGETATION_EXPOSURE,
+  HUMID_JUNGLE_VEGETATION_SATURATION,
+  HUMID_JUNGLE_VEGETATION_TINT,
+  RIG_HEMI_UP_SKY_WEIGHT,
+  RIG_LOW_SUN_FADE_FLOOR,
+  RIG_LOW_SUN_FADE_HI,
+  RIG_LOW_SUN_FADE_LO,
+  RIG_WRAP,
+} from '../billboard/BillboardNodeMaterial';
 
 interface StaticImpostorMaterialUniform<T> {
   value: T;
@@ -42,6 +52,11 @@ interface StaticImpostorMaterialUniforms {
   cameraPosition: StaticImpostorMaterialUniform<THREE.Vector3>;
   parallaxStrength: StaticImpostorMaterialUniform<number>;
   alphaCutoff: StaticImpostorMaterialUniform<number>;
+  fogColor: StaticImpostorMaterialUniform<THREE.Color>;
+  fogDensity: StaticImpostorMaterialUniform<number>;
+  fogHeightFalloff: StaticImpostorMaterialUniform<number>;
+  fogStartDistance: StaticImpostorMaterialUniform<number>;
+  fogEnabled: StaticImpostorMaterialUniform<boolean>;
 }
 
 export type StaticImpostorNodeMaterial = MeshBasicNodeMaterial & {
@@ -59,8 +74,16 @@ type TslNode = any;
 
 const TWO_PI = Math.PI * 2;
 const HALF_PI = Math.PI * 0.5;
-const STATIC_IMPOSTOR_ALPHA_TEST = 0.08;
+const STATIC_IMPOSTOR_ALPHA_TEST = 0.22;
 const STATIC_IMPOSTOR_LUMA = new THREE.Vector3(0.2126, 0.7152, 0.0722);
+const DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY = 0.00055;
+const STATIC_IMPOSTOR_FOG_HEIGHT_FALLOFF = 0.03;
+const STATIC_IMPOSTOR_FOG_START_DISTANCE = 100;
+const STATIC_IMPOSTOR_TILE_UV_MARGIN_PIXELS = 1.5;
+// Hero-tree impostor atlases are baked from full GLBs and read brighter than
+// the legacy hand-authored billboard sheets. Keep the shared foliage tint and
+// rig response, but trim the static hero exposure so LOD snaps do not bloom pale.
+const STATIC_IMPOSTOR_FOLIAGE_EXPOSURE = HUMID_JUNGLE_VEGETATION_EXPOSURE * 0.68;
 
 const tslFloat = (value: number): TslNode => float(value) as TslNode;
 const tslVec2 = (...args: TslNode[]): TslNode => (vec2 as (...values: TslNode[]) => TslNode)(...args);
@@ -68,6 +91,8 @@ const tslVec3 = (...args: TslNode[]): TslNode => (vec3 as (...values: TslNode[])
 const tslReference = (type: string, uniform: StaticImpostorMaterialUniform<unknown>): TslNode => (
   reference('value', type, uniform) as TslNode
 );
+const tslMix = (...args: TslNode[]): TslNode => (mix as (...values: TslNode[]) => TslNode)(...args);
+const tslSelect = (...args: TslNode[]): TslNode => (select as (...values: TslNode[]) => TslNode)(...args);
 const tslTexture = (source: THREE.Texture, sampleUv: TslNode): TslNode => texture(source, sampleUv) as TslNode;
 const tslInstancedBufferAttribute = (
   attribute: THREE.InstancedBufferAttribute,
@@ -93,6 +118,11 @@ export function createStaticImpostorNodeMaterial(
     cameraPosition: { value: new THREE.Vector3() },
     parallaxStrength: { value: archetype.parallaxStrength },
     alphaCutoff: { value: STATIC_IMPOSTOR_ALPHA_TEST },
+    fogColor: { value: new THREE.Color(0x5a7a6a) },
+    fogDensity: { value: DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY },
+    fogHeightFalloff: { value: STATIC_IMPOSTOR_FOG_HEIGHT_FALLOFF },
+    fogStartDistance: { value: STATIC_IMPOSTOR_FOG_START_DISTANCE },
+    fogEnabled: { value: false },
   };
 
   const material = new MeshBasicNodeMaterial({
@@ -133,13 +163,34 @@ export function createStaticImpostorNodeMaterial(
     .add(right.mul(positionGeometry.x.mul(instanceScale.x)))
     .add(up.mul(positionGeometry.y.mul(instanceScale.y)));
 
-  const atlas = createStaticImpostorAtlasNodes(textures, uniforms, instancePosition, instanceYaw);
+  const atlas = createStaticImpostorAtlasNodes(textures, uniforms, instancePosition, instanceYaw, archetype);
   const color = atlas.color as TslNode;
+  const alphaCutoff = tslReference('float', uniforms.alphaCutoff);
+  const hardenedAlpha = tslMix(
+    color.a,
+    tslFloat(1),
+    smoothstep(alphaCutoff, tslFloat(0.65), color.a),
+  );
   const normal = atlas.normal.rgb.mul(2).sub(1).normalize();
-  const litColor = createStaticImpostorLightingNode(color.rgb, normal);
-  material.colorNode = litColor.mul(color.a);
-  material.opacityNode = color.a;
-  material.alphaTestNode = tslReference('float', uniforms.alphaCutoff);
+  const baseColor = archetype.lightingProfile === 'foliage-card'
+    ? createStaticImpostorFoliageColorNode(color.rgb)
+    : color.rgb;
+  const litColor = createStaticImpostorLightingNode(baseColor, normal, archetype);
+  const cameraDistance = length(cameraPosition.sub(instancePosition));
+  const worldY = instancePosition.y.add(positionGeometry.y.mul(instanceScale.y));
+  const exposure = archetype.lightingProfile === 'foliage-card'
+    ? tslFloat(STATIC_IMPOSTOR_FOLIAGE_EXPOSURE)
+    : tslFloat(1);
+  const foggedColor = createStaticImpostorFogNode(
+    litColor.mul(exposure),
+    color.a,
+    worldY,
+    cameraDistance,
+    uniforms,
+  );
+  material.colorNode = foggedColor.mul(hardenedAlpha);
+  material.opacityNode = hardenedAlpha;
+  material.alphaTestNode = alphaCutoff;
 
   return material;
 }
@@ -159,6 +210,7 @@ function createStaticImpostorAtlasNodes(
   uniforms: StaticImpostorMaterialUniforms,
   instancePosition: TslNode,
   instanceYaw: TslNode,
+  archetype: StaticImpostorArchetype,
 ): { color: TslNode; normal: TslNode } {
   const atlasTiles = tslReference('vec2', uniforms.atlasTiles);
   const invTiles = atlasTiles.reciprocal();
@@ -177,8 +229,14 @@ function createStaticImpostorAtlasNodes(
   const tileBlend = smoothstep(tslFloat(0), tslFloat(1), fract(azimuthTile) as TslNode);
 
   const localUv = uv() as TslNode;
-  const baseAtlasUv = atlasUv(localUv, tileX, tileY, invTiles);
-  const nextAtlasUv = atlasUv(localUv, nextTileX, tileY, invTiles);
+  const tileMargin = tslVec2(
+    tslFloat(STATIC_IMPOSTOR_TILE_UV_MARGIN_PIXELS / Math.max(1, archetype.tileSize[0])),
+    tslFloat(STATIC_IMPOSTOR_TILE_UV_MARGIN_PIXELS / Math.max(1, archetype.tileSize[1])),
+  );
+  const tileMax = tslVec2(tslFloat(1).sub(tileMargin.x), tslFloat(1).sub(tileMargin.y));
+  const safeLocalUv = tslClamp(localUv, tileMargin, tileMax);
+  const baseAtlasUv = atlasUv(safeLocalUv, tileX, tileY, invTiles);
+  const nextAtlasUv = atlasUv(safeLocalUv, nextTileX, tileY, invTiles);
 
   const depth = mix(
     tslTexture(textures.depthMap, baseAtlasUv),
@@ -187,11 +245,11 @@ function createStaticImpostorAtlasNodes(
   ) as TslNode;
   const parallaxStrength = tslReference('float', uniforms.parallaxStrength);
   const parallax = depth.r.sub(0.5).mul(parallaxStrength);
-  const uvFromCenter = localUv.sub(tslVec2(tslFloat(0.5), tslFloat(0.5)));
+  const uvFromCenter = safeLocalUv.sub(tslVec2(tslFloat(0.5), tslFloat(0.5)));
   const parallaxLocalUv = tslClamp(
-    localUv.add(uvFromCenter.mul(parallax)),
-    tslVec2(tslFloat(0.001), tslFloat(0.001)),
-    tslVec2(tslFloat(0.999), tslFloat(0.999)),
+    safeLocalUv.add(uvFromCenter.mul(parallax)),
+    tileMargin,
+    tileMax,
   );
 
   const sampleUv = atlasUv(parallaxLocalUv, tileX, tileY, invTiles);
@@ -217,7 +275,15 @@ function atlasUv(localUv: TslNode, tileX: TslNode, tileY: TslNode, invTiles: Tsl
   );
 }
 
-function createStaticImpostorLightingNode(baseColor: TslNode, normal: TslNode): TslNode {
+function createStaticImpostorLightingNode(
+  baseColor: TslNode,
+  normal: TslNode,
+  archetype: StaticImpostorArchetype,
+): TslNode {
+  if (archetype.lightingProfile === 'foliage-card') {
+    return createStaticImpostorFoliageLightingNode(baseColor, normal);
+  }
+
   const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
   const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
   const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
@@ -236,4 +302,70 @@ function createStaticImpostorLightingNode(baseColor: TslNode, normal: TslNode): 
     .add(lit.g.mul(STATIC_IMPOSTOR_LUMA.y))
     .add(lit.b.mul(STATIC_IMPOSTOR_LUMA.z));
   return mix(tslVec3(luma), pow(lit, tslVec3(tslFloat(0.96))), tslFloat(0.96)) as TslNode;
+}
+
+function createStaticImpostorFoliageColorNode(baseColor: TslNode): TslNode {
+  const tint = tslVec3(
+    tslFloat(HUMID_JUNGLE_VEGETATION_TINT.r),
+    tslFloat(HUMID_JUNGLE_VEGETATION_TINT.g),
+    tslFloat(HUMID_JUNGLE_VEGETATION_TINT.b),
+  );
+  const tinted = baseColor.mul(tint);
+  const luma = tinted.r.mul(STATIC_IMPOSTOR_LUMA.x)
+    .add(tinted.g.mul(STATIC_IMPOSTOR_LUMA.y))
+    .add(tinted.b.mul(STATIC_IMPOSTOR_LUMA.z));
+  return tslMix(tslVec3(luma), tinted, tslFloat(HUMID_JUNGLE_VEGETATION_SATURATION));
+}
+
+function createStaticImpostorFoliageLightingNode(baseColor: TslNode, normal: TslNode): TslNode {
+  const rigSun = tslReference('color', lightingRigBindings.sunRadiance);
+  const rigSky = tslReference('color', lightingRigBindings.skyIrradiance);
+  const rigGround = tslReference('color', lightingRigBindings.groundIrradiance);
+  const rigAmbient = tslReference('color', lightingRigBindings.ambientRadiance);
+  const rigSunDir = tslReference('vec3', lightingRigBindings.sunDirection);
+  const rigExposure = tslReference('float', lightingRigBindings.exposure);
+  const rigSunElevationSin = tslReference('float', lightingRigBindings.sunElevationSin);
+
+  // Vegetation hero impostors have baked normal atlases. Preserve crown/trunk
+  // shape detail while keeping the accepted foliage low-sun damping so they do
+  // not over-catch warm horizon light like hard surface-normal props.
+  const cardNormal = normal;
+  const wrap = tslFloat(RIG_WRAP);
+  const nl = tslMax(cardNormal.dot(rigSunDir), wrap.negate());
+  const diffuse = nl.add(wrap).div(tslFloat(1).add(wrap));
+  const hemiWeight = tslFloat(0.5).add(
+    cardNormal.y.mul(tslFloat(RIG_HEMI_UP_SKY_WEIGHT - 0.5)),
+  );
+  const hemi = mix(rigGround, rigSky, hemiWeight) as TslNode;
+  const lowSunFade = tslFloat(RIG_LOW_SUN_FADE_FLOOR).add(
+    tslFloat(1 - RIG_LOW_SUN_FADE_FLOOR).mul(
+      smoothstep(
+        tslFloat(RIG_LOW_SUN_FADE_LO),
+        tslFloat(RIG_LOW_SUN_FADE_HI),
+        rigSunElevationSin,
+      ),
+    ),
+  );
+  return baseColor
+    .mul(hemi.add(rigSun.mul(diffuse).mul(lowSunFade)).add(rigAmbient))
+    .mul(rigExposure);
+}
+
+function createStaticImpostorFogNode(
+  baseColor: TslNode,
+  alpha: TslNode,
+  worldY: TslNode,
+  cameraDistance: TslNode,
+  uniforms: StaticImpostorMaterialUniforms,
+): TslNode {
+  const fogEnabled = tslReference('bool', uniforms.fogEnabled);
+  const fogColor = tslReference('color', uniforms.fogColor);
+  const fogDensity = tslReference('float', uniforms.fogDensity);
+  const fogHeightFalloff = tslReference('float', uniforms.fogHeightFalloff);
+  const fogStartDistance = tslReference('float', uniforms.fogStartDistance);
+  const heightFactor = exp(fogHeightFalloff.negate().mul(tslMax(tslFloat(0), worldY)));
+  const effectiveDistance = tslMax(tslFloat(0), cameraDistance.sub(fogStartDistance));
+  const distanceFactor = tslFloat(1).sub(exp(fogDensity.negate().mul(effectiveDistance)));
+  const fogFactor = tslClamp(heightFactor.mul(distanceFactor), tslFloat(0), tslFloat(1));
+  return tslSelect(fogEnabled, tslMix(baseColor, fogColor, fogFactor.mul(alpha)), baseColor) as TslNode;
 }

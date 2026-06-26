@@ -1,7 +1,7 @@
 {
   "generator": "scripts/bake-vegetation-impostor.mjs",
-  "generatedAt": "2026-06-25T20:12:45.856Z",
-  "modelUrl": "http://localhost:8765/assets/vegetation/jungle-tree/jungle-tree.glb",
+  "generatedAt": "2026-06-26T17:25:59.990Z",
+  "modelUrl": "http://127.0.0.1:8765/assets/vegetation/jungle-tree/jungle-tree.glb",
   "columns": 8,
   "rows": 3,
   "tileSize": [
@@ -21,14 +21,14 @@
   "bounds": {
     "center": [
       0,
-      15.753375819700599,
+      15.878284194437423,
       0
     ],
     "size": [
-      29.581784235249756,
-      31.506751639401205,
-      28.30623628553235
+      29.581783404582836,
+      31.756568388874847,
+      28.30623795126092
     ],
-    "radius": 25.831184496941724
+    "radius": 25.907550309641113
   }
 }

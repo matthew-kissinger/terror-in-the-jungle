@@ -1,7 +1,7 @@
 {
   "generator": "scripts/bake-vegetation-impostor.mjs",
-  "generatedAt": "2026-06-26T08:52:35.869Z",
-  "modelUrl": "http://localhost:8765/assets/vegetation/bamboo-grove/bamboo-grove.glb",
+  "generatedAt": "2026-06-26T17:25:37.449Z",
+  "modelUrl": "http://127.0.0.1:8765/assets/vegetation/bamboo-grove/bamboo-grove.glb",
   "columns": 8,
   "rows": 3,
   "tileSize": [

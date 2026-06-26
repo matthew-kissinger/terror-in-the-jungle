@@ -205,6 +205,25 @@ export async function bootstrapGame(): Promise<void> {
       return;
     }
 
+    const {
+      isVegetationLodReviewMode,
+      getVegetationLodReviewAssetParam,
+      getVegetationLodReviewStageParam,
+    } = await import('../dev/vegetationLodReview/vegetationLodReviewMode');
+    if (isVegetationLodReviewMode()) {
+      try {
+        const { VegetationLodReviewApp } = await import('../dev/vegetationLodReview/VegetationLodReviewApp');
+        const review = await VegetationLodReviewApp.create(document.body);
+        review.start(getVegetationLodReviewAssetParam(), getVegetationLodReviewStageParam());
+        window.addEventListener('beforeunload', () => review.dispose());
+      } catch (error) {
+        Logger.error('bootstrap', 'Vegetation-LOD-review mode failed to initialize', error);
+        const message = error instanceof Error ? error.message : String(error);
+        showFatalError(message);
+      }
+      return;
+    }
+
     const { isTerrainSandboxMode } = await import('../dev/terrainSandboxMode');
     if (isTerrainSandboxMode()) {
       try {
