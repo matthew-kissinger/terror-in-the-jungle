@@ -209,8 +209,11 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       denseJungle.vegetationPalette.find((entry) => entry.typeId === 'fan-palm')?.densityMultiplier ?? 0;
     const bambooHero =
       denseJungle.vegetationPalette.find((entry) => entry.typeId === 'bamboo-grove')?.densityMultiplier ?? 0;
+    // Dense understory is now the library ground-cover CARDS (kebab ids), not the old
+    // fern/elephantEar billboards (removed). The instanced cross cards cover more area per
+    // instance, so the multiplier backbone is lower while coverage stays comparable.
     const denseGroundCoverMultiplier = denseJungle.vegetationPalette
-      .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
+      .filter((entry) => entry.typeId === 'understory-fern' || entry.typeId === 'taro-elephant-ear')
       .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
     const highlandFernMultiplier =
       getBiome('highland').vegetationPalette.find((entry) => entry.typeId === 'fern')?.densityMultiplier ?? 0;
@@ -218,10 +221,13 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     // The old fanPalm/bambooGrove billboards are gone from the jungle palette (promoted to heroes).
     expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'fanPalm')).toBe(false);
     expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'bambooGrove')).toBe(false);
+    // The old fern/elephantEar billboards are gone too (replaced by the instanced cards).
+    expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'fern')).toBe(false);
+    expect(denseJungle.vegetationPalette.some((e) => e.typeId === 'elephantEar')).toBe(false);
     // The tall palm hero is denser than the bamboo hero (palm is the prominent mid feature).
     expect(fanPalmHero).toBeGreaterThan(bambooHero);
-    // Ground cover trimmed for fill-rate headroom but still the understory backbone.
-    expect(denseGroundCoverMultiplier).toBeGreaterThan(1.5);
+    // Card ground cover is still the dense understory backbone (highland keeps its fern billboard).
+    expect(denseGroundCoverMultiplier).toBeGreaterThan(1.0);
     expect(highlandFernMultiplier).toBeGreaterThan(0.7);
     // The bamboo billboard config (still used by the dense bambooGrove biome) stays clustered.
     expect(bamboo?.poissonMinDistance).toBeLessThan(8);
@@ -234,17 +240,19 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     const denseJungle = getBiome('denseJungle');
     const ashauIds = ashauJungle.vegetationPalette.map((entry) => entry.typeId).sort();
     const denseIds = denseJungle.vegetationPalette.map((entry) => entry.typeId).sort();
+    // Ground cover is now the library cards (understory-fern + taro-elephant-ear); both
+    // jungle palettes carry the same card id set so they stay directly comparable.
     const ashauGroundCoverMultiplier = ashauJungle.vegetationPalette
-      .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
+      .filter((entry) => entry.typeId === 'understory-fern' || entry.typeId === 'taro-elephant-ear')
       .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
     const denseGroundCoverMultiplier = denseJungle.vegetationPalette
-      .filter((entry) => entry.typeId === 'fern' || entry.typeId === 'elephantEar')
+      .filter((entry) => entry.typeId === 'understory-fern' || entry.typeId === 'taro-elephant-ear')
       .reduce((sum, entry) => sum + entry.densityMultiplier, 0);
 
     expect(ashauIds).toEqual(denseIds);
     expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier);
-    expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier * 0.5);
-    expect(ashauGroundCoverMultiplier).toBeGreaterThan(0.6);
+    expect(ashauGroundCoverMultiplier).toBeLessThan(denseGroundCoverMultiplier * 0.6);
+    expect(ashauGroundCoverMultiplier).toBeGreaterThan(0.5);
   });
 
   it('quarantines the broken low-angle coconut atlas row and trunk cross-fade', () => {
@@ -277,10 +285,12 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       expect(billboardIds.has(slug)).toBe(false);
     }
 
-    // The old Pixel Forge fern/elephantEar billboards are intentionally NOT trimmed
-    // yet (no live ground-card scatterer to replace them), so dense ground cover is
-    // not regressed in the meantime.
-    expect(denseIds).toContain('fern');
-    expect(denseIds).toContain('elephantEar');
+    // The old Pixel Forge fern/elephantEar billboards are now TRIMMED from the jungle +
+    // riverbank palettes: the live GroundCardScatterer cards replace them (dual-namespace,
+    // re-tuned to keep total ground cover similar-or-slightly-lower).
+    for (const ids of [denseIds, ashauIds, riverbankIds]) {
+      expect(ids).not.toContain('fern');
+      expect(ids).not.toContain('elephantEar');
+    }
   });
 });
