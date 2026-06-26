@@ -1,0 +1,18 @@
+{
+  "slug": "81mm-mortar-emplacement",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/81mm-mortar-emplacement.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.957Z",
+  "sourcePrompt": "An 81mm mortar emplacement, a circular pit about four meters across ringed by a low sandbag wall. The mortar stands centered - a tube on a two-legged bipod over a round baseplate, elevated steeply skyward - with a couple of ammunition crates and a stack of rounds inside the ring. Sandbags, dark gunmetal and dirt, dug-in and ready. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 259d2460-b291-4e85-b853-88000ee04c3b",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3814 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

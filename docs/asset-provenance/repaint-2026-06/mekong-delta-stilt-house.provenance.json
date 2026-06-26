@@ -1,0 +1,16 @@
+{
+  "slug": "mekong-delta-stilt-house",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/mekong-delta-stilt-house.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.242Z",
+  "sourcePrompt": "A Mekong Delta stilt house standing about two meters above flood-prone ground on tall slender hardwood posts. A timber house with woven-mat walls and a thatched roof perched on the open stilt frame, a railed front porch along one side, and a steep ladder-stair climbing from the ground to the porch door; the shaded under-space stays open. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation a1bae77b-2230-4cd4-b42f-ac45404970a3",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "medium-barracks-tent",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/medium-barracks-tent.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.878Z",
+  "sourcePrompt": "A medium barracks tent, a long ridge-line canvas tent about nine meters long. Vertical canvas side walls rise to a peaked roof along a ridge with a stovepipe poking through, evenly spaced guy ropes stake out both eaves, and the entrance flaps at one end are tied back showing the dark interior. Olive-drab canvas, orderly billeting. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 15bcf1eb-6c17-4d68-a0be-263037f8a9e3",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2656 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

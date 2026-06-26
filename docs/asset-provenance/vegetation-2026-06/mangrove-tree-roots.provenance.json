@@ -1,0 +1,13 @@
+{
+  "slug": "mangrove-tree-roots",
+  "provider": "Sketchfab",
+  "sourceUrl": "https://sketchfab.com/3d-models/mangrove-tree-roots-c32d977c14e04e5ebc1fbef9b6111957",
+  "license": "CC-BY-4.0",
+  "sourceTriangles": 3926,
+  "status": "pending-download (browser/login)",
+  "localPath": "public/assets/vegetation/source/mangrove-tree-roots/",
+  "attributionRequired": true,
+  "notes": "Tier 2 #5 — 1957 verts. Banyan/mangrove prop-root system; compose with an EZ-Tree/M02P canopy for a sub-5k strangler-fig hero ($0 alt banyan path). Capture exact author handle + license version on download.",
+  "author": "lucq22",
+  "isDownloadable": true
+}

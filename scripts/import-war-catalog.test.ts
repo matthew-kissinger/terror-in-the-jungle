@@ -121,10 +121,12 @@ describe('budget triage', () => {
       .filter((e) => e.budgetStatus === 'REJECT')
       .map((e) => e.slug)
       .sort();
-    // The audit memo's expected reject set (8 replacements + egret withheld).
+    // The audit memo's reject set (8 replacements + egret withheld) plus the one
+    // over-budget Kiln war-export asset (burmese-python-rest: 22k tris / 582KB).
     expect(rejected).toEqual([
       'ammo-bunker',
       'barbed-wire-fence',
+      'burmese-python-rest',
       'concertina-wire',
       'egret',
       'helipad',

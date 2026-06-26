@@ -1,0 +1,16 @@
+{
+  "slug": "m50-ontos",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/m50-ontos.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.514Z",
+  "sourcePrompt": "An M50 Ontos, the tiny US Marine tank destroyer, under four meters long but impossible to mistake: six long recoilless rifles mounted in two stacked banks of three on either side of a small turret atop a stubby tracked hull. The tubes overhang the vehicle in both directions, dwarfing it. Short tracks with four road wheels per. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 8174b59a-13e0-4ac7-85f4-660c21cce2c2",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "plain-utilitarian-concrete-town",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/plain-utilitarian-concrete-town.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.157Z",
+  "sourcePrompt": "A plain utilitarian concrete town building, a two-story Vietnamese government office or small hotel about ten meters wide. A flat-roofed rectangular block with its concrete frame showing as a grid around rows of plain rectangular windows, a recessed ground-floor entrance behind a couple of square columns, and a low parapet hiding the roof.. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation d1d13485-98dd-4213-bf8d-0c4f1a9d0e08",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3732 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,73 @@
+{
+  "id": "teak-b",
+  "commonName": "Teak (open ash-crown variant)",
+  "species": "Tectona grandis (stylized)",
+  "tags": ["tree", "canopy", "hardwood", "teak", "eztree", "procedural"],
+  "status": "ready",
+  "provenance": {
+    "source": "EZ-Tree",
+    "author": "Daniel Greenheck (dgreenheck)",
+    "url": "https://github.com/dgreenheck/ez-tree",
+    "license": "MIT",
+    "attributionRequired": false,
+    "sourceTris": 9522,
+    "notes": "Generated headless with @dgreenheck/ez-tree@1.1.0 (Ash Large base, seed 60412; tall bole, wider open crown). Native EZ-Tree oak bark + ash leaf textures bound (NOT FAL); leaf is alphaClip. Scaled to ~21m, ground-center pivot. EZ-Tree is MIT; credited in THIRD-PARTY-ASSETS.md as courtesy."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [
+    {
+      "id": "bark",
+      "blend": "opaque",
+      "maps": {
+        "baseColor": "textures/eztree-bark-oak_basecolor.webp",
+        "normal": "textures/eztree-bark-oak_normal.webp",
+        "roughness": "textures/eztree-bark-oak_roughness.webp"
+      },
+      "factors": { "roughness": 1, "metalness": 0 }
+    },
+    {
+      "id": "leaf",
+      "blend": "alphaClip",
+      "maps": { "baseColor": "textures/eztree-leaf-ash_basecolor.webp" },
+      "factors": { "roughness": 0.85, "metalness": 0, "alphaCutoff": 0.5 }
+    }
+  ],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-teak-b",
+      "role": "hero",
+      "path": "teak-b/teak-b.glb",
+      "tris": 9522,
+      "materialBuckets": ["bark", "leaf"],
+      "bounds": { "center": [0, 10.5, 0], "size": [23.34, 21, 20.14], "radius": 18.65 },
+      "budget": { "trisPerInstance": 9522, "drawCallsPerBatch": 2, "textureMb": 0.65 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-teak-b",
+      "baseColorPath": "teak-b/impostor/atlas.base-color.png",
+      "normalPath": "teak-b/impostor/atlas.normal.png",
+      "depthPath": "teak-b/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 10.5, 0], "size": [23.34, 21, 20.14], "radius": 18.65 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 2.7 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+octa-far",
+    "rationale": "Procedural hardwood canopy hero with shared EZ-Tree bark/leaf buckets. Near mesh (<10k tris) keeps the open-crown silhouette; beyond ~160m it collapses to an 8x3 octahedral impostor baked from the normalized mesh.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 160, "representationId": "mesh-teak-b", "budget": { "trisPerInstance": 9522, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 160, "maxDistanceMeters": null, "representationId": "octa-teak-b", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 2.7 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized teak-b mesh via scripts/bake-vegetation-impostor.mjs (base-color + normal + depth)." }
+    ]
+  },
+  "ecology": {
+    "tier": "canopy",
+    "preferredBiomes": ["denseJungle", "trailEdge", "uplandForest"],
+    "density": 0.07,
+    "slopeRangeDeg": [0, 22],
+    "cluster": { "min": 1, "max": 3, "radiusMeters": 16 }
+  }
+}

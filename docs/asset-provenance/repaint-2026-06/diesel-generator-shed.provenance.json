@@ -1,0 +1,18 @@
+{
+  "slug": "diesel-generator-shed",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/diesel-generator-shed.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.935Z",
+  "sourcePrompt": "A diesel generator shed, an open-sided utility shelter about three meters square. A corrugated-tin roof on a rough timber frame covers a chunky skid-mounted diesel generator with a small exhaust stack, a fuel drum standing alongside, and a cable bundle running out under one eave. Rusty tin, dark olive machinery and timber, noisy-looking. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation f7c33f10-cc72-4a6a-a035-fab044d78157",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4152 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

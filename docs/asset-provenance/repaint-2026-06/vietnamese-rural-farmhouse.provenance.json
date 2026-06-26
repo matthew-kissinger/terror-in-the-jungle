@@ -1,0 +1,16 @@
+{
+  "slug": "vietnamese-rural-farmhouse",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/vietnamese-rural-farmhouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.164Z",
+  "sourcePrompt": "A Vietnamese rural farmhouse, a single-story family home about eight meters wide - a step up from a hut. Plastered timber-framed walls in a warm earth tone, a clay-tile roof with gentle pitch, a covered veranda across the front on wooden posts sheltering the central doorway, and shuttered windows either side. Earthy plaster, dark timber. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation af0deb26-40b0-4f5a-940e-e241992a85fc",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

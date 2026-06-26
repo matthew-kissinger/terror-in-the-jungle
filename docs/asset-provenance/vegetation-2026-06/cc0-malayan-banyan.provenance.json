@@ -1,0 +1,13 @@
+{
+  "slug": "cc0-malayan-banyan",
+  "provider": "ffish.asia / floraZia (Sketchfab)",
+  "sourceUrl": "https://sketchfab.com/3d-models/cc0-malayan-banyan-ficus-microcarpa-038bae6f4bfe4a4f804b63efa2155481",
+  "license": "CC0",
+  "sourceTriangles": null,
+  "status": "pending-download (browser/login)",
+  "localPath": "public/assets/vegetation/source/cc0-malayan-banyan/",
+  "attributionRequired": false,
+  "notes": "Tier 2 #4 — default banyan hero source ($0 path). CC0 (no attribution required). Roots understated; decimate trunk to ~10-12k, author the prop-root curtain, build LOD chain, bake octahedral impostor from same mesh (~1-2h mesh work). Verify license badge at download.",
+  "author": "ffish.asia / floraZia.com",
+  "isDownloadable": true
+}

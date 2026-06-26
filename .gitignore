@@ -99,6 +99,12 @@ data/vietnam/reference/hydroviet-rivers/
 public/data/vietnam/
 public/asset-manifest.json
 
+# Vegetation raw-source staging (cycle C4 Strategy A) — raw downloaded source
+# bytes are git-ignored (license terms + size); keep only the README + .gitkeep.
+public/assets/vegetation/source/*
+!public/assets/vegetation/source/.gitkeep
+!public/assets/vegetation/source/README.md
+
 # Example zoo (reference repos cloned for study, not part of project)
 example-zoo/
 examples/

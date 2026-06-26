@@ -45,7 +45,9 @@
     ],
     "ignoreDependencies": [
       "@cloudflare/workers-types",
-      "wrangler"
+      "wrangler",
+      "@gltf-transform/core",
+      "@gltf-transform/extensions"
     ],
     "ignoreFiles": [
       ".claude/skills/**/templates/**",
@@ -61,6 +63,11 @@
       "scripts/perf-startup-mobile.ts",
       "scripts/perf-tsl-shader-cost.ts",
       "scripts/real-device-validation.ts",
+      "scripts/bake-vegetation-impostor.mjs",
+      "scripts/bake-veg-card.mjs",
+      "scripts/stage-kiln-war-export.mjs",
+      "tools/kiln-asset-batch/build-packs.mjs",
+      "tools/weapon/capture-ads-align.mjs",
       "src/systems/assets/PixelForgePropCatalog.ts",
       "src/systems/combat/weapons/NpcM2HBAdapter.ts"
     ],
@@ -171,6 +178,7 @@
     "check:asset-crops": "npx tsx scripts/asset-crop-probe.ts --renderer webgpu-strict --headed",
     "check:asset-gallery": "npx tsx scripts/check-asset-gallery.ts",
     "check:static-impostors": "npx tsx scripts/check-static-impostors.ts",
+    "check:vegetation-adapter": "npx tsx scripts/check-vegetation-adapter.ts",
     "check:terrain-fire-authority": "npx tsx scripts/terrain-fire-authority-probe.ts --renderer webgpu-strict --headed",
     "check:doc-drift": "npx tsx scripts/doc-drift.ts",
     "check:doc-drift:full": "npx tsx scripts/doc-drift.ts --full",
@@ -202,6 +210,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260422.1",
+    "@gltf-transform/core": "^4.4.0",
+    "@gltf-transform/extensions": "^4.4.0",
     "@types/node": "^25.6.0",
     "@types/three": "^0.184.1",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
@@ -237,6 +247,7 @@
     "@game-field-kits/frame-scheduler": "*",
     "@game-field-kits/three-effect-pool": "*",
     "@game-field-kits/three-model-optimizer": "*",
+    "@game-field-kits/vegetation-library": "*",
     "@preact/signals-core": "^1.14.1",
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/generators": "^0.43.0",

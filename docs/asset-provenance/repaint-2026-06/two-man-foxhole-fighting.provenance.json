@@ -1,0 +1,16 @@
+{
+  "slug": "two-man-foxhole-fighting",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/two-man-foxhole-fighting.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.921Z",
+  "sourcePrompt": "A two-man foxhole fighting position, a rectangular hole about two meters by one, dug shoulder-deep. A low parapet of sandbags rims the front lip, a dirt firing step runs inside the forward wall, and the spoil is heaped loosely behind the rear edge. Dark turned earth and a handful of worn sandbags, simple and grim. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation af7746af-07a5-447c-b8af-0f18e94ab60b",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

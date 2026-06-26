@@ -1,0 +1,32 @@
+{
+  "id": "elephant-grass",
+  "commonName": "Elephant grass",
+  "species": "Pennisetum purpureum",
+  "tags": ["groundcover", "grass", "card", "route-concealment"],
+  "status": "sourceStaged",
+  "provenance": {
+    "source": "ambientCG",
+    "author": null,
+    "url": "https://ambientcg.com/view?id=Grass004",
+    "license": "CC0-1.0",
+    "attributionRequired": false,
+    "notes": "Grass004 2K tiling set staged under source/ambientcg-grass004 (Color/Normal/Roughness/AO/Displacement). Needs slicing into a blade card atlas before it is 'ready'."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [],
+  "lod": {
+    "label": "instanced-card-only",
+    "rationale": "Ground cover never warrants a mesh or an impostor: one alpha-blade card, instanced densely near and faded out at mid range. No far band — grass culls before the impostor distance.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 45, "representationId": null, "plannedKind": "groundCard", "notes": "Slice Grass004 into a 2-4 blade-cluster alpha card; instance with wind." }
+    ]
+  },
+  "ecology": {
+    "tier": "groundCover",
+    "preferredBiomes": ["clearingEdge", "trailEdge", "riverbank"],
+    "density": 0.8,
+    "slopeRangeDeg": [0, 30],
+    "cluster": { "min": 6, "max": 24, "radiusMeters": 4 }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "banyan-standard",
+  "commonName": "Banyan (standard)",
+  "species": "Ficus benghalensis",
+  "tags": ["tree", "canopy", "strangler-fig"],
+  "status": "ready",
+  "provenance": {
+    "source": "Kiln Studio",
+    "author": "Terror in the Jungle (first-party, procedural gen)",
+    "url": null,
+    "license": "CC-BY-SA-4.0",
+    "attributionRequired": true,
+    "sourceTris": 5868,
+    "notes": "Kiln procedural lineage 1e7fcf51 -> bb2d8d0c -> c7e77396 (root-connect + litter-removal). Shares the bark+leaf bucket maps with banyan-large for batching."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [
+    {
+      "id": "bark",
+      "blend": "opaque",
+      "maps": { "baseColor": "textures/bark_basecolor.webp", "normal": "textures/bark_normal.webp" },
+      "factors": { "roughness": 0.92, "metalness": 0 }
+    },
+    {
+      "id": "leaf",
+      "blend": "opaque",
+      "maps": { "baseColor": "textures/leaf_basecolor.webp", "normal": "textures/leaf_normal.webp" },
+      "factors": { "roughness": 0.85, "metalness": 0 }
+    }
+  ],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-standard",
+      "role": "hero",
+      "path": "banyan/banyan-standard-textured.glb",
+      "tris": 5868,
+      "materialBuckets": ["bark", "leaf"],
+      "bounds": { "center": [0.28, 1.4, -0.02], "size": [6.76, 4.81, 6.95], "radius": 5.41 },
+      "budget": { "trisPerInstance": 5868, "drawCallsPerBatch": 2, "textureMb": 0.39 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+billboard-far",
+    "rationale": "Common placement (many instances), so the far band uses a cheap lat/lon billboard card instead of an impostor bake — a 7m tree reads fine as a card at range and saves the bake + memory. Card not yet baked (planned).",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 70, "representationId": "mesh-standard", "budget": { "trisPerInstance": 5868, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 70, "maxDistanceMeters": null, "representationId": null, "plannedKind": "billboardAtlas", "notes": "Bake an 8x3 lat/lon card atlas from the standard mesh." }
+    ]
+  },
+  "ecology": {
+    "tier": "canopy",
+    "preferredBiomes": ["denseJungle", "trailEdge", "clearingEdge"],
+    "density": 0.25,
+    "slopeRangeDeg": [0, 22],
+    "cluster": { "min": 1, "max": 3, "radiusMeters": 12 }
+  }
+}

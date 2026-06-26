@@ -1,0 +1,13 @@
+{
+  "slug": "ambientcg-leafset017",
+  "provider": "ambientCG",
+  "sourceUrl": "https://ambientcg.com/view?id=LeafSet017",
+  "license": "CC0",
+  "sourceTriangles": null,
+  "status": "downloaded",
+  "localPath": "public/assets/vegetation/source/ambientcg-leafset017/",
+  "attributionRequired": false,
+  "notes": "Tier 1 #3 — LeafSet017 atlas, liana/vine cards (draped, not free-floating). CC0 (no attribution required) but record provenance anyway. Confirm exact set name at download.",
+  "author": "ambientCG (Lennart Demes)",
+  "downloadedRes": "2K-PNG (incl. Opacity alpha)"
+}

@@ -1,0 +1,24 @@
+{
+  "slug": "jungle-tree",
+  "provider": "Sketchfab",
+  "sourceUrl": "https://sketchfab.com/3d-models/jungle-tree-46f83ec5f6c04abf9d509c1070f67d1e",
+  "license": "CC-BY-4.0",
+  "sourceTriangles": 30720,
+  "status": "downloaded + normalized (canopy hero)",
+  "localPath": "public/assets/vegetation/source/jungle-tree/",
+  "attributionRequired": true,
+  "notes": "Tier 2 #7 — 37082 verts. Full aerial-root look; decimate one pass to ~15k ($0 alt banyan path). VERIFY bundled sub-asset licenses. Capture exact author handle + license version on download.",
+  "author": "kobaltsecond",
+  "isDownloadable": true,
+  "normalizedPath": "public/assets/vegetation/jungle-tree/jungle-tree.glb",
+  "derivedArtifacts": [
+    {
+      "kind": "octaImpostor",
+      "path": "public/assets/vegetation/jungle-tree/impostor/",
+      "atlases": ["atlas.base-color.png", "atlas.normal.png", "atlas.depth.png"],
+      "grid": "8x3 upper-hemisphere octahedral",
+      "bakedBy": "scripts/bake-vegetation-impostor.mjs",
+      "note": "Far-LOD impostor baked from the normalized mesh; same CC-BY-4.0 source attribution applies."
+    }
+  ]
+}

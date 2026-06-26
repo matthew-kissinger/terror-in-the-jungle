@@ -1,0 +1,16 @@
+{
+  "slug": "m60-pig-general-purpose",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m60-pig-general-purpose.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.707Z",
+  "sourcePrompt": "An M60 \"The Pig\" general-purpose machine gun, about one point one meters long and heavy in profile. A long machine gun with a perforated barrel shroud, a folding bipod spread at the front, a flat top-mounted feed cover, a carry handle, a pistol grip and a fixed shoulder stock; a short belt of linked brass ammunition drapes from the open feed tray. Black. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 94cbcef5-a72e-474b-bb87-d706cff1ee00",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

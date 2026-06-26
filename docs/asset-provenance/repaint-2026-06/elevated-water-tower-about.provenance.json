@@ -1,0 +1,18 @@
+{
+  "slug": "elevated-water-tower-about",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/elevated-water-tower-about.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.008Z",
+  "sourcePrompt": "An elevated water tower about nine meters tall. A cylindrical riveted tank with a shallow cone cap sits on a four-legged tower of steel and timber laced with diagonal cross-bracing, a ladder climbing one leg to a small platform at the tank base, and a single down-pipe dropping to ground level. Weathered gray tank over rusty framing, tall. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 995fa6da-84be-47d0-a8a2-746ea9923d10",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3456 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

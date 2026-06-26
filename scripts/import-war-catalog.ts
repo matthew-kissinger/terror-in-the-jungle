@@ -16,10 +16,14 @@
  *   1. Parse the GLB JSON + BIN chunks; measure world bbox (buffer-decoding
  *      POSITION when accessor min/max is absent — artillery-pit), tris,
  *      materials, minY.
- *   2. Graft canonical rig joints from scripts/asset-import/rig-grafts.json
- *      (m48 Joint_Turret/Joint_MainGun; canonical rotor/prop joints) in
- *      pre-wrap source space, rebasing reparented meshes so world position is
- *      preserved.
+ *   2. Normalize the rig vocabulary to the canonical joint contract
+ *      (scripts/asset-import/joint-taxonomy.json): auto-detect every Joint_*
+ *      node, map its generator-native name to ONE canonical name + semantic
+ *      role (Joint_Rotor -> Joint_MainRotor; Joint_Gun -> Joint_MainGun;
+ *      Joint_PropLeft -> Joint_PropellerL), rename the node, record
+ *      {name,type,spinAxis}, and validate each asset resolved the joints its
+ *      rig profile requires (a missing rotor/turret fails the import instead of
+ *      dying silently at runtime). Geometric thin-axis cross-checks spin axes.
  *   3. Axis-normalize per class (+X-forward source -> +Z on-disk for
  *      weapons/aircraft/structures/etc., +X -> -Z for ground vehicles) using
  *      the proven quaternion-wrap-node pattern.
@@ -104,41 +108,49 @@ interface GlbJson {
   [k: string]: unknown;
 }
 
-interface GraftJointSpec {
-  name: string;
-  meshes: string[];
-  pivot?: 'meshes-center' | 'hub';
-  hubMesh?: string;
-  /**
-   * Root-local offset applied to the inserted joint and its child meshes as a
-   * unit. Use this when an upstream mesh set is authored at the wrong location
-   * but still needs to spin around its own hub-relative pivot.
-   */
-  translationOffset?: [number, number, number];
+/**
+ * One canonical articulation role in the rig contract
+ * (scripts/asset-import/joint-taxonomy.json). `aliases` are the
+ * generator-native joint names that all normalize to `canonical`.
+ */
+interface JointRoleSpec {
+  role: string;
+  canonical: string;
   type?: 'mainBlades' | 'tailBlades';
   spinAxis?: 'x' | 'y' | 'z';
+  aliases: string[];
+  doc?: string;
 }
 
-interface RenameJointSpec {
-  from: string;
-  to: string;
-  type?: 'mainBlades' | 'tailBlades';
-  spinAxis?: 'x' | 'y' | 'z';
+interface WeaponNodeRules {
+  magazineIncludePattern: string;
+  magazineExcludePattern: string;
+  muzzleIncludePattern: string;
+  overrides?: Record<string, { magazineNodes?: string[]; muzzleNodes?: string[] }>;
 }
 
-interface GraftEntry {
-  graftJoints?: GraftJointSpec[];
-  renameJoints?: RenameJointSpec[];
+/** The whole canonical rig contract, loaded from joint-taxonomy.json. */
+interface JointTaxonomy {
+  jointRoles: JointRoleSpec[];
+  ignoreJointPattern: string;
+  rigProfiles: Record<string, string[]>;
+  assetRigProfiles: Record<string, string>;
+  weaponNodes: WeaponNodeRules;
 }
 
-interface WeaponNodeEntry {
-  magazineNodes?: string[];
-  muzzleNodes?: string[];
+/** Compiled lookup tables derived once from a JointTaxonomy. */
+interface CompiledTaxonomy {
+  taxonomy: JointTaxonomy;
+  aliasToRole: Map<string, JointRoleSpec>;
+  roleByName: Map<string, JointRoleSpec>;
+  ignore: RegExp;
 }
 
-interface RigGrafts {
-  grafts: Record<string, GraftEntry>;
-  weaponNodes: Record<string, WeaponNodeEntry>;
+/** A rig-normalization finding surfaced to the import report. */
+interface RigIssue {
+  slug: string;
+  severity: 'error' | 'warn' | 'info';
+  message: string;
 }
 
 interface JointRecord {
@@ -592,105 +604,235 @@ function round2(v: number): number {
   return Math.round(v * 100) / 100;
 }
 
-// ─── Graft joints ────────────────────────────────────────────────────────────
+// ─── Rig normalization (canonical joint contract) ────────────────────────────
 
-/** Parent index of each node (built from children lists). */
-function buildParents(json: GlbJson): number[] {
-  const parents = new Array(json.nodes?.length ?? 0).fill(-1);
-  json.nodes?.forEach((n, i) => {
-    for (const c of n.children ?? []) parents[c] = i;
-  });
-  return parents;
-}
+/** Classes that use Joint_* nodes as modeling groups, not articulation pivots. */
+const STATIC_RIG_CLASSES = new Set(['buildings', 'structures', 'animals', 'props']);
 
 function findNode(json: GlbJson, name: string): number {
   return json.nodes?.findIndex((n) => n.name === name) ?? -1;
 }
 
-function detachChild(json: GlbJson, parents: number[], child: number): void {
-  const p = parents[child];
-  if (p >= 0 && json.nodes?.[p]?.children) {
-    json.nodes[p].children = json.nodes[p].children!.filter((c) => c !== child);
-  } else {
-    for (const scene of json.scenes ?? []) {
-      if (scene.nodes) scene.nodes = scene.nodes.filter((c) => c !== child);
+/** Compile the taxonomy's alias/role/ignore lookups once. */
+function compileTaxonomy(t: JointTaxonomy): CompiledTaxonomy {
+  const aliasToRole = new Map<string, JointRoleSpec>();
+  const roleByName = new Map<string, JointRoleSpec>();
+  for (const r of t.jointRoles) {
+    if (roleByName.has(r.role)) throw new Error(`joint-taxonomy: duplicate role "${r.role}"`);
+    roleByName.set(r.role, r);
+    for (const a of r.aliases) {
+      const prior = aliasToRole.get(a);
+      if (prior && prior !== r) {
+        throw new Error(`joint-taxonomy: alias "${a}" claimed by both "${prior.role}" and "${r.role}"`);
+      }
+      aliasToRole.set(a, r);
     }
   }
-  parents[child] = -1;
+  return { taxonomy: t, aliasToRole, roleByName, ignore: new RegExp(t.ignoreJointPattern) };
+}
+
+/** Count mesh-bearing nodes in a node's subtree (reported as meshCount). */
+function countSubtreeMeshes(json: GlbJson, idx: number): number {
+  let n = 0;
+  const node = json.nodes?.[idx];
+  if (!node) return 0;
+  if (node.mesh !== undefined) n += 1;
+  for (const c of node.children ?? []) n += countSubtreeMeshes(json, c);
+  return n;
 }
 
 /**
- * Insert a graft joint at `pivot`, reparenting `meshIdxs` under it. By default
- * translations are rebased so world (root-space) position is preserved. When a
- * `translationOffset` is provided, the whole grafted subtree moves by that
- * offset while retaining each mesh's hub-relative local transform. All assets
- * here have a flat hierarchy (meshes are direct children of the single root
- * with TRS-only local transforms), so we rebase translation directly. Returns
- * the new joint node index, or -1 if no listed mesh was found.
+ * Local-frame thin axis of a joint's mesh subtree. A rotor/propeller disc is
+ * wide in two axes and thin along its spin axis, so the axis of minimal extent
+ * (in the joint's own local frame, which the axis-normalize wrapper leaves
+ * invariant) is the geometric spin axis. Returns null when the subtree is not
+ * clearly disc-like (no confident reading) so the caller only warns on a real
+ * disagreement.
  */
-function graftJoint(json: GlbJson, rootIdx: number, spec: GraftJointSpec): JointRecord | null {
-  const parents = buildParents(json);
-  const meshIdxs = spec.meshes.map((m) => findNode(json, m)).filter((i) => i >= 0);
-  if (meshIdxs.length === 0) return null;
-
-  // Compute pivot in root-local space.
-  let pivot: Vec3;
-  if (spec.pivot === 'hub' && spec.hubMesh) {
-    const hub = findNode(json, spec.hubMesh);
-    pivot = (hub >= 0 ? json.nodes?.[hub]?.translation : undefined) as Vec3 ?? [0, 0, 0];
-    pivot = [pivot[0] ?? 0, pivot[1] ?? 0, pivot[2] ?? 0];
-  } else {
-    let sum: Vec3 = [0, 0, 0];
-    for (const mi of meshIdxs) {
-      const t = json.nodes?.[mi]?.translation ?? [0, 0, 0];
-      sum = [sum[0] + (t[0] ?? 0), sum[1] + (t[1] ?? 0), sum[2] + (t[2] ?? 0)];
+function jointThinAxis(json: GlbJson, bin: Buffer | null, jointIdx: number): 'x' | 'y' | 'z' | null {
+  const min: Vec3 = [Infinity, Infinity, Infinity];
+  const max: Vec3 = [-Infinity, -Infinity, -Infinity];
+  const recur = (idx: number, m: Mat4): void => {
+    const n = json.nodes?.[idx];
+    if (!n) return;
+    if (n.mesh !== undefined) {
+      for (const p of json.meshes?.[n.mesh]?.primitives ?? []) {
+        const pos = p.attributes?.POSITION;
+        if (pos === undefined) continue;
+        const mm = accessorMinMax(json, bin, pos);
+        if (!mm) continue;
+        for (let xi = 0; xi < 2; xi++) for (let yi = 0; yi < 2; yi++) for (let zi = 0; zi < 2; zi++) {
+          const corner: Vec3 = [xi ? mm.max[0] : mm.min[0], yi ? mm.max[1] : mm.min[1], zi ? mm.max[2] : mm.min[2]];
+          const w = applyPoint(m, corner);
+          for (let c = 0; c < 3; c++) {
+            if (w[c] < min[c]) min[c] = w[c];
+            if (w[c] > max[c]) max[c] = w[c];
+          }
+        }
+      }
     }
-    pivot = [sum[0] / meshIdxs.length, sum[1] / meshIdxs.length, sum[2] / meshIdxs.length];
-  }
-
-  const offset = spec.translationOffset ?? [0, 0, 0];
-  const jointTranslation: Vec3 = [
-    pivot[0] + (offset[0] ?? 0),
-    pivot[1] + (offset[1] ?? 0),
-    pivot[2] + (offset[2] ?? 0),
-  ];
-  const jointIdx = json.nodes!.length;
-  json.nodes!.push({ name: spec.name, translation: jointTranslation, children: [] });
-
-  for (const mi of meshIdxs) {
-    detachChild(json, parents, mi);
-    const t = (json.nodes![mi].translation ?? [0, 0, 0]) as number[];
-    json.nodes![mi].translation = [(t[0] ?? 0) - pivot[0], (t[1] ?? 0) - pivot[1], (t[2] ?? 0) - pivot[2]];
-    json.nodes![jointIdx].children!.push(mi);
-  }
-  // Attach joint under the asset root.
-  json.nodes![rootIdx].children ??= [];
-  json.nodes![rootIdx].children!.push(jointIdx);
-
-  return { name: spec.name, type: spec.type, spinAxis: spec.spinAxis, meshCount: meshIdxs.length };
+    for (const c of n.children ?? []) recur(c, mul(m, nodeLocalMatrix(json.nodes![c])));
+  };
+  // Walk the joint's children in the joint's own local frame (joint = identity).
+  for (const c of json.nodes?.[jointIdx]?.children ?? []) recur(c, nodeLocalMatrix(json.nodes![c]));
+  if (!Number.isFinite(min[0])) return null;
+  const ext: Vec3 = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+  const order = [0, 1, 2].sort((a, b) => ext[a] - ext[b]);
+  // Confident only when the thinnest axis is clearly thinner than the next.
+  if (ext[order[0]] >= ext[order[1]] * 0.6) return null;
+  return (['x', 'y', 'z'] as const)[order[0]];
 }
 
-function renameJoint(json: GlbJson, spec: RenameJointSpec): JointRecord | null {
-  const idx = findNode(json, spec.from);
-  if (idx < 0) return null;
-  json.nodes![idx].name = spec.to;
-  const childMeshes = (json.nodes![idx].children ?? []).filter((c) => json.nodes?.[c]?.mesh !== undefined);
-  return { name: spec.to, type: spec.type, spinAxis: spec.spinAxis, meshCount: childMeshes.length };
+/**
+ * Normalize an asset's rig vocabulary to the canonical contract: auto-detect
+ * every `Joint_*` node, map its generator-native name to the canonical role
+ * via the taxonomy, rename the GLB node, and record {name,type,spinAxis} for
+ * the catalog. Unknown (non-ignored) joints and spin-axis disagreements are
+ * surfaced as issues. Runs in pre-wrap source space; the joint-local spin axis
+ * is wrapper-invariant, so the geometric cross-check holds either side of the
+ * axis-normalize wrap.
+ */
+function normalizeRig(
+  json: GlbJson,
+  slug: string,
+  cls: string,
+  ct: CompiledTaxonomy,
+  bin: Buffer | null,
+): { joints: JointRecord[]; issues: RigIssue[] } {
+  const joints: JointRecord[] = [];
+  const issues: RigIssue[] = [];
+  const nodes = json.nodes ?? [];
+  const seen = new Set<string>();
+  // Static classes use Joint_* as a modeling-group convention (window groups,
+  // columns, walls, table pivots), not articulation, so an unrecognized joint
+  // there is expected. Only articulating classes get the unclassified warning.
+  const articulating = !STATIC_RIG_CLASSES.has(cls);
+  const unclassified = new Set<string>();
+
+  for (let i = 0; i < nodes.length; i++) {
+    const name = nodes[i].name;
+    if (!name) continue;
+    const role = ct.aliasToRole.get(name);
+    if (!role) {
+      if (articulating && /^Joint_/i.test(name) && !ct.ignore.test(name)) {
+        // Collapse indexed/coordinate-suffixed instances to one base name
+        // (Joint_PlankPivot_0_1_R -> Joint_PlankPivot) for a single summary line.
+        unclassified.add(name.replace(/_(?=[-\d]).*$/, ''));
+      }
+      continue;
+    }
+
+    // Canonicalize the node name in place (rename only when it differs).
+    if (name !== role.canonical) {
+      const collision = findNode(json, role.canonical);
+      if (collision >= 0 && collision !== i) {
+        issues.push({
+          slug,
+          severity: 'error',
+          message: `cannot rename "${name}" -> "${role.canonical}": that canonical name already exists`,
+        });
+      } else {
+        nodes[i].name = role.canonical;
+      }
+    }
+    if (seen.has(role.canonical)) {
+      issues.push({ slug, severity: 'warn', message: `duplicate joint "${role.canonical}"` });
+    }
+    seen.add(role.canonical);
+
+    // Geometric spin-axis cross-check for spinning blade joints.
+    if (role.spinAxis && (role.type === 'mainBlades' || role.type === 'tailBlades')) {
+      const thin = jointThinAxis(json, bin, i);
+      if (thin && thin !== role.spinAxis) {
+        issues.push({
+          slug,
+          severity: 'warn',
+          message: `joint "${role.canonical}" declares spinAxis=${role.spinAxis} but its geometric thin-axis is ${thin}`,
+        });
+      }
+    }
+
+    joints.push({
+      name: role.canonical,
+      type: role.type,
+      spinAxis: role.spinAxis,
+      meshCount: countSubtreeMeshes(json, i),
+    });
+  }
+
+  // One summary line per asset for un-wired articulation the GLB exposes but no
+  // consumer reads yet (e.g. C-130 props, PBR gun turret). Informational: add a
+  // rig profile + role aliases when the asset becomes a consumer.
+  if (unclassified.size > 0) {
+    issues.push({
+      slug,
+      severity: 'info',
+      message: `${unclassified.size} un-wired articulation joint group(s): ${[...unclassified].sort().join(', ')}`,
+    });
+  }
+  return { joints, issues };
 }
 
-function applyGrafts(json: GlbJson, entry: GraftEntry | undefined): JointRecord[] {
-  if (!entry) return [];
-  const rootIdx = json.scenes?.[json.scene ?? 0]?.nodes?.[0] ?? 0;
-  const records: JointRecord[] = [];
-  for (const r of entry.renameJoints ?? []) {
-    const rec = renameJoint(json, r);
-    if (rec) records.push(rec);
+/**
+ * Classify a weapon's magazine + muzzle anchor meshes from the taxonomy rules
+ * (regex include/exclude over Mesh_* node names), with per-slug overrides for
+ * the few the rules cannot decide. Magazine = the detachable body that drops on
+ * reload (well + release catch excluded); muzzle = the forward muzzle device
+ * (bare barrel omitted — WeaponRigManager already falls back to Mesh_Barrel).
+ */
+function classifyWeaponNodes(
+  json: GlbJson,
+  slug: string,
+  t: JointTaxonomy,
+): { magazineNodes?: string[]; muzzleNodes?: string[]; issues: RigIssue[] } {
+  const rules = t.weaponNodes;
+  const override = rules.overrides?.[slug];
+  const meshNames = (json.nodes ?? [])
+    .map((n) => n.name)
+    .filter((n): n is string => !!n && /^Mesh_/i.test(n));
+
+  const magInc = new RegExp(rules.magazineIncludePattern, 'i');
+  const magExc = new RegExp(rules.magazineExcludePattern, 'i');
+  const muzInc = new RegExp(rules.muzzleIncludePattern, 'i');
+
+  const magazineNodes = override?.magazineNodes ?? meshNames.filter((n) => magInc.test(n) && !magExc.test(n));
+  const muzzleNodes = override?.muzzleNodes ?? meshNames.filter((n) => muzInc.test(n));
+
+  const issues: RigIssue[] = [];
+  return {
+    magazineNodes: magazineNodes.length > 0 ? magazineNodes : undefined,
+    muzzleNodes: muzzleNodes.length > 0 ? muzzleNodes : undefined,
+    issues,
+  };
+}
+
+/**
+ * Assert an articulated asset resolved every joint its rig profile requires.
+ * This turns a silent runtime regression (dead rotor / un-traversing turret)
+ * into a loud import-time failure when a future batch renames a part outside
+ * the taxonomy's alias coverage.
+ */
+function validateRig(slug: string, joints: JointRecord[], ct: CompiledTaxonomy): RigIssue[] {
+  const profileName = ct.taxonomy.assetRigProfiles[slug];
+  if (!profileName) return [];
+  const required = ct.taxonomy.rigProfiles[profileName] ?? [];
+  const present = new Set(joints.map((j) => j.name));
+  const issues: RigIssue[] = [];
+  for (const role of required) {
+    const spec = ct.roleByName.get(role);
+    if (!spec) {
+      issues.push({ slug, severity: 'error', message: `rig profile "${profileName}" references unknown role "${role}"` });
+      continue;
+    }
+    if (!present.has(spec.canonical)) {
+      issues.push({
+        slug,
+        severity: 'error',
+        message: `missing required joint "${spec.canonical}" (role ${role}, profile ${profileName})`,
+      });
+    }
   }
-  for (const g of entry.graftJoints ?? []) {
-    const rec = graftJoint(json, rootIdx, g);
-    if (rec) records.push(rec);
-  }
-  return records;
+  return issues;
 }
 
 // ─── Axis normalization (wrap the scene roots under a rotation node) ─────────
@@ -1018,11 +1160,15 @@ function main(): void {
     join(root, '..', 'pixel-forge', 'war-assets', '_repaint-2026-06'),
   );
   const dryRun = process.argv.includes('--dry-run');
+  const strict = process.argv.includes('--strict');
   const provenanceDir = join(root, 'docs', 'asset-provenance', 'repaint-2026-06');
   const catalogPath = join(root, 'src', 'config', 'generated', 'warAssetCatalog.ts');
 
   const manifest = JSON.parse(readFileSync(join(sourceDir, 'manifest.json'), 'utf-8')) as Manifest;
-  const rig = JSON.parse(readFileSync(join(root, 'scripts', 'asset-import', 'rig-grafts.json'), 'utf-8')) as RigGrafts;
+  const taxonomy = JSON.parse(
+    readFileSync(join(root, 'scripts', 'asset-import', 'joint-taxonomy.json'), 'utf-8'),
+  ) as JointTaxonomy;
+  const ct = compileTaxonomy(taxonomy);
 
   if (!dryRun) {
     mkdirSync(provenanceDir, { recursive: true });
@@ -1031,6 +1177,7 @@ function main(): void {
 
   const entries: CatalogEntry[] = [];
   const reports: AssetReport[] = [];
+  const rigIssues: RigIssue[] = [];
   const rejects: Array<{ asset: ManifestAsset; triage: TriageResult; tris: number; sizeKB: number }> = [];
 
   for (const asset of manifest.assets) {
@@ -1043,8 +1190,11 @@ function main(): void {
     const sizeKB = Math.round((statSync(sourceGlb).size / 1024) * 10) / 10;
     const materials = json.materials?.length ?? 0;
 
-    // Grafts happen in pre-wrap source space.
-    const joints = applyGrafts(json, rig.grafts[asset.slug]);
+    // Rig normalization happens in pre-wrap source space (joint-local spin
+    // axes are wrapper-invariant, so the geometric cross-check still holds).
+    const rig = normalizeRig(json, asset.slug, asset.class, ct, bin);
+    const joints = rig.joints;
+    rigIssues.push(...rig.issues, ...validateRig(asset.slug, joints, ct));
     const { forward, quat, label } = classForward(asset.class);
 
     // Measure AFTER grafts (node graph changed) but BEFORE the axis wrap, then
@@ -1062,7 +1212,8 @@ function main(): void {
     normalizeAxis(json, quat, label);
 
     const targetGlb = join(root, runtimePath(asset.tijTarget).split('/').reduce((p, s) => join(p, s), join('public', 'models')));
-    const weaponNodes = rig.weaponNodes[asset.slug];
+    const weaponNodes = asset.class === 'weapons' ? classifyWeaponNodes(json, asset.slug, taxonomy) : undefined;
+    if (weaponNodes) rigIssues.push(...weaponNodes.issues);
 
     // On-disk dims after wrap: +X<->+Z (or -Z) swap means the source X extent
     // becomes the Z extent. Report on-disk dims so "Z-long" reads true.
@@ -1117,6 +1268,17 @@ function main(): void {
     reports.push({ slug: asset.slug, cls: asset.class, axis: forward === 'neg-z' ? '-Z' : '+Z', dims: onDiskDims, tris, status: triageResult.status, written });
   }
 
+  // Rig contract report (canonical-joint normalization + validation).
+  printRigIssues(rigIssues);
+  const errors = rigIssues.filter((i) => i.severity === 'error');
+  if (errors.length > 0 && (strict || !dryRun)) {
+    console.error(
+      `\nRig contract: ${errors.length} error(s). ${dryRun ? '' : 'Refusing to write a catalog with a broken rig contract.\n'}` +
+        'Fix joint-taxonomy.json (add the new generator name to the role aliases) and re-run.',
+    );
+    process.exit(1);
+  }
+
   // Emit catalog.
   if (!dryRun) {
     writeFileSync(catalogPath, emitCatalog(entries), 'utf-8');
@@ -1124,6 +1286,21 @@ function main(): void {
   }
 
   printReport(reports, entries, rejects);
+}
+
+/** Print the rig-normalization findings grouped by severity. */
+function printRigIssues(issues: RigIssue[]): void {
+  if (issues.length === 0) {
+    console.log('\nRig contract: all articulated assets resolved their canonical joints (0 issues).');
+    return;
+  }
+  const errors = issues.filter((i) => i.severity === 'error');
+  const warns = issues.filter((i) => i.severity === 'warn');
+  const infos = issues.filter((i) => i.severity === 'info');
+  console.log(`\nRig contract: ${errors.length} error(s), ${warns.length} warning(s), ${infos.length} info.`);
+  for (const i of errors) console.log(`  ERROR  ${i.slug}: ${i.message}`);
+  for (const i of warns) console.log(`  warn   ${i.slug}: ${i.message}`);
+  for (const i of infos) console.log(`  info   ${i.slug}: ${i.message}`);
 }
 
 function writeRerollRequests(

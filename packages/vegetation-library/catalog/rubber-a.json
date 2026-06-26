@@ -1,0 +1,73 @@
+{
+  "id": "rubber-a",
+  "commonName": "Rubber tree (slender bole)",
+  "species": "Hevea brasiliensis (stylized)",
+  "tags": ["tree", "canopy", "hardwood", "rubber", "plantation", "eztree", "procedural"],
+  "status": "ready",
+  "provenance": {
+    "source": "EZ-Tree",
+    "author": "Daniel Greenheck (dgreenheck)",
+    "url": "https://github.com/dgreenheck/ez-tree",
+    "license": "MIT",
+    "attributionRequired": false,
+    "sourceTris": 9522,
+    "notes": "Generated headless with @dgreenheck/ez-tree@1.1.0 (Ash Large base, seed 70513; slender tall bole, narrower smaller crown). Native EZ-Tree oak bark + ash leaf textures bound (NOT FAL); leaf is alphaClip. Scaled to ~20m, ground-center pivot. EZ-Tree is MIT; credited in THIRD-PARTY-ASSETS.md as courtesy."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [
+    {
+      "id": "bark",
+      "blend": "opaque",
+      "maps": {
+        "baseColor": "textures/eztree-bark-oak_basecolor.webp",
+        "normal": "textures/eztree-bark-oak_normal.webp",
+        "roughness": "textures/eztree-bark-oak_roughness.webp"
+      },
+      "factors": { "roughness": 1, "metalness": 0 }
+    },
+    {
+      "id": "leaf",
+      "blend": "alphaClip",
+      "maps": { "baseColor": "textures/eztree-leaf-ash_basecolor.webp" },
+      "factors": { "roughness": 0.85, "metalness": 0, "alphaCutoff": 0.5 }
+    }
+  ],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-rubber-a",
+      "role": "hero",
+      "path": "rubber-a/rubber-a.glb",
+      "tris": 9522,
+      "materialBuckets": ["bark", "leaf"],
+      "bounds": { "center": [0, 10, 0], "size": [18.06, 20, 16.5], "radius": 15.8 },
+      "budget": { "trisPerInstance": 9522, "drawCallsPerBatch": 2, "textureMb": 0.65 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-rubber-a",
+      "baseColorPath": "rubber-a/impostor/atlas.base-color.png",
+      "normalPath": "rubber-a/impostor/atlas.normal.png",
+      "depthPath": "rubber-a/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 10, 0], "size": [18.06, 20, 16.5], "radius": 15.8 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 2.4 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+octa-far",
+    "rationale": "Procedural plantation hardwood with a slender bole and compact crown; shared EZ-Tree bark/leaf buckets. Near mesh (<10k tris) under ~150m, then an 8x3 octahedral impostor baked from the normalized mesh.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 150, "representationId": "mesh-rubber-a", "budget": { "trisPerInstance": 9522, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 150, "maxDistanceMeters": null, "representationId": "octa-rubber-a", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 2.4 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized rubber-a mesh via scripts/bake-vegetation-impostor.mjs (base-color + normal + depth)." }
+    ]
+  },
+  "ecology": {
+    "tier": "canopy",
+    "preferredBiomes": ["plantation", "trailEdge", "denseJungle"],
+    "density": 0.09,
+    "slopeRangeDeg": [0, 18],
+    "cluster": { "min": 2, "max": 5, "radiusMeters": 12 }
+  }
+}

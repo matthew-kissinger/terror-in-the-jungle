@@ -1,0 +1,16 @@
+{
+  "slug": "water-monitor-lizard-standing",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/water-monitor-lizard-standing.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.779Z",
+  "sourcePrompt": "A water monitor lizard standing in a high-walk pause, about a meter and a half from snout to tail-tip - half of it muscular tail. A big amphibious lizard on four splayed bent legs with long claws, a long neck carrying a tapered snout with a flicking tongue, and a deep keeled tail trailing in a curve. Dark gray-brown skin flecked with yellow speckle rows. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation af4fee93-876d-4c60-ae5b-2fb05ebcb976",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,25 @@
+{
+  "slug": "t-54-main-battle",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/t-54-main-battle.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.568Z",
+  "sourcePrompt": "A T-54 main battle tank, the NVA's Soviet-pattern armor, about six and a half meters of hull with the 100mm gun stretching it past nine. A low sloped hull under a smooth half-egg dome turret, the long gun wearing a bore evacuator near the muzzle; five big road wheels per side with a distinct gap between the first and second. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 147654a4-346e-4c5c-a86c-c3d1d434f76b",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [
+    {
+      "name": "Joint_Turret",
+      "meshCount": 18
+    },
+    {
+      "name": "Joint_MainGun",
+      "meshCount": 4
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,129 @@
+{
+  "plan": {
+    "name": "Vietnam Structures",
+    "prompt": "Vietnam-war firebase fortifications, emplacements, and field structures, low-poly game-ready.",
+    "paletteId": "vietnam-war",
+    "items": [
+      {
+        "prompt": "A 37mm anti-aircraft gun, an NVA towed autocannon about six meters long with its barrel raised high. A single long thin barrel with a small flash cone elevates steeply from a cradle between two flat armor shield plates, gunner seats and handwheels hang off the mount, and the whole gun rides a cruciform carriage on two rubber road wheels. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A field medical aid station tent about six meters long. A canvas field tent with both entrance flaps tied wide open revealing folding cots and stacked medical chests inside, a large red cross on white painted on the roof and another on the side wall, guy ropes staked out, and supply crates by the entrance. Olive-drab canvas and red crosses. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A military ammunition crate about eighty centimeters long. A sturdy rectangular wooden box with a hinged lid, rope loop handles on each end, metal reinforcing strips at the corners, and stenciled white markings along the side. Olive-drab painted wood with darker metal banding, dense and regulation. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A 105mm howitzer emplacement, a circular sandbagged gun pit about eight meters across. The howitzer centers it - a long barrel angled up over the parapet, a shield plate, two splayed trail legs and two rubber tires - while ammunition crates and a powder canister stack against the inside of the chest-high sandbag ring. Sandbags and olive-drab. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A medium barracks tent, a long ridge-line canvas tent about nine meters long. Vertical canvas side walls rise to a peaked roof along a ridge with a stovepipe poking through, evenly spaced guy ropes stake out both eaves, and the entrance flaps at one end are tied back showing the dark interior. Olive-drab canvas, orderly billeting. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "An M18 Claymore mine deployed on its legs, a small curved rectangular block about twenty-two centimeters wide. The olive-drab plastic body bows convex toward the front with raised embossed lettering, two pairs of thin scissor legs splay into the soil beneath, and a blasting-cap well with a wire stub sits on top. Olive-drab plastic, small. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A military command tent, a large ridge-line canvas field tent about six meters long. A taut canvas roof peaks along a central ridge pole and breaks to sloping side walls, guy ropes stake out from the eaves all around, and the entrance flaps at one gable end are rolled open. Olive-drab canvas with visible seams, taut and field-grade. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A radio communications tower about twelve meters tall. A slender three-legged lattice mast of cross-braced steel angle sections rises from a small concrete pad, steadied by three guy wires to ground anchors, topped with two whip antennas and one small dish. Galvanized gray lattice, spindly and tall. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A firebase entrance gate about five meters wide. Two stout timber posts carry a horizontal lifting cross-pole barrier, a hand-painted unit sign board hangs from the crossbar, and a small sandbagged guard position with a tin roof hunches to one side. Rough timber, sandbags and stenciled paint, the way in. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A simple wooden footbridge over a stream, about five meters long and one plank-width wide. A slightly sagging deck of mismatched planks rests on two or three timber pile bents, with a single rough handrail down each side on slender posts, one rail leaning. Sun-grayed weathered timber, rustic and creaky-looking. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A two-man foxhole fighting position, a rectangular hole about two meters by one, dug shoulder-deep. A low parapet of sandbags rims the front lip, a dirt firing step runs inside the forward wall, and the spoil is heaped loosely behind the rear edge. Dark turned earth and a handful of worn sandbags, simple and grim. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A 55-gallon steel fuel drum, about ninety centimeters tall. A straight cylinder with two raised rolling ribs around the body, a flat top with two small bung caps, stenciled fuel markings on the side, and scattered dents and rust streaks down from the rim. Olive-drab paint gone rusty at the seams, ubiquitous and grimy. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A diesel generator shed, an open-sided utility shelter about three meters square. A corrugated-tin roof on a rough timber frame covers a chunky skid-mounted diesel generator with a small exhaust stack, a fuel drum standing alongside, and a cable bundle running out under one eave. Rusty tin, dark olive machinery and timber, noisy-looking. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A firebase guard tower about eight meters tall. Four heavy timber legs lean inward, laced with diagonal cross-bracing; a ladder climbs one face to a square observation platform with a waist-high sandbag wall and a simple corrugated-tin shade roof on corner posts. Rough-cut timber, sandbags and rusty tin, narrow and watchful. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A field latrine, a narrow standalone privy about two and a half meters tall. An upright shed of rough vertical planks under a single-slope corrugated-tin roof, a plank door on strap hinges with a gap at top and bottom, and a thin vent pipe rising up one back corner. Sun-grayed wood and rusty tin, humble and necessary. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "An 81mm mortar emplacement, a circular pit about four meters across ringed by a low sandbag wall. The mortar stands centered - a tube on a two-legged bipod over a round baseplate, elevated steeply skyward - with a couple of ammunition crates and a stack of rounds inside the ring. Sandbags, dark gunmetal and dirt, dug-in and ready. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A defensive perimeter berm section about eight meters long. A bulldozed earth embankment rising to chest height, its forward face steep and its rear sloping into a shallow walkway, the crest topped with a course or two of sandbags forming a firing line. Raw shoved earth and tan sandbags, the camp's hard edge. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A punji-stake trap, a VC booby trap - a shallow pit about a meter and a half across. The bottom bristles with a bed of sharpened bamboo stakes angled upward, while a flimsy cover of sticks, leaves and grass lies half-collapsed into the opening, broken at the center. Pale sharpened bamboo against dark disturbed earth, cruel and hidden. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "An AN/PRC-25 field-radio stack for a command post, about half a meter tall on its crate. A boxy olive-drab radio set with a dialed control face, a coiled handset cable hanging to a handset hooked on the side, a long whip antenna rising well overhead, and a spare battery box stacked beneath. Olive-drab metal, black dials and a thin whip, field. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "An SA-2 Guideline surface-to-air missile on its launcher, the missile alone over ten meters long. A slender two-stage missile - cruciform fins at the tail of a flared booster, smaller fins mid-body and at the pointed nose - angled steeply skyward on a single launch rail atop a rotating pedestal with a trailer-style base. White missile. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A wooden supply crate about a meter long. A plain rectangular shipping box of rough sawn planks with batten strips reinforcing the corners and edges, faint stenciled markings across one side, and small gaps between slats. Pale weathered raw wood, plain, square and stackable. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A VC tunnel entrance, a concealed spider hole barely sixty centimeters square. A woven stick-and-earth trapdoor lies tipped aside revealing a tight dark vertical shaft cut into the ground, its rim packed smooth, with scuffed dirt and scattered leaves around the opening. Dark earth and camouflage litter, claustrophobic and secret. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "An elevated water tower about nine meters tall. A cylindrical riveted tank with a shallow cone cap sits on a four-legged tower of steel and timber laced with diagonal cross-bracing, a ladder climbing one leg to a small platform at the tank base, and a single down-pipe dropping to ground level. Weathered gray tank over rusty framing, tall. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      },
+      {
+        "prompt": "A ZPU-4 quad anti-aircraft gun, an NVA towed mount about four and a half meters long. Four heavy machine-gun barrels with conical flash hiders sit clustered in a two-by-two block, elevated together skyward from a rotating central mount with a gunner's seat and two small shield plates, all riding a four-wheeled towing carriage with a hitch. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "environment",
+        "role": "building"
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "slug": "firebase-guard-tower-about",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/firebase-guard-tower-about.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.942Z",
+  "sourcePrompt": "A firebase guard tower about eight meters tall. Four heavy timber legs lean inward, laced with diagonal cross-bracing; a ladder climbs one face to a square observation platform with a waist-high sandbag wall and a simple corrugated-tin shade roof on corner posts. Rough-cut timber, sandbags and rusty tin, narrow and watchful. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation fbe8ed9c-5b8c-442a-811c-2671d43c9417",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2860 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

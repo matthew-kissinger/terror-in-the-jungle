@@ -1,0 +1,16 @@
+{
+  "slug": "37mm-anti-aircraft-gun",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/37mm-anti-aircraft-gun.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.855Z",
+  "sourcePrompt": "A 37mm anti-aircraft gun, an NVA towed autocannon about six meters long with its barrel raised high. A single long thin barrel with a small flash cone elevates steeply from a cradle between two flat armor shield plates, gunner seats and handwheels hang off the mount, and the whole gun rides a cruciform carriage on two rubber road wheels. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 0bd4ce44-f2ea-4aa3-963e-fa1b3e89961c",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,13 @@
+{
+  "slug": "chinese-banyan",
+  "provider": "Sketchfab",
+  "sourceUrl": "https://sketchfab.com/3d-models/chinese-banyan-ficus-microcarpa-2a0dbcdf8f5d48f5ad79987c7a8170ce",
+  "license": "CC-BY-4.0",
+  "sourceTriangles": 111392,
+  "status": "pending-download (browser/login)",
+  "localPath": "public/assets/vegetation/source/chinese-banyan/",
+  "attributionRequired": true,
+  "notes": "Tier 2 #6 — 71033 verts. IMPOSTOR-BAKE SOURCE ONLY (real banyan silhouette; too heavy for LOD0). Bake the far impostor from this heavy source directly. Capture exact author handle + license version on download.",
+  "author": "Valery.Li",
+  "isDownloadable": true
+}

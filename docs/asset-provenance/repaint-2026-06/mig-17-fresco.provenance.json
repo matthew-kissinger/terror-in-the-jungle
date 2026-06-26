@@ -1,0 +1,16 @@
+{
+  "slug": "mig-17-fresco",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/mig-17-fresco.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.498Z",
+  "sourcePrompt": "A MiG-17 \"Fresco\", the NVA's nimble Soviet jet fighter, about eleven meters long, parked nose-high on tricycle gear. The whole nose is a round open air intake; a bubble canopy sits close behind it over a slim barrel fuselage that tapers straight to a single exhaust. Mid-set wings sweep back hard wearing low fences across their. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 429f7d8e-e787-4a44-af57-183c6e6aa3e0",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

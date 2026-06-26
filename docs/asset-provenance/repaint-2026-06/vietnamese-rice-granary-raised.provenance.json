@@ -1,0 +1,16 @@
+{
+  "slug": "vietnamese-rice-granary-raised",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/vietnamese-rice-granary-raised.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.194Z",
+  "sourcePrompt": "A Vietnamese rice granary raised on stilts, a small square store about three meters on a side, lifted a full meter off the ground on four stout flared posts that keep rodents and floodwater out. Woven bamboo walls bulge slightly between corner posts, a steep thatched roof caps it, and a short ladder leans up to one small square door. Bamboo. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 2919f896-670d-41f6-b714-5e349de5036f",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "king-cobra-reared-strike",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/king-cobra-reared-strike.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.731Z",
+  "sourcePrompt": "A king cobra reared to strike, the front third of a three-meter body raised vertically about a meter off the ground. The neck spreads into a broad flattened hood below a level, forward-fixed head, while the remaining body pools behind in two settled coils. Dark olive-brown scales with faint pale chevron bands, the belly paler. Poised, taut and dangerous. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 5f303b06-a0fd-4e2a-8617-2b53671f8813",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

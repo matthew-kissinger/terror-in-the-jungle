@@ -1,0 +1,16 @@
+{
+  "slug": "m1911a1-colt",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m1911a1-colt.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.685Z",
+  "sourcePrompt": "An M1911A1 Colt .45 pistol, the US officer sidearm, about twenty-five centimeters long. A compact semi-automatic handgun with a slab-sided slide over a short barrel, a hammer at the rear, a curved grip with checkered walnut panels raked back from the trigger guard, and a flat single-stack magazine base at the heel. Blued and parkerized steel, classic. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 5d34e9e2-4e54-4bd8-8d34-fba5e7bf6378",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

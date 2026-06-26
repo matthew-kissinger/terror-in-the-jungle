@@ -69,6 +69,14 @@ export interface StaticImpostorTextureProvider {
 export interface StaticImpostorSystemOptions {
   textureProvider?: StaticImpostorTextureProvider;
   batchCapacity?: number;
+  /**
+   * Extra archetypes keyed by modelPath, resolved BEFORE the global
+   * STATIC_IMPOSTOR_ARCHETYPES registry. Lets a dedicated instance (e.g. the
+   * vegetation-owned scatterer) register impostors for archetypes that should
+   * NOT pollute the global registry — keeping authored-asset gates and the
+   * world-feature path untouched. See docs/rearch/VEGETATION_PHASE_II_*.
+   */
+  archetypes?: Readonly<Record<string, StaticImpostorArchetype>>;
 }
 
 class ThreeStaticImpostorTextureProvider implements StaticImpostorTextureProvider {
@@ -282,6 +290,7 @@ class StaticImpostorBatch {
 export class StaticImpostorSystem {
   private readonly textureProvider: StaticImpostorTextureProvider;
   private readonly batchCapacity: number;
+  private readonly archetypeOverrides: Readonly<Record<string, StaticImpostorArchetype>>;
   private readonly instances = new Map<string, RegisteredStaticImpostorInstance>();
   private readonly atlasRecords = new Map<string, StaticImpostorAtlasRecord>();
   private readonly batches = new Map<string, StaticImpostorBatch>();
@@ -293,6 +302,11 @@ export class StaticImpostorSystem {
   ) {
     this.textureProvider = options.textureProvider ?? new ThreeStaticImpostorTextureProvider();
     this.batchCapacity = options.batchCapacity ?? DEFAULT_BATCH_CAPACITY;
+    this.archetypeOverrides = options.archetypes ?? {};
+  }
+
+  private resolveArchetype(modelPath: string): StaticImpostorArchetype | undefined {
+    return this.archetypeOverrides[modelPath] ?? getStaticImpostorArchetype(modelPath);
   }
 
   registerInstance(params: {
@@ -300,7 +314,7 @@ export class StaticImpostorSystem {
     modelPath: string;
     object: THREE.Object3D;
   }): boolean {
-    const archetype = getStaticImpostorArchetype(params.modelPath);
+    const archetype = this.resolveArchetype(params.modelPath);
     if (!archetype || !isStaticObjectSafeForImpostor(params.object)) {
       return false;
     }

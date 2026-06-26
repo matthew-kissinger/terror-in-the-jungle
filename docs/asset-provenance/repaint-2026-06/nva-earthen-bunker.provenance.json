@@ -1,0 +1,16 @@
+{
+  "slug": "nva-earthen-bunker",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/nva-earthen-bunker.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.141Z",
+  "sourcePrompt": "An NVA earthen bunker, a buried timber-and-earth strongpoint about five meters across that barely rises a meter above grade. A low rounded mound of packed earth over a log roof, a wide dark horizontal firing slit facing front between timber lintels, and a small log-framed crawl entrance at the rear flanked by a few sandbags. Raw earth, rough. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 419a723d-7052-41c1-901c-6d68b9d55e63",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

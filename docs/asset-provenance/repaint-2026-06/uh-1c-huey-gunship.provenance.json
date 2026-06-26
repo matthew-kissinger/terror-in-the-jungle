@@ -1,0 +1,29 @@
+{
+  "slug": "uh-1c-huey-gunship",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/uh-1c-huey-gunship.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.585Z",
+  "sourcePrompt": "A UH-1C Huey gunship, the armed Vietnam Huey, parked on its skids - the same thirteen-meter rounded-cockpit fuselage and long tapering tail boom as the transport, but bristling. Short stub pylons jut from the cabin sides carrying cylindrical rocket pods, flexible machine guns hang at the open doors, and the two-bladed main rotor. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 1e6bf3f5-4364-4c40-989a-b81bd343623e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 10
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 5
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

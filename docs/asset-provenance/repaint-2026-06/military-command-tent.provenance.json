@@ -1,0 +1,18 @@
+{
+  "slug": "military-command-tent",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/military-command-tent.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.893Z",
+  "sourcePrompt": "A military command tent, a large ridge-line canvas field tent about six meters long. A taut canvas roof peaks along a central ridge pole and breaks to sloping side walls, guy ropes stake out from the eaves all around, and the entrance flaps at one gable end are rolled open. Olive-drab canvas with visible seams, taut and field-grade. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 0738ca56-522f-4f04-b8df-09524135325e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3588 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -534,7 +534,9 @@ describe('WeaponAnimations', () => {
 
     it('getADSPosition() returns correct values', () => {
       const pos = animations.getADSPosition()
-      expect(pos).toEqual({ x: 0.0, y: -0.18, z: -0.55 })
+      // y lowered from -0.18 -> -0.44 so the sight line drops onto the center
+      // crosshair (screenshot-validated; previously the gun sat above it).
+      expect(pos).toEqual({ x: 0.0, y: -0.44, z: -0.55 })
     })
   })
 

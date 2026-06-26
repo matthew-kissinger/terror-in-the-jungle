@@ -1,0 +1,16 @@
+{
+  "slug": "m113-armored-personnel-carrier",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/m113-armored-personnel-carrier.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.460Z",
+  "sourcePrompt": "An M113 armored personnel carrier, about five meters long, flat and boxy on its tracks. A slab-sided aluminum hull with a steeply sloped bow plate, a flat roof carrying a small commander's cupola with a .50 caliber machine gun, a tall flat rear panel hiding the drop ramp, and tracks running over five evenly spaced road wheels per. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 936b6ac9-1c8f-47ed-acab-7b5f77357ff0",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

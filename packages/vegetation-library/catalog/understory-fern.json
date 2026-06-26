@@ -1,0 +1,53 @@
+{
+  "id": "understory-fern",
+  "commonName": "Understory fern (M02P)",
+  "species": "tropical fern",
+  "tags": ["groundcover", "fern", "understory", "jungle"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "mozzarellaARC",
+    "url": "https://sketchfab.com/3d-models/tropical-plants-pack-m02p",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 1152,
+    "notes": "Extracted from Tropical Plants Pack M02P (SM_MZRa_Fern_B0512 low-poly variant; 1.1k tris vs the 3-10k duplicates). Subtree pruned, world transform baked, normalized to ground-center pivot. Single material, 1 texture webp-compressed. Distinct from the CC0 Poly Haven 'fern' asset. Credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-fern",
+      "role": "instanced",
+      "path": "understory-fern/understory-fern.glb",
+      "tris": 1152,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 0.34, 0], "size": [1.78, 0.69, 1.75], "radius": 1.3 },
+      "budget": { "trisPerInstance": 1152, "drawCallsPerBatch": 1, "textureMb": 3.0 }
+    },
+    {
+      "kind": "groundCard",
+      "id": "card-fern",
+      "baseColorPath": "understory-fern/card/atlas.base-color.png",
+      "normalPath": "understory-fern/card/atlas.normal.png",
+      "worldSize": [2.498, 0.688],
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 0.6 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+card-far",
+    "rationale": "A low-lying fern reads as real fronds up close (single-material 1.1k mesh) but is indistinguishable from a single alpha card past ~14m, so the far band is a baked ground card. Culls before any impostor range.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 14, "representationId": "mesh-fern", "budget": { "trisPerInstance": 1152, "drawCallsPerBatch": 1 } },
+      { "minDistanceMeters": 14, "maxDistanceMeters": 40, "representationId": "card-fern", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 40m." }
+    ]
+  },
+  "ecology": {
+    "tier": "groundCover",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.6,
+    "slopeRangeDeg": [0, 28],
+    "cluster": { "min": 3, "max": 10, "radiusMeters": 3 }
+  }
+}

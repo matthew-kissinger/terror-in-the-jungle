@@ -1,0 +1,29 @@
+{
+  "slug": "ch-47-chinook-heavy",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/ch-47-chinook-heavy.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.430Z",
+  "sourcePrompt": "A CH-47 Chinook heavy-lift helicopter, about sixteen meters of fat straight fuselage with no tail rotor at all - its silhouette is the two tall rotor pylons, one at the nose and a taller one at the tail, carrying huge overlapping three-bladed rotors. Long sponsons run low along each side housing fuel and the four-wheel landing. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation b42a06b1-9903-4d27-b612-2dbc4bd6d02e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_FrontRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 7
+    },
+    {
+      "name": "Joint_RearRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 7
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

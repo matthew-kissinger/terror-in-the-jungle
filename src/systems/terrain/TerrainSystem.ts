@@ -169,7 +169,7 @@ export class TerrainSystem implements GameSystem {
     const losAccelerator = new LOSAccelerator();
     this.raycastRuntime = new TerrainRaycastRuntime(losAccelerator);
     this.terrainQueries = new TerrainQueries(losAccelerator);
-    this.vegetationRuntime = new TerrainVegetationRuntime(globalBillboardSystem, this.config.vegetationCellSize);
+    this.vegetationRuntime = new TerrainVegetationRuntime(globalBillboardSystem, this.config.vegetationCellSize, scene, camera);
     this.vegetationRuntime.setWorldBounds(worldSize, this.config.visualMargin);
     this.workerPool = new TerrainWorkerPool();
     this.streamingScheduler = new TerrainStreamingScheduler();
@@ -247,6 +247,7 @@ export class TerrainSystem implements GameSystem {
         pendingUnits: result.pendingUnits,
       };
     });
+    this.vegetationRuntime.update(deltaTime); // hero impostor LOD swap: every frame, off the streaming budget
 
     // Stagger collision rebuild: skip on frames where vegetation did work
     // to avoid compounding expensive terrain operations in the same frame.

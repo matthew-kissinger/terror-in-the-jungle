@@ -1,0 +1,11 @@
+{
+  "slug": "ez-tree",
+  "provider": "dgreenheck (eztree.dev generator)",
+  "sourceUrl": "https://eztree.dev",
+  "license": "MIT",
+  "sourceTriangles": null,
+  "status": "normalized",
+  "localPath": "public/assets/vegetation/{teak-a,teak-b,rubber-a,rubber-b}/",
+  "attributionRequired": false,
+  "notes": "Tier 1 #2 — generator (@dgreenheck/ez-tree@1.1.0, headless via jsdom+three GLTFExporter). Generated 2 teak (Oak/Ash Large bases, seeds 50231/60412; tall straight bole + broad crown) + 2 rubber (Ash/Oak Large, seeds 70513/80614; slender taller bole + smaller crown) variants. LOD0 tris: teak-a/teak-b/rubber-a 9522, rubber-b 8962 (all <=10k). NATIVE EZ-Tree oak bark (color/normal/roughness) + oak/ash leaf textures bound (alphaClip) — NOT FAL bark/leaf. Each scaled from ~native 70-80m to 19-22m, ground-center pivot, written to public/assets/vegetation/<id>/<id>.glb. Bound textures at public/assets/vegetation/textures/eztree-*. EZ-Tree MIT (no attribution obligation). Source GLB export not committed; generation script lives in the cycle scratchpad."
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "m79-thumper-40mm-grenade",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m79-thumper-40mm-grenade.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.715Z",
+  "sourcePrompt": "An M79 \"Thumper\" 40mm grenade launcher, a stubby single-shot weapon about seventy centimeters long, like an oversized sawn-off shotgun. A short fat smoothbore barrel, hinged open-and-shut at a wide break-action breech, a wooden fore-end under the barrel, a wooden shoulder stock, and a tall flip-up leaf sight near the breech. Walnut wood and dark blued. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 78c00daf-02be-428b-874c-794dd1a28092",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

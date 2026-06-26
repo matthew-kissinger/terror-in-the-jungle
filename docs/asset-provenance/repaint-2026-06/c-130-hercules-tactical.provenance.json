@@ -1,0 +1,16 @@
+{
+  "slug": "c-130-hercules-tactical",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/c-130-hercules-tactical.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.423Z",
+  "sourcePrompt": "A C-130 Hercules tactical transport, about thirty meters long, squatting low on stubby gear housed in fuselage sponsons. A fat round-nosed fuselage rides under a high straight wing carrying four turboprops with broad propellers; the rear fuselage sweeps up over a full-width cargo ramp, and a tall slab tail fin rises above it.. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 7d977b0d-02a8-4cc1-8b2a-66fbb514fdc6",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}
