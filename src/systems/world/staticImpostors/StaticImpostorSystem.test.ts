@@ -15,7 +15,7 @@ import {
 } from './StaticImpostorMaterial';
 import type { StaticImpostorArchetype } from '../../../config/staticImpostorArchetypes';
 import { Logger } from '../../../utils/Logger';
-import { LightingRigConfig } from '../../environment/LightingRig';
+import { LightingRigConfig, lightingRigBindings } from '../../environment/LightingRig';
 
 function makeAtlas(): LoadedStaticImpostorAtlas {
   return {
@@ -382,6 +382,34 @@ describe('StaticImpostorSystem', () => {
       system.update(0.016);
       expect(material.uniforms.fogEnabled.value).toBe(false);
     } finally {
+      LightingRigConfig.enabled = previousRigState;
+    }
+  });
+
+  it('compresses rig fog color for static alpha impostors before manual fog mixing', async () => {
+    const previousRigState = LightingRigConfig.enabled;
+    const previousFogColor = lightingRigBindings.fogColor.value.clone();
+    LightingRigConfig.enabled = true;
+    lightingRigBindings.fogColor.value.setRGB(2.36, 2.66, 2.82);
+    try {
+      const provider = makeProvider();
+      scene.fog = new THREE.FogExp2(0x123456, 0.00055);
+      const system = new StaticImpostorSystem(scene, camera, { textureProvider: provider });
+      const object = makeStaticObject(new THREE.Vector3(220, 0, 0));
+      scene.add(object);
+
+      system.registerInstance({ id: 'rig_fogged_static', modelPath: StructureModels.FUEL_DRUM, object });
+      await flushPromises();
+      system.update(0.016);
+
+      const material = getBatchMaterial(scene);
+      expect(material.uniforms.fogColor.value.b).toBeCloseTo(0.74, 2);
+      expect(material.uniforms.fogColor.value.r).toBeLessThan(0.74);
+      expect(material.uniforms.fogColor.value.g).toBeLessThan(0.74);
+      expect(material.uniforms.fogColor.value.r / material.uniforms.fogColor.value.b)
+        .toBeCloseTo(2.36 / 2.82, 2);
+    } finally {
+      lightingRigBindings.fogColor.value.copy(previousFogColor);
       LightingRigConfig.enabled = previousRigState;
     }
   });

@@ -15,6 +15,7 @@ import {
 const STATIC_IMPOSTOR_PERF_CATEGORY = 'world_static_impostors';
 const DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY = 0.00055;
 const MAX_STATIC_IMPOSTOR_FOG_DENSITY = 0.002;
+const STATIC_IMPOSTOR_FOG_MAX_COMPONENT = 0.74;
 
 const clampNumber = (value: number, min: number, max: number): number => (
   Math.min(max, Math.max(min, value))
@@ -276,8 +277,10 @@ export class StaticImpostorBatch {
     const fog = this.scene.fog;
     if (fog && 'density' in fog) {
       this.material.uniforms.fogEnabled.value = true;
-      const fogColor = isLightingRigEnabled() ? lightingRigBindings.fogColor.value : fog.color;
-      this.material.uniforms.fogColor.value.copy(fogColor);
+      copyStaticImpostorFogColor(
+        isLightingRigEnabled() ? lightingRigBindings.fogColor.value : fog.color,
+        this.material.uniforms.fogColor.value,
+      );
       this.material.uniforms.fogDensity.value = clampNumber(
         Number.isFinite(fog.density) ? fog.density : DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY,
         0,
@@ -288,4 +291,15 @@ export class StaticImpostorBatch {
       this.material.uniforms.fogDensity.value = DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY;
     }
   }
+}
+
+function copyStaticImpostorFogColor(source: THREE.Color, target: THREE.Color): void {
+  target.copy(source);
+  const peak = Math.max(target.r, target.g, target.b);
+  if (peak > STATIC_IMPOSTOR_FOG_MAX_COMPONENT && peak > 1e-6) {
+    target.multiplyScalar(STATIC_IMPOSTOR_FOG_MAX_COMPONENT / peak);
+  }
+  target.r = clampNumber(target.r, 0, STATIC_IMPOSTOR_FOG_MAX_COMPONENT);
+  target.g = clampNumber(target.g, 0, STATIC_IMPOSTOR_FOG_MAX_COMPONENT);
+  target.b = clampNumber(target.b, 0, STATIC_IMPOSTOR_FOG_MAX_COMPONENT);
 }

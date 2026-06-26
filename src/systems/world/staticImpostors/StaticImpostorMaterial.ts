@@ -8,6 +8,7 @@ import {
   atan,
   cameraPosition,
   clamp as tslClamp,
+  cross,
   exp,
   float,
   floor,
@@ -98,6 +99,7 @@ const tslVec3 = (...args: TslNode[]): TslNode => (vec3 as (...values: TslNode[])
 const tslReference = (type: string, uniform: StaticImpostorMaterialUniform<unknown>): TslNode => (
   reference('value', type, uniform) as TslNode
 );
+const tslCross = (...args: TslNode[]): TslNode => (cross as (...values: TslNode[]) => TslNode)(...args);
 const tslMix = (...args: TslNode[]): TslNode => (mix as (...values: TslNode[]) => TslNode)(...args);
 const tslSelect = (...args: TslNode[]): TslNode => (select as (...values: TslNode[]) => TslNode)(...args);
 const tslTexture = (source: THREE.Texture, sampleUv: TslNode): TslNode => texture(source, sampleUv) as TslNode;
@@ -193,7 +195,7 @@ export function createStaticImpostorNodeMaterial(
     smoothstep(alphaCutoff, tslFloat(0.65), color.a),
   );
   const visibleAlpha = hardenedAlpha.mul(tslClamp(instanceOpacity, tslFloat(0), tslFloat(1)));
-  const normal = atlas.normal.rgb.mul(2).sub(1).normalize();
+  const normal = createStaticImpostorCaptureViewNormalNode(atlas.normal.rgb, instancePosition);
   const baseColor = archetype.lightingProfile === 'foliage-card'
     ? createStaticImpostorFoliageColorNode(color.rgb)
     : color.rgb;
@@ -297,6 +299,29 @@ function atlasUv(localUv: TslNode, tileX: TslNode, tileY: TslNode, invTiles: Tsl
   );
 }
 
+function createStaticImpostorCaptureViewNormalNode(normalColor: TslNode, instancePosition: TslNode): TslNode {
+  const captureNormal = normalColor.mul(2).sub(1).normalize();
+  const toCamera = cameraPosition.sub(instancePosition);
+  const viewDistance = tslMax(length(toCamera), tslFloat(0.001));
+  const forward = toCamera.div(viewDistance);
+  const flatToCamera = tslVec3(toCamera.x, 0, toCamera.z);
+  const flatDistance = length(flatToCamera);
+  const flatBlend = smoothstep(tslFloat(0.05), tslFloat(0.3), flatDistance);
+  const flatForward = tslMix(
+    tslVec3(1, 0, 0),
+    flatToCamera.div(tslMax(flatDistance, tslFloat(0.001))),
+    flatBlend,
+  );
+  const right = tslVec3(flatForward.z, 0, flatForward.x.negate()).normalize();
+  const captureUp = tslCross(forward, right).normalize();
+
+  return right
+    .mul(captureNormal.x)
+    .add(captureUp.mul(captureNormal.y))
+    .add(forward.mul(captureNormal.z))
+    .normalize();
+}
+
 function createStaticImpostorLightingNode(
   baseColor: TslNode,
   normal: TslNode,
@@ -348,13 +373,12 @@ function createStaticImpostorFoliageLightingNode(baseColor: TslNode, normal: Tsl
   const rigExposure = tslReference('float', lightingRigBindings.exposure);
   const rigSunElevationSin = tslReference('float', lightingRigBindings.sunElevationSin);
 
-  // Vegetation hero impostors have baked normal atlases. Preserve crown/trunk
-  // shape detail while keeping the accepted foliage low-sun damping so they do
-  // not over-catch warm horizon light like hard surface-normal props.
+  // Vegetation hero impostors are baked from real GLBs, not hand-authored flat
+  // foliage cards. Use source-like clamped direct light against the transformed
+  // capture normal; the billboard wrap term over-lifts backfaces and recreates
+  // the pale LOD snap this path is meant to avoid.
   const cardNormal = normal;
-  const wrap = tslFloat(RIG_WRAP);
-  const nl = tslMax(cardNormal.dot(rigSunDir), wrap.negate());
-  const diffuse = nl.add(wrap).div(tslFloat(1).add(wrap));
+  const diffuse = tslMax(cardNormal.dot(rigSunDir), tslFloat(0));
   const hemiWeight = tslFloat(0.5).add(
     cardNormal.y.mul(tslFloat(RIG_HEMI_UP_SKY_WEIGHT - 0.5)),
   );

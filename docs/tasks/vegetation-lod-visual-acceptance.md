@@ -1,6 +1,6 @@
 # Vegetation LOD Visual Acceptance
 
-Status: candidate branch, owner acceptance pending.
+Status: candidate branch, owner acceptance pending, not deployed.
 
 Goal: make vegetation far representations match their GLB/source assets across
 lighting, fog, and LOD snap distances before production deploy.
@@ -15,6 +15,14 @@ lighting, fog, and LOD snap distances before production deploy.
   reduce mip/filter dark-edge contamination.
 - Static vegetation impostor atlases were rebaked from source GLBs after fixing
   the baker to preserve vertex colors in the base-color pass.
+- Static vegetation impostor normal atlases are now treated as capture/view-space
+  normals from the bake and transformed into the runtime camera/world lighting
+  basis before sun and hemisphere lighting are evaluated.
+- Static alpha impostors compress high-radiance lighting-rig fog colors before
+  manual fog mixing, preserving fog hue without washing cards toward white in
+  Open Frontier daylight.
+- GLB-backed vegetation impostors use a source-like clamped direct-light term
+  instead of the wrapped billboard foliage term that over-lifted backfaces.
 - Vegetation-owned hero impostors now use a mesh-to-impostor crossfade band at
   the LOD boundary, so the source GLB and far card overlap during promotion and
   demotion instead of hard-snapping visibility in one frame.
@@ -58,6 +66,15 @@ npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes 
 
 Latest useful candidate artifacts:
 
+- `artifacts/perf/2026-06-26T19-50-19-966Z/scene-parity/scene-parity.md`
+  - dirty-source Open Frontier + A Shau strict-WebGPU focused scene pass after
+    capture-normal transform, fog compression, and source-like direct lighting
+  - Open Frontier static impostor fog is compressed from the rig color to
+    `rgb(0.620, 0.700, 0.740)` before manual card fog mixing
+  - still `warn` only because finite-edge evidence is screenshot-review based
+- `artifacts/vegetation-lod-review/2026-06-26T19-49-13-051Z`
+  - focused bamboo-grove + fan-palm daylight / humid-fog matrix after the same
+    normal, fog, and direct-light candidate changes
 - `artifacts/vegetation-lod-review/2026-06-26T18-12-44-039Z`
   - clean-head full-catalog matrix for `cfa260aa481b17ae84c8190ac738c8a0ef0fad94`
   - `summary.json` records `sourceGitStatus: []`
