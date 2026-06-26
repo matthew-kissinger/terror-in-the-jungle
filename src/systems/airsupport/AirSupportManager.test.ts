@@ -31,6 +31,7 @@ vi.mock('../assets/modelPaths', () => ({
     AH1_COBRA: 'vehicles/aircraft/ah1-cobra.glb',
     A1_SKYRAIDER: 'vehicles/aircraft/a1-skyraider.glb',
     B52_STRATOFORTRESS: 'vehicles/aircraft/b52-stratofortress.glb',
+    B_52D_STRATOFORTRESS_STRATEGIC: 'vehicles/aircraft/kiln-war-2026-06/b-52d-stratofortress-strategic.glb',
   },
   // FixedWingConfigs reads the catalog at module-init for prop joints + dims.
   warAssetCatalog: {
@@ -244,6 +245,7 @@ describe('AirSupportManager', () => {
       expect(arclight.cooldown).toBeGreaterThan(config.cooldown);
       expect(arclight.altitude).toBeGreaterThan(config.altitude);
     }
-    expect(arclight.modelKey).toBe('B52_STRATOFORTRESS');
+    // Repointed to the Kiln B-52D by default (scale-corrected at the importer).
+    expect(arclight.modelKey).toBe('B_52D_STRATOFORTRESS_STRATEGIC');
   });
 });

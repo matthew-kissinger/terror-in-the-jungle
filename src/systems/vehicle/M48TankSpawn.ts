@@ -226,35 +226,17 @@ export const M48_SCENARIO_SPAWNS: Record<'open_frontier' | 'a_shau_valley', M48S
 export type M48ScenarioMode = keyof typeof M48_SCENARIO_SPAWNS;
 
 /**
- * Full per-mode tank fleet. Keeps `M48_SCENARIO_SPAWNS` as the legacy
- * primary-US lookup while the scenario spawn path fields both factions.
+ * Full per-mode tank fleet. The US fields the M48 in each large scenario; the
+ * NVA armor is the period-correct T-54 (`T54TankSpawn.T54_SCENARIO_SPAWN_GROUPS`),
+ * spawned at the OPFOR anchors this table used to field NVA Pattons at — so a
+ * single tank sits at each anchor with no NVA M48 / T-54 overlap.
  */
 export const M48_SCENARIO_SPAWN_GROUPS: Record<M48ScenarioMode, readonly M48ScenarioSpawnDefinition[]> = {
   open_frontier: [
     M48_SCENARIO_SPAWNS.open_frontier,
-    {
-      vehicleId: 'm48_tank_of_nva_main_hq',
-      position: new THREE.Vector3(
-        M48_SPAWN_OFFSETS.open_frontier_opfor.x,
-        0,
-        M48_SPAWN_OFFSETS.open_frontier_opfor.z,
-      ),
-      faction: Faction.NVA,
-      initialYaw: M48_SPAWN_OFFSETS.open_frontier_opfor.yaw,
-    },
   ],
   a_shau_valley: [
     M48_SCENARIO_SPAWNS.a_shau_valley,
-    {
-      vehicleId: 'm48_tank_ashau_nva_dongso',
-      position: new THREE.Vector3(
-        M48_SPAWN_OFFSETS.a_shau_valley_opfor.x,
-        0,
-        M48_SPAWN_OFFSETS.a_shau_valley_opfor.z,
-      ),
-      faction: Faction.NVA,
-      initialYaw: M48_SPAWN_OFFSETS.a_shau_valley_opfor.yaw,
-    },
   ],
 };
 

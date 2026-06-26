@@ -18,6 +18,10 @@ import {
   type M48ScenarioMode,
 } from './M48TankSpawn';
 import {
+  spawnScenarioT54Tanks,
+  type T54ScenarioMode,
+} from './T54TankSpawn';
+import {
   spawnScenarioM151Jeeps,
   type M151ScenarioMode,
 } from './M151JeepSpawn';
@@ -224,6 +228,36 @@ export class VehicleManager implements GameSystem {
     resolvePosition?: (mode: M48ScenarioMode, base: THREE.Vector3) => THREE.Vector3;
   }): string[] {
     const spawned = spawnScenarioM48Tanks({
+      modes: args.modes,
+      scene: args.scene,
+      vehicleManager: this,
+      resolvePosition: args.resolvePosition,
+    });
+    return spawned.map(s => s.vehicleId);
+  }
+
+  /**
+   * Scenario-time spawn entry for the NVA T-54 tanks (Open Frontier NVA
+   * Main HQ + A Shau Dong So NVA Trail Base). The faction-flipped sibling of
+   * `spawnScenarioM48Tanks`: each spawn registers a `Tank` (NVA) with this
+   * manager, and the operational runtime composer wires the runtime terrain
+   * provider immediately after spawn so the chassis rests on terrain from
+   * frame 0. The `getTankByOccupant` resolver, player tank adapter, and NPC
+   * gunner route are all generic over `Tank`, so the NVA T-54 inherits the
+   * full drive + cannon path the M48 already has.
+   *
+   * `resolvePosition` mirrors the M48 spawn callback — typically a
+   * terrain-snap closure.
+   *
+   * Returns the registered vehicle ids so the composer / scenario runtime
+   * can tear them down on mode switch.
+   */
+  spawnScenarioT54Tanks(args: {
+    scene: THREE.Scene;
+    modes: T54ScenarioMode[];
+    resolvePosition?: (mode: T54ScenarioMode, base: THREE.Vector3) => THREE.Vector3;
+  }): string[] {
+    const spawned = spawnScenarioT54Tanks({
       modes: args.modes,
       scene: args.scene,
       vehicleManager: this,

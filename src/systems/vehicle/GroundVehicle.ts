@@ -99,27 +99,33 @@ interface GroundVehicleRuntimeProfile {
   maxHp: number;
 }
 
+// Legacy + Kiln (kiln-war-2026-06) art paths share one runtime profile per
+// vehicle, so the placement promotes whichever path the ?vehicleArt flag
+// resolves to (kiln in browser, legacy in node/SSR + when opted out).
+const M35_TRUCK_PROFILE: GroundVehicleRuntimeProfile = {
+  seats: M35_TRUCK_SEATS,
+  physicsConfig: M35_PHYSICS_CONFIG,
+  maxHp: 420,
+};
+const M113_APC_PROFILE: GroundVehicleRuntimeProfile = {
+  seats: APC_SEATS,
+  physicsConfig: APC_PHYSICS_CONFIG,
+  maxHp: 650,
+};
+
 const GROUND_VEHICLE_RUNTIME_PROFILES: Record<string, GroundVehicleRuntimeProfile> = {
   [GroundVehicleModels.M151_JEEP]: {
     seats: DEFAULT_M151_SEATS,
     physicsConfig: M151_PHYSICS_CONFIG,
     maxHp: M151_MAX_HP,
   },
-  [GroundVehicleModels.M35_TRUCK]: {
-    seats: M35_TRUCK_SEATS,
-    physicsConfig: M35_PHYSICS_CONFIG,
-    maxHp: 420,
-  },
-  [GroundVehicleModels.ZIL_157]: {
-    seats: M35_TRUCK_SEATS,
-    physicsConfig: M35_PHYSICS_CONFIG,
-    maxHp: 420,
-  },
-  [GroundVehicleModels.M113_APC]: {
-    seats: APC_SEATS,
-    physicsConfig: APC_PHYSICS_CONFIG,
-    maxHp: 650,
-  },
+  [GroundVehicleModels.M35_TRUCK]: M35_TRUCK_PROFILE,
+  [GroundVehicleModels.M35_DEUCE_A_HALF]: M35_TRUCK_PROFILE,
+  // ZIL-157 reuses the wheeled-truck profile.
+  [GroundVehicleModels.ZIL_157]: M35_TRUCK_PROFILE,
+  [GroundVehicleModels.ZIL_157_SIX_WHEEL]: M35_TRUCK_PROFILE,
+  [GroundVehicleModels.M113_APC]: M113_APC_PROFILE,
+  [GroundVehicleModels.M113_ARMORED_PERSONNEL_CARRIER]: M113_APC_PROFILE,
 };
 
 export function isM151ModelPath(modelPath: string): boolean {

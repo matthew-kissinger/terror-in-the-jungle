@@ -76,6 +76,12 @@ function resolveVehicleDisplayName(vehicle: IVehicle): string {
   if (id.startsWith('m48_') || id.includes('_m48_')) {
     return 'M48 Patton tank';
   }
+  // T-54 ids (`t54_tank_of_nva_main_hq`, `t54_tank_ashau_nva_dongso`) share the
+  // `ground` category with the M151 jeep, so match the token before the generic
+  // ground fall-through below mislabels them as "M151 Jeep".
+  if (id.startsWith('t54_') || id.includes('_t54_') || id.includes('t-54')) {
+    return 'T-54 Tank';
+  }
   if (id.includes('m35')) {
     return 'M35 cargo truck';
   }

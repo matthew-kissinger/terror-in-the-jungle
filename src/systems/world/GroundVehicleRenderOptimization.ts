@@ -12,9 +12,14 @@ const GROUND_VEHICLE_OPTIMIZED_RESOURCE_KEY = 'groundVehicleOptimizedGeneratedRe
 const GROUND_VEHICLE_RENDER_RADIUS_KEY = 'groundVehicleRenderCullRadius';
 const OPTIMIZABLE_DYNAMIC_GROUND_VEHICLES = new Set<string>([
   GroundVehicleModels.M151_JEEP,
+  // Legacy + Kiln (kiln-war-2026-06) art paths both optimize — the placement
+  // resolves to whichever the ?vehicleArt flag selects.
   GroundVehicleModels.M35_TRUCK,
+  GroundVehicleModels.M35_DEUCE_A_HALF,
   GroundVehicleModels.M113_APC,
+  GroundVehicleModels.M113_ARMORED_PERSONNEL_CARRIER,
   GroundVehicleModels.ZIL_157,
+  GroundVehicleModels.ZIL_157_SIX_WHEEL,
 ]);
 const _bounds = new THREE.Box3();
 const _size = new THREE.Vector3();

@@ -35,9 +35,10 @@ export interface AircraftWeaponMount {
    * the airframe rather than floating inside the hull. Source dims (model axes
    * [w, h, length], `warAssetCatalog`):
    *
-   *  - UH-1C gunship door gun is banded to the LEGACY repaint hull
-   *    [3.71, 3.96, 13.86]: the UH-1C is HELD on legacy art (its Kiln GLB is
-   *    half-scale), so its mount stays tuned to the legacy width.
+   *  - UH-1C gunship door gun: the UH-1C now ships Kiln art, corrected to true
+   *    scale (~13.85 m long) at the importer. The cabin half-width is comparable
+   *    to the legacy hull, so the door-gun lateral (~1.8 m) still reads at the
+   *    cabin door rather than the (wide) rotor-span bbox edge.
    *  - AH-1 Cobra is repointed to the Kiln art (kiln-war-2026-06) and its
    *    minigun/rocket mounts are re-banded to the Kiln dims [2.84, 2.95, 13.45]
    *    (narrower + slightly shorter than the legacy [3.74, 3.82, 14.34]). The

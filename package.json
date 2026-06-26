@@ -133,6 +133,7 @@
     "assets:fix-alpha": "npm run check:pixel-forge-cutover",
     "assets:import-pixel-forge-aircraft": "npx tsx scripts/import-pixel-forge-aircraft.ts",
     "assets:import-war-catalog": "npx tsx scripts/import-war-catalog.ts",
+    "assets:scale-fix": "npx tsx scripts/apply-catalog-scale-fix.ts",
     "assets:bake-static-impostors": "npx tsx scripts/bake-static-impostor-atlases.ts",
     "assets:generate-npc-crops": "npx tsx scripts/generate-pixel-forge-npc-tile-crops.ts",
     "ui:matrix": "npx tsx scripts/ui-device-matrix.ts",

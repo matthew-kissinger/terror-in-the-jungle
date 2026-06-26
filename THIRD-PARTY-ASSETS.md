@@ -61,7 +61,8 @@ and the engine-agnostic descriptors in
 - **Bamboo Grove** — author **verify** (from the "free bamboo set"), Sketchfab, **CC BY 4.0**.
   https://sketchfab.com/search?q=bamboo&type=models
   Representative 3-culm clump extracted + re-clustered + uniform-scaled to a realistic
-  ~14m height, normalized (pivot + webp textures) to `public/assets/vegetation/bamboo-grove/`.
+  ~14m height, normalized (pivot + webp textures) to `public/assets/vegetation/bamboo-grove/`
+  (also re-baked as the `bamboo-thicket` ground-card variant for dense high-density placement).
   **Attribution required** — keep this credit while shipped (author handle to be confirmed).
 
 - **Rice Paddy Plant** — author **verify**, Sketchfab, **CC BY 4.0**.
@@ -74,6 +75,12 @@ and the engine-agnostic descriptors in
   Split into four per-species assets (cleanest representative variant each), world-transform
   baked, pivot + webp normalized to `public/assets/vegetation/fan-palm/`, `.../banana-plant/`,
   `.../understory-fern/`, `.../taro-elephant-ear/`.
+  **Attribution required** — keep this credit while shipped.
+
+- **Coconut Palm** — author **Poly by Google**, via poly.pizza, **CC BY 4.0**.
+  https://poly.pizza/m/bXUTyfiwqBb
+  Centered to a ground pivot + webp-compressed (2.38MB -> 329KB) via @gltf-transform to
+  `public/assets/vegetation/coconut-palm/`; a front-view alpha card is baked for the far LOD.
   **Attribution required** — keep this credit while shipped.
 
 - **EZ-Tree hardwoods (teak-a, teak-b, rubber-a, rubber-b)** — generator by
