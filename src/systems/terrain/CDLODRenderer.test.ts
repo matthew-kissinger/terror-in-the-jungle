@@ -75,6 +75,14 @@ vi.mock('three', () => {
 
   class MockMatrix4 {
     elements = new Float32Array(16);
+    identity() {
+      this.elements.fill(0);
+      this.elements[0] = 1;
+      this.elements[5] = 1;
+      this.elements[10] = 1;
+      this.elements[15] = 1;
+      return this;
+    }
     makeScale(sx: number, _sy: number, sz: number) {
       this.elements.fill(0);
       this.elements[0] = sx;
