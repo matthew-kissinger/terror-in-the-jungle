@@ -42,6 +42,8 @@ export interface StaticImpostorBatchDebugInfo {
   transitionFadeMeters: number;
   fogStrength: number;
   foliageExposure: number;
+  foliageColorGamma: number;
+  foliageSaturation: number;
 }
 
 export class StaticImpostorBatch {
@@ -256,6 +258,8 @@ export class StaticImpostorBatch {
       transitionFadeMeters: this.transitionFadeMeters,
       fogStrength: this.material.uniforms.fogStrength.value,
       foliageExposure: this.material.uniforms.foliageExposure.value,
+      foliageColorGamma: this.material.uniforms.foliageColorGamma.value,
+      foliageSaturation: this.material.uniforms.foliageSaturation.value,
     };
   }
 

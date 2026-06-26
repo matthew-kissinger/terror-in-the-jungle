@@ -32,7 +32,6 @@ import type { StaticImpostorArchetype } from '../../../config/staticImpostorArch
 import { lightingRigBindings } from '../../environment/LightingRig';
 import {
   HUMID_JUNGLE_VEGETATION_EXPOSURE,
-  HUMID_JUNGLE_VEGETATION_SATURATION,
   HUMID_JUNGLE_VEGETATION_TINT,
   RIG_HEMI_UP_SKY_WEIGHT,
   RIG_LOW_SUN_FADE_FLOOR,
@@ -60,6 +59,8 @@ interface StaticImpostorMaterialUniforms {
   fogEnabled: StaticImpostorMaterialUniform<boolean>;
   fogStrength: StaticImpostorMaterialUniform<number>;
   foliageExposure: StaticImpostorMaterialUniform<number>;
+  foliageColorGamma: StaticImpostorMaterialUniform<number>;
+  foliageSaturation: StaticImpostorMaterialUniform<number>;
 }
 
 export type StaticImpostorNodeMaterial = MeshBasicNodeMaterial & {
@@ -76,6 +77,8 @@ export interface StaticImpostorMaterialTextures {
 export interface StaticImpostorMaterialTuning {
   readonly fogStrength?: number;
   readonly foliageExposureScale?: number;
+  readonly foliageColorGamma?: number;
+  readonly foliageSaturation?: number;
 }
 
 type TslNode = any;
@@ -88,6 +91,8 @@ const DEFAULT_STATIC_IMPOSTOR_FOG_DENSITY = 0.00055;
 const STATIC_IMPOSTOR_FOG_HEIGHT_FALLOFF = 0.03;
 const STATIC_IMPOSTOR_FOG_START_DISTANCE = 100;
 const STATIC_IMPOSTOR_TILE_UV_MARGIN_PIXELS = 1.5;
+const STATIC_IMPOSTOR_FOLIAGE_COLOR_GAMMA = 1.75;
+const STATIC_IMPOSTOR_FOLIAGE_SATURATION = 1;
 // Hero-tree impostor atlases are baked from full GLBs and read brighter than
 // the legacy hand-authored billboard sheets. Keep the shared foliage tint and
 // rig response, but trim the static hero exposure so LOD snaps do not bloom pale.
@@ -127,6 +132,18 @@ export function createStaticImpostorNodeMaterial(
   configureStaticImpostorTexture(textures.normalMap, THREE.NoColorSpace);
   configureStaticImpostorTexture(textures.depthMap, THREE.NoColorSpace);
   const foliageExposureScale = clampFinite(tuning.foliageExposureScale, 1, 0, 2);
+  const foliageColorGamma = clampFinite(
+    tuning.foliageColorGamma,
+    STATIC_IMPOSTOR_FOLIAGE_COLOR_GAMMA,
+    0.6,
+    2.5,
+  );
+  const foliageSaturation = clampFinite(
+    tuning.foliageSaturation,
+    STATIC_IMPOSTOR_FOLIAGE_SATURATION,
+    0,
+    1.25,
+  );
 
   const uniforms: StaticImpostorMaterialUniforms = {
     baseColorMap: { value: textures.baseColorMap },
@@ -143,6 +160,8 @@ export function createStaticImpostorNodeMaterial(
     fogEnabled: { value: false },
     fogStrength: { value: clampFinite(tuning.fogStrength, 1, 0, 1.5) },
     foliageExposure: { value: STATIC_IMPOSTOR_FOLIAGE_EXPOSURE * foliageExposureScale },
+    foliageColorGamma: { value: foliageColorGamma },
+    foliageSaturation: { value: foliageSaturation },
   };
 
   const material = new MeshBasicNodeMaterial({
@@ -197,7 +216,7 @@ export function createStaticImpostorNodeMaterial(
   const visibleAlpha = hardenedAlpha.mul(tslClamp(instanceOpacity, tslFloat(0), tslFloat(1)));
   const normal = createStaticImpostorCaptureViewNormalNode(atlas.normal.rgb, instancePosition);
   const baseColor = archetype.lightingProfile === 'foliage-card'
-    ? createStaticImpostorFoliageColorNode(color.rgb)
+    ? createStaticImpostorFoliageColorNode(color.rgb, uniforms)
     : color.rgb;
   const litColor = createStaticImpostorLightingNode(baseColor, normal, archetype);
   const cameraDistance = length(cameraPosition.sub(instancePosition));
@@ -351,17 +370,22 @@ function createStaticImpostorLightingNode(
   return mix(tslVec3(luma), pow(lit, tslVec3(tslFloat(0.96))), tslFloat(0.96)) as TslNode;
 }
 
-function createStaticImpostorFoliageColorNode(baseColor: TslNode): TslNode {
+function createStaticImpostorFoliageColorNode(
+  baseColor: TslNode,
+  uniforms: StaticImpostorMaterialUniforms,
+): TslNode {
   const tint = tslVec3(
     tslFloat(HUMID_JUNGLE_VEGETATION_TINT.r),
     tslFloat(HUMID_JUNGLE_VEGETATION_TINT.g),
     tslFloat(HUMID_JUNGLE_VEGETATION_TINT.b),
   );
-  const tinted = baseColor.mul(tint);
+  const colorGamma = tslReference('float', uniforms.foliageColorGamma);
+  const saturation = tslReference('float', uniforms.foliageSaturation);
+  const tinted = pow(baseColor.mul(tint), tslVec3(colorGamma)) as TslNode;
   const luma = tinted.r.mul(STATIC_IMPOSTOR_LUMA.x)
     .add(tinted.g.mul(STATIC_IMPOSTOR_LUMA.y))
     .add(tinted.b.mul(STATIC_IMPOSTOR_LUMA.z));
-  return tslMix(tslVec3(luma), tinted, tslFloat(HUMID_JUNGLE_VEGETATION_SATURATION));
+  return tslMix(tslVec3(luma), tinted, saturation);
 }
 
 function createStaticImpostorFoliageLightingNode(baseColor: TslNode, normal: TslNode): TslNode {

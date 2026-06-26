@@ -116,17 +116,24 @@ function vegetationImpostorReviewOptions(): VegetationImpostorReviewOptions {
     const params = new URLSearchParams(window.location.search);
     const fogStrength = readFiniteQueryNumber(params, 'vegImpostorFogStrength', 0, 1.5);
     const foliageExposureScale = readFiniteQueryNumber(params, 'vegImpostorExposureScale', 0, 2);
+    const foliageColorGamma = readFiniteQueryNumber(params, 'vegImpostorColorGamma', 0.6, 2.5);
+    const foliageSaturation = readFiniteQueryNumber(params, 'vegImpostorSaturation', 0, 1.25);
     const transitionFadeMeters = readFiniteQueryNumber(
       params,
       'vegImpostorTransitionMeters',
       0,
       80,
     ) ?? DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS;
-    const materialTuning = fogStrength === undefined && foliageExposureScale === undefined
+    const materialTuning = fogStrength === undefined
+      && foliageExposureScale === undefined
+      && foliageColorGamma === undefined
+      && foliageSaturation === undefined
       ? undefined
       : {
           ...(fogStrength !== undefined ? { fogStrength } : {}),
           ...(foliageExposureScale !== undefined ? { foliageExposureScale } : {}),
+          ...(foliageColorGamma !== undefined ? { foliageColorGamma } : {}),
+          ...(foliageSaturation !== undefined ? { foliageSaturation } : {}),
         };
     return { materialTuning, transitionFadeMeters };
   } catch {

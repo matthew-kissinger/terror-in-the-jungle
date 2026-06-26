@@ -421,6 +421,8 @@ describe('StaticImpostorSystem', () => {
       materialTuning: {
         fogStrength: 0.62,
         foliageExposureScale: 0.9,
+        foliageColorGamma: 1.45,
+        foliageSaturation: 0.92,
       },
     });
     const object = makeStaticObject(new THREE.Vector3(220, 0, 0));
@@ -433,9 +435,13 @@ describe('StaticImpostorSystem', () => {
     const material = getBatchMaterial(scene);
     expect(material.uniforms.fogStrength.value).toBeCloseTo(0.62);
     expect(material.uniforms.foliageExposure.value).toBeCloseTo(STATIC_IMPOSTOR_FOLIAGE_EXPOSURE * 0.9);
+    expect(material.uniforms.foliageColorGamma.value).toBeCloseTo(1.45);
+    expect(material.uniforms.foliageSaturation.value).toBeCloseTo(0.92);
     expect(system.getDebugInfo().batches['fuel-drum']).toEqual(expect.objectContaining({
       fogStrength: 0.62,
       foliageExposure: material.uniforms.foliageExposure.value,
+      foliageColorGamma: 1.45,
+      foliageSaturation: 0.92,
     }));
   });
 
