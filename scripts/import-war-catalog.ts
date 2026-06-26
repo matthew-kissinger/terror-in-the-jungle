@@ -43,6 +43,7 @@
 
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { CATALOG_SCALE_FIX } from './asset-import/catalog-scale-fix';
 
 const JSON_CHUNK_TYPE = 0x4e4f534a;
 const BIN_CHUNK_TYPE = 0x004e4942;
@@ -892,14 +893,20 @@ function classForward(cls: string): { forward: ForwardAxis; quat: readonly numbe
   return { forward: 'pos-z', quat: X_TO_Z, label: '+X forward -> +Z forward' };
 }
 
-function normalizeAxis(json: GlbJson, quat: readonly number[], note: string): void {
+function normalizeAxis(json: GlbJson, quat: readonly number[], note: string, scale = 1): void {
   json.nodes ??= [];
   json.scenes ??= [{ nodes: [] }];
   for (const scene of json.scenes) {
     const roots = scene.nodes ?? [];
     if (roots.length === 1 && json.nodes[roots[0]]?.name === AXIS_NODE_NAME) continue;
     const wrapperIdx = json.nodes.length;
-    json.nodes.push({ name: AXIS_NODE_NAME, rotation: [...quat], children: [...roots] });
+    const wrapper: GlbNode = { name: AXIS_NODE_NAME, rotation: [...quat], children: [...roots] };
+    // Uniform scale correction for slugs whose Kiln source is scale-defective
+    // (CATALOG_SCALE_FIX). Applied at the wrapper so the whole model scales
+    // about its ground-anchored origin; the measured dims/minY are scaled to
+    // match at the call site, keeping the catalog truthful.
+    if (scale !== 1) wrapper.scale = [scale, scale, scale];
+    json.nodes.push(wrapper);
     scene.nodes = [wrapperIdx];
   }
   json.asset ??= {};
@@ -1247,16 +1254,21 @@ function main(): void {
     // Measure AFTER grafts (node graph changed) but BEFORE the axis wrap, then
     // swap the long axis to reflect the on-disk forward for clarity.
     const bbox = worldBbox(json, bin);
+    // Uniform scale correction for scale-defective Kiln sources (single source
+    // of truth: scripts/asset-import/catalog-scale-fix.ts). Applied to the
+    // measured dims/minY here AND to the axis wrapper below, so the generated
+    // catalog reports the same true-scale geometry that loads at runtime.
+    const scaleFix = CATALOG_SCALE_FIX[asset.slug] ?? 1;
     const dims: Vec3 = [
-      round2(bbox.max[0] - bbox.min[0]),
-      round2(bbox.max[1] - bbox.min[1]),
-      round2(bbox.max[2] - bbox.min[2]),
+      round2((bbox.max[0] - bbox.min[0]) * scaleFix),
+      round2((bbox.max[1] - bbox.min[1]) * scaleFix),
+      round2((bbox.max[2] - bbox.min[2]) * scaleFix),
     ];
-    const minY = round2(bbox.min[1]);
+    const minY = round2(bbox.min[1] * scaleFix);
 
     const triageResult = triage(asset, tris, sizeKB, bbox);
 
-    normalizeAxis(json, quat, label);
+    normalizeAxis(json, quat, label, scaleFix);
 
     const targetGlb = join(root, runtimePath(asset.tijTarget).split('/').reduce((p, s) => join(p, s), join('public', 'models')));
     const weaponNodes = asset.class === 'weapons' ? classifyWeaponNodes(json, asset.slug, taxonomy) : undefined;

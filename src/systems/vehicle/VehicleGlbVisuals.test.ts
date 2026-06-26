@@ -3,10 +3,11 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { applyM151JeepGlbVisual, applyM48TankGlbVisual, vehicleArtMode } from './VehicleGlbVisuals';
+import { applyM151JeepGlbVisual, applyM48TankGlbVisual, applyT54TankGlbVisual, vehicleArtMode } from './VehicleGlbVisuals';
 import type { TurretRigSource, VehicleModelLoader } from './VehicleGlbVisuals';
 import { buildM151JeepMesh } from './M151JeepSpawn';
 import { buildM48ChassisMesh } from './M48TankSpawn';
+import { buildT54ChassisMesh } from './T54TankSpawn';
 
 function loaderResolving(glb: THREE.Group): VehicleModelLoader {
   return { loadModel: () => Promise.resolve(glb) };
@@ -100,6 +101,29 @@ function fakeTurretRig(): { rig: TurretRigSource; yawNode: THREE.Object3D; pitch
     yawNode.add(m);
   }
   for (const name of ['m48_mantlet', 'm48_barrel', 'm48_muzzle_brake']) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    m.name = name;
+    pitchNode.add(m);
+  }
+  const rig: TurretRigSource = {
+    getTurret: () => ({ getYawNode: () => yawNode, getPitchNode: () => pitchNode }),
+  };
+  return { rig, yawNode, pitchNode };
+}
+
+/** Sibling of `fakeTurretRig` with the T-54 procedural mesh-name set. */
+function fakeT54TurretRig(): { rig: TurretRigSource; yawNode: THREE.Object3D; pitchNode: THREE.Object3D } {
+  const yawNode = new THREE.Object3D();
+  yawNode.position.set(0, 1.7, 0);
+  const pitchNode = new THREE.Object3D();
+  pitchNode.position.set(0, 0.45, -0.3);
+  yawNode.add(pitchNode);
+  for (const name of ['t54_turret', 't54_turret_ring', 't54_cupola']) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    m.name = name;
+    yawNode.add(m);
+  }
+  for (const name of ['t54_mantlet', 't54_barrel', 't54_muzzle_brake']) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
     m.name = name;
     pitchNode.add(m);
@@ -397,6 +421,91 @@ describe('applyM48TankGlbVisual', () => {
     const before = root.children.length;
 
     const ok = await applyM48TankGlbVisual(root, rig, failingLoader);
+
+    expect(ok).toBe(false);
+    expect(root.children).toHaveLength(before);
+  });
+});
+
+describe('applyT54TankGlbVisual', () => {
+  it('loads the Kiln T-54 main-battle GLB under kiln art', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const { glb } = fakeM48Glb(); // generic Joint_Turret / Joint_MainGun articulated GLB
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyT54TankGlbVisual(root, rig, loader, 'kiln');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('t-54-main-battle');
+  });
+
+  it('loads the legacy jointless T-54 GLB under legacy art', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const { glb } = fakeM48Glb();
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyT54TankGlbVisual(root, rig, loader, 'legacy');
+
+    expect(ok).toBe(true);
+    // Legacy path is the bare t54-tank.glb, not the kiln main-battle variant.
+    expect(requested[0]).toContain('t54-tank.glb');
+    expect(requested[0]).not.toContain('main-battle');
+  });
+
+  it('splits the GLB across chassis root + turret rig nodes and strips the t54 procedural parts', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeT54TurretRig();
+    const { glb, turret, gun } = fakeM48Glb();
+
+    const ok = await applyT54TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    expect(root.children).toContain(glb);
+    expect(root.children.filter((c) => (c as THREE.Mesh).isMesh)).toHaveLength(0);
+    expect(turret.parent).toBe(yawNode);
+    expect(gun.parent).toBe(pitchNode);
+    expect(yawNode.getObjectByName('t54_turret')).toBeUndefined();
+    expect(pitchNode.getObjectByName('t54_barrel')).toBeUndefined();
+    // T-54-specific draw-call userData keys (proves the spec parameterization).
+    expect(glb.userData.t54HullDrawCallOptimization).toMatchObject({ sourceMeshCount: 2, mergedMeshCount: 1 });
+    expect(turret.userData.t54TurretDrawCallOptimization).toMatchObject({ sourceMeshCount: 2, mergedMeshCount: 1 });
+    expect(gun.userData.t54GunDrawCallOptimization).toMatchObject({ sourceMeshCount: 2, mergedMeshCount: 1 });
+  });
+
+  it('keeps the barrel pointing down-bore after re-seating past the axis wrapper', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const { glb, gun, muzzle } = fakeM48Glb();
+
+    const ok = await applyT54TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    const forward = barrelForward(root, gun, muzzle);
+    expect(forward.dot(new THREE.Vector3(0, 0, -1))).toBeGreaterThan(0.99);
+  });
+
+  it('keeps every procedural mesh when the GLB lacks the turret joints (legacy jointless art)', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeT54TurretRig();
+    const before = root.children.length;
+    const bareGlb = new THREE.Group(); // no Joint_Turret / Joint_MainGun, as t54-tank.glb
+
+    const ok = await applyT54TankGlbVisual(root, rig, loaderResolving(bareGlb));
+
+    expect(ok).toBe(false);
+    expect(root.children).toHaveLength(before);
+    expect(yawNode.getObjectByName('t54_turret')).toBeDefined();
+    expect(pitchNode.getObjectByName('t54_barrel')).toBeDefined();
+  });
+
+  it('keeps the procedural mesh when the load fails', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const before = root.children.length;
+
+    const ok = await applyT54TankGlbVisual(root, rig, failingLoader);
 
     expect(ok).toBe(false);
     expect(root.children).toHaveLength(before);

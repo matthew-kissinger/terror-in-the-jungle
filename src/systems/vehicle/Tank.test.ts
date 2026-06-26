@@ -295,11 +295,12 @@ describe('M48 scenario spawn', () => {
     expect(new Set(allIds).size).toBe(allIds.length);
   });
 
-  it('fields US and NVA M48s in each large scenario mode', () => {
+  it('fields US-only M48s in each large scenario mode (NVA armor is the T-54)', () => {
     for (const defs of Object.values(M48_SCENARIO_SPAWN_GROUPS)) {
-      expect(defs.map(def => def.faction)).toEqual(
-        expect.arrayContaining([Faction.US, Faction.NVA])
-      );
+      expect(defs.length).toBeGreaterThan(0);
+      for (const def of defs) {
+        expect(def.faction).toBe(Faction.US);
+      }
     }
   });
 
@@ -336,10 +337,11 @@ describe('M48 scenario spawn', () => {
       vehicleManager: vm,
     });
 
-    expect(spawned).toHaveLength(4);
+    // One US M48 per mode (the NVA armor is the T-54, spawned separately).
+    expect(spawned).toHaveLength(2);
     // Every scenario tank should be registered as a ground-category vehicle.
     const ground = vm.getVehiclesByCategory('ground');
-    expect(ground).toHaveLength(4);
+    expect(ground).toHaveLength(2);
   });
 
   it('spawns at the table positions when no resolver is supplied', () => {
@@ -358,10 +360,9 @@ describe('M48 scenario spawn', () => {
     expect(ofTank.getPosition().z).toBeCloseTo(M48_SCENARIO_SPAWNS.open_frontier.position.z, 2);
     expect(ashauTank.getPosition().x).toBeCloseTo(M48_SCENARIO_SPAWNS.a_shau_valley.position.x, 2);
     expect(ashauTank.getPosition().z).toBeCloseTo(M48_SCENARIO_SPAWNS.a_shau_valley.position.z, 2);
-    const ofOpforTank = vm.getVehicle('m48_tank_of_nva_main_hq')!;
-    const ashauOpforTank = vm.getVehicle('m48_tank_ashau_nva_dongso')!;
-    expect(ofOpforTank.faction).toBe(Faction.NVA);
-    expect(ashauOpforTank.faction).toBe(Faction.NVA);
+    // The M48 table is US-only now; the NVA Pattons were replaced by T-54s.
+    expect(ofTank.faction).toBe(Faction.US);
+    expect(ashauTank.faction).toBe(Faction.US);
   });
 
   it('honours an optional resolvePosition (terrain-snap callback)', () => {
@@ -675,7 +676,8 @@ describe('VehicleManager.spawnScenarioM48Tanks surface', () => {
       modes: ['open_frontier', 'a_shau_valley'],
     });
 
-    expect(ids).toHaveLength(4);
+    // One US M48 per mode (NVA armor is the T-54, spawned via spawnScenarioT54Tanks).
+    expect(ids).toHaveLength(2);
     for (const id of ids) {
       expect(vm.getVehicle(id)?.category).toBe('ground');
     }

@@ -123,6 +123,7 @@ function createRefs() {
       spawnScenarioM2HBEmplacements: vi.fn(() => ['m2hb_scenario_id']),
       spawnScenarioM151Jeeps: vi.fn(() => ['m151_scenario_id']),
       spawnScenarioM48Tanks: vi.fn(() => ['m48_scenario_id']),
+      spawnScenarioT54Tanks: vi.fn(() => ['t54_scenario_id']),
     },
     warSimulator: {
       setCombatantSystem: vi.fn(),
@@ -308,6 +309,30 @@ describe('OperationalRuntimeComposer', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(setTerrain).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(tank.getPosition().y).toBeGreaterThan(12);
+    expect(tank.getPosition().y).toBeLessThan(13);
+  });
+
+  it('binds spawned T-54 tanks to the runtime terrain provider immediately after spawn', async () => {
+    const { refs, getModeChangedCallback } = createRefs();
+    refs.terrainSystem.getHeightAt = vi.fn(() => 12);
+    const tank = new Tank('t54_scenario_id', new THREE.Group(), Faction.NVA);
+    const setTerrain = vi.spyOn(tank, 'setTerrain');
+    refs.vehicleManager.getVehicle = vi.fn((id: string) => {
+      if (id === 't54_scenario_id') return tank;
+      return null;
+    });
+
+    wireOperationalRuntime(createOperationalRuntimeGroups(refs), { scene: new THREE.Scene() });
+
+    getModeChangedCallback()?.('open_frontier', {});
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(refs.vehicleManager.spawnScenarioT54Tanks).toHaveBeenCalledWith(expect.objectContaining({
+      modes: ['open_frontier'],
+    }));
+    expect(setTerrain).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(tank.faction).toBe(Faction.NVA);
     expect(tank.getPosition().y).toBeGreaterThan(12);
     expect(tank.getPosition().y).toBeLessThan(13);
   });

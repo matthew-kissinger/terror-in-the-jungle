@@ -4,10 +4,21 @@
 import * as THREE from 'three';
 import type { MapFeatureDefinition, StaticModelPlacementConfig } from '../../config/gameModeTypes';
 import { AircraftModels, AnimalModels, BuildingModels, GroundVehicleModels, PropModels, StructureModels } from '../assets/modelPaths';
+import { pickVehicleArt } from '../../config/vehicleArt';
 
 interface WorldFeaturePrefabDefinition {
   placements: StaticModelPlacementConfig[];
 }
+
+// kiln-war-2026-06 art cutover for the placement-promoted ground vehicles. Kiln
+// by default; `?vehicleArt=legacy` reverts (node/SSR resolves legacy, so the
+// prefab tests keep asserting the legacy paths). All three Kiln GLBs measure
+// true-scale + ground-anchored (minY 0), so the generic dynamic-render path
+// needs no per-vehicle scale fudge; GroundVehicle + GroundVehicleRenderOptimization
+// register both art paths so promotion matches whichever resolves.
+const M35_TRUCK_ART = pickVehicleArt(GroundVehicleModels.M35_DEUCE_A_HALF, GroundVehicleModels.M35_TRUCK);
+const M113_APC_ART = pickVehicleArt(GroundVehicleModels.M113_ARMORED_PERSONNEL_CARRIER, GroundVehicleModels.M113_APC);
+const ZIL_157_ART = pickVehicleArt(GroundVehicleModels.ZIL_157_SIX_WHEEL, GroundVehicleModels.ZIL_157);
 
 const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   firebase_us_small: {
@@ -94,7 +105,7 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(-5, 0, -6.25), yaw: 0 },
       { modelPath: StructureModels.PUNJI_TRAP, offset: new THREE.Vector3(7.5, 0, 8.75), yaw: Math.PI * 0.25 },
       // NVA supply truck (Soviet ZIL-157) - promoted to the ground vehicle runtime when spawned.
-      { modelPath: GroundVehicleModels.ZIL_157, offset: new THREE.Vector3(11, 0, -8), yaw: Math.PI * 0.45, registerCollision: true },
+      { modelPath: ZIL_157_ART, offset: new THREE.Vector3(11, 0, -8), yaw: Math.PI * 0.45, registerCollision: true },
     ],
   },
   nva_trail_base_small: {
@@ -103,10 +114,10 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.MORTAR_PIT, offset: new THREE.Vector3(-7.5, 0, -5), yaw: Math.PI * 0.8, registerCollision: true },
       { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(6.25, 0, -5), yaw: 0 },
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(7.5, 0, 5), yaw: 0 },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-12.5, 0, 6.25), yaw: Math.PI * 0.5, registerCollision: true },
-      // Static NVA armor dressing — non-drivable scenery (T-54 is not M151,
-      // so WorldFeatureSystem keeps it in the frozen feature tree).
-      { modelPath: GroundVehicleModels.T54_TANK, offset: new THREE.Vector3(11, 0, 9), yaw: -Math.PI * 0.35, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(-12.5, 0, 6.25), yaw: Math.PI * 0.5, registerCollision: true },
+      // The NVA T-54 is now a live, drivable Tank IVehicle spawned through the
+      // scenario path (T54TankSpawn / OperationalRuntimeComposer), so the static
+      // armor-dressing prop is removed — exactly one T-54 stands in the world.
     ],
   },
   // Universal hamlet — the only village prefab referenced by every game-mode
@@ -170,7 +181,7 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: PropModels.COOPERED_WOODEN_BARREL_STANDING, offset: new THREE.Vector3(8, 0, 8), yaw: 0 },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(-10, 0, 2.5), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: StructureModels.RADIO_STACK, offset: new THREE.Vector3(10, 0, 5), yaw: 0, registerCollision: true },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(13.75, 0, -2.5), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(13.75, 0, -2.5), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: StructureModels.AMMO_CRATE, offset: new THREE.Vector3(-3.75, 0, 6.25), yaw: 0 },
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(3.75, 0, 6.25), yaw: 0 },
     ],
@@ -194,9 +205,9 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   motor_pool_small: {
     placements: [
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -12), yaw: Math.PI, registerCollision: true },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-14, 0, 3), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(-14, 0, 3), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: GroundVehicleModels.M151_JEEP, offset: new THREE.Vector3(0, 0, 6), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(14, 0, 1), yaw: Math.PI * 0.55, registerCollision: true },
+      { modelPath: M113_APC_ART, offset: new THREE.Vector3(14, 0, 1), yaw: Math.PI * 0.55, registerCollision: true },
       // Static US AA + recoilless dressing. M35/M151/M113 placements above promote separately.
       { modelPath: GroundVehicleModels.M42_DUSTER, offset: new THREE.Vector3(-14, 0, 14), yaw: Math.PI * 0.4, registerCollision: true },
       { modelPath: GroundVehicleModels.ONTOS, offset: new THREE.Vector3(14, 0, 14), yaw: -Math.PI * 0.4, registerCollision: true },
@@ -215,8 +226,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI, registerCollision: true },
       { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(20, 0, -4), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-16, 0, 14), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(10, 0, 18), yaw: Math.PI * 0.7, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(-16, 0, 14), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: M113_APC_ART, offset: new THREE.Vector3(10, 0, 18), yaw: Math.PI * 0.7, registerCollision: true },
       // M151 bay anchor: real GroundVehicle IVehicle spawns here by
       // M151JeepSpawn. Distance from prefab center:
       // sqrt(21^2 + 7^2) ≈ 22.1 m, inside the 36 m OF footprint.
@@ -238,8 +249,8 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI, registerCollision: true },
       { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(20, 0, -4), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-18, 0, 12), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(12, 0, 10), yaw: Math.PI * 0.58, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(-18, 0, 12), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: M113_APC_ART, offset: new THREE.Vector3(12, 0, 10), yaw: Math.PI * 0.58, registerCollision: true },
       { modelPath: GroundVehicleModels.M48_PATTON, offset: new THREE.Vector3(24, 0, 14), yaw: Math.PI * 0.6, registerCollision: true },
       // Static US AA + recoilless dressing. M35/M113 promote separately; both
       // static AA assets sit inside the 34 m Ta Bat footprint radius.
@@ -261,7 +272,7 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
   airstrip_rough_small: {
     placements: [
       { modelPath: AircraftModels.UH1_HUEY, offset: new THREE.Vector3(0, 0, -12.5), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-15, 0, 7.5), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(-15, 0, 7.5), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(10, 0, 5), yaw: 0 },
       { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(13.75, 0, 7.5), yaw: 0 },
     ],
@@ -271,7 +282,7 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -10), yaw: Math.PI, registerCollision: true },
       { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-15, 0, 2.5), yaw: 0, registerCollision: true },
       { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(15, 0, 2.5), yaw: Math.PI * 0.5, registerCollision: true },
-      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-7.5, 0, 10), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: M35_TRUCK_ART, offset: new THREE.Vector3(-7.5, 0, 10), yaw: Math.PI * 0.5, registerCollision: true },
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(6.25, 0, 10), yaw: 0 },
     ],
   },

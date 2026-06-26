@@ -15,10 +15,11 @@
  * URL param. With no window (SSR / node tests) the default Kiln art is used, so
  * unit tests exercise the shipped art.
  *
- * NOTE: a couple of Kiln airframes are deliberately HELD on legacy art at their
- * call sites regardless of this flag because their Kiln GLBs are scale-defective
- * (UH-1C gunship ~6.28 m vs ~13.86 m; B-52D ~21 m vs the true-scale ~47.85 m
- * legacy). Those holds live in the consumers, not here.
+ * NOTE: the UH-1C gunship + B-52D Kiln GLBs were scale-defective in the source
+ * (UH-1C ~6.28 m long; B-52D ~21 m span). They are corrected to true scale at
+ * the importer via scripts/asset-import/catalog-scale-fix.ts and now ship Kiln
+ * art by default like the rest of the fleet; `?aircraftArt=legacy` restores the
+ * legacy GLBs.
  */
 export type AircraftArtMode = 'kiln' | 'legacy';
 

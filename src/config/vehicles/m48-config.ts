@@ -55,10 +55,6 @@ export const M48_SPAWN_OFFSETS = {
    * the only M48 visible in OF.
    */
   open_frontier: { x: 183, z: -1173, yaw: Math.PI * 0.55 },
-  /** Open Frontier: NVA Main HQ defender inside the authored OPFOR home base. */
-  open_frontier_opfor: { x: 0, z: 1382, yaw: Math.PI },
   /** A Shau Valley: valley-road anchor near the south road bend. */
   a_shau_valley: { x: 40, z: 60, yaw: Math.PI * 0.25 },
-  /** A Shau Valley: Dong So NVA Trail Base packed-earth yard. */
-  a_shau_valley_opfor: { x: 7842.15, z: -4430.45, yaw: Math.PI * 0.9 },
 } as const;

@@ -52,7 +52,8 @@ interface AirSupportConfig {
 // default; `?aircraftArt=legacy` restores the cycle-2026-06-11 repaint keys.
 // AirSupportManager resolves these via AircraftModels[key] and applies a 2x
 // visibility scale (the Kiln strikers are similar true-scale to the legacy ones,
-// so the bump still reads correctly). The B-52 is HELD on legacy below.
+// so the bump still reads correctly). The B-52 arclight flies at native (1x)
+// scale and is repointed to Kiln art below.
 export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
   spooky: {
     delay: 10,
@@ -94,16 +95,18 @@ export const AIR_SUPPORT_CONFIGS: Record<AirSupportType, AirSupportConfig> = {
   // continues outbound. Faster than the prop strikers but slower than the F-4
   // fast jet, reflecting a heavy-bomber cruise.
   //
-  // HELD on legacy art regardless of `__aircraftArt`: the Kiln B-52D GLB is
-  // scale-defective (~21 m vs the true-scale legacy ~47.85 m), and the
-  // arclight-only native-scale (1x) bump lives in AirSupportManager (outside this
-  // stream's scope), so repointing would render a tiny bomber. Re-roll the Kiln
-  // B-52D before cutting it over.
+  // Repointed to the Kiln B-52D by default. Its Kiln GLB was scale-defective
+  // (~21 m span); it is corrected to the balanced ~54.4 m wingspan at the
+  // importer via CATALOG_SCALE_FIX, so the arclight native-scale (1x) bump in
+  // AirSupportManager renders it true-size. The Kiln source fuselage is slightly
+  // stubby (a re-roll advisory captured in catalog-scale-fix.ts), but the
+  // dominant wingspan silhouette matches the legacy bomber for this
+  // high-altitude pass. `?aircraftArt=legacy` restores the legacy B-52 GLB.
   arclight: {
     delay: 20,
     duration: 10,
     cooldown: 300,
-    modelKey: 'B52_STRATOFORTRESS',
+    modelKey: pickAircraftArt('B_52D_STRATOFORTRESS_STRATEGIC', 'B52_STRATOFORTRESS'),
     altitude: 600,
     speed: 150,
   },

@@ -15,8 +15,10 @@ import fern from '../catalog/fern.json';
 import jungleDeadfall from '../catalog/jungle-deadfall.json';
 import jungleTree from '../catalog/jungle-tree.json';
 import bambooGrove from '../catalog/bamboo-grove.json';
+import bambooThicket from '../catalog/bamboo-thicket.json';
 import ricePaddy from '../catalog/rice-paddy.json';
 import fanPalm from '../catalog/fan-palm.json';
+import coconutPalm from '../catalog/coconut-palm.json';
 import bananaPlant from '../catalog/banana-plant.json';
 import understoryFern from '../catalog/understory-fern.json';
 import taroElephantEar from '../catalog/taro-elephant-ear.json';
@@ -33,8 +35,10 @@ const RAW: readonly unknown[] = [
   fern,
   jungleDeadfall,
   bambooGrove,
+  bambooThicket,
   ricePaddy,
   fanPalm,
+  coconutPalm,
   bananaPlant,
   understoryFern,
   taroElephantEar,

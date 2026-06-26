@@ -83,7 +83,7 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
     // similar-or-slightly-lower (the cross cards cover more area per instance).
     { typeId: 'understory-fern',   densityMultiplier: 0.8 },
     { typeId: 'taro-elephant-ear', densityMultiplier: 0.5 },
-    { typeId: 'coconut',      densityMultiplier: 0.8 },
+    { typeId: 'coconut-palm',      densityMultiplier: 0.8 },
     // Banana fronds: real mesh near, baked alpha card far (kebab id, GroundCardScatterer).
     { typeId: 'banana-plant', densityMultiplier: 0.5 },
   ],
@@ -107,7 +107,7 @@ const BIOME_ASHAU_JUNGLE: BiomeConfig = {
     // palettes stay comparable). Replace the old fern / elephantEar billboards (removed).
     { typeId: 'understory-fern',   densityMultiplier: 0.4 },
     { typeId: 'taro-elephant-ear', densityMultiplier: 0.25 },
-    { typeId: 'coconut',      densityMultiplier: 0.55 },
+    { typeId: 'coconut-palm',      densityMultiplier: 0.55 },
     { typeId: 'banana-plant', densityMultiplier: 0.28 },
   ],
 };
@@ -153,7 +153,7 @@ const BIOME_RIVERBANK: BiomeConfig = {
     { typeId: 'teak-a',       densityMultiplier: 0.08 },
     { typeId: 'rubber-a',     densityMultiplier: 0.06 },
     { typeId: 'fan-palm',     densityMultiplier: 0.6 },
-    { typeId: 'coconut',      densityMultiplier: 1.25 },
+    { typeId: 'coconut-palm',      densityMultiplier: 1.25 },
     { typeId: 'banana-plant', densityMultiplier: 0.45 },
     // Library ground-cover cards: the wet riverbank understory. The taro card carries the
     // broadleaf cover that the dense elephantEar billboard used to (both elephantEar + fern
@@ -210,9 +210,11 @@ const BIOME_BAMBOO_GROVE: BiomeConfig = {
   groundTileScale: 0.135,
   groundRoughness: 0.84,
   vegetationPalette: [
-    // Dense bamboo stays a billboard: the hero path keeps one GLB clone per instance, which
-    // is a memory blowup at this density (2.8). KEEP it on the camelCase billboard id.
-    { typeId: 'bambooGrove',   densityMultiplier: 2.8 },
+    // Dense bamboo is now a ground CARD (bamboo-thicket, kebab id): the far band is a
+    // baked alpha card (2 tris) and the near-mesh tier is globally capped at 32, so the
+    // old billboard's per-instance GLB-clone memory blowup at this density (2.8) is gone.
+    // The sparse hero bamboo-grove (mesh+octa) stays for low-density jungle understory.
+    { typeId: 'bamboo-thicket',    densityMultiplier: 2.8 },
     // Understory cards (kebab ids) replace the old fern/elephantEar billboards.
     { typeId: 'understory-fern',   densityMultiplier: 0.8 },
     { typeId: 'taro-elephant-ear', densityMultiplier: 0.3 },
@@ -226,10 +228,11 @@ const BIOME_SWAMP: BiomeConfig = {
   groundTileScale: 0.14,
   groundRoughness: 0.96,
   vegetationPalette: [
-    { typeId: 'coconut',       densityMultiplier: 1.0 },
+    { typeId: 'coconut-palm',  densityMultiplier: 1.0 },
     { typeId: 'fanPalm',       densityMultiplier: 0.9 },
-    // Understory cards (kebab ids) replace the old fern/elephantEar/bananaPlant billboards.
-    // coconut + fanPalm stay billboards (no ground-card art for those species yet).
+    // Understory cards (kebab ids) replace the old fern/elephantEar/bananaPlant billboards;
+    // the coconut palm is now the coconut-palm card (mesh-near + alpha card far). fanPalm
+    // stays a billboard (no card art for that species yet).
     { typeId: 'taro-elephant-ear', densityMultiplier: 1.2 },
     { typeId: 'understory-fern',   densityMultiplier: 0.75 },
     { typeId: 'banana-plant',      densityMultiplier: 0.55 },

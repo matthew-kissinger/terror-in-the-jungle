@@ -312,16 +312,18 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       expect(groundCards['taro-elephant-ear']).toBeDefined();
     }
 
-    // The dense bamboo grove (2.8) stays on its billboard id: promoting it to the GLB hero
-    // path would keep one clone per instance — a memory blowup at this density.
-    const denseBamboo = bambooGrove.find((entry) => entry.typeId === 'bambooGrove');
+    // The dense bamboo grove (2.8) is now a ground CARD (bamboo-thicket): the far band is a
+    // baked alpha card and the near-mesh tier is globally capped, so the old billboard's
+    // per-instance GLB-clone memory blowup at this density is gone.
+    const denseBamboo = bambooGrove.find((entry) => entry.typeId === 'bamboo-thicket');
     expect(denseBamboo?.densityMultiplier).toBe(2.8);
+    expect(groundCards['bamboo-thicket']).toBeDefined();
   });
 
   it('leaves no old fern/elephantEar/bananaPlant billboard id in any biome palette', () => {
-    // The fern/elephantEar ground cards and the freshly baked banana-plant card now cover
-    // these everywhere. coconut (no replacement asset) and the dense bambooGrove billboard
-    // are the documented camelCase holdouts.
+    // The fern/elephantEar/banana-plant cards (and now the bamboo-thicket + coconut-palm
+    // cards) cover these. fanPalm + the sparse highland bamboo billboard are the remaining
+    // camelCase holdouts.
     const biomeIds = [
       'ashauJungle', 'denseJungle', 'highland', 'ricePaddy', 'riverbank',
       'cleared', 'tallGrass', 'mudTrail', 'bambooGrove', 'swamp', 'defoliated',
@@ -345,5 +347,25 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     // bananaPlant billboard id, so the billboard scatterer ignores it.
     const billboardIds = new Set(VEGETATION_TYPES.map((type) => type.id));
     expect(billboardIds.has('banana-plant')).toBe(false);
+  });
+
+  it('wires the bamboo-thicket + coconut-palm cards (kiln-held-assets cutover)', () => {
+    const groundCards = vegetationLibraryGroundCards();
+    // Both new cards resolve to live ground-card archetypes.
+    expect(groundCards['bamboo-thicket']).toBeDefined();
+    expect(groundCards['coconut-palm']).toBeDefined();
+    // Dense bamboo -> bamboo-thicket card; coconut billboard -> coconut-palm card (swamp).
+    expect(getBiome('bambooGrove').vegetationPalette.map((e) => e.typeId)).toContain('bamboo-thicket');
+    expect(getBiome('swamp').vegetationPalette.map((e) => e.typeId)).toContain('coconut-palm');
+    // The old camelCase 'coconut' billboard id is gone from every palette.
+    const allBiomeIds = ['ashauJungle', 'denseJungle', 'highland', 'ricePaddy', 'riverbank',
+      'cleared', 'tallGrass', 'mudTrail', 'bambooGrove', 'swamp', 'defoliated'];
+    for (const biomeId of allBiomeIds) {
+      expect(getBiome(biomeId).vegetationPalette.map((e) => e.typeId), biomeId).not.toContain('coconut');
+    }
+    // Dual-namespace: kebab card ids never collide with the camelCase billboard scatterer ids.
+    const billboardIds = new Set(VEGETATION_TYPES.map((type) => type.id));
+    expect(billboardIds.has('bamboo-thicket')).toBe(false);
+    expect(billboardIds.has('coconut-palm')).toBe(false);
   });
 });
