@@ -201,9 +201,10 @@ manifest file as usual.
 **ACTIVE CAMPAIGN — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
 (6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
 from the owner playtest triage). Phase 1
-(`cycle-2026-06-28-control-discoverability`) is seeded in "Current cycle" below
-with briefs in `docs/tasks/`. Phases 2-6 briefs are authored at each phase's open
-per the manifest tables. Run it with the kickoff prompt in the manifest.
+(`cycle-2026-06-28-control-discoverability`) CLOSED 2026-06-28 (#425-#428,
+playtest-deferred). **Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) is now
+active** in "Current cycle" below. Phases 3-6 briefs are authored at each phase's
+open per the manifest tables.
 
 Prior campaigns (engineering closed; owner walks pending in
 [PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
@@ -229,27 +230,32 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-28-control-discoverability` — Phase 1 of
+- **Active:** `cycle-2026-06-28-combat-vehicle-feel` — Phase 2 of
   [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
-  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 2
-  `cycle-2026-06-28-combat-vehicle-feel` on the Phase-1 exit gate). Briefs:
-  `docs/tasks/{control-hints-hud,seat-and-fire-cues,radio-command-menu,hud-overlap-and-scoreboard}.md`.
+  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 3
+  `cycle-2026-06-28-terrain-vegetation-asset-defects` on the Phase-2 exit gate).
+  Briefs: `docs/tasks/{tank-exit-and-seatswap,tank-turret-traverse,tank-hill-authority,ground-vehicle-speed-and-camera,weapon-ads-per-weapon-offset}.md`.
 
-  **Task DAG:**
+  **Task DAG:** all roots — fully parallel (disjoint files).
   ```
-  control-hints-hud ──► seat-and-fire-cues        (shared HUD legend surface)
-  radio-command-menu        (root; combat-reviewer — CommandInputManager)
-  hud-overlap-and-scoreboard (root)
+  tank-exit-and-seatswap            (root; vehicle input routing; FENCE WATCH)
+  tank-turret-traverse              (root; tuning)
+  tank-hill-authority               (root; tracked physics)
+  ground-vehicle-speed-and-camera   (root; wheeled physics + follow cam)
+  weapon-ads-per-weapon-offset      (root; weapon viewmodel) ── unblocks Phase 4
   ```
-  R1 (parallel): `control-hints-hud`, `radio-command-menu`, `hud-overlap-and-scoreboard`.
-  R2: `seat-and-fire-cues` (after `control-hints-hud`).
-  Reviewer: `radio-command-menu` → combat-reviewer (`src/systems/combat/**`).
-  Hard-stops: campaign-level (see manifest). Exit gate: control legend on
-  foot/vehicle/aircraft + radio menu on `T` + attribution/health no longer overlap.
-- **Previous:** `cycle-2026-06-11-war-asset-repaint` (12/12: #383-#394 incl.
-  3 mid-cycle defect-fix PRs, closed 2026-06-12) — KATALOG-1 code-complete;
-  see BACKLOG "Recently Completed" and the PLAYTEST_PENDING owner-walk row.
-  Briefs archived at `docs/tasks/archive/cycle-2026-06-11-war-asset-repaint/`.
+  R1 (parallel, all 5): the five tasks above.
+  Reviewer: none (files under `src/systems/vehicle/**`, `src/systems/player/**`,
+  `src/config/vehicles/**` — no combat/terrain/nav reviewer scope).
+  Perf: run `perf-analyst` after R1 — HALT on >5% combat120 p99 regression.
+  Hard-stops: campaign-level (see manifest), incl. fence change on
+  `tank-exit-and-seatswap`. Exit gate: combat120 p99 within +5%; tank exits
+  cleanly with a visible cue; jeep noticeably faster; M60 ADS sight clear.
+- **Previous:** `cycle-2026-06-28-control-discoverability` (Phase 1, 4/4:
+  #425-#428, closed 2026-06-28, playtest-deferred) — control legend + unified
+  radio menu + HUD de-overlap + seat/fire cues. See BACKLOG "Recently Completed"
+  and PLAYTEST_PENDING. Briefs archived at
+  `docs/tasks/archive/cycle-2026-06-28-control-discoverability/`.
 
 ## Dispatch protocol
 
