@@ -198,9 +198,16 @@ manifest file as usual.
 
 ## Current state
 
-**No active campaign.** Both 2026-06-09 `/goal` campaigns completed
-2026-06-10 (engineering closed; owner walks pending in
-[PLAYTEST_PENDING](PLAYTEST_PENDING.md)):
+**ACTIVE CAMPAIGN — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
+(6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
+from the owner playtest triage). Phase 1
+(`cycle-2026-06-28-control-discoverability`) is seeded in "Current cycle" below
+with briefs in `docs/tasks/`. Phases 2-6 briefs are authored at each phase's open
+per the manifest tables. Run it with the kickoff prompt in the manifest.
+
+Prior campaigns (engineering closed; owner walks pending in
+[PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
+2026-06-10:
 
 - [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
   — ALL PHASES COMPLETE (#363-#381): unified rig is the shipped default
@@ -222,9 +229,23 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** (none — between cycles. Seed the next cycle here: active slug,
-  R0 evidence, task DAG, dependencies, file-ownership, cycle-specific
-  hard-stops.)
+- **Active:** `cycle-2026-06-28-control-discoverability` — Phase 1 of
+  [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
+  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 2
+  `cycle-2026-06-28-combat-vehicle-feel` on the Phase-1 exit gate). Briefs:
+  `docs/tasks/{control-hints-hud,seat-and-fire-cues,radio-command-menu,hud-overlap-and-scoreboard}.md`.
+
+  **Task DAG:**
+  ```
+  control-hints-hud ──► seat-and-fire-cues        (shared HUD legend surface)
+  radio-command-menu        (root; combat-reviewer — CommandInputManager)
+  hud-overlap-and-scoreboard (root)
+  ```
+  R1 (parallel): `control-hints-hud`, `radio-command-menu`, `hud-overlap-and-scoreboard`.
+  R2: `seat-and-fire-cues` (after `control-hints-hud`).
+  Reviewer: `radio-command-menu` → combat-reviewer (`src/systems/combat/**`).
+  Hard-stops: campaign-level (see manifest). Exit gate: control legend on
+  foot/vehicle/aircraft + radio menu on `T` + attribution/health no longer overlap.
 - **Previous:** `cycle-2026-06-11-war-asset-repaint` (12/12: #383-#394 incl.
   3 mid-cycle defect-fix PRs, closed 2026-06-12) — KATALOG-1 code-complete;
   see BACKLOG "Recently Completed" and the PLAYTEST_PENDING owner-walk row.
