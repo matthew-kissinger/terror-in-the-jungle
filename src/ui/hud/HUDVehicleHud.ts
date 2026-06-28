@@ -132,4 +132,12 @@ export class HUDVehicleHud {
   updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string): void {
     this.fixedWingHUD.setAmmo(rounds, capacity, weaponName);
   }
+
+  setFixedWingSeatFireCue(armed: boolean, broadside: boolean): void {
+    this.fixedWingHUD.setSeatFireCue(armed, broadside);
+  }
+
+  flashFixedWingAirborneHint(): void {
+    this.fixedWingHUD.flashAirborneHint();
+  }
 }

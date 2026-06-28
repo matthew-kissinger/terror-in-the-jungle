@@ -50,6 +50,19 @@ the cycle that re-opens it.
 
 History log:
 
+- 2026-06-28 — budget-ratchet re-base (seat-and-fire-cues): two
+  already-grandfathered files grew minimally to surface multi-crew seat/fire
+  cues. `src/systems/vehicle/FixedWingModel.ts` snapshot raised 1166→1191 LOC /
+  51→52 methods — the airborne-gate feedback signal adds one consume-on-read
+  getter (`consumeGroundedFireBlocked`) plus the grounded-trigger record branch
+  and a structural HUD-sink poll, so the silent ground fire no-op now flashes an
+  "Airborne to fire" hint. `src/ui/hud/HUDSystem.ts` snapshot raised 788→809 LOC
+  / 85→86 methods — one HUD delegation method (`flashFixedWingAirborneHint`,
+  mirror of the existing ammo delegation) plus seat-hint derivation wired into
+  the existing `setVehicleContext`; the seat-cue logic itself lives in
+  HudControlHints so only one method is added. Within-cycle growth, not a new
+  carry-over; both split targets unchanged.
+
 - 2026-06-15/16 — budget-ratchet stabilization re-base
   (dropped-frame-perf-harness): the dropped-frame harness/perf recovery branch
   intentionally grew several already-grandfathered orchestration, combat,
