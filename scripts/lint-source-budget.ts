@@ -116,7 +116,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // the mirror of the existing `setHelicopterWeaponStatus` delegation. Growth
   // is intentional and minimal; the R3 split target is unchanged. In-cycle
   // ratchet re-base, not a new carry-over (see docs/CARRY_OVERS.md).
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring', loc: 774, methods: 85 },
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud, the actor→context mapper lives in HudControlHints so method count is unchanged)', loc: 788, methods: 85 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence); +28 LOC dropped-frame combat telemetry wiring', loc: 790, methods: 43 },
   // Admitted 2026-06-15/16 (dropped-frame-perf-harness): the main loop grew
   // with frame/presentation epoch recording and render-context attribution.
