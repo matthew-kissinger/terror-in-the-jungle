@@ -6,8 +6,31 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HudControlHints } from './HudControlHints';
+import type { VehicleCapabilities, VehicleUIContext } from '../layout/types';
 
 const STORAGE_KEY = 'tij.hud.controlHints.visible';
+
+/** Capabilities with everything off — override just the fields a test cares about. */
+function caps(overrides: Partial<VehicleCapabilities> = {}): VehicleCapabilities {
+  return {
+    canExit: true,
+    canFirePrimary: false,
+    canCycleWeapons: false,
+    canFreeLook: false,
+    canStabilize: false,
+    canDeploySquad: false,
+    canOpenMap: false,
+    canOpenCommand: false,
+    ...overrides,
+  };
+}
+
+/** Read the seat block text (label + cues + note), or '' when it is hidden. */
+function seatText(host: HTMLElement): string {
+  const seat = host.querySelector('.hud-control-hints__seat') as HTMLElement | null;
+  if (!seat || seat.style.display === 'none') return '';
+  return seat.textContent ?? '';
+}
 
 /** Read the text of every legend row as "keys → action" strings. */
 function legendRows(host: HTMLElement): string[] {
@@ -153,5 +176,114 @@ describe('HudControlHints', () => {
     // A toggle key after dispose must not throw or re-show anything.
     document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
     expect(document.querySelector('.hud-control-hints')).toBeNull();
+  });
+});
+
+describe('HudControlHints — seat / fire cues', () => {
+  let host: HTMLDivElement;
+  let hints: HudControlHints;
+
+  // Realistic VehicleUIContexts mirroring the adapters' createX UI contexts.
+  const tankDriver: VehicleUIContext = {
+    kind: 'car', role: 'pilot', hudVariant: 'groundVehicle', weaponCount: 0,
+    capabilities: caps({ canFreeLook: true }),
+  };
+  const tankGunner: VehicleUIContext = {
+    kind: 'turret', role: 'gunner', hudVariant: 'turret', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
+  };
+  const jeepDriver: VehicleUIContext = {
+    kind: 'car', role: 'driver', hudVariant: 'groundVehicle', weaponCount: 0,
+    capabilities: caps({ canFreeLook: true }),
+  };
+  const gunshipHeli: VehicleUIContext = {
+    kind: 'helicopter', role: 'gunship', hudVariant: 'flight', weaponCount: 2,
+    capabilities: caps({ canFirePrimary: true }),
+  };
+  const transportHeli: VehicleUIContext = {
+    kind: 'helicopter', role: 'transport', hudVariant: 'flight', weaponCount: 0,
+    capabilities: caps({ canDeploySquad: true }),
+  };
+  const ac47: VehicleUIContext = {
+    kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
+    viewToggle: { inactiveLabel: 'SIDE', activeLabel: 'CHASE', active: false },
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    hints = new HudControlHints();
+    hints.mount(host);
+  });
+
+  afterEach(() => {
+    hints.dispose();
+    host.remove();
+    document.querySelectorAll('.hud-control-hints').forEach((el) => el.remove());
+  });
+
+  it('shows no seat block on foot or in a single-seat unarmed jeep', () => {
+    expect(seatText(host)).toBe('');
+
+    hints.setSeatHint(HudControlHints.seatHintFromContext(jeepDriver));
+    // A jeep has one seat and no weapon — nothing to teach, so no seat block.
+    expect(seatText(host)).toBe('');
+  });
+
+  it('names the tank gunner seat and shows both LMB-fire and F-swap cues', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(tankGunner));
+
+    const text = seatText(host);
+    expect(text).toContain('GUNNER');
+    expect(text).toContain('LMB: fire');
+    expect(text).toContain('F: swap seat'); // the owner could not tell F swaps seats
+  });
+
+  it('names the tank driver seat with a swap cue but no fire cue (driver is unarmed)', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(tankDriver));
+
+    const text = seatText(host);
+    expect(text).toContain('DRIVER');
+    expect(text).toContain('F: swap seat');
+    expect(text).not.toContain('LMB: fire');
+  });
+
+  it('tells the gunship pilot they can swap to the door gun and fire', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(gunshipHeli));
+
+    const text = seatText(host);
+    expect(text).toContain('PILOT');
+    expect(text).toContain('F: swap seat');
+    expect(text.toLowerCase()).toContain('door gun');
+    expect(text).toContain('LMB: fire');
+  });
+
+  it('shows the AC-47 pilot the fire cue and broadside gun-cam note, with no seat swap', () => {
+    // The owner boarded the AC-47, thought he was a stuck gunner, and never
+    // found the pilot. The cue must say: you ARE the pilot, LMB fires, RMB is
+    // the broadside camera — and there is no second seat to hunt for.
+    hints.setSeatHint(HudControlHints.seatHintFromContext(ac47));
+
+    const text = seatText(host);
+    expect(text).toContain('PILOT');
+    expect(text).toContain('LMB: fire');
+    expect(text.toLowerCase()).toContain('broadside');
+    expect(text).not.toContain('F: swap seat');
+  });
+
+  it('shows a single-seat transport helicopter pilot no fire or swap cue', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(transportHeli));
+    // Unarmed transport with no door gun: nothing to surface.
+    expect(seatText(host)).toBe('');
+  });
+
+  it('clears the seat block when the player leaves the vehicle (null context)', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(tankGunner));
+    expect(seatText(host)).toContain('GUNNER');
+
+    hints.setSeatHint(HudControlHints.seatHintFromContext(null));
+    expect(seatText(host)).toBe('');
   });
 });

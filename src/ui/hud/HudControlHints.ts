@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import { colors, fontStack, zIndex } from '../design/tokens';
-import type { ActorMode } from '../layout/types';
+import type { ActorMode, VehicleUIContext } from '../layout/types';
 
 /**
  * HudControlHints — persistent, context-sensitive control legend.
@@ -32,6 +32,31 @@ import type { ActorMode } from '../layout/types';
 
 /** The control context the legend renders binds for. */
 export type ControlHintContext = 'foot' | 'groundVehicle' | 'aircraft';
+
+/**
+ * The seat the player currently occupies in a multi-crew / armed craft, plus
+ * which seat-specific cues apply. Surfaced above the bind list so the player
+ * always knows which station they hold, that `F` swaps seats when a second one
+ * exists, and that `LMB` fires when the seat is armed.
+ *
+ * Closes the AC-47 finding: the owner boarded the gunship, assumed he was a
+ * gunner who couldn't fire, never found the pilot, and couldn't tell `F` swaps
+ * seats — because nothing on the HUD named the seat or its actions.
+ */
+export interface SeatHint {
+  /** Human label for the current station (e.g. `PILOT`, `GUNNER`, `DRIVER`). */
+  readonly label: string;
+  /** A second enterable seat exists on this craft, swappable with `F`. */
+  readonly hasSecondSeat: boolean;
+  /** This seat can pull the trigger (`LMB`). */
+  readonly armed: boolean;
+  /**
+   * Optional extra line clarifying a craft-specific control — used for the
+   * AC-47 to spell out that the player IS the pilot and RMB is the broadside
+   * gun camera.
+   */
+  readonly note?: string;
+}
 
 /** A single legend row: a key/button label and what it does. */
 interface ControlHint {
@@ -109,6 +134,18 @@ const STORAGE_KEY = 'tij.hud.controlHints.visible';
 
 const STYLE_ID = 'hud-control-hints-styles';
 
+/** Value-equality for two seat hints so `setSeatHint` is idempotent. */
+function seatHintEquals(a: SeatHint | null, b: SeatHint | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.label === b.label &&
+    a.hasSecondSeat === b.hasSecondSeat &&
+    a.armed === b.armed &&
+    a.note === b.note
+  );
+}
+
 export interface HudControlHintsOptions {
   /**
    * KeyboardEvent.code that toggles the legend (default `KeyH`). When the
@@ -127,11 +164,13 @@ export interface HudControlHintsOptions {
 export class HudControlHints {
   private readonly root: HTMLDivElement;
   private readonly titleEl: HTMLDivElement;
+  private readonly seatEl: HTMLDivElement;
   private readonly listEl: HTMLDivElement;
   private readonly toggleKeyCode: string | null;
   private readonly hideOnTouch: boolean;
 
   private context: ControlHintContext = 'foot';
+  private seat: SeatHint | null = null;
   /** User preference (toggle). Combined with `suppressed` to decide rendering. */
   private enabled: boolean;
   /** Host-driven suppression (touch device / reduced clutter). */
@@ -152,6 +191,14 @@ export class HudControlHints {
     this.titleEl = document.createElement('div');
     this.titleEl.className = 'hud-control-hints__title';
     this.root.appendChild(this.titleEl);
+
+    // Seat block sits between the title and the bind list. Empty + hidden until
+    // a multi-crew / armed craft pushes a SeatHint, so on-foot and single-seat
+    // vehicles render exactly as before.
+    this.seatEl = document.createElement('div');
+    this.seatEl.className = 'hud-control-hints__seat';
+    this.seatEl.style.display = 'none';
+    this.root.appendChild(this.seatEl);
 
     this.listEl = document.createElement('div');
     this.listEl.className = 'hud-control-hints__list';
@@ -215,6 +262,77 @@ export class HudControlHints {
   /** Current control context (for composing add-ons on the same surface). */
   getContext(): ControlHintContext {
     return this.context;
+  }
+
+  /**
+   * Show (or clear) the current-seat block. Pass a {@link SeatHint} when the
+   * player is in a multi-crew / armed craft, or `null` to hide it (on foot,
+   * single-seat jeep). Idempotent for an equivalent hint.
+   */
+  setSeatHint(seat: SeatHint | null): void {
+    if (seatHintEquals(this.seat, seat)) return;
+    this.seat = seat;
+    this.renderSeat();
+  }
+
+  /**
+   * Derive a {@link SeatHint} from the `VehicleUIContext` the HUD already
+   * receives, or `null` for craft with no seat cue (single-seat jeep, fixed
+   * wing whose cues live on the FixedWingHUD). Lives here so the cue strings
+   * and the seat-swap rule stay in one place rather than drifting at call
+   * sites — the same way `actorToContext` owns the actor mapping.
+   *
+   * Seat-swap detection keys on the stable `role` values the vehicle adapters
+   * already emit: the tank crews `pilot` (driver hatch) and `gunner`, both of
+   * which swap with `F`; a gunship helicopter swaps the pilot seat with its
+   * door gun; a jeep `driver` and the transport/attack helicopters do not.
+   */
+  static seatHintFromContext(context: VehicleUIContext | null): SeatHint | null {
+    if (!context) return null;
+
+    const role = context.role;
+    const armed = context.capabilities.canFirePrimary;
+
+    // AC-47 broadside gunship (fixed wing): the player IS the pilot; the
+    // broadside battery fires on LMB once airborne and RMB is its gun camera.
+    // Checked before the tank `pilot` branch since the fixed wing also reports
+    // `role: 'pilot'` but with `kind: 'plane'`.
+    if (context.kind === 'plane' && (armed || context.viewToggle)) {
+      return {
+        label: 'PILOT',
+        hasSecondSeat: false,
+        armed,
+        note: 'RMB: broadside gun cam',
+      };
+    }
+
+    // Tank: driver hatch (`pilot`) <-> gunner station, both swap with F.
+    if (role === 'pilot' || role === 'gunner') {
+      return {
+        label: role === 'gunner' ? 'GUNNER' : 'DRIVER',
+        hasSecondSeat: true,
+        armed,
+      };
+    }
+
+    // Door-gun gunship: the player flies as pilot and swaps to the door gun.
+    if (context.kind === 'helicopter' && role === 'gunship') {
+      return {
+        label: 'PILOT',
+        hasSecondSeat: true,
+        armed,
+        note: 'F swaps to door gun',
+      };
+    }
+
+    // Single-seat armed station (M2HB emplacement / attack heli pilot): name the
+    // seat and surface the fire cue, but no seat swap.
+    if (armed) {
+      const label = role === 'transport' || role === 'attack' ? 'PILOT' : role.toUpperCase();
+      return { label, hasSecondSeat: false, armed: true };
+    }
+
+    return null;
   }
 
   /** The shared legend root, so add-on elements can mount alongside the binds. */
@@ -281,6 +399,40 @@ export class HudControlHints {
       row.appendChild(keys);
       row.appendChild(action);
       this.listEl.appendChild(row);
+    }
+  }
+
+  private renderSeat(): void {
+    const seat = this.seat;
+    if (!seat) {
+      this.seatEl.style.display = 'none';
+      this.seatEl.replaceChildren();
+      return;
+    }
+
+    this.seatEl.style.display = '';
+    this.seatEl.replaceChildren();
+
+    const label = document.createElement('div');
+    label.className = 'hud-control-hints__seat-label';
+    label.textContent = `SEAT: ${seat.label}`;
+    this.seatEl.appendChild(label);
+
+    const cues: string[] = [];
+    if (seat.armed) cues.push('LMB: fire');
+    if (seat.hasSecondSeat) cues.push('F: swap seat');
+    for (const cue of cues) {
+      const row = document.createElement('div');
+      row.className = 'hud-control-hints__seat-cue';
+      row.textContent = cue;
+      this.seatEl.appendChild(row);
+    }
+
+    if (seat.note) {
+      const note = document.createElement('div');
+      note.className = 'hud-control-hints__seat-note';
+      note.textContent = seat.note;
+      this.seatEl.appendChild(note);
     }
   }
 
@@ -358,6 +510,28 @@ export class HudControlHints {
         color: ${colors.textMuted};
         margin-bottom: 4px;
         text-transform: uppercase;
+      }
+      .hud-control-hints__seat {
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid ${colors.glassBorder};
+      }
+      .hud-control-hints__seat-label {
+        font-family: ${fontStack.stamp};
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        color: ${colors.textPrimary};
+        font-weight: 700;
+      }
+      .hud-control-hints__seat-cue {
+        color: ${colors.textPrimary};
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .hud-control-hints__seat-note {
+        color: ${colors.textMuted};
+        font-size: 10px;
+        white-space: nowrap;
       }
       .hud-control-hints__row {
         display: flex;

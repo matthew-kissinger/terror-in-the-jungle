@@ -90,7 +90,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // is the per-airframe config plumbing and the +3 method-regex matches are the
   // getWeaponName getter plus two multi-line call-expression false positives.
   // Within-cycle ratchet re-base; R4 split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files; +3 LOC from dropped-frame stabilization branch wiring', loc: 1166, methods: 51 },
+  // Snapshot raised 1166 → 1191 / 51 → 52 (seat-and-fire-cues, 2026-06-28): the
+  // airborne-gate feedback signal adds one consume-on-read getter
+  // (`consumeGroundedFireBlocked`) + the grounded-trigger record branch and the
+  // structural HUD-sink poll in the update loop, so the silent ground no-op
+  // surfaces an "Airborne to fire" hint. In-cycle ratchet re-base; R4 split
+  // target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files; +3 LOC from dropped-frame stabilization branch wiring; +25 LOC/+1 method airborne-gate feedback signal (seat-and-fire-cues, 2026-06-28)', loc: 1191, methods: 52 },
   'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
   'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence); +102 LOC dropped-frame materialization telemetry', loc: 1035, methods: 32 },
   'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files; +204 LOC dropped-frame world-static attribution and optimization hooks', loc: 1064, methods: 34 },
@@ -116,7 +122,14 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // the mirror of the existing `setHelicopterWeaponStatus` delegation. Growth
   // is intentional and minimal; the R3 split target is unchanged. In-cycle
   // ratchet re-base, not a new carry-over (see docs/CARRY_OVERS.md).
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud, the actor→context mapper lives in HudControlHints so method count is unchanged)', loc: 788, methods: 85 },
+  // Snapshot raised 788 → 809 / 85 → 86 (seat-and-fire-cues, 2026-06-28): the
+  // seat/fire-cue task adds one HUD delegation method
+  // (`flashFixedWingAirborneHint`, mirror of the existing ammo delegation) and
+  // grows `setVehicleContext` to derive the seat hint + plane seat-fire cue from
+  // the context the HUD already receives (derivation logic lives in
+  // HudControlHints so only one method is added). In-cycle ratchet re-base; the
+  // R3 split target is unchanged. See docs/CARRY_OVERS.md.
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud); +21 LOC/+1 method seat/fire cue wiring (seat-and-fire-cues, 2026-06-28)', loc: 809, methods: 86 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence); +28 LOC dropped-frame combat telemetry wiring', loc: 790, methods: 43 },
   // Admitted 2026-06-15/16 (dropped-frame-perf-harness): the main loop grew
   // with frame/presentation epoch recording and render-context attribution.

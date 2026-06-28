@@ -631,6 +631,14 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateFixedWingAmmo(rounds, capacity, weaponName);
   }
 
+  /**
+   * Flash the FixedWingHUD "Airborne to fire" hint. Polled by FixedWingModel
+   * when the player pulls the trigger on the ground (the gun no-ops there).
+   */
+  flashFixedWingAirborneHint(): void {
+    this.elements.flashFixedWingAirborneHint();
+  }
+
   // Squad deploy prompt methods (IHUDSystem)
   showSquadDeployPrompt(): void {
     this.showInteractionPrompt('Press G to deploy squad');
@@ -783,6 +791,19 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       actorMode,
     });
     this.controlHints.setContextForActor(actorMode);
+    // Surface the seat label + F/LMB cues for multi-crew / armed craft, derived
+    // from the same context the HUD already receives (null when on foot or in a
+    // single-seat unarmed vehicle).
+    this.controlHints.setSeatHint(HudControlHints.seatHintFromContext(context));
+    // Fixed wing carries its seat / fire cue on the FixedWingHUD instrument
+    // stack: name the pilot seat, light LMB-fire when armed, and the AC-47
+    // broadside gun-cam note when the side view is available.
+    if (context?.kind === 'plane') {
+      this.elements.setFixedWingSeatFireCue(
+        context.capabilities.canFirePrimary,
+        context.viewToggle !== undefined,
+      );
+    }
   }
 
   isScoreboardCurrentlyVisible(): boolean {
