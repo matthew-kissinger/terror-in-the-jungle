@@ -11,8 +11,8 @@
 > 2-6 briefs authored at each phase's open per the tables below.**
 >
 > **Progress:**
-> ⬜ 1 control-discoverability ·
-> ⬜ 2 combat-vehicle-feel ·
+> ✅ 1 control-discoverability (#425-#428, playtest-deferred) ·
+> 🔄 2 combat-vehicle-feel ·
 > ⬜ 3 terrain-vegetation-asset-defects ·
 > ⬜ 4 arsenal-expansion ·
 > ⬜ 5 deploy-armory-faction-select ·

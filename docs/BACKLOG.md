@@ -57,6 +57,29 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-28-control-discoverability)
+
+Phase 1 of CAMPAIGN_2026-06-28-field-readiness (overnight, `posture:
+autonomous-loop`). 4 PRs #425-#428, R1 (3 parallel) + R2 (1), zero fence
+changes, zero dropped tasks. Closes the campaign's dominant finding — the game
+does more than it shows. `control-hints-hud` (#426): a persistent right-edge
+context-sensitive control legend (foot/vehicle/aircraft) sourced from the live
+keybinds — surfaces T radio / Z squad / F board / TAB scoreboard. `radio-command-menu`
+(#427, combat-reviewer APPROVE-WITH-NOTES): unified `T` menu listing all 7
+fire-support sorties (+ cooldowns + SMOKE/WP/GRID marks) AND the 6 squad orders
+(Shift+1-6 with plain effect lines), driving the existing `requestSupport` path.
+`hud-overlap-and-scoreboard` (#425): attribution notice moved bottom-left →
+bottom-center (off the health pill); hold-Tab scoreboard hint (tracking was
+always correct). `seat-and-fire-cues` (#428): seat label + F-swap (multi-crew
+only) + LMB-fire cue + transient "Airborne to fire" on a grounded fixed-wing
+fire attempt. No perf gate (additive HUD, no hot path). The campaign base
+`348e935b` arrived CI-red (doc-drift gate from briefs committed ahead of code +
+a pre-existing FixedWingConfigs gear-clearance failure from the `f8c3518c` A-1
+re-roll); both healed inside #426 (the keystone that creates the doc-drift-named
+files). Carry-overs 5→5. Owner walk row in PLAYTEST_PENDING; memo at
+`docs/playtests/cycle-2026-06-28-control-discoverability.md`. Follow-up: confirm
+`CommandModeOverlay` tolerates `hasSquad:false` without the squad-loss auto-close.
+
 ## Recently Completed (cycle-2026-06-11-war-asset-repaint)
 
 KATALOG-1 → code-complete (owner walk pending). 12 PRs #383-#394, 4 rounds,
