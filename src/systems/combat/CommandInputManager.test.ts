@@ -157,7 +157,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('opens the radio shell directly and keeps cooldown state in the HUD', () => {
+  it('opens the unified radio menu on T and shows live fire-support cooldowns', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -173,15 +173,16 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.setRadioCooldowns({ ac47_orbit: 75 });
+    // T opens the one menu that lists fire support AND squad orders together.
     manager.toggleRadioMenu();
 
-    const radio = document.body.querySelector<HTMLElement>('[role="dialog"]');
-    expect(radio?.dataset.visible).toBe('true');
+    const overlay = document.body.querySelector<HTMLElement>('.command-mode-overlay');
+    expect(overlay?.dataset.visible).toBe('true');
     expect(document.body.textContent).toContain(`${RADIO_ASSET_COUNT - 1}/${RADIO_ASSET_COUNT} ready`);
     expect(document.body.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]')?.disabled).toBe(true);
 
     expect(manager.handleCancel()).toBe(true);
-    expect(radio?.dataset.visible).toBe('false');
+    expect(overlay?.dataset.visible).toBe('false');
     expect(relockPointer).toHaveBeenCalledTimes(1);
 
     manager.dispose();

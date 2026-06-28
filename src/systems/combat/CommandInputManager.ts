@@ -5,7 +5,11 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import type { InputManager } from '../input/InputManager';
 import type { HUDLayout } from '../../ui/layout/HUDLayout';
-import type { AirSupportRadioCooldowns } from '../airsupport/AirSupportRadioCatalog';
+import type {
+  AirSupportRadioAssetId,
+  AirSupportRadioCooldowns,
+  AirSupportTargetMarking,
+} from '../airsupport/AirSupportRadioCatalog';
 import {
   AIR_SUPPORT_RADIO_ASSETS,
   getAirSupportRadioAsset,
@@ -48,6 +52,7 @@ export class CommandInputManager implements GameSystem {
   };
   private overlayVisible = false;
   private radioVisible = false;
+  private selectedMarking: AirSupportTargetMarking = 'smoke';
   private pendingPlacementCommand: SquadCommand | null = null;
   private mapUpdateAccumulator = 0;
   private readonly mapDirection = new THREE.Vector3();
@@ -71,7 +76,9 @@ export class CommandInputManager implements GameSystem {
       onMapPointSelected: (position) => this.applyPlacementCommand(position),
       onSquadSelected: (squadId) => this.handleSquadSelection(squadId),
       onCloseRequested: () => this.closeOverlay(),
-      onRadioRequested: () => this.openRadioMenu()
+      onRadioRequested: () => this.openRadioMenu(),
+      onFireSupportSelected: (assetId) => this.handleFireSupportSelection(assetId),
+      onMarkingSelected: (marking) => this.setSelectedMarking(marking)
     });
     this.airSupportRadioMenu.setCallbacks({
       onCloseRequested: () => this.closeRadioMenu(),
@@ -94,7 +101,9 @@ export class CommandInputManager implements GameSystem {
   }
 
   update(deltaTime: number): void {
-    if (this.radioVisible) {
+    // Live cooldown counters tick while either fire-support surface is open
+    // (the unified command overlay or the detailed radio deep-dive).
+    if (this.radioVisible || this.overlayVisible) {
       this.radioCooldownAccumulator += deltaTime;
       if (this.radioCooldownAccumulator >= 0.1) {
         this.radioCooldownAccumulator = 0;
@@ -205,7 +214,9 @@ export class CommandInputManager implements GameSystem {
   }
 
   toggleCommandMode(): void {
-    if (!this.latestSquadState.hasSquad) return;
+    // The unified radio is one surface for fire support AND squad orders, so it
+    // opens even without a squad — the squad rows simply read NO SQUAD and stay
+    // disabled while the fire-support section remains fully usable.
     if (this.overlayVisible) {
       this.closeOverlay();
     } else {
@@ -269,16 +280,27 @@ export class CommandInputManager implements GameSystem {
     return true;
   }
 
+  /**
+   * `T` opens the unified radio: one menu listing the fire-support call-ins AND
+   * the squad orders. It toggles the same overlay `Z` uses, so the two entry
+   * points land on one discoverable surface.
+   */
   toggleRadioMenu(): void {
     if (this.radioVisible) {
       this.closeRadioMenu();
-    } else {
-      this.openRadioMenu();
+      return;
     }
+    this.toggleCommandMode();
   }
 
   setRadioCooldowns(cooldowns: AirSupportRadioCooldowns): void {
     this.airSupportRadioMenu.setCooldowns(cooldowns);
+    this.commandModeOverlay.setFireSupportCooldowns(cooldowns);
+  }
+
+  private setSelectedMarking(marking: AirSupportTargetMarking): void {
+    this.selectedMarking = marking;
+    this.commandModeOverlay.setSelectedMarking(marking);
   }
 
   private openOverlay(): void {
@@ -288,6 +310,12 @@ export class CommandInputManager implements GameSystem {
     this.overlayVisible = true;
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
+    this.radioCooldownAccumulator = 0;
+    // Snapshot the call-in target (where the player looks) and seed the
+    // fire-support cooldown bars + active mark the instant the radio opens.
+    this.resolveRadioTarget();
+    this.feedRadioCooldowns();
+    this.commandModeOverlay.setSelectedMarking(this.selectedMarking);
     this.inputManager?.unlockPointer?.();
     this.openOverlayTouchPassThrough();
     this.commandModeOverlay.setVisible(true);
@@ -443,7 +471,12 @@ export class CommandInputManager implements GameSystem {
         statusText: `${asset.label} inbound - ${asset.aircraft}`,
       });
       this.feedRadioCooldowns();
-      this.closeRadioMenu();
+      // Close whichever fire-support surface launched the call-in.
+      if (this.radioVisible) {
+        this.closeRadioMenu();
+      } else if (this.overlayVisible) {
+        this.closeOverlay();
+      }
     } else {
       const remaining = Math.ceil(this.airSupportManager.getCooldownRemaining(supportType));
       this.airSupportRadioMenu.setState({
@@ -453,6 +486,15 @@ export class CommandInputManager implements GameSystem {
       });
       this.feedRadioCooldowns();
     }
+  }
+
+  /**
+   * Fire-support call-in from the unified radio overlay. Re-uses the exact
+   * `AirSupportManager.requestSupport` path the detailed radio menu drives — it
+   * does NOT reimplement the sortie. The selection carries the active mark mode.
+   */
+  private handleFireSupportSelection(assetId: AirSupportRadioAssetId): void {
+    this.handleRadioSelection({ assetId, targetMarking: this.selectedMarking });
   }
 
   /**
@@ -474,6 +516,10 @@ export class CommandInputManager implements GameSystem {
     if (!this.playerController) return false;
 
     const camera = this.playerController.getCamera();
+    // The unified radio seeds a call-in target whenever it opens; a camera that
+    // cannot report a world position (e.g. before spawn) leaves the target
+    // unresolved rather than throwing.
+    if (typeof camera?.getWorldPosition !== 'function') return false;
     camera.getWorldPosition(this.radioOrigin);
     camera.getWorldDirection(this.radioDir);
 
