@@ -27,9 +27,19 @@ interface PlayerScore {
   faction: Faction;
 }
 
+const HINT_ID = 'scoreboard-discoverability-hint';
+
 export class ScoreboardPanel extends UIComponent {
   private isVisible = false;
   private onClose?: () => void;
+  /**
+   * Tiny, always-on discoverability nudge. Playtest read the scoreboard as
+   * "not working" because it is hold-Tab, not a toggle — the hint makes the
+   * affordance visible. Standalone + pointer-events:none so it composes with a
+   * future unified control-hints HUD without coupling to it. Keyboard-only
+   * (touch uses tap, with a sacred bottom-corner control zone).
+   */
+  private hintEl?: HTMLDivElement;
 
   constructor(
     private statsTracker: PlayerStatsTracker,
@@ -49,6 +59,12 @@ export class ScoreboardPanel extends UIComponent {
         this.onClose?.();
       }
     });
+    this.mountDiscoverabilityHint();
+  }
+
+  protected onUnmount(): void {
+    this.hintEl?.remove();
+    this.hintEl = undefined;
   }
 
   // --- Public API ---
@@ -56,6 +72,8 @@ export class ScoreboardPanel extends UIComponent {
   toggle(visible: boolean): void {
     this.isVisible = visible;
     this.toggleClass(styles.visible, visible);
+    // Hide the nudge while the board is up — it would be redundant.
+    if (this.hintEl) this.hintEl.style.display = visible ? 'none' : 'block';
     if (visible) {
       this.refresh();
     }
@@ -66,6 +84,42 @@ export class ScoreboardPanel extends UIComponent {
   }
 
   // --- Private ---
+
+  /**
+   * Mount the standalone "Hold Tab: scoreboard" nudge into document.body
+   * (idempotent). Right edge, vertically centered — clear of the bottom HUD
+   * corners (health / ammo / weapon-bar) and the top-right kill-feed. Purely
+   * visual; never intercepts input.
+   */
+  private mountDiscoverabilityHint(): void {
+    if (typeof document === 'undefined' || !document.body) return;
+    // Keyboard-only affordance; touch shows the board on tap.
+    if (isTouchDevice()) return;
+    if (document.getElementById(HINT_ID)) return;
+
+    const el = document.createElement('div');
+    el.id = HINT_ID;
+    el.textContent = 'Hold Tab: scoreboard';
+    el.setAttribute('aria-hidden', 'true');
+    Object.assign(el.style, {
+      position: 'fixed',
+      right: '8px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: '180',
+      pointerEvents: 'none',
+      whiteSpace: 'nowrap',
+      font: '10px/1.3 "Courier Prime", "Courier New", monospace',
+      letterSpacing: '0.04em',
+      textTransform: 'uppercase',
+      color: 'rgba(231, 217, 186, 0.5)',
+      textShadow: '0 1px 2px rgba(0, 0, 0, 0.75)',
+      userSelect: 'none',
+    } as Partial<CSSStyleDeclaration>);
+    el.style.display = this.isVisible ? 'none' : 'block';
+    document.body.appendChild(el);
+    this.hintEl = el;
+  }
 
   private refresh(): void {
     const content = this.root.querySelector(`.${styles.content}`) as HTMLDivElement;

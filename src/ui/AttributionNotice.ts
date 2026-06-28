@@ -33,12 +33,20 @@ export function mountPersistentAttribution(): void {
   el.textContent = ATTRIBUTION_LINE;
   el.title = ATTRIBUTION_LINE;
   el.setAttribute('aria-hidden', 'false');
+  // Bottom-CENTER, flush to the screen edge. The bottom-left corner is the
+  // health pill's slot and the bottom-right is the ammo slot (see
+  // HUDLayoutStyles grid), so a left/bottom-anchored notice overlaps the
+  // health readout. The weapon bar sits in the bottom-center *row* but its
+  // content is vertically centered, not flush, so this 10px line tucks
+  // beneath it. Stays pointer-events:none so it never steals input.
   Object.assign(el.style, {
     position: 'fixed',
-    left: '6px',
-    bottom: '4px',
+    left: '50%',
+    bottom: '2px',
+    transform: 'translateX(-50%)',
     zIndex: '2147482000',
     maxWidth: 'min(70vw, 540px)',
+    textAlign: 'center',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
