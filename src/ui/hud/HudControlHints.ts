@@ -2,6 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import { colors, fontStack, zIndex } from '../design/tokens';
+import type { ActorMode } from '../layout/types';
 
 /**
  * HudControlHints — persistent, context-sensitive control legend.
@@ -17,8 +18,9 @@ import { colors, fontStack, zIndex } from '../design/tokens';
  * Design goals:
  *  - Small and composable. `seat-and-fire-cues` (Phase 1) and
  *    `situation-readout-hud` (Phase 6) share this surface, so the public API is
- *    deliberately tiny: `mount`, `setContext`, `toggle`, `setVisible`,
- *    `isShown`, `dispose`.
+ *    deliberately tiny: `mount`, `setContext` / `setContextForActor`, `toggle`,
+ *    `setVisible`, `isShown`, `dispose`. The actor→context mapping lives here so
+ *    HUDSystem just forwards its existing `ActorMode` at each transition.
  *  - Single source of truth for bind text. The strings come from CONTEXT_BINDS
  *    below, which mirror PlayerInput.showControls / SettingsModal's controls
  *    reference. They are NOT re-typed per call site, so they can't drift
@@ -184,6 +186,30 @@ export class HudControlHints {
     if (this.context === context) return;
     this.context = context;
     this.render();
+  }
+
+  /**
+   * Switch the legend by the actor mode the player is in. Aircraft
+   * (helicopter + plane) share the flight binds; ground vehicles and turrets
+   * share the ground-vehicle binds; everything else is on-foot. Lets callers
+   * pass their existing `ActorMode` without mapping it themselves.
+   */
+  setContextForActor(actor: ActorMode): void {
+    this.setContext(HudControlHints.actorToContext(actor));
+  }
+
+  /** Map an actor mode to the control-legend context. */
+  static actorToContext(actor: ActorMode): ControlHintContext {
+    switch (actor) {
+      case 'helicopter':
+      case 'plane':
+        return 'aircraft';
+      case 'car':
+      case 'turret':
+        return 'groundVehicle';
+      default:
+        return 'foot';
+    }
   }
 
   /** Current control context (for composing add-ons on the same surface). */
