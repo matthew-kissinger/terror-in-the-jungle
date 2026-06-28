@@ -11,6 +11,8 @@ import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
 import { HUDZoneDisplay } from './HUDZoneDisplay';
+import { HudControlHints, ControlHintContext } from './HudControlHints';
+import { isTouchDevice } from '../../utils/DeviceDetector';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { movementStatsTracker } from '../../systems/player/MovementStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
@@ -56,6 +58,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private styles: HUDStyles;
   private elements: HUDElements;
   private zoneDisplay: HUDZoneDisplay;
+  private controlHints: HudControlHints;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
   private scoreboard: ScoreboardPanel;
@@ -80,6 +83,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.styles = HUDStyles.getInstance();
     this.elements = new HUDElements(camera);
     this.zoneDisplay = new HUDZoneDisplay(this.elements);
+    this.controlHints = new HudControlHints();
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.hudLayout = new HUDLayout();
@@ -152,6 +156,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.attachToDOM(this.hudLayout);
     this.scoreboard.mount(this.hudLayout.getRoot());
     this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
+    // Context-sensitive control legend pinned to the right edge (an unused HUD
+    // zone). Suppressed on touch, where on-screen buttons teach the controls.
+    this.controlHints.mount(this.hudLayout.getRoot(), isTouchDevice());
 
     // Initialize ticket display
     this.elements.ticketDisplay.setTickets(300, 300);
@@ -263,6 +270,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     for (const unsub of this.eventUnsubscribes) unsub();
     this.eventUnsubscribes.length = 0;
     this.viewportUnsubscribe?.();
+    this.controlHints.dispose();
     this.hudLayout.dispose();
     this.scoreboard.dispose();
     this.personalStatsPanel.dispose();
@@ -524,10 +532,39 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateHelicopterMouseMode(controlMode);
   }
 
+  /**
+   * Map the active actor mode to the control-legend context. Aircraft
+   * (helicopter + plane) share the flight binds; ground vehicles and turrets
+   * share the ground-vehicle binds; everything else is on-foot.
+   */
+  private controlContextForActor(actor: ActorMode): ControlHintContext {
+    switch (actor) {
+      case 'helicopter':
+      case 'plane':
+        return 'aircraft';
+      case 'car':
+      case 'turret':
+        return 'groundVehicle';
+      default:
+        return 'foot';
+    }
+  }
+
+  /** Swap the live control legend to match the actor the player is in. */
+  private syncControlHints(actor: ActorMode): void {
+    this.controlHints.setContext(this.controlContextForActor(actor));
+  }
+
+  /** Toggle the on-screen control legend (display only). */
+  toggleControlHints(): void {
+    this.controlHints.toggle();
+  }
+
   // Helicopter instruments methods (only visible in helicopter)
   showHelicopterInstruments(): void {
     this.elements.showHelicopterInstruments();
     this.hudLayout.setState({ actorMode: 'helicopter' });
+    this.syncControlHints('helicopter');
   }
 
   hideHelicopterInstruments(): void {
@@ -536,6 +573,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       actorMode: 'infantry',
       vehicleContext: null,
     });
+    this.syncControlHints('infantry');
   }
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
@@ -562,6 +600,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   showFixedWingInstruments(): void {
     this.elements.showFixedWingInstruments();
     this.hudLayout.setState({ actorMode: 'plane' });
+    this.syncControlHints('plane');
   }
 
   hideFixedWingInstruments(): void {
@@ -570,6 +609,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       actorMode: 'infantry',
       vehicleContext: null,
     });
+    this.syncControlHints('infantry');
   }
 
   updateFixedWingFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
@@ -737,6 +777,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   /** Set the vehicle context (hides infantry-only slots in helicopter). */
   setVehicle(vehicle: ActorMode): void {
     this.hudLayout.setState({ actorMode: vehicle });
+    this.syncControlHints(vehicle);
   }
 
   /** Set ADS state (dims non-essential HUD when aiming). */
@@ -765,10 +806,12 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   setVehicleContext(context: VehicleUIContext | null): void {
+    const actorMode: ActorMode = context?.kind ?? 'infantry';
     this.hudLayout.setState({
       vehicleContext: context,
-      actorMode: context?.kind ?? 'infantry',
+      actorMode,
     });
+    this.syncControlHints(actorMode);
   }
 
   isScoreboardCurrentlyVisible(): boolean {
