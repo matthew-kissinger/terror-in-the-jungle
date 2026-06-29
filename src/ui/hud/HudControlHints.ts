@@ -101,7 +101,12 @@ const CONTEXT_BINDS: Record<ControlHintContext, ContextLegend> = {
       { keys: 'A/D', action: 'Steer' },
       { keys: 'LMB', action: 'Fire (if armed)' },
       { keys: 'RMB', action: 'Free look' },
-      { keys: 'F', action: 'Exit / swap seat' },
+      // E exits any seated ground/tracked vehicle (mirrors the aircraft exit
+      // key); F swaps the driver<->gunner seat on craft with a second seat
+      // (tank). They are split because on a two-seat tank F always swaps, so
+      // a conflated "F: exit / swap" left the dismount unreachable.
+      { keys: 'E', action: 'Exit vehicle' },
+      { keys: 'F', action: 'Swap seat' },
       { keys: 'T', action: 'Air support radio' },
       { keys: 'TAB', action: 'Scoreboard' },
     ],
