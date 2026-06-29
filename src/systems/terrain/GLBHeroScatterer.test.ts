@@ -318,14 +318,19 @@ describe('GLBHeroScatterer real-config wiring', () => {
     scatterer.configure('denseJungle', new Map([['denseJungle', palette]]), []);
     await settle(scatterer, new THREE.Vector3(0, 0, 0));
 
-    // Distinct asset slugs actually streamed to the loader.
+    // Distinct asset slugs actually streamed to the loader. Do not derive the
+    // slug from the asset folder: bamboo-grove intentionally loads a derivative
+    // bamboo-culm GLB.
+    const slugForModelPath = new Map(Object.values(archetypes).map((a) => [a.modelPath, a.slug]));
     const slugs = new Set(
-      requested.map((u) => u.split('/assets/vegetation/')[1]?.split('/')[0]),
+      requested.map((u) => slugForModelPath.get(u) ?? u),
     );
-    // Every baked canopy hero wired into denseJungle places.
-    for (const s of ['jungle-tree', 'rubber-a', 'rubber-b', 'teak-a', 'teak-b', 'coconut-palm']) {
+    // Every baked canopy/mid-level hero wired into denseJungle places.
+    for (const s of ['jungle-tree', 'rubber-a', 'rubber-b', 'teak-a', 'teak-b', 'bamboo-grove']) {
       expect(slugs.has(s), s).toBe(true);
     }
+    // coconut-palm is intentionally owned by the straightened mesh/card ground-card tier.
+    expect(slugs.has('coconut-palm')).toBe(false);
     // Nothing outside the hero archetype set ever reaches the GLB loader.
     expect([...slugs].every((s) => s in archetypes)).toBe(true);
     expect(impostors.registered.size).toBeGreaterThan(0);

@@ -165,8 +165,8 @@ function createCardTextureProvider(): GroundCardTextureProvider {
  * The authored world-feature props (WorldFeatureSystem) are sparse and hand-placed,
  * so the StaticImpostorSystem default of 256 is plenty there. The vegetation heroes
  * are different: they are scattered PROCEDURALLY at biome density across the whole
- * streaming radius, and the dense mid-heroes (fan-palm ~0.55, bamboo-grove ~0.28)
- * generate far more than 256 impostor instances inside that radius. Sizing every
+ * streaming radius, and dense mid-heroes such as fan-palm and single-culm
+ * bamboo-grove generate far more than 256 impostor instances inside that radius. Sizing every
  * veg-hero batch generously lets those distant plants actually render instead of
  * overflowing the batch (each instance is ~8 floats, so 8192 ≈ 256KB per archetype —
  * cheap, and the sparse heroes never come close to filling it).

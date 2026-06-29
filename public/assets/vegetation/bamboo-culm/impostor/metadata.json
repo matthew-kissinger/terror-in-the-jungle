@@ -1,7 +1,7 @@
 {
   "generator": "scripts/bake-vegetation-impostor.mjs",
-  "generatedAt": "2026-06-29T19:41:42.135Z",
-  "modelUrl": "/assets/vegetation/coconut-palm/coconut-palm.glb",
+  "generatedAt": "2026-06-29T22:58:08.664Z",
+  "modelUrl": "http://127.0.0.1:9232/assets/vegetation/bamboo-culm/bamboo-culm.glb",
   "columns": 8,
   "rows": 3,
   "tileSize": [
@@ -21,14 +21,14 @@
   "bounds": {
     "center": [
       0,
-      13.539649963378906,
+      7.150569888933606,
       0
     ],
     "size": [
-      12.752389907836914,
-      27.079299926757812,
-      12.15804386138916
+      5.129300947189332,
+      14.301139777867212,
+      5.35651424407959
     ],
-    "radius": 16.153404930697036
+    "radius": 8.054883177302461
   }
 }

@@ -75,8 +75,19 @@ npm run check:vegetation-lod-review
 npx tsx scripts/scene-parity-probe.ts --renderer webgpu-strict --headed --modes open_frontier,a_shau_valley --force-build --veg-impostor-transition-meters 28
 ```
 
-Latest useful shipped artifacts:
+Latest useful artifacts:
 
+- `artifacts/vegetation-lod-review/2026-06-29T23-28-48-525Z`
+  - focused bamboo-grove and coconut-palm matrix for the current LOD fixes
+  - 6/6 pass across daylight, low-sun, and humid-fog
+  - source route: `bamboo-grove` now loads `bamboo-culm/bamboo-culm.glb`
+    near and `bamboo-culm/impostor/` far, so groves come from scatter
+    placement instead of one baked 3-culm clump
+  - `coconut-palm` keeps the grounded straightened mesh near and crossed
+    physical-card far route to avoid octa/lat-long trunk snapping
+  - bamboo-specific material tuning keeps the pale culm and muted leaves closer
+    to the source mesh than the old surface-normal and rejected dark
+    foliage-card outputs
 - `artifacts/perf/2026-06-26T21-23-21-426Z/projekt-143-live-release-proof/release-proof.json`
   - production proof for merge commit
     `e6e881a4bf9a1d50028b6f8262cbad6315d45b6a`
@@ -138,6 +149,9 @@ Latest useful shipped artifacts:
   - clean-head focused matrix for bamboo-grove, fan-palm, jungle-tree, and
     understory-fern after the capture-normal, fog, and direct-light candidate
     changes
+  - bamboo-grove is no longer a three-culm static-impostor acceptance target after
+    that bake showed grounding/hue artifacts; current review should use the
+    single-culm mesh-near / static-impostor-far entry instead
 - `scripts/scene-parity-probe.ts`
   - live-scene proof now includes a `vegetation-focus` screenshot in addition to
     ground / elevated / skyward / finite-edge poses

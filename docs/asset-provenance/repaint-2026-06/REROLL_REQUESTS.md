@@ -45,12 +45,12 @@ Accepted into the catalog this cycle; fix in a future re-roll, not urgent:
 ## Not a re-roll (handled elsewhere)
 
 - **Coconut palm** — the off-center/leaning-trunk pop first seen in the owner
-  walk was handled as an LOD transition issue by `coconut-card-crossfade`
-  (PR #437, `fd46642c`). The later crossed-trunk far-card artifact is also not
-  a Kiln art re-roll: `coconut-palm` now routes to a mesh-near / octa-impostor
-  far LOD in the vegetation pipeline. The coconut GLB itself (external
-  Poly-by-Google CC-BY) is unchanged. A true source replacement, if ever needed,
-  goes through the vegetation/impostor pipeline, not the war importer.
+  walk was handled first as an LOD transition issue by `coconut-card-crossfade`
+  (PR #437, `fd46642c`). The later octa view-cell snap / leaf-edge pixelation is
+  also not a Kiln art re-roll: `coconut-palm` now uses a trunk-straightened,
+  grounded derivative of the external Poly-by-Google CC-BY GLB plus a rebaked
+  1024px card in the vegetation pipeline. A true source replacement, if ever
+  needed, goes through the vegetation/card pipeline, not the war importer.
 
 Owner walk 2026-06-28: the UH-1 Huey + A-1 Skyraider rolls above are DONE; the
 remaining open items are the advisories listed above (next Kiln pass). The

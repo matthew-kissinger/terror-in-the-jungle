@@ -83,10 +83,18 @@ regenerated or approved: `rubberTree`, `ricePaddyPlants`, `elephantGrass`,
 Pixel Forge vegetation is currently impostor-only. Runtime metadata still carries
 the older atlas guard for the legacy camelCase `coconut` package: it samples a
 clean column and avoids the bad low-elevation row. The newer library
-`coconut-palm` GLB uses a real mesh near the player and an 8x3 octahedral
-impostor to avoid the crossed-card trunk split seen in the previous single-front
-ground-card far LOD. Its far material narrows azimuth blending so adjacent
-capture angles do not smear the curved trunk into a second silhouette.
+`coconut-palm` GLB uses a trunk-straightened real mesh near the player and a
+1024px-high baked card far from the player. The source mesh ground contact and
+crown are re-centered to one vertical line so the baked far card keeps one trunk
+instead of exposing the octahedral view-cell snap / curved-trunk double image
+seen in the short-lived octa pass. Library `bamboo-grove` no longer bakes the
+three-culm cluster as one impostor: the sparse grove now uses a single extracted
+bamboo culm as the near mesh and a matching single-culm static impostor far from
+the player, with grove volume coming from scatter placement instead of one
+multi-plant projection. That impostor carries bamboo-specific material tuning
+that lowers the foliage-card gamma, lifts exposure, and trims saturation/fog so
+the pale culm and muted leaves track the source mesh under daylight, low sun,
+and humid fog instead of crushing to black or shifting yellow.
 
 The 2026-06-13 jungle vegetation pass briefly routed near-field ground cover
 through `JungleGroundRing`, but owner follow-up rejected the dense
@@ -94,8 +102,9 @@ camera-following vegetation circle. Normal runtime now routes accepted ground
 cover back through `VegetationScatterer` with the rest of the approved
 vegetation set; `JungleGroundRing` is dormant experiment/reference code, not
 the current player-facing vegetation owner. `fanPalm` and legacy `coconut`
-remain Pixel Forge impostor families, while library `coconut-palm` is the
-current mesh-near / octa-far palm path. This does not approve any blocked
+remain Pixel Forge impostor families, while library `coconut-palm` is a
+mesh-near / card-far path and `bamboo-grove` is a single-culm mesh-near /
+static-impostor-far path. This does not approve any blocked
 vegetation species or promote generic Pixel Forge prop trees into runtime
 vegetation.
 

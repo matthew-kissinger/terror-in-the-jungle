@@ -427,7 +427,7 @@ export class VegetationLodReviewApp {
       map,
       alphaTest: 0.5,
       transparent: false,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
       roughness: 1,
       metalness: 0,
     });
@@ -664,7 +664,12 @@ function buildGroundCardCrossGeometry(): THREE.BufferGeometry {
     0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
     0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
   ]), 3));
-  geometry.setIndex([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]);
+  geometry.setIndex([
+    0, 1, 2, 0, 2, 3,
+    2, 1, 0, 3, 2, 0,
+    4, 5, 6, 4, 6, 7,
+    6, 5, 4, 7, 6, 4,
+  ]);
   geometry.computeBoundingSphere();
   return geometry;
 }

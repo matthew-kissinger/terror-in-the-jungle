@@ -83,7 +83,7 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
     // similar-or-slightly-lower (the cross cards cover more area per instance).
     { typeId: 'understory-fern',   densityMultiplier: 0.8 },
     { typeId: 'taro-elephant-ear', densityMultiplier: 0.5 },
-    // Tall sparse palm: real mesh near, 8x3 octahedral impostor far.
+    // Tall sparse palm: straightened real mesh near, 1024px baked card far.
     { typeId: 'coconut-palm',      densityMultiplier: 0.8 },
     // Banana fronds: real mesh near, baked alpha card far (kebab id, GroundCardScatterer).
     { typeId: 'banana-plant', densityMultiplier: 0.5 },
@@ -121,7 +121,8 @@ const BIOME_HIGHLAND: BiomeConfig = {
   groundRoughness: 0.78,
   vegetationPalette: [
     // Ground cover is now the library understory-fern card (kebab id, GroundCardScatterer);
-    // the old fern billboard is removed. fanPalm + sparse bamboo billboards stay (no card art).
+    // the old fern billboard is removed. fanPalm + the highland-only legacy bamboo
+    // billboard remain until that biome gets a separate accepted bamboo asset.
     { typeId: 'understory-fern', densityMultiplier: 0.8 },
     { typeId: 'fanPalm',      densityMultiplier: 0.3 },
     { typeId: 'bambooGrove',  densityMultiplier: 0.2 },
@@ -213,9 +214,10 @@ const BIOME_BAMBOO_GROVE: BiomeConfig = {
   groundRoughness: 0.84,
   vegetationPalette: [
     // Dense bamboo is now a ground CARD (bamboo-thicket, kebab id): the far band is a
-    // baked alpha card (2 tris) and the near-mesh tier is globally capped at 32, so the
-    // old billboard's per-instance GLB-clone memory blowup at high density is gone.
-    // The sparse hero bamboo-grove (mesh+octa) stays for low-density jungle understory.
+    // baked alpha card and the near-mesh tier is globally capped at 32, so the old
+    // billboard's per-instance GLB-clone memory blowup at high density is gone.
+    // Sparse bamboo-grove is separate: one bamboo culm scattered as mesh-near +
+    // static-impostor-far, so side views do not bake multiple culms into one sprite.
     // Thinned 2.8 -> 1.8 (2026-06-28 owner playtest: still reads as dense bamboo but no
     // longer walls off movement/sightlines).
     { typeId: 'bamboo-thicket',    densityMultiplier: 1.8 },
@@ -235,7 +237,7 @@ const BIOME_SWAMP: BiomeConfig = {
     { typeId: 'coconut-palm',  densityMultiplier: 1.0 },
     { typeId: 'fanPalm',       densityMultiplier: 0.9 },
     // Understory cards (kebab ids) replace the old fern/elephantEar/bananaPlant billboards;
-    // the coconut palm is now a coconut-palm octa impostor hero. fanPalm stays a
+    // coconut-palm is a straightened mesh/card species. fanPalm stays a
     // billboard (no card art for that species yet).
     { typeId: 'taro-elephant-ear', densityMultiplier: 1.2 },
     { typeId: 'understory-fern',   densityMultiplier: 0.75 },

@@ -48,23 +48,37 @@ describe('vegetationLibraryAdapter', () => {
     expect(archetypes['teak-a'].promotionDistanceMeters).toBe(160);
   });
 
-  it('emits archetypes for the promoted fan-palm, bamboo-grove, and coconut-palm heroes', () => {
+  it('emits an archetype for the promoted fan-palm hero', () => {
     const archetypes = vegetationLibraryStaticArchetypes();
     expect(archetypes['fan-palm']).toBeDefined();
-    expect(archetypes['bamboo-grove']).toBeDefined();
-    expect(archetypes['coconut-palm']).toBeDefined();
     // Short mesh ranges: understory reads flat sooner than canopy.
     expect(archetypes['fan-palm'].promotionDistanceMeters).toBe(70);
-    expect(archetypes['bamboo-grove'].promotionDistanceMeters).toBe(100);
-    expect(archetypes['coconut-palm'].promotionDistanceMeters).toBe(50);
-    expect(archetypes['coconut-palm'].cullDistanceMeters).toBe(140);
-    expect(archetypes['coconut-palm'].materialTuning).toMatchObject({
-      foliageExposureScale: 1.45,
-      foliageColorGamma: 1.2,
-      azimuthBlendBand: 0.22,
-    });
     expect(archetypes['fan-palm'].maps.baseColor).toContain('fan-palm/impostor/atlas.base-color.png');
-    expect(archetypes['coconut-palm'].maps.baseColor).toContain('coconut-palm/impostor/atlas.base-color.png');
+  });
+
+  it('emits the single-culm bamboo-grove mesh with a baked far impostor', () => {
+    const archetypes = vegetationLibraryStaticArchetypes();
+    const cards = vegetationLibraryGroundCards();
+    const bamboo = archetypes['bamboo-grove'];
+
+    expect(bamboo).toBeDefined();
+    expect(cards['bamboo-grove']).toBeUndefined();
+    expect(bamboo.modelPath).toBe(`${VEGETATION_ASSET_ROOT}/bamboo-culm/bamboo-culm.glb`);
+    expect(bamboo.maps.baseColor).toBe(`${VEGETATION_ASSET_ROOT}/bamboo-culm/impostor/atlas.base-color.png`);
+    expect(bamboo.maps.normal).toContain('bamboo-culm/impostor/atlas.normal.png');
+    expect(bamboo.maps.depth).toContain('bamboo-culm/impostor/atlas.depth.png');
+    expect(bamboo.columns).toBe(8);
+    expect(bamboo.rows).toBe(3);
+    expect(bamboo.promotionDistanceMeters).toBe(70);
+    expect(bamboo.demotionDistanceMeters).toBeLessThan(bamboo.promotionDistanceMeters);
+    expect(bamboo.bounds.radius).toBeCloseTo(8.055, 3);
+    expect(bamboo.materialTuning).toMatchObject({
+      foliageExposureScale: 1.55,
+      foliageColorGamma: 1.05,
+      foliageSaturation: 0.82,
+      fogStrength: 0.85,
+      azimuthBlendBand: 0.6,
+    });
   });
 
   it('does NOT emit archetypes for assets whose far representation is only planned', () => {
@@ -74,6 +88,9 @@ describe('vegetationLibraryAdapter', () => {
     // banana-plant's far rep is a baked groundCard (not an octa impostor), so it never
     // reaches the static (per-clone hero) archetype path either.
     expect(archetypes['banana-plant']).toBeUndefined();
+    // coconut-palm also uses the mesh-near + baked-card-far path after its trunk
+    // was straightened, so it stays off the octa hero system.
+    expect(archetypes['coconut-palm']).toBeUndefined();
   });
 
   it('returns no billboard assets yet (no card atlases baked)', () => {
@@ -153,11 +170,29 @@ describe('vegetationLibraryGroundCards', () => {
     expect(vegetationLibraryBillboardAssets()).toEqual([]);
   });
 
-  it('keeps coconut-palm out of the crossed ground-card path', () => {
+  it('routes coconut-palm through the straightened ground-card path', () => {
     const cards = vegetationLibraryGroundCards();
     const archetypes = vegetationLibraryStaticArchetypes();
+    const coconut = cards['coconut-palm'];
 
-    expect(cards['coconut-palm']).toBeUndefined();
-    expect(archetypes['coconut-palm']).toBeDefined();
+    expect(coconut).toBeDefined();
+    expect(archetypes['coconut-palm']).toBeUndefined();
+    expect(coconut.meshPath).toBe(`${VEGETATION_ASSET_ROOT}/coconut-palm/coconut-palm.glb`);
+    expect(coconut.card.baseColor).toBe(`${VEGETATION_ASSET_ROOT}/coconut-palm/card/atlas.base-color.png`);
+    expect(coconut.card.normal).toContain('coconut-palm/card/atlas.normal.png');
+    expect(coconut.meshFarEdgeMeters).toBe(50);
+    expect(coconut.cullDistanceMeters).toBe(140);
+  });
+
+  it('keeps bamboo-grove off the grounded-card path', () => {
+    const cards = vegetationLibraryGroundCards();
+    const archetypes = vegetationLibraryStaticArchetypes();
+    const bamboo = archetypes['bamboo-grove'];
+
+    expect(cards['bamboo-grove']).toBeUndefined();
+    expect(bamboo).toBeDefined();
+    expect(bamboo.modelPath).toBe(`${VEGETATION_ASSET_ROOT}/bamboo-culm/bamboo-culm.glb`);
+    expect(bamboo.maps.baseColor).toBe(`${VEGETATION_ASSET_ROOT}/bamboo-culm/impostor/atlas.base-color.png`);
+    expect(bamboo.promotionDistanceMeters).toBe(70);
   });
 });
