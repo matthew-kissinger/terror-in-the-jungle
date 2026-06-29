@@ -15,13 +15,14 @@ import type { LoadoutWeapon } from '../../../ui/loadout/LoadoutTypes'
  * Unified implementation to eliminate duplication
  */
 export class WeaponSwitching {
-  private static readonly RUNTIME_WEAPON_MAP: Record<LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'> = {
+  private static readonly RUNTIME_WEAPON_MAP: Record<LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman', 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman'> = {
     rifle: 'rifle',
     shotgun: 'shotgun',
     smg: 'smg',
     pistol: 'pistol',
     lmg: 'lmg',
-    launcher: 'launcher'
+    launcher: 'launcher',
+    marksman: 'marksman'
   }
   private rigManager: WeaponRigManager
   private input: WeaponInput
@@ -31,13 +32,14 @@ export class WeaponSwitching {
   private audioManager?: AudioManager
 
   // Weapon type to ammo manager mapping
-  private readonly weaponAmmoMap: Record<'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', () => AmmoManager> = {
+  private readonly weaponAmmoMap: Record<'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman', () => AmmoManager> = {
     rifle: () => this.ammo.getRifleAmmo(),
     shotgun: () => this.ammo.getShotgunAmmo(),
     smg: () => this.ammo.getSMGAmmo(),
     pistol: () => this.ammo.getPistolAmmo(),
     lmg: () => this.ammo.getLMGAmmo(),
-    launcher: () => this.ammo.getLauncherAmmo()
+    launcher: () => this.ammo.getLauncherAmmo(),
+    marksman: () => this.ammo.getMarksmanAmmo()
   }
 
   constructor(
@@ -72,12 +74,12 @@ export class WeaponSwitching {
 
   /**
    * Switch to the specified weapon type
-   * @param weaponType - 'rifle', 'shotgun', 'smg', 'pistol', 'lmg', or 'launcher'
+   * @param weaponType - 'rifle', 'shotgun', 'smg', 'pistol', 'lmg', 'launcher', or 'marksman'
    * @param onAmmoChange - Callback to update HUD with new ammo state
    * @returns true if switch was initiated, false if already on that weapon or switching
    */
   switchWeapon(
-    weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher',
+    weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman',
     onAmmoChange: (state: AmmoState) => void
   ): boolean {
     const runtimeWeaponType = WeaponSwitching.RUNTIME_WEAPON_MAP[weaponType]

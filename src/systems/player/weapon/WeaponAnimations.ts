@@ -5,7 +5,7 @@ import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
 
 /** Weapon-type identity used to resolve the per-weapon ADS sight-line offset. */
-export type WeaponAdsType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
+export type WeaponAdsType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman'
 
 type AdsOffset = { x: number; y: number; z: number }
 
@@ -64,6 +64,19 @@ export class WeaponAnimations {
   // table fall back to adsPosition. ADS timing/recoil/hip pose are unchanged.
   private readonly adsPositionOverrides: Partial<Record<WeaponAdsType, AdsOffset>> = {
     lmg: { x: 0.0, y: -0.6, z: -0.62 },
+    // The Dragunov is long with a high scope line; drop it lower and pull it
+    // slightly back so the optic sits on the reticle at the deeper marksman zoom.
+    marksman: { x: 0.0, y: -0.5, z: -0.6 },
+  }
+
+  // Per-weapon ADS FOV-zoom divisor. ADS lerps the FOV from baseFOV toward
+  // baseFOV/divisor, so a LARGER divisor = tighter ("more zoomed") sight picture.
+  // Weapons absent from this table use ADS_FOV_DIVISOR_DEFAULT (the shared
+  // baseFOV/1.3 that every iron-sight weapon used before). Only the marksman
+  // overrides it here, for the "scope" feel — no other weapon changes.
+  private readonly ADS_FOV_DIVISOR_DEFAULT = 1.3
+  private readonly adsFovDivisorOverrides: Partial<Record<WeaponAdsType, number>> = {
+    marksman: 2.6,
   }
 
   private baseFOV = 75 // Store base FOV for zoom effect
@@ -94,7 +107,7 @@ export class WeaponAnimations {
     this.pumpGripRef = ref
   }
 
-  update(deltaTime: number, isMoving: boolean, lookVelocity: THREE.Vector3): void {
+  update(deltaTime: number, isMoving: boolean, lookVelocity: THREE.Vector3, weaponType?: WeaponAdsType): void {
     // Update idle animation
     this.idleTime += deltaTime
 
@@ -121,9 +134,11 @@ export class WeaponAnimations {
     const k = adsTime > 0 ? Math.min(1, deltaTime / adsTime) : 1
     this.adsProgress = THREE.MathUtils.lerp(this.adsProgress, target, k)
 
-    // Apply FOV zoom when ADS (reduced zoom for less disorientation)
+    // Apply FOV zoom when ADS. The zoom divisor is per-weapon (the marksman
+    // zooms deeper for the "scope" feel); unlisted weapons use the shared default.
     if (this.camera instanceof THREE.PerspectiveCamera) {
-      const targetFOV = THREE.MathUtils.lerp(this.baseFOV, this.baseFOV / 1.3, this.adsProgress)
+      const divisor = this.getADSFovDivisor(weaponType)
+      const targetFOV = THREE.MathUtils.lerp(this.baseFOV, this.baseFOV / divisor, this.adsProgress)
       if (this.camera.fov !== targetFOV) {
         this.camera.fov = targetFOV
         this.camera.updateProjectionMatrix()
@@ -214,6 +229,19 @@ export class WeaponAnimations {
       if (override) return override
     }
     return this.adsPosition
+  }
+
+  /**
+   * Resolve the ADS FOV-zoom divisor for the active weapon. Returns the
+   * per-weapon override when one exists (e.g. the marksman's deeper "scope"
+   * zoom), otherwise the shared default. Call with no argument for the default.
+   */
+  getADSFovDivisor(weaponType?: WeaponAdsType): number {
+    if (weaponType) {
+      const override = this.adsFovDivisorOverrides[weaponType]
+      if (override !== undefined) return override
+    }
+    return this.ADS_FOV_DIVISOR_DEFAULT
   }
 
   startPumpAnimation(): void {
