@@ -6,10 +6,21 @@
  *
  * Each card: icon + name + one stat line.
  * Tap card -> emits mode selection. No descriptions, no feature badges.
+ *
+ * Premiere modes (A Shau, future faction-selectable modes) additionally show a
+ * side/faction picker (BLUFOR vs OPFOR) before launch; standard modes launch
+ * straight from the card with no picker. See `isFactionSelectable`.
  */
 
 import { UIComponent } from '../engine/UIComponent';
 import { GameMode } from '../../config/gameModeTypes';
+import { Alliance, Faction } from '../../systems/combat/types';
+import {
+  getFactionOptionsForAlliance,
+  getGameModeDefinition,
+  getPlayableAlliances,
+  isFactionSelectable,
+} from '../../config/gameModeDefinitions';
 import { iconHtml } from '../icons/IconRegistry';
 import styles from './ModeSelectScreen.module.css';
 
@@ -77,9 +88,28 @@ const MODE_ENTRIES: ModeEntry[] = [
   },
 ];
 
+const ALLIANCE_DISPLAY_NAMES: Record<Alliance, string> = {
+  [Alliance.BLUFOR]: 'BLUFOR',
+  [Alliance.OPFOR]: 'OPFOR',
+};
+
+const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
+  [Faction.US]: 'US',
+  [Faction.ARVN]: 'ARVN',
+  [Faction.NVA]: 'NVA',
+  [Faction.VC]: 'Viet Cong',
+};
+
+/** Selection callback payload. `alliance` is set only for premiere modes. */
+export interface ModeSelection {
+  mode: GameMode;
+  alliance?: Alliance;
+}
+
 export class ModeSelectScreen extends UIComponent {
-  private onModeSelect?: (mode: GameMode) => void;
+  private onModeSelect?: (selection: ModeSelection) => void;
   private onBack?: () => void;
+  private pendingMode: GameMode | null = null;
 
   protected build(): void {
     this.root.className = styles.screen;
@@ -130,7 +160,14 @@ export class ModeSelectScreen extends UIComponent {
           </div>
         </section>
 
-        <div class="${styles.cards}">${cardsHtml}</div>
+        <div class="${styles.cards}" data-ref="cards">${cardsHtml}</div>
+
+        <section class="${styles.sidePicker}" data-ref="side-picker">
+          <span class="${styles.sidePickerLabel}">Premiere deployment</span>
+          <h3 class="${styles.sidePickerTitle}">CHOOSE YOUR SIDE</h3>
+          <p class="${styles.sidePickerBody}">Fight as the allied coalition or the people's army.</p>
+          <div class="${styles.sideOptions}" data-ref="side-options"></div>
+        </section>
       </div>
     `;
   }
@@ -140,18 +177,18 @@ export class ModeSelectScreen extends UIComponent {
     for (const card of cards) {
       this.listen(card, 'click', () => {
         const mode = card.dataset.mode as GameMode;
-        this.onModeSelect?.(mode);
+        this.handleModeCardClick(mode);
       });
     }
 
     const backBtn = this.$('[data-ref="back"]');
     if (backBtn) {
-      this.listen(backBtn, 'click', () => this.onBack?.());
+      this.listen(backBtn, 'click', () => this.handleBack());
     }
 
     this.listen(window, 'keydown', (e) => {
       if (e.key === 'Escape' && this.isVisible()) {
-        this.onBack?.();
+        this.handleBack();
       }
     });
   }
@@ -159,22 +196,102 @@ export class ModeSelectScreen extends UIComponent {
   // --- Public API ---
 
   show(): void {
+    this.showCards();
     this.root.classList.add(styles.visible);
   }
 
   hide(): void {
     this.root.classList.remove(styles.visible);
+    this.showCards();
   }
 
   isVisible(): boolean {
     return this.root.classList.contains(styles.visible);
   }
 
-  setOnModeSelect(callback: (mode: GameMode) => void): void {
+  setOnModeSelect(callback: (selection: ModeSelection) => void): void {
     this.onModeSelect = callback;
   }
 
   setOnBack(callback: () => void): void {
     this.onBack = callback;
+  }
+
+  // --- Private ---
+
+  private handleModeCardClick(mode: GameMode): void {
+    const definition = getGameModeDefinition(mode);
+    if (isFactionSelectable(definition)) {
+      this.openSidePicker(mode);
+      return;
+    }
+    this.onModeSelect?.({ mode });
+  }
+
+  /** BACK steps out of the side picker first, then leaves the screen. */
+  private handleBack(): void {
+    if (this.isSidePickerOpen()) {
+      this.showCards();
+      return;
+    }
+    this.onBack?.();
+  }
+
+  private openSidePicker(mode: GameMode): void {
+    this.pendingMode = mode;
+    const definition = getGameModeDefinition(mode);
+    const optionsHost = this.$('[data-ref="side-options"]');
+    if (!optionsHost) return;
+
+    const alliances = getPlayableAlliances(definition);
+    optionsHost.innerHTML = alliances
+      .map((alliance) => {
+        const factions = getFactionOptionsForAlliance(definition, alliance)
+          .map((f) => FACTION_DISPLAY_NAMES[f])
+          .join(' + ');
+        return `
+          <button class="${styles.sideOption}" data-alliance="${alliance}" type="button">
+            <span class="${styles.sideOptionName}">${ALLIANCE_DISPLAY_NAMES[alliance]}</span>
+            <span class="${styles.sideOptionFactions}">${factions}</span>
+          </button>
+        `;
+      })
+      .join('');
+
+    for (const option of this.$all('[data-alliance]')) {
+      this.listen(option, 'click', () => {
+        const alliance = option.dataset.alliance as Alliance;
+        this.handleSideSelected(alliance);
+      });
+    }
+
+    this.showSidePicker();
+  }
+
+  private handleSideSelected(alliance: Alliance): void {
+    if (this.pendingMode === null) return;
+    const mode = this.pendingMode;
+    this.pendingMode = null;
+    this.onModeSelect?.({ mode, alliance });
+  }
+
+  private showCards(): void {
+    this.pendingMode = null;
+    const sidePicker = this.$('[data-ref="side-picker"]');
+    const cards = this.$('[data-ref="cards"]');
+    sidePicker?.classList.remove(styles.sidePickerVisible);
+    if (cards) cards.style.display = '';
+  }
+
+  private showSidePicker(): void {
+    const sidePicker = this.$('[data-ref="side-picker"]');
+    const cards = this.$('[data-ref="cards"]');
+    if (cards) cards.style.display = 'none';
+    sidePicker?.classList.add(styles.sidePickerVisible);
+  }
+
+  private isSidePickerOpen(): boolean {
+    const sidePicker = this.$('[data-ref="side-picker"]');
+    return Boolean(sidePicker?.classList.contains(styles.sidePickerVisible));
   }
 }
