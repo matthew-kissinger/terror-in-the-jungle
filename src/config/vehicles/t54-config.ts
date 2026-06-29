@@ -12,21 +12,30 @@ import type { TrackedVehiclePhysicsConfig } from '../../systems/vehicle/TrackedV
  *   - Hull length ~ 6.04 m, width ~ 3.27 m, height ~ 2.4 m.
  *   - Combat weight ~ 36 t (36000 kg) — lighter + lower than the M48.
  *   - Road speed ~ 50 km/h ≈ 14 m/s (per-track speed cap, before
- *     off-road slope-stall scaling) — a touch faster than the Patton.
+ *     off-road slope-stall scaling) — historically a touch faster than the
+ *     Patton. We run the cap slightly low (13 m/s) for "slower but
+ *     stronger" off-road feel, kept one step above the M48 (11 m/s).
  *   - Max climbable grade ~ 30° historically; the tracked-vehicle ground
- *     pressure lets us push the engine envelope to ~34° (0.6 rad) before
+ *     pressure lets us push the engine envelope to ~0.78 rad (~45°) before
  *     drive force fades to zero, matching the M48 tuning rationale.
  *
- * Only fields that differ from `TrackedVehiclePhysics` defaults are named;
- * the physics class merges over its own defaults so passing `undefined` for
- * an omitted field yields the same simulation.
+ * Climb-authority tuning (2026-06-28 owner playtest) is kept in lockstep
+ * with the M48 (see `m48-config.ts` for the full rationale): the same
+ * `maxClimbSlope` / `slopeDriveFloor` / `slopeGravityScale` so both the US
+ * and NVA armor crest jungle grades the same way.
+ *
+ * Only fields that differ in intent from `TrackedVehiclePhysics` defaults
+ * are named; the physics class merges over its own defaults so passing
+ * `undefined` for an omitted field yields the same simulation.
  */
 export const T54_PHYSICS_CONFIG: Partial<TrackedVehiclePhysicsConfig> = {
   mass: 36000,
   trackSeparation: 2.64,
   hullLength: 6.04,
-  maxTrackSpeed: 14,
-  maxClimbSlope: 0.6,
+  maxTrackSpeed: 13,
+  maxClimbSlope: 0.78,
+  slopeDriveFloor: 0.62,
+  slopeGravityScale: 0.2,
 };
 
 /** Bounding-box dimensions (m) used by the procedural fallback mesh. */
