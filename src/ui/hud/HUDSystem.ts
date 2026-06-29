@@ -12,6 +12,8 @@ import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
 import { HUDZoneDisplay } from './HUDZoneDisplay';
 import { HudControlHints } from './HudControlHints';
+import { HudSituationReadout } from './HudSituationReadout';
+import { Alliance, getAlliance } from '../../systems/combat/types';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { movementStatsTracker } from '../../systems/player/MovementStatsTracker';
@@ -59,6 +61,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private elements: HUDElements;
   private zoneDisplay: HUDZoneDisplay;
   private controlHints: HudControlHints;
+  private situationReadout: HudSituationReadout;
+  private playerAlliance: Alliance = Alliance.BLUFOR;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
   private scoreboard: ScoreboardPanel;
@@ -84,6 +88,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements = new HUDElements(camera);
     this.zoneDisplay = new HUDZoneDisplay(this.elements);
     this.controlHints = new HudControlHints();
+    this.situationReadout = new HudSituationReadout();
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.hudLayout = new HUDLayout();
@@ -158,6 +163,11 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
     // Context-sensitive control legend on the right edge; suppressed on touch.
     this.controlHints.mount(this.hudLayout.getRoot(), isTouchDevice());
+    // Situation readout (war posture + nearest contested objective + a direction
+    // nudge) shares the control-hint panel surface — mounted into the legend
+    // root so the two read as one right-edge panel and never collide with the
+    // health / ammo / scoreboard slots.
+    this.situationReadout.mount(this.controlHints.getRoot());
 
     // Initialize ticket display
     this.elements.ticketDisplay.setTickets(300, 300);
@@ -191,6 +201,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       if (this.ticketSystem) {
         this.updateGameStatus(this.ticketSystem);
       }
+      this.updateSituationReadout(isTDM);
       this.objectiveAccumulator = 0;
     }
 
@@ -269,6 +280,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     for (const unsub of this.eventUnsubscribes) unsub();
     this.eventUnsubscribes.length = 0;
     this.viewportUnsubscribe?.();
+    this.situationReadout.dispose();
     this.controlHints.dispose();
     this.hudLayout.dispose();
     this.scoreboard.dispose();
@@ -356,6 +368,32 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       scoreboardVisible: false,
     });
     Logger.info('hud', ' Match statistics tracking started');
+  }
+
+  /**
+   * Drive the situation readout from EXISTING zone + ticket + player state.
+   * Read-only: it pulls capturable zones off the zone query, ticket counts off
+   * the ticket system, and the player position off the camera — no new strategy
+   * computation, and no WarSimulator / zone-capture mutation. Runs on the same
+   * 2Hz objective tick as the zone display, so it adds no extra per-frame work.
+   * Hidden (null) in TDM or before zones/tickets exist.
+   */
+  private updateSituationReadout(isTDM: boolean): void {
+    if (isTDM || !this.zoneQuery || !this.ticketSystem || !this.camera) {
+      this.situationReadout.setSituation(null);
+      return;
+    }
+
+    const friendlyFaction = this.playerAlliance === Alliance.BLUFOR ? Faction.US : Faction.NVA;
+    const hostileFaction = this.playerAlliance === Alliance.BLUFOR ? Faction.NVA : Faction.US;
+    const snapshot = HudSituationReadout.buildSnapshot({
+      capturableZones: this.zoneQuery.getCapturableZones(),
+      friendlyTickets: this.ticketSystem.getTickets(friendlyFaction),
+      hostileTickets: this.ticketSystem.getTickets(hostileFaction),
+      playerAlliance: this.playerAlliance,
+      playerPosition: { x: this.camera.position.x, z: this.camera.position.z },
+    });
+    this.situationReadout.setSituation(snapshot);
   }
 
   private updateGameStatus(ticketSystem: TicketSystem): void {
@@ -461,6 +499,17 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   setFactionLabels(blufor: string, opfor: string): void {
     this.elements.ticketDisplay.setFactionLabels(blufor, opfor);
+  }
+
+  /**
+   * Set the player's alliance so faction-relative HUD readouts (the situation
+   * readout's friendly/hostile ticket split and nearest-objective ownership)
+   * read from the right side. Defaults to BLUFOR. Forwarded to the zone display
+   * so its tactical status colouring agrees with the readout.
+   */
+  setPlayerAlliance(faction: Faction): void {
+    this.playerAlliance = getAlliance(faction);
+    this.zoneDisplay.setPlayerAlliance(this.playerAlliance);
   }
 
   setAudioManager(audioManager: AudioManager): void {
