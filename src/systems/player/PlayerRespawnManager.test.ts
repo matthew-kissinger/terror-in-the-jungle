@@ -1047,6 +1047,69 @@ describe('PlayerRespawnManager', () => {
       expect(helipadSpawn?.position.x).toBe(28);
       expect(helipadSpawn?.position.z).toBe(-1400);
     });
+
+    // helipad-spawn-truth: the label must match reality. A pad with a boardable
+    // helicopter promises one; a pad without is relabeled to an on-foot pad so
+    // the deploy list never promises an aircraft that isn't there.
+    describe('helipad label honesty (helipad-spawn-truth)', () => {
+      const helipadSystemWith = (aircraft: string) => ({
+        getAllHelipads: () => [
+          { id: 'helipad_main', position: new THREE.Vector3(40, 5, -1400), aircraft, faction: 'US' },
+        ],
+      }) as any;
+
+      beforeEach(() => {
+        vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
+        respawnManager.setHelipadSystem(helipadSystemWith('UH1_HUEY'));
+      });
+
+      it('promises the helicopter when one is boardable at the pad', () => {
+        respawnManager.setBoardableHelicopterPresence({
+          hasBoardableHelicopterForHelipad: () => true,
+        });
+
+        respawnManager['updateAvailableSpawnPoints']();
+
+        const pad = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_main');
+        expect(pad).toBeDefined();
+        expect(pad!.name).toContain('Helipad');
+        expect(pad!.name).toContain('UH1');
+      });
+
+      it('does not promise a helicopter when none is boardable at the pad', () => {
+        respawnManager.setBoardableHelicopterPresence({
+          hasBoardableHelicopterForHelipad: () => false,
+        });
+
+        respawnManager['updateAvailableSpawnPoints']();
+
+        const pad = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_main');
+        expect(pad).toBeDefined();
+        // No false promise: the label must not advertise a helicopter.
+        expect(pad!.name).not.toContain('Helipad');
+        expect(pad!.name).not.toContain('UH1');
+      });
+
+      it('keys the label off live presence per pad, not the configured aircraft', () => {
+        // Two pads, only one actually has a boardable helicopter.
+        respawnManager.setHelipadSystem({
+          getAllHelipads: () => [
+            { id: 'helipad_main', position: new THREE.Vector3(40, 5, -1400), aircraft: 'UH1_HUEY', faction: 'US' },
+            { id: 'helipad_west', position: new THREE.Vector3(-960, 5, -800), aircraft: 'UH1C_GUNSHIP', faction: 'US' },
+          ],
+        } as any);
+        respawnManager.setBoardableHelicopterPresence({
+          hasBoardableHelicopterForHelipad: (id: string) => id === 'helipad_main',
+        });
+
+        respawnManager['updateAvailableSpawnPoints']();
+
+        const withHeli = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_main');
+        const withoutHeli = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_west');
+        expect(withHeli!.name).toContain('Helipad');
+        expect(withoutHeli!.name).not.toContain('Helipad');
+      });
+    });
   });
 
   describe('deploy session policy', () => {

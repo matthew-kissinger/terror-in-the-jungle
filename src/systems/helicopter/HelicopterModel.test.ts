@@ -339,6 +339,17 @@ describe('HelicopterModel', () => {
       expect(helicopters[0].id).toBe(HELI_ID);
       expect(helicopters[0].model).toBe('UH-1 Huey');
     });
+
+    // helipad-spawn-truth: the spawn selector asks this to label a helipad
+    // honestly. A pad with a live helicopter reports present; an empty pad does
+    // not — so the deploy label never promises an aircraft that isn't there.
+    it('reports a boardable helicopter present for a pad that has one', () => {
+      expect(model.hasBoardableHelicopterForHelipad(HELIPAD_ID)).toBe(true);
+    });
+
+    it('reports no boardable helicopter for a pad that has none', () => {
+      expect(model.hasBoardableHelicopterForHelipad('empty_pad')).toBe(false);
+    });
   });
 
   describe('Update Loop', () => {

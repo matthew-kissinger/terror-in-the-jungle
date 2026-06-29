@@ -115,7 +115,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // single-owner stepping gate in one cycle window. Orchestrator note in
   // docs/CARRY_OVERS.md (Parked). Factor into a composition split when it
   // next grows.
-  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); +35 LOC dropped-frame startup/materialization wiring; split queued when it next grows', loc: 783, methods: 50 },
+  // Snapshot raised 783 → 790 LOC (helipad-spawn-truth, 2026-06-28): +6 LOC to
+  // wire the boardable-helicopter presence provider (HelicopterModel) into the
+  // player respawn manager so helipad spawn labels match reality. This is the
+  // prod composition point for player/vehicle wiring — exactly where this wire
+  // belongs. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by the
+  // task brief); split target unchanged.
+  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); +35 LOC dropped-frame startup/materialization wiring; +6 LOC boardable-helicopter presence wire (helipad-spawn-truth, 2026-06-28); split queued when it next grows', loc: 790, methods: 50 },
   // Snapshot raised 757 → 761 / 83 → 84 (fixedwing-gunsight, 2026-06-10): the
   // fixed-wing reflector-gunsight task adds one HUD delegation method
   // (`updateFixedWingAmmo`) so the nose-gun ammo count reaches FixedWingHUD —
@@ -152,7 +158,12 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // depending on HelicopterWeaponSystem directly (it only holds the fenced
   // IHelicopterModel). Within-cycle ratchet re-base; R4 split target unchanged.
   // See docs/CARRY_OVERS.md.
-  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +14 LOC for player door-gun seat pass-throughs (door-gun-seat, 2026-06-09)', loc: 721, methods: 51 },
+  // Snapshot raised 721 → 732 LOC / 51 → 52 methods (helipad-spawn-truth,
+  // 2026-06-28): +1 read-only method `hasBoardableHelicopterForHelipad` so the
+  // spawn selector can label a helipad honestly (promise a helicopter only when
+  // one is actually boardable). No spawning rework. In-cycle ratchet re-base, no
+  // CARRY_OVERS row (sanctioned by the task brief).
+  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +14 LOC for player door-gun seat pass-throughs (door-gun-seat, 2026-06-09); +1 read-only presence method (helipad-spawn-truth, 2026-06-28)', loc: 732, methods: 52 },
   // Snapshot raised 781 → 810 (ci-gate-consolidation, 2026-06-09): the sibling
   // Phase-1 task `real-mouse-input` (040337e7) added 29 LOC of real
   // held-mouse-button state to PlayerInput AFTER the budget-ratchet snapshot
@@ -164,7 +175,12 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // `onHelicopterDoorGunToggle` callback decl. Within-cycle ratchet re-base; R3
   // split target unchanged. See docs/CARRY_OVERS.md.
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
-  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
+  // Snapshot raised 752 → 757 LOC / 58 → 59 methods (helipad-spawn-truth,
+  // 2026-06-28): +1 setter `setBoardableHelicopterPresence` that forwards the
+  // boardable-helicopter presence provider to the spawn selector so helipad
+  // spawn labels match reality. In-cycle ratchet re-base, no CARRY_OVERS row
+  // (sanctioned by the task brief).
+  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md; +1 presence-provider setter (helipad-spawn-truth, 2026-06-28)', loc: 757, methods: 59 },
   // Admitted 2026-06-28 (sks-rifle-wiring, cycle-2026-06-28-arsenal-expansion):
   // the runtime-weapon-type plumbing established by marksman-rifle-class left
   // this file at 699 LOC (1 under the base limit). Adding the SKS as its own
