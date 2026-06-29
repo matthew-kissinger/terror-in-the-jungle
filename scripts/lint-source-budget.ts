@@ -143,7 +143,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // mount/dispose wiring. The read rule itself lives in HudSituationReadout, so
   // HUDSystem only forwards existing read paths. In-cycle ratchet re-base; the
   // R3 split target is unchanged. See docs/CARRY_OVERS.md.
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud); +21 LOC/+1 method seat/fire cue wiring (seat-and-fire-cues, 2026-06-28); +49 LOC/+2 methods situation-readout mount/update wiring (situation-readout-hud, 2026-06-28)', loc: 858, methods: 88 },
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud); +21 LOC/+1 method seat/fire cue wiring (seat-and-fire-cues, 2026-06-28); +49 LOC/+2 methods situation-readout mount/update wiring (situation-readout-hud, 2026-06-28); +20 LOC/+1 method task-card mount/dispose + reward-dispatcher wiring + getTaskCard accessor (tasking-director-mvp, 2026-06-28). The card owns its own DOM/logic in HudTaskCard; HUDSystem only mounts it + forwards rewards to the existing score-popup surface. In-cycle ratchet re-base; R3 split target unchanged.', loc: 878, methods: 89 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence); +28 LOC dropped-frame combat telemetry wiring', loc: 790, methods: 43 },
   // Admitted 2026-06-15/16 (dropped-frame-perf-harness): the main loop grew
   // with frame/presentation epoch recording and render-context attribution.
@@ -242,7 +242,7 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // method (also cleared on resetSelectedSpawn). In-cycle ratchet re-base, no
   // CARRY_OVERS row (sanctioned by the task brief).
   'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28); +3 LOC map-controls positioning context (deploy-map-navigation, 2026-06-28); armory declutter removed the redundant per-slot PREV/NEXT cycle buttons, net -1 LOC (armory-layout-reflow, 2026-06-28); +22 LOC/+1 method F-board hint (crew-vehicle-selectable, 2026-06-28)', loc: 1142, methods: 76 },
-  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff', loc: 355, methods: 62 },
+  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff; +1 taskingDirector registry getter (tasking-director-mvp, 2026-06-28). In-cycle ratchet re-base for the new opt-in system registration; decompose target unchanged.', loc: 355, methods: 63 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as
   // split-debt in docs/CARRY_OVERS.md (konveyer-large-file-splits). The

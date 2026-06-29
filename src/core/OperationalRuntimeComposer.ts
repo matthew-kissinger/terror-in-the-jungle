@@ -33,6 +33,7 @@ type OperationalRuntimeRefs = Pick<
   | 'npcVehicleController'
   | 'playerController'
   | 'strategicFeedback'
+  | 'taskingDirector'
   | 'terrainSystem'
   | 'ticketSystem'
   | 'vehicleManager'
@@ -53,6 +54,7 @@ interface OperationalRuntimeGroups {
     | 'influenceMapSystem'
     | 'minimapSystem'
     | 'strategicFeedback'
+    | 'taskingDirector'
     | 'ticketSystem'
     | 'warSimulator'
     | 'zoneManager'
@@ -105,6 +107,7 @@ export function createOperationalRuntimeGroups(
       influenceMapSystem: refs.influenceMapSystem,
       minimapSystem: refs.minimapSystem,
       strategicFeedback: refs.strategicFeedback,
+      taskingDirector: refs.taskingDirector,
       ticketSystem: refs.ticketSystem,
       warSimulator: refs.warSimulator,
       zoneManager: refs.zoneManager,
@@ -165,6 +168,16 @@ function wireStrategyRuntime(runtime: OperationalRuntimeGroups['strategyRuntime'
   runtime.strategicFeedback.setWarSimulator(runtime.warSimulator);
   runtime.strategicFeedback.setHUDSystem(runtime.hudSystem);
   runtime.strategicFeedback.setAudioManager(runtime.audioManager);
+
+  // Tasking director (tasking-director-mvp): a read-only consumer of the same
+  // war/zone/ticket state, surfacing one opt-in mission at a time on the HUD
+  // task card. It subscribes to WarSimulator events for clear/complete and
+  // mutates nothing. zoneManager is the IZoneQuery handle (ZoneManager
+  // implements it, same as HUDZoneDisplay consumes).
+  runtime.taskingDirector.setWarSimulator(runtime.warSimulator);
+  runtime.taskingDirector.setZoneQuery(runtime.zoneManager);
+  runtime.taskingDirector.setTicketSystem(runtime.ticketSystem);
+  runtime.taskingDirector.setTaskCard(runtime.hudSystem.getTaskCard());
 
   runtime.gameModeManager.setWarSimulator(runtime.warSimulator);
   runtime.minimapSystem.setWarSimulator(runtime.warSimulator);

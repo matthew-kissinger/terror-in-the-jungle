@@ -38,6 +38,7 @@ import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import type { LoadoutService } from '../systems/player/LoadoutService';
 import type { WarSimulator } from '../systems/strategy/WarSimulator';
 import type { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import type { TaskingDirector } from '../systems/missions/TaskingDirector';
 import type { SpatialGridManager } from '../systems/combat/SpatialGridManager';
 import type { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 
@@ -87,6 +88,7 @@ export interface SystemKeyToType {
   loadoutService: LoadoutService;
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
+  taskingDirector: TaskingDirector;
   spatialGridManager: SpatialGridManager;
   worldFeatureSystem: WorldFeatureSystem;
   navmeshSystem: NavmeshSystem;
@@ -175,6 +177,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'loadoutService',
   'warSimulator',
   'strategicFeedback',
+  'taskingDirector',
   'spatialGridManager',
   'worldFeatureSystem',
   'navmeshSystem',
