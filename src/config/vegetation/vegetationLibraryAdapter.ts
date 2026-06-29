@@ -93,6 +93,7 @@ export function vegetationLibraryStaticArchetypes(
     if (!near || near.kind !== 'mesh' || !octa || octa.kind !== 'octaImpostor') continue;
 
     const promotion = meshBandFarEdge(resolved) ?? 180;
+    const octaBand = bandWithRepKind(resolved, 'octaImpostor')?.band;
     out[asset.id] = {
       slug: asset.id,
       modelPath: near.path,
@@ -112,7 +113,11 @@ export function vegetationLibraryStaticArchetypes(
       bounds: { center: near.bounds.center, size: near.bounds.size, radius: near.bounds.radius },
       promotionDistanceMeters: promotion,
       demotionDistanceMeters: Math.round(promotion * DEMOTION_FRACTION),
+      ...(octaBand?.maxDistanceMeters !== null && octaBand?.maxDistanceMeters !== undefined
+        ? { cullDistanceMeters: octaBand.maxDistanceMeters }
+        : {}),
       parallaxStrength: DEFAULT_PARALLAX,
+      ...(octa.materialTuning ? { materialTuning: octa.materialTuning } : {}),
       lightingProfile: 'foliage-card',
     };
   }

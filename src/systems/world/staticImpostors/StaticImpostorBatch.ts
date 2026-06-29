@@ -44,6 +44,7 @@ export interface StaticImpostorBatchDebugInfo {
   foliageExposure: number;
   foliageColorGamma: number;
   foliageSaturation: number;
+  azimuthBlendBand: number;
 }
 
 export class StaticImpostorBatch {
@@ -260,6 +261,7 @@ export class StaticImpostorBatch {
       foliageExposure: this.material.uniforms.foliageExposure.value,
       foliageColorGamma: this.material.uniforms.foliageColorGamma.value,
       foliageSaturation: this.material.uniforms.foliageSaturation.value,
+      azimuthBlendBand: this.material.uniforms.azimuthBlendBand.value,
     };
   }
 

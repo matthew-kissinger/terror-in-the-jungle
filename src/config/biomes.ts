@@ -83,6 +83,7 @@ const BIOME_DENSE_JUNGLE: BiomeConfig = {
     // similar-or-slightly-lower (the cross cards cover more area per instance).
     { typeId: 'understory-fern',   densityMultiplier: 0.8 },
     { typeId: 'taro-elephant-ear', densityMultiplier: 0.5 },
+    // Tall sparse palm: real mesh near, 8x3 octahedral impostor far.
     { typeId: 'coconut-palm',      densityMultiplier: 0.8 },
     // Banana fronds: real mesh near, baked alpha card far (kebab id, GroundCardScatterer).
     { typeId: 'banana-plant', densityMultiplier: 0.5 },
@@ -234,8 +235,8 @@ const BIOME_SWAMP: BiomeConfig = {
     { typeId: 'coconut-palm',  densityMultiplier: 1.0 },
     { typeId: 'fanPalm',       densityMultiplier: 0.9 },
     // Understory cards (kebab ids) replace the old fern/elephantEar/bananaPlant billboards;
-    // the coconut palm is now the coconut-palm card (mesh-near + alpha card far). fanPalm
-    // stays a billboard (no card art for that species yet).
+    // the coconut palm is now a coconut-palm octa impostor hero. fanPalm stays a
+    // billboard (no card art for that species yet).
     { typeId: 'taro-elephant-ear', densityMultiplier: 1.2 },
     { typeId: 'understory-fern',   densityMultiplier: 0.75 },
     { typeId: 'banana-plant',      densityMultiplier: 0.55 },

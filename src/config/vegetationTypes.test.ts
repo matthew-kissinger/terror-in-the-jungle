@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { getBiome } from './biomes';
 import { VEGETATION_TYPES } from './vegetationTypes';
-import { vegetationLibraryGroundCards } from './vegetation/vegetationLibraryAdapter';
+import {
+  vegetationLibraryGroundCards,
+  vegetationLibraryStaticArchetypes,
+} from './vegetation/vegetationLibraryAdapter';
 import {
   PIXEL_FORGE_BLOCKED_VEGETATION_IDS,
   PIXEL_FORGE_RETIRED_VEGETATION_IDS,
@@ -322,8 +325,8 @@ describe('VEGETATION_TYPES production imposter policy', () => {
   });
 
   it('leaves no old fern/elephantEar/bananaPlant billboard id in any biome palette', () => {
-    // The fern/elephantEar/banana-plant cards (and now the bamboo-thicket + coconut-palm
-    // cards) cover these. fanPalm + the sparse highland bamboo billboard are the remaining
+    // The fern/elephantEar/banana-plant cards (and bamboo-thicket card) cover these.
+    // fanPalm + the sparse highland bamboo billboard are the remaining
     // camelCase holdouts.
     const biomeIds = [
       'ashauJungle', 'denseJungle', 'highland', 'ricePaddy', 'riverbank',
@@ -350,12 +353,16 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     expect(billboardIds.has('banana-plant')).toBe(false);
   });
 
-  it('wires the bamboo-thicket + coconut-palm cards (kiln-held-assets cutover)', () => {
+  it('wires the bamboo-thicket card and coconut-palm octa impostor hero', () => {
     const groundCards = vegetationLibraryGroundCards();
-    // Both new cards resolve to live ground-card archetypes.
+    const staticArchetypes = vegetationLibraryStaticArchetypes();
+    // Dense bamboo remains a live ground-card archetype; coconut-palm moved to the
+    // static-impostor hero path so it no longer renders a crossed trunk card.
     expect(groundCards['bamboo-thicket']).toBeDefined();
-    expect(groundCards['coconut-palm']).toBeDefined();
-    // Dense bamboo -> bamboo-thicket card; coconut billboard -> coconut-palm card (swamp).
+    expect(groundCards['coconut-palm']).toBeUndefined();
+    expect(staticArchetypes['coconut-palm']).toBeDefined();
+    expect(staticArchetypes['coconut-palm'].cullDistanceMeters).toBe(140);
+    // Dense bamboo -> bamboo-thicket card; coconut billboard -> coconut-palm octa hero.
     expect(getBiome('bambooGrove').vegetationPalette.map((e) => e.typeId)).toContain('bamboo-thicket');
     expect(getBiome('swamp').vegetationPalette.map((e) => e.typeId)).toContain('coconut-palm');
     // The old camelCase 'coconut' billboard id is gone from every palette.
@@ -364,7 +371,7 @@ describe('VEGETATION_TYPES production imposter policy', () => {
     for (const biomeId of allBiomeIds) {
       expect(getBiome(biomeId).vegetationPalette.map((e) => e.typeId), biomeId).not.toContain('coconut');
     }
-    // Dual-namespace: kebab card ids never collide with the camelCase billboard scatterer ids.
+    // Dual-namespace: kebab vegetation-library ids never collide with the camelCase billboard scatterer ids.
     const billboardIds = new Set(VEGETATION_TYPES.map((type) => type.id));
     expect(billboardIds.has('bamboo-thicket')).toBe(false);
     expect(billboardIds.has('coconut-palm')).toBe(false);

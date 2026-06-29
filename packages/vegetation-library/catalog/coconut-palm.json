@@ -27,20 +27,24 @@
       "budget": { "trisPerInstance": 2784, "drawCallsPerBatch": 1, "textureMb": 0.3 }
     },
     {
-      "kind": "groundCard",
-      "id": "card-coconut-palm",
-      "baseColorPath": "coconut-palm/card/atlas.base-color.png",
-      "normalPath": "coconut-palm/card/atlas.normal.png",
-      "worldSize": [17.62, 27.08],
-      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 0.3 }
+      "kind": "octaImpostor",
+      "id": "octa-coconut-palm",
+      "baseColorPath": "coconut-palm/impostor/atlas.base-color.png",
+      "normalPath": "coconut-palm/impostor/atlas.normal.png",
+      "depthPath": "coconut-palm/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 13.54, 0], "size": [12.75, 27.08, 12.16], "radius": 16.15 },
+      "materialTuning": { "foliageExposureScale": 1.45, "foliageColorGamma": 1.2, "foliageSaturation": 1.0, "azimuthBlendBand": 0.22 },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.9 }
     }
   ],
   "lod": {
-    "label": "mesh-near+card-far",
-    "rationale": "A 27m coconut palm is a sparse coastal landmark, not dense ground cover. Up close it reads as a real fronded crown on a bare trunk (cheap 2.8k-tri mesh, globally-capped near tier); past ~50m it collapses to a baked front-view alpha card visible out to 140m. A single-front card is acceptable for a radially-sparse palm; an 8x3 octahedral hero (like fan-palm/bamboo-grove) is the higher-fidelity upgrade if the flat far-card reads poorly in playtest.",
+    "label": "mesh-near+octa-far",
+    "rationale": "A 27m coconut palm is a sparse coastal landmark with a curved asymmetric trunk. Up close it reads as a real fronded crown on a bare trunk (cheap 2.8k-tri mesh); past ~50m it collapses to an 8x3 octahedral impostor so ground-level views remain one coherent palm instead of the previous crossed front-card trunk split. Its narrowed azimuth blend band avoids smearing two adjacent trunk captures across most angles. The far band keeps the previous 140m outer range to avoid expanding residency cost.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 50, "representationId": "mesh-coconut-palm", "budget": { "trisPerInstance": 2784, "drawCallsPerBatch": 1 } },
-      { "minDistanceMeters": 50, "maxDistanceMeters": 140, "representationId": "card-coconut-palm", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 140m." }
+      { "minDistanceMeters": 50, "maxDistanceMeters": 140, "representationId": "octa-coconut-palm", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.9 }, "notes": "8x3 upper-hemisphere octahedral atlas baked from the normalized mesh via scripts/bake-vegetation-impostor.mjs; batched and finite-ranged at 140m." }
     ]
   },
   "ecology": {

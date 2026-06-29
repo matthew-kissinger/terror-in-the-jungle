@@ -140,6 +140,52 @@ describe('GLBHeroScatterer', () => {
     expect(scatterer.getDebugInfo().activeCells).toBe(0); // no residency targets built
   });
 
+  it('respects finite catalog cull distance while placing heroes', async () => {
+    const limitedHero: StaticImpostorArchetype = {
+      ...HERO_ARCHETYPE,
+      slug: 'limited-tree',
+      modelPath: '/assets/vegetation/limited-tree/limited-tree.glb',
+      cullDistanceMeters: 80,
+    };
+    const placedXZ: Array<{ x: number; z: number }> = [];
+    const modelLoader = new FakeModelLoader();
+    const impostors: HeroImpostorRegistrar = {
+      registerInstance(params: { id: string; modelPath: string; object: THREE.Object3D }): boolean {
+        placedXZ.push({ x: params.object.position.x, z: params.object.position.z });
+        return true;
+      },
+      unregisterInstance(): void {},
+      update(): void {},
+    };
+    const scatterer = new GLBHeroScatterer(
+      {
+        scene: new THREE.Scene(),
+        modelLoader,
+        impostors,
+        getHeight: flatHeight,
+        archetypes: { 'limited-tree': limitedHero },
+      },
+      128,
+      2,
+    );
+    const player = new THREE.Vector3(0, 0, 0);
+    scatterer.setWorldBounds(100_000, 200);
+    scatterer.configure(
+      'denseJungle',
+      new Map([['denseJungle', [{ typeId: 'limited-tree', densityMultiplier: 1.5 }]]]),
+      [],
+    );
+
+    await settle(scatterer, player);
+
+    expect(placedXZ.length).toBeGreaterThan(0);
+    for (const p of placedXZ) {
+      const dx = p.x - player.x;
+      const dz = p.z - player.z;
+      expect(dx * dx + dz * dz).toBeLessThanOrEqual(80 * 80);
+    }
+  });
+
   it('unregisters and disposes every instance on teardown (no leak)', async () => {
     const { scatterer, impostors, modelLoader } = makeScatterer();
     await settle(scatterer, new THREE.Vector3(0, 0, 0));
@@ -277,7 +323,7 @@ describe('GLBHeroScatterer real-config wiring', () => {
       requested.map((u) => u.split('/assets/vegetation/')[1]?.split('/')[0]),
     );
     // Every baked canopy hero wired into denseJungle places.
-    for (const s of ['jungle-tree', 'rubber-a', 'rubber-b', 'teak-a', 'teak-b']) {
+    for (const s of ['jungle-tree', 'rubber-a', 'rubber-b', 'teak-a', 'teak-b', 'coconut-palm']) {
       expect(slugs.has(s), s).toBe(true);
     }
     // Nothing outside the hero archetype set ever reaches the GLB loader.

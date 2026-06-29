@@ -169,8 +169,9 @@ route-corridor's +3 LOC tripped the `lint:budget` ratchet on grandfathered
 `TerrainFeatureCompiler.ts` (764→767) — resolved by sanctioned snapshot rebase,
 no new carry-over. Carry-overs 5→5. Owner visual walk row in PLAYTEST_PENDING;
 memo at `docs/playtests/cycle-2026-06-28-terrain-vegetation-asset-defects.md`.
-Follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost + card-fade
-runtime-knob plumbing; route-corridor edge-sliver + `map_only` latent over-clear.
+Follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost is superseded
+for `coconut-palm` by the mesh-near / octa-far route; route-corridor edge-sliver
+and `map_only` latent over-clear.
 
 ## Recently Completed (cycle-2026-06-28-combat-vehicle-feel)
 

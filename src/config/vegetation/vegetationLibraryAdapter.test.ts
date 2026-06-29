@@ -48,14 +48,23 @@ describe('vegetationLibraryAdapter', () => {
     expect(archetypes['teak-a'].promotionDistanceMeters).toBe(160);
   });
 
-  it('emits archetypes for the promoted fan-palm + bamboo-grove mid heroes', () => {
+  it('emits archetypes for the promoted fan-palm, bamboo-grove, and coconut-palm heroes', () => {
     const archetypes = vegetationLibraryStaticArchetypes();
     expect(archetypes['fan-palm']).toBeDefined();
     expect(archetypes['bamboo-grove']).toBeDefined();
+    expect(archetypes['coconut-palm']).toBeDefined();
     // Short mesh ranges: understory reads flat sooner than canopy.
     expect(archetypes['fan-palm'].promotionDistanceMeters).toBe(70);
     expect(archetypes['bamboo-grove'].promotionDistanceMeters).toBe(100);
+    expect(archetypes['coconut-palm'].promotionDistanceMeters).toBe(50);
+    expect(archetypes['coconut-palm'].cullDistanceMeters).toBe(140);
+    expect(archetypes['coconut-palm'].materialTuning).toMatchObject({
+      foliageExposureScale: 1.45,
+      foliageColorGamma: 1.2,
+      azimuthBlendBand: 0.22,
+    });
     expect(archetypes['fan-palm'].maps.baseColor).toContain('fan-palm/impostor/atlas.base-color.png');
+    expect(archetypes['coconut-palm'].maps.baseColor).toContain('coconut-palm/impostor/atlas.base-color.png');
   });
 
   it('does NOT emit archetypes for assets whose far representation is only planned', () => {
@@ -142,5 +151,13 @@ describe('vegetationLibraryGroundCards', () => {
     }
     // ...and ground cards never leak into the billboard seam either.
     expect(vegetationLibraryBillboardAssets()).toEqual([]);
+  });
+
+  it('keeps coconut-palm out of the crossed ground-card path', () => {
+    const cards = vegetationLibraryGroundCards();
+    const archetypes = vegetationLibraryStaticArchetypes();
+
+    expect(cards['coconut-palm']).toBeUndefined();
+    expect(archetypes['coconut-palm']).toBeDefined();
   });
 });

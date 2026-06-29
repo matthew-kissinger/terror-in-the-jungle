@@ -44,12 +44,13 @@ Accepted into the catalog this cycle; fix in a future re-roll, not urgent:
 
 ## Not a re-roll (handled elsewhere)
 
-- **Coconut palm** — the off-center/leaning-trunk pop the owner saw is a LOD
-  mesh<->card transition pop, fixed in-cycle by `coconut-card-crossfade`
-  (PR #437, `fd46642c`) — a `transitionFadeMeters` opacity crossfade, NOT an art
-  re-roll. The coconut GLB itself (external Poly-by-Google CC-BY) is unchanged.
-  A true source replacement, if ever needed, goes through the
-  vegetation/impostor pipeline, not the war importer.
+- **Coconut palm** — the off-center/leaning-trunk pop first seen in the owner
+  walk was handled as an LOD transition issue by `coconut-card-crossfade`
+  (PR #437, `fd46642c`). The later crossed-trunk far-card artifact is also not
+  a Kiln art re-roll: `coconut-palm` now routes to a mesh-near / octa-impostor
+  far LOD in the vegetation pipeline. The coconut GLB itself (external
+  Poly-by-Google CC-BY) is unchanged. A true source replacement, if ever needed,
+  goes through the vegetation/impostor pipeline, not the war importer.
 
 Owner walk 2026-06-28: the UH-1 Huey + A-1 Skyraider rolls above are DONE; the
 remaining open items are the advisories listed above (next Kiln pass). The

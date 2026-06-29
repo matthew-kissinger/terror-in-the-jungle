@@ -73,8 +73,9 @@
   sanctioned ratchet rebase (snapshot 764→767); no new carry-over (within-cycle,
   the file's split-debt is already tracked in the grandfather entry). Not part of
   the walk.
-- Reviewer follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost +
-  card-fade runtime-knob plumbing gap; route-corridor edge-sliver coverage +
-  `map_only` latent over-clear (no production config uses `map_only`).
+- Reviewer follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost is
+  superseded for `coconut-palm` by the mesh-near / octa-far route;
+  route-corridor edge-sliver coverage + `map_only` latent over-clear (no
+  production config uses `map_only`).
 - Open advisories filed for the owner's next Kiln pass: B-52D fuselage aspect,
   A-37 scale (`docs/asset-provenance/repaint-2026-06/REROLL_REQUESTS.md`).

@@ -17,6 +17,14 @@ export interface StaticImpostorAtlasBounds {
   readonly radius: number;
 }
 
+export interface StaticImpostorMaterialTuningOverride {
+  readonly fogStrength?: number;
+  readonly foliageExposureScale?: number;
+  readonly foliageColorGamma?: number;
+  readonly foliageSaturation?: number;
+  readonly azimuthBlendBand?: number;
+}
+
 export interface StaticImpostorArchetype {
   readonly slug: string;
   readonly modelPath: string;
@@ -32,7 +40,10 @@ export interface StaticImpostorArchetype {
   readonly bounds: StaticImpostorAtlasBounds;
   readonly promotionDistanceMeters: number;
   readonly demotionDistanceMeters: number;
+  /** Optional outer residency hint for procedurally scattered vegetation impostors. */
+  readonly cullDistanceMeters?: number;
   readonly parallaxStrength: number;
+  readonly materialTuning?: StaticImpostorMaterialTuningOverride;
   /**
    * Lighting response used by the runtime impostor material.
    *

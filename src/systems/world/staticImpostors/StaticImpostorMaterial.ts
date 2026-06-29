@@ -61,6 +61,7 @@ interface StaticImpostorMaterialUniforms {
   foliageExposure: StaticImpostorMaterialUniform<number>;
   foliageColorGamma: StaticImpostorMaterialUniform<number>;
   foliageSaturation: StaticImpostorMaterialUniform<number>;
+  azimuthBlendBand: StaticImpostorMaterialUniform<number>;
 }
 
 export type StaticImpostorNodeMaterial = MeshBasicNodeMaterial & {
@@ -79,6 +80,7 @@ export interface StaticImpostorMaterialTuning {
   readonly foliageExposureScale?: number;
   readonly foliageColorGamma?: number;
   readonly foliageSaturation?: number;
+  readonly azimuthBlendBand?: number;
 }
 
 type TslNode = any;
@@ -128,22 +130,27 @@ export function createStaticImpostorNodeMaterial(
   opacityAttribute?: THREE.InstancedBufferAttribute,
   tuning: StaticImpostorMaterialTuning = {},
 ): StaticImpostorNodeMaterial {
+  const materialTuning: StaticImpostorMaterialTuning = {
+    ...archetype.materialTuning,
+    ...tuning,
+  };
   configureStaticImpostorTexture(textures.baseColorMap, THREE.SRGBColorSpace);
   configureStaticImpostorTexture(textures.normalMap, THREE.NoColorSpace);
   configureStaticImpostorTexture(textures.depthMap, THREE.NoColorSpace);
-  const foliageExposureScale = clampFinite(tuning.foliageExposureScale, 1, 0, 2);
+  const foliageExposureScale = clampFinite(materialTuning.foliageExposureScale, 1, 0, 2);
   const foliageColorGamma = clampFinite(
-    tuning.foliageColorGamma,
+    materialTuning.foliageColorGamma,
     STATIC_IMPOSTOR_FOLIAGE_COLOR_GAMMA,
     0.6,
     2.5,
   );
   const foliageSaturation = clampFinite(
-    tuning.foliageSaturation,
+    materialTuning.foliageSaturation,
     STATIC_IMPOSTOR_FOLIAGE_SATURATION,
     0,
     1.25,
   );
+  const azimuthBlendBand = clampFinite(materialTuning.azimuthBlendBand, 1, 0.05, 1);
 
   const uniforms: StaticImpostorMaterialUniforms = {
     baseColorMap: { value: textures.baseColorMap },
@@ -158,10 +165,11 @@ export function createStaticImpostorNodeMaterial(
     fogHeightFalloff: { value: STATIC_IMPOSTOR_FOG_HEIGHT_FALLOFF },
     fogStartDistance: { value: STATIC_IMPOSTOR_FOG_START_DISTANCE },
     fogEnabled: { value: false },
-    fogStrength: { value: clampFinite(tuning.fogStrength, 1, 0, 1.5) },
+    fogStrength: { value: clampFinite(materialTuning.fogStrength, 1, 0, 1.5) },
     foliageExposure: { value: STATIC_IMPOSTOR_FOLIAGE_EXPOSURE * foliageExposureScale },
     foliageColorGamma: { value: foliageColorGamma },
     foliageSaturation: { value: foliageSaturation },
+    azimuthBlendBand: { value: azimuthBlendBand },
   };
 
   const material = new MeshBasicNodeMaterial({
@@ -269,7 +277,9 @@ function createStaticImpostorAtlasNodes(
   const azimuthTile = azimuthWrapped.div(tslFloat(TWO_PI)).mul(atlasTiles.x);
   const tileX = floor(azimuthTile).mod(atlasTiles.x);
   const nextTileX = tileX.add(1).mod(atlasTiles.x);
-  const tileBlend = smoothstep(tslFloat(0), tslFloat(1), fract(azimuthTile) as TslNode);
+  const azimuthBlendBand = tslReference('float', uniforms.azimuthBlendBand);
+  const tileBlendStart = tslFloat(1).sub(azimuthBlendBand);
+  const tileBlend = smoothstep(tileBlendStart, tslFloat(1), fract(azimuthTile) as TslNode);
 
   const localUv = uv() as TslNode;
   const tileMargin = tslVec2(

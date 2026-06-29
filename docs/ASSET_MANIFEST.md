@@ -70,29 +70,32 @@ check:pixel-forge-cutover` fails on old vegetation filenames, old NPC sprite
 filenames, old `assets/source/soldiers` paths, blocked vegetation species IDs,
 `dipterocarp`, and `rejected-do-not-import` paths in source or shipped output.
 
-Approved runtime vegetation species are `bambooGrove`, `fern`, `bananaPlant`,
-`fanPalm`, `elephantEar`, and `coconut`. The short Quaternius palm previously
-named `giantPalm` / `palm-quaternius-2` is owner-retired and its public shipped
-assets were removed on 2026-05-05; do not confuse it with the preserved taller
-`fanPalm` or `coconut` palm-like trees. Blocked species remain excluded until
+Approved Pixel Forge runtime vegetation species are `bambooGrove`, `fern`,
+`bananaPlant`, `fanPalm`, `elephantEar`, and legacy `coconut`; the vegetation
+library also supplies kebab-case runtime species such as `coconut-palm`. The
+short Quaternius palm previously named `giantPalm` / `palm-quaternius-2` is
+owner-retired and its public shipped assets were removed on 2026-05-05; do not
+confuse it with the preserved taller `fanPalm`, legacy `coconut`, or library
+`coconut-palm` palm-like trees. Blocked species remain excluded until
 regenerated or approved: `rubberTree`, `ricePaddyPlants`, `elephantGrass`,
 `areca`, `mangrove`, and `banyan`.
 
-Pixel Forge vegetation is currently impostor-only. Runtime metadata now carries
-review fixes for asymmetric palm packages: `coconut` is locked to a clean
-column while avoiding its bad low-elevation atlas row. These guards are an
-interim runtime answer, not final tree art. For polished close-range palms,
-prefer regenerated assets with close mesh LODs or a hybrid instanced trunk plus
-impostor canopy path.
+Pixel Forge vegetation is currently impostor-only. Runtime metadata still carries
+the older atlas guard for the legacy camelCase `coconut` package: it samples a
+clean column and avoids the bad low-elevation row. The newer library
+`coconut-palm` GLB uses a real mesh near the player and an 8x3 octahedral
+impostor to avoid the crossed-card trunk split seen in the previous single-front
+ground-card far LOD. Its far material narrows azimuth blending so adjacent
+capture angles do not smear the curved trunk into a second silhouette.
 
 The 2026-06-13 jungle vegetation pass briefly routed near-field ground cover
 through `JungleGroundRing`, but owner follow-up rejected the dense
 camera-following vegetation circle. Normal runtime now routes accepted ground
 cover back through `VegetationScatterer` with the rest of the approved
 vegetation set; `JungleGroundRing` is dormant experiment/reference code, not
-the current player-facing vegetation owner. `fanPalm` and `coconut` are the
-first accepted canopy/tree tier families for runtime placement, backed by
-their existing Pixel Forge impostor assets. This does not approve any blocked
+the current player-facing vegetation owner. `fanPalm` and legacy `coconut`
+remain Pixel Forge impostor families, while library `coconut-palm` is the
+current mesh-near / octa-far palm path. This does not approve any blocked
 vegetation species or promote generic Pixel Forge prop trees into runtime
 vegetation.
 
