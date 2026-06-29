@@ -9,8 +9,8 @@
  *  - The slot shows the current load label (Standard by default / when absent)
  *    and surfaces the universal ammo-load pool as chips with the active one
  *    highlighted (NOT faction-filtered).
- *  - Cycling the slot's PREV/NEXT fires the loadout-change callback with the
- *    'ammoLoad' field key so it flows to LoadoutService.cycleField.
+ *  - Selecting an ammo chip fires the loadout-select callback with the
+ *    'ammoLoad' field key so it flows to LoadoutService.
  */
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
@@ -78,16 +78,12 @@ function deploySession(overrides: Partial<Parameters<DeployScreen['configureSess
   };
 }
 
-/** The PREV/NEXT buttons for a loadout slot are text buttons inside the row
- * that owns the `loadout-<field>-value` element. Walk up to the row and pick
- * the button by its label. */
-function slotButton(field: string, label: 'PREV' | 'NEXT'): HTMLButtonElement {
-  const valueEl = document.getElementById(`loadout-${field}-value`)!;
-  const row = valueEl.parentElement!.parentElement!;
-  const button = Array.from(row.querySelectorAll('button')).find(
-    b => b.textContent === label,
-  );
-  return button as HTMLButtonElement;
+/** A loadout slot's selection chips live in the `respawn-loadout-<field>-options`
+ * strip, each carrying its option value on `data-loadout-option`. */
+function optionChip(field: string, value: string): HTMLButtonElement {
+  return document.querySelector<HTMLButtonElement>(
+    `#respawn-loadout-${field}-options button[data-loadout-option="${value}"]`,
+  )!;
 }
 
 describe('DeployScreen ammo-load slot', () => {
@@ -126,26 +122,43 @@ describe('DeployScreen ammo-load slot', () => {
     expect(active?.dataset.loadoutOption).toBe(AmmoLoad.EXTENDED);
   });
 
-  it('cycles the ammo load forward via the slot NEXT button', () => {
-    const onChange = vi.fn();
-    screen.setLoadoutChangeCallback(onChange);
+  it('selects an ammo load by picking its chip', () => {
+    const onSelect = vi.fn();
+    screen.setLoadoutSelectCallback(onSelect);
     screen.setLoadoutEditingEnabled(true);
+    screen.updateLoadoutPresentation(presentation());
     screen.updateLoadout(loadout());
 
-    slotButton('ammoLoad', 'NEXT').dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    optionChip('ammoLoad', AmmoLoad.HEAVY).dispatchEvent(new Event('pointerdown', { bubbles: true }));
 
-    expect(onChange).toHaveBeenCalledWith('ammoLoad', 1);
+    expect(onSelect).toHaveBeenCalledWith('ammoLoad', AmmoLoad.HEAVY);
   });
 
-  it('cycles the ammo load backward via the slot PREV button', () => {
-    const onChange = vi.fn();
-    screen.setLoadoutChangeCallback(onChange);
-    screen.setLoadoutEditingEnabled(true);
+  it('offers a single selection affordance per slot: the chip strip, not a duplicate cycle control', () => {
+    screen.updateLoadoutPresentation(presentation());
     screen.updateLoadout(loadout());
 
-    slotButton('ammoLoad', 'PREV').dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    for (const field of ['primaryWeapon', 'secondaryWeapon', 'equipment', 'ammoLoad']) {
+      const section = document.getElementById(`respawn-loadout-${field}-section`)!;
+      const chips = section.querySelectorAll('button[data-loadout-option]');
+      const allButtons = section.querySelectorAll('button');
+      // The only buttons in a slot are its selection chips — no extra
+      // prev/next cycle buttons duplicating what the chips already do.
+      expect(chips.length).toBeGreaterThan(0);
+      expect(allButtons.length).toBe(chips.length);
+    }
+  });
 
-    expect(onChange).toHaveBeenCalledWith('ammoLoad', -1);
+  it('does not select an ammo chip while loadout editing is locked', () => {
+    const onSelect = vi.fn();
+    screen.setLoadoutSelectCallback(onSelect);
+    screen.setLoadoutEditingEnabled(false);
+    screen.updateLoadoutPresentation(presentation());
+    screen.updateLoadout(loadout());
+
+    optionChip('ammoLoad', AmmoLoad.EXTENDED).dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('exposes a separate Armory deploy view', () => {

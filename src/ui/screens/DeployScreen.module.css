@@ -89,6 +89,15 @@
   align-items: center;
 }
 
+.viewTabsLabel {
+  margin-right: var(--space-1);
+  color: var(--ink-faint);
+  font-family: var(--type);
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
 .viewTab {
   min-width: 116px;
   justify-content: center;
@@ -419,11 +428,17 @@
   margin-bottom: var(--space-3);
 }
 
+/* Coherent vertical rhythm for the armory column: the preset block reads as a
+   distinct unit above the weapon/equipment slot stack, separated by a divider
+   so the stack doesn't crowd into the preset controls. */
 .loadoutGrid {
   display: flex;
   min-height: 0;
   flex-direction: column;
   gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--paper-edge);
 }
 
 .armoryPreviewPanel {
@@ -693,8 +708,7 @@
   border-color: var(--green);
 }
 
-.presetButtons,
-.loadoutButtons {
+.presetButtons {
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
@@ -753,10 +767,10 @@
 }
 
 .loadoutSectionHeader {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   gap: var(--space-2);
-  align-items: center;
 }
 
 .loadoutCurrent {
@@ -867,10 +881,6 @@
 
 .root[data-deploy-view="armory"] .loadoutOptionGrid {
   grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-}
-
-.root[data-deploy-view="armory"] .loadoutButtons {
-  display: none;
 }
 
 .root[data-deploy-view="armory"] .loadoutOptionCard {
@@ -1052,10 +1062,6 @@
 
   .map {
     height: 180px;
-  }
-
-  .loadoutSectionHeader {
-    grid-template-columns: 1fr;
   }
 
   .presetMeta {

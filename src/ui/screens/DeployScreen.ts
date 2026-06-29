@@ -51,8 +51,6 @@ import {
 
 interface LoadoutFieldControl {
   value: HTMLDivElement;
-  previousButton: HTMLButtonElement;
-  nextButton: HTMLButtonElement;
   availability: HTMLDivElement;
   optionButtons: HTMLButtonElement[];
 }
@@ -178,11 +176,17 @@ export class DeployScreen extends UIComponent {
     header.appendChild(headerCopy);
     header.appendChild(headerMeta);
 
+    // The insertion map and the armory are too tall to read together, so they
+    // share one column behind an explicit, labeled toggle. The label makes it
+    // obvious the two views are alternatives (not a hidden either/or).
     const viewTabs = this.createDiv(styles.viewTabs, 'respawn-view-tabs');
-    this.insertionViewButton = this.makeButton('respawn-view-insertion', 'Insertion', () => this.setActiveView('insertion'));
-    this.armoryViewButton = this.makeButton('respawn-view-armory', 'Armory', () => this.setActiveView('armory'));
+    const viewTabsLabel = this.createDiv(styles.viewTabsLabel);
+    viewTabsLabel.textContent = 'View';
+    this.insertionViewButton = this.makeButton('respawn-view-insertion', 'Insertion Map', () => this.setActiveView('insertion'));
+    this.armoryViewButton = this.makeButton('respawn-view-armory', 'Armory Kit', () => this.setActiveView('armory'));
     this.insertionViewButton.classList.add(styles.viewTab);
     this.armoryViewButton.classList.add(styles.viewTab);
+    viewTabs.appendChild(viewTabsLabel);
     viewTabs.appendChild(this.insertionViewButton);
     viewTabs.appendChild(this.armoryViewButton);
 
@@ -301,10 +305,6 @@ export class DeployScreen extends UIComponent {
     }
     if (this.headerLoadoutValue) {
       this.headerLoadoutValue.textContent = enabled ? 'Editable' : 'Locked';
-    }
-    for (const control of this.loadoutControls.values()) {
-      this.applyButtonState(control.previousButton, enabled);
-      this.applyButtonState(control.nextButton, enabled);
     }
     this.setLoadoutOptionButtonsEnabled(enabled);
     if (this.presetPreviousButton) this.applyButtonState(this.presetPreviousButton, enabled);
@@ -717,6 +717,12 @@ export class DeployScreen extends UIComponent {
     return panel;
   }
 
+  // Each loadout slot has ONE selection affordance: the chip strip below the
+  // current value. The chip strip both shows the faction's available pool and
+  // selects directly, so the old PREV/NEXT cycle buttons (which were hidden by
+  // CSS in the only view this panel appears in) were removed as redundant. The
+  // `onLoadoutChange` cycle callback stays on the public API for callers, but
+  // the screen no longer fires it from a duplicate control.
   private createLoadoutRow(field: LoadoutFieldKey, label: string): HTMLDivElement {
     const row = this.createDiv(styles.loadoutSection, `respawn-loadout-${field}-section`);
     const header = this.createDiv(styles.loadoutSectionHeader);
@@ -728,18 +734,11 @@ export class DeployScreen extends UIComponent {
     valueBlock.appendChild(labelEl);
     valueBlock.appendChild(valueEl);
 
-    const buttons = this.createDiv(styles.loadoutButtons);
-    const prev = this.makeButton(undefined, 'PREV', () => this.onLoadoutChange?.(field, -1));
-    const next = this.makeButton(undefined, 'NEXT', () => this.onLoadoutChange?.(field, 1));
-    buttons.appendChild(prev);
-    buttons.appendChild(next);
-
     header.appendChild(valueBlock);
-    header.appendChild(buttons);
     const availability = this.createDiv(styles.loadoutOptionGrid, `respawn-loadout-${field}-options`);
     row.appendChild(header);
     row.appendChild(availability);
-    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next, availability, optionButtons: [] });
+    this.loadoutControls.set(field, { value: valueEl, availability, optionButtons: [] });
     return row;
   }
 
