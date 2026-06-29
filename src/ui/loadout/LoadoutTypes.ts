@@ -333,6 +333,27 @@ export function getAmmoLoadReserveFactor(load: AmmoLoad): number {
   }
 }
 
+/**
+ * Weapon-handling penalty multiplier for an ammo load. STANDARD is the baseline
+ * (1.0 -- no penalty); EXTENDED and HEAVY return a value > 1.0 that scales with
+ * the extra reserve they grant, so carrying more ammo costs handling speed. A
+ * caller multiplies a "time to do X" handling lever (e.g. ADS-transition time)
+ * by this factor: a larger factor = a slower, heavier-feeling action. This makes
+ * EXTENDED/HEAVY a genuine tradeoff rather than strictly better than STANDARD.
+ * Mirrors `getAmmoLoadReserveFactor` so the deploy UI / stats can read it later.
+ */
+export function getAmmoLoadHandlingFactor(load: AmmoLoad): number {
+  switch (load) {
+    case AmmoLoad.EXTENDED:
+      return 1.15;
+    case AmmoLoad.HEAVY:
+      return 1.3;
+    case AmmoLoad.STANDARD:
+    default:
+      return 1.0;
+  }
+}
+
 export function isGrenadeEquipment(equipment: LoadoutEquipment): boolean {
   return equipment === LoadoutEquipment.FRAG_GRENADE
     || equipment === LoadoutEquipment.SMOKE_GRENADE

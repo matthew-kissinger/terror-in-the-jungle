@@ -136,6 +136,46 @@ describe('WeaponAnimations', () => {
       expect(animations.getADSProgress()).toBeCloseTo(0)
     })
 
+    it('a heavier handling penalty makes the ADS transition slower (the ammo-load tradeoff)', () => {
+      // Baseline (no penalty set): measure how far ADS progresses after a fixed
+      // slice of time. STANDARD load leaves handling untouched, so this is the
+      // "today" behavior we must preserve.
+      const baseline = new WeaponAnimations(camera)
+      baseline.setADS(true)
+      baseline.update(0.05, false, new THREE.Vector3())
+      const baselineProgress = baseline.getADSProgress()
+
+      // Explicitly setting the no-penalty factor (1.0) must be identical to the
+      // baseline — STANDARD does not change ADS feel.
+      const standard = new WeaponAnimations(camera)
+      standard.setAdsTimeFactor(1.0)
+      standard.setADS(true)
+      standard.update(0.05, false, new THREE.Vector3())
+      expect(standard.getADSProgress()).toBeCloseTo(baselineProgress, 6)
+
+      // A heavier load slows the transition: after the SAME elapsed time the gun
+      // has aimed in LESS, so reaching the sights takes longer.
+      const heavy = new WeaponAnimations(camera)
+      heavy.setAdsTimeFactor(1.3)
+      heavy.setADS(true)
+      heavy.update(0.05, false, new THREE.Vector3())
+      expect(heavy.getADSProgress()).toBeLessThan(baselineProgress)
+    })
+
+    it('clamps the handling factor so it can never speed ADS up below baseline', () => {
+      // A sub-1.0 (or invalid) factor must never make aiming faster than STANDARD.
+      const baseline = new WeaponAnimations(camera)
+      baseline.setADS(true)
+      baseline.update(0.05, false, new THREE.Vector3())
+
+      const fast = new WeaponAnimations(camera)
+      fast.setAdsTimeFactor(0.1)
+      fast.setADS(true)
+      fast.update(0.05, false, new THREE.Vector3())
+
+      expect(fast.getADSProgress()).toBeCloseTo(baseline.getADSProgress(), 6)
+    })
+
     it('FOV changes when ADS is active (zooms in)', () => {
       const initialFov = camera.fov
       animations.setADS(true)

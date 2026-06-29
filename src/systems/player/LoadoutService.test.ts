@@ -260,6 +260,51 @@ describe('LoadoutService', () => {
       expect(firstPersonWeapon.setPrimaryWeapon).toHaveBeenCalled();
     });
 
+    it('surfaces no handling penalty (factor 1.0) for the standard / default load', () => {
+      const service = new LoadoutService();
+      const firstPersonWeapon = {
+        setPlayerFaction: vi.fn(),
+        setPrimaryWeapon: vi.fn(),
+        setHandlingFactor: vi.fn(),
+      };
+
+      service.applyToRuntime({ firstPersonWeapon: firstPersonWeapon as any });
+
+      // STANDARD must keep handling identical to today (no penalty).
+      expect(firstPersonWeapon.setHandlingFactor).toHaveBeenCalledWith(1.0);
+    });
+
+    it('surfaces a real handling penalty (> 1.0) for the heavy load — the tradeoff', () => {
+      const service = new LoadoutService();
+      const firstPersonWeapon = {
+        setPlayerFaction: vi.fn(),
+        setPrimaryWeapon: vi.fn(),
+        setHandlingFactor: vi.fn(),
+      };
+
+      service.setAmmoLoad(AmmoLoad.HEAVY);
+      service.applyToRuntime({ firstPersonWeapon: firstPersonWeapon as any });
+
+      // The heavy load must cost handling speed (penalty strictly above baseline),
+      // so it is not strictly better than STANDARD. Value is tuning, not asserted.
+      const factor = firstPersonWeapon.setHandlingFactor.mock.calls[0][0];
+      expect(factor).toBeGreaterThan(1.0);
+    });
+
+    it('does not break applyToRuntime when the weapon double lacks setHandlingFactor', () => {
+      const service = new LoadoutService();
+      const firstPersonWeapon = {
+        setPlayerFaction: vi.fn(),
+        setPrimaryWeapon: vi.fn(),
+      };
+
+      service.setAmmoLoad(AmmoLoad.HEAVY);
+
+      expect(() =>
+        service.applyToRuntime({ firstPersonWeapon: firstPersonWeapon as any })
+      ).not.toThrow();
+    });
+
     it('persists the selected ammo load across a reload from storage', () => {
       const service = new LoadoutService();
       service.setAmmoLoad(AmmoLoad.EXTENDED);
