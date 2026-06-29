@@ -224,8 +224,11 @@ export class OpenFrontierRespawnMapRenderer {
       : spawnPoint.kind === 'helipad'
         ? 'rgba(58, 79, 42, 0.95)'
         : 'rgba(79, 107, 58, 0.95)';
-    const outerRadius = Math.max(11, 16 / Math.sqrt(Math.max(zoomLevel, 0.75)));
-    const innerRadius = Math.max(7, 11 / Math.sqrt(Math.max(zoomLevel, 0.75)));
+    // Enlarged pin glyph (deploy-map-navigation): bigger, easier-to-hit spawn
+    // markers so points on A Shau's 21km canvas read clearly and are simple to
+    // click. The 1/sqrt(zoom) term keeps zoomed-in pins from ballooning.
+    const outerRadius = Math.max(14, 21 / Math.sqrt(Math.max(zoomLevel, 0.75)));
+    const innerRadius = Math.max(9, 14 / Math.sqrt(Math.max(zoomLevel, 0.75)));
 
     ctx.fillStyle = 'rgba(43, 38, 32, 0.5)';
     ctx.beginPath();
@@ -482,13 +485,14 @@ export class OpenFrontierRespawnMapRenderer {
 
   private static drawControlsHint(ctx: CanvasRenderingContext2D): void {
     ctx.fillStyle = 'rgba(43, 38, 32, 0.78)';
-    ctx.fillRect(10, MAP_SIZE - 60, 200, 50);
+    ctx.fillRect(10, MAP_SIZE - 75, 230, 65);
 
     ctx.fillStyle = 'rgba(231, 217, 186, 0.7)';
     ctx.font = '11px "Courier Prime", monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('Scroll / Pinch: Zoom', 15, MAP_SIZE - 45);
-    ctx.fillText('Drag: Pan', 15, MAP_SIZE - 30);
+    ctx.fillText('+ / − / ⌖ : Zoom / Recenter', 15, MAP_SIZE - 60);
+    ctx.fillText('◀ ▶ : Step through spawns', 15, MAP_SIZE - 45);
+    ctx.fillText('Scroll / Pinch / Drag', 15, MAP_SIZE - 30);
     ctx.fillText('Tap / Click: Select', 15, MAP_SIZE - 15);
   }
 }

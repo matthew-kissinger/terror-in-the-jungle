@@ -202,7 +202,11 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // built from the shared WeaponRigManager spec table and updated on cycle /
   // chip select. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by
   // the brief). The loadout/presentation split target above is unchanged.
-  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28)', loc: 1118, methods: 75 },
+  // Snapshot raised 1118 → 1121 LOC (deploy-map-navigation, 2026-06-28): +3 LOC
+  // to make the map container a positioning context for the map's self-mounted
+  // navigation controls overlay (zoom / recenter / spawn-cycle). In-cycle
+  // ratchet re-base sanctioned by the task brief; no CARRY_OVERS row.
+  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28); +3 LOC map-controls positioning context (deploy-map-navigation, 2026-06-28)', loc: 1121, methods: 75 },
   'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff', loc: 355, methods: 62 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as

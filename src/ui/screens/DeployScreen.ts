@@ -195,6 +195,9 @@ export class DeployScreen extends UIComponent {
     const mapHelper = this.createDiv(styles.mapHelper);
     mapHelper.textContent = 'Tap or click a sector to select your insertion point — or pick from the spawn list below.';
     this.mapContainer = this.createDiv(styles.map, 'respawn-map');
+    // Positioning context for the map's self-mounted navigation controls
+    // (zoom / recenter / spawn-cycle overlay lives inside this container).
+    this.mapContainer.style.position = 'relative';
     mapHeader.appendChild(this.mapTitle);
     mapHeader.appendChild(mapHelper);
     mapPanel.appendChild(mapHeader);
