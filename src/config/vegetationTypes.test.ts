@@ -312,11 +312,12 @@ describe('VEGETATION_TYPES production imposter policy', () => {
       expect(groundCards['taro-elephant-ear']).toBeDefined();
     }
 
-    // The dense bamboo grove (2.8) is now a ground CARD (bamboo-thicket): the far band is a
+    // The dense bamboo grove is now a ground CARD (bamboo-thicket): the far band is a
     // baked alpha card and the near-mesh tier is globally capped, so the old billboard's
-    // per-instance GLB-clone memory blowup at this density is gone.
+    // per-instance GLB-clone memory blowup at this density is gone. Density still reads as
+    // dense (>1) but is no longer the wall-it-off value retuned in vegetation-density-retune.
     const denseBamboo = bambooGrove.find((entry) => entry.typeId === 'bamboo-thicket');
-    expect(denseBamboo?.densityMultiplier).toBe(2.8);
+    expect(denseBamboo?.densityMultiplier).toBeGreaterThan(1);
     expect(groundCards['bamboo-thicket']).toBeDefined();
   });
 

@@ -153,7 +153,8 @@ const BIOME_RIVERBANK: BiomeConfig = {
     { typeId: 'teak-a',       densityMultiplier: 0.08 },
     { typeId: 'rubber-a',     densityMultiplier: 0.06 },
     { typeId: 'fan-palm',     densityMultiplier: 0.6 },
-    { typeId: 'coconut-palm',      densityMultiplier: 1.25 },
+    // Thinned 1.25 -> 0.7 (2026-06-28 owner playtest: shoreline palms walled in the player).
+    { typeId: 'coconut-palm',      densityMultiplier: 0.7 },
     { typeId: 'banana-plant', densityMultiplier: 0.45 },
     // Library ground-cover cards: the wet riverbank understory. The taro card carries the
     // broadleaf cover that the dense elephantEar billboard used to (both elephantEar + fern
@@ -212,9 +213,11 @@ const BIOME_BAMBOO_GROVE: BiomeConfig = {
   vegetationPalette: [
     // Dense bamboo is now a ground CARD (bamboo-thicket, kebab id): the far band is a
     // baked alpha card (2 tris) and the near-mesh tier is globally capped at 32, so the
-    // old billboard's per-instance GLB-clone memory blowup at this density (2.8) is gone.
+    // old billboard's per-instance GLB-clone memory blowup at high density is gone.
     // The sparse hero bamboo-grove (mesh+octa) stays for low-density jungle understory.
-    { typeId: 'bamboo-thicket',    densityMultiplier: 2.8 },
+    // Thinned 2.8 -> 1.8 (2026-06-28 owner playtest: still reads as dense bamboo but no
+    // longer walls off movement/sightlines).
+    { typeId: 'bamboo-thicket',    densityMultiplier: 1.8 },
     // Understory cards (kebab ids) replace the old fern/elephantEar billboards.
     { typeId: 'understory-fern',   densityMultiplier: 0.8 },
     { typeId: 'taro-elephant-ear', densityMultiplier: 0.3 },
