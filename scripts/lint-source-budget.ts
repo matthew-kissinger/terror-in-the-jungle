@@ -180,7 +180,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // boardable-helicopter presence provider to the spawn selector so helipad
   // spawn labels match reality. In-cycle ratchet re-base, no CARRY_OVERS row
   // (sanctioned by the task brief).
-  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md; +1 presence-provider setter (helipad-spawn-truth, 2026-06-28)', loc: 757, methods: 59 },
+  // Snapshot raised 757 → 800 LOC / 59 → 60 methods (crew-vehicle-selectable,
+  // 2026-06-28): selecting a crewable vehicle in the CREW-A-VEHICLE deploy panel
+  // now adopts the vehicle anchor as a real selected spawn (enables Deploy, lands
+  // the player at the vehicle) instead of being a logging no-op — adds the
+  // buildVehicleSpawnPoint helper + the selection/hint wiring. In-cycle ratchet
+  // re-base, no CARRY_OVERS row (sanctioned by the task brief).
+  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md; +1 presence-provider setter (helipad-spawn-truth, 2026-06-28); +43 LOC/+1 method crew-a-vehicle selectable spawn (crew-vehicle-selectable, 2026-06-28)', loc: 800, methods: 60 },
   // Admitted 2026-06-28 (sks-rifle-wiring, cycle-2026-06-28-arsenal-expansion):
   // the runtime-weapon-type plumbing established by marksman-rifle-class left
   // this file at 699 LOC (1 under the base limit). Adding the SKS as its own
@@ -222,7 +228,12 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // to make the map container a positioning context for the map's self-mounted
   // navigation controls overlay (zoom / recenter / spawn-cycle). In-cycle
   // ratchet re-base sanctioned by the task brief; no CARRY_OVERS row.
-  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28); +3 LOC map-controls positioning context (deploy-map-navigation, 2026-06-28); armory declutter removed the redundant per-slot PREV/NEXT cycle buttons, net -1 LOC (armory-layout-reflow, 2026-06-28)', loc: 1120, methods: 75 },
+  // Snapshot raised 1120 → 1142 LOC / 75 → 76 methods (crew-vehicle-selectable,
+  // 2026-06-28): the CREW-A-VEHICLE selection surfaces a "Press F to board" hint
+  // in the selected-spawn panel — one new hint element + the setBoardVehicleHint
+  // method (also cleared on resetSelectedSpawn). In-cycle ratchet re-base, no
+  // CARRY_OVERS row (sanctioned by the task brief).
+  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28); +3 LOC map-controls positioning context (deploy-map-navigation, 2026-06-28); armory declutter removed the redundant per-slot PREV/NEXT cycle buttons, net -1 LOC (armory-layout-reflow, 2026-06-28); +22 LOC/+1 method F-board hint (crew-vehicle-selectable, 2026-06-28)', loc: 1142, methods: 76 },
   'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff', loc: 355, methods: 62 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as
