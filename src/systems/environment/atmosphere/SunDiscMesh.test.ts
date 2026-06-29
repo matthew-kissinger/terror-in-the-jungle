@@ -3,7 +3,12 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { SunDiscMesh } from './SunDiscMesh';
+import {
+  SunDiscMesh,
+  SUN_DISC_MAX_SINE_FREQUENCY,
+  SUN_DISC_SINE_FREQ,
+  computeSunDiscSurfaceTerms,
+} from './SunDiscMesh';
 
 /**
  * Behaviour contract for the additive HDR sun-disc sprite. We assert what
@@ -148,6 +153,95 @@ describe('SunDiscMesh', () => {
     // ticks `update` should not flash a bright disc on the first frame.
     const disc = new SunDiscMesh(DOME_RADIUS);
     expect(disc.getMesh().visible).toBe(false);
+  });
+
+  // --- Surface-texture band-limit (CPU mirror of the shared TSL/GLSL terms) ---
+  //
+  // Owner playtest 2026-06-28: the disc read as an "LED-dot lattice" because the
+  // plasma/filament/granule sine terms stacked frequencies up to ~x317 over the
+  // disc UV, which aliases into a regular dot grid at render resolution. These
+  // tests pin the band-limit on the CPU mirror — the same coefficients the
+  // shaders inject — so the disc keeps surface mottling without the lattice.
+  describe('surface-texture band-limit (no dot lattice)', () => {
+    // The historical max coefficient that produced the visible lattice; the cap
+    // must stay well below this so the terms can no longer alias into a grid.
+    const LATTICE_FREQUENCY = 317;
+
+    it('caps every sine coefficient at the band-limit, well below the lattice frequency', () => {
+      expect(SUN_DISC_MAX_SINE_FREQUENCY).toBeLessThan(LATTICE_FREQUENCY * 0.5);
+
+      const coefficients = Object.values(SUN_DISC_SINE_FREQ);
+      expect(coefficients.length).toBeGreaterThan(0);
+      for (const coeff of coefficients) {
+        expect(Math.abs(coeff)).toBeLessThanOrEqual(SUN_DISC_MAX_SINE_FREQUENCY);
+      }
+    });
+
+    it('produces low-frequency mottling: terms stay smooth across one render texel', () => {
+      // Sample the CPU mirror across a small UV step (~ one texel of the 128px
+      // fallback over the disc body). A band-limited field changes only gently
+      // texel-to-texel; the old x317 terms swung the full 0..1 range, which is
+      // exactly the per-pixel flip that read as a dot grid.
+      const step = 1 / 128; // one texel in centered-UV units
+      let maxDelta = 0;
+      for (let i = 0; i < 64; i += 1) {
+        const cx = -0.3 + (i / 64) * 0.6;
+        const cy = 0.07;
+        const a = computeSunDiscSurfaceTerms(cx, cy);
+        const b = computeSunDiscSurfaceTerms(cx + step, cy);
+        maxDelta = Math.max(
+          maxDelta,
+          Math.abs(a.plasma - b.plasma),
+          Math.abs(a.filament - b.filament),
+          Math.abs(a.granule - b.granule),
+        );
+      }
+      // A full 0..1 flip across one texel is the lattice signature. Stay well
+      // under that — band-limited terms vary only a fraction per texel.
+      expect(maxDelta).toBeLessThan(0.5);
+    });
+
+    it('keeps all three surface terms in the 0..1 range', () => {
+      for (let i = 0; i < 50; i += 1) {
+        const cx = -0.4 + (i / 50) * 0.8;
+        const cy = -0.25 + (i / 50) * 0.5;
+        const { plasma, filament, granule } = computeSunDiscSurfaceTerms(cx, cy);
+        for (const v of [plasma, filament, granule]) {
+          expect(v).toBeGreaterThanOrEqual(0);
+          expect(v).toBeLessThanOrEqual(1);
+        }
+      }
+    });
+
+    it('keeps a warm, hot core: the disc center is bright and warmer in red than blue', () => {
+      // The fallback DataTexture is the CPU render of the disc. Its center pixel
+      // is the hot core — it must stay bright and warm (red-dominant), not get
+      // flattened by the band-limit.
+      const disc = new SunDiscMesh(DOME_RADIUS);
+      const material = disc.getMaterial() as THREE.Material & {
+        userData: { sunDiscFallbackTexture?: THREE.DataTexture };
+      };
+      const texture = material.userData.sunDiscFallbackTexture;
+      expect(texture).toBeDefined();
+
+      const size = texture!.image.width as number;
+      const data = texture!.image.data as Uint8Array;
+      const cx = Math.floor(size / 2);
+      const cy = Math.floor(size / 2);
+      const i = (cy * size + cx) * 4;
+      const red = data[i];
+      const green = data[i + 1];
+      const blue = data[i + 2];
+      const alpha = data[i + 3];
+
+      // Hot core reads as a bright, warm body, not a dull/transparent spot.
+      expect(red).toBeGreaterThan(200);
+      expect(red).toBeGreaterThan(blue);
+      expect(alpha).toBeGreaterThan(120);
+      expect(green).toBeGreaterThan(blue * 0.5);
+
+      disc.dispose();
+    });
   });
 
   it('dispose() releases material + geometry resources', () => {
