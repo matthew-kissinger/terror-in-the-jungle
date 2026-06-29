@@ -16,7 +16,12 @@ export class WeaponAnimations {
   // ADS state
   private isADS = false
   private adsProgress = 0 // 0..1
-  private readonly ADS_TIME = 0.18 // seconds
+  private readonly ADS_TIME = 0.18 // seconds (baseline transition time)
+  // Handling-speed penalty multiplier on the ADS transition time (1.0 = none).
+  // Heavier ammo loads set this > 1.0 so aiming-down-sights is slower; the
+  // baseline (STANDARD load) keeps the effective ADS time at ADS_TIME exactly.
+  private adsTimeFactor = 1
+
 
   // Recoil recovery with spring physics
   private weaponRecoilOffset = { x: 0, y: 0, z: 0, rotX: 0 }
@@ -110,9 +115,10 @@ export class WeaponAnimations {
     this.swayOffset.x = THREE.MathUtils.lerp(this.swayOffset.x, speedFactor * 0.02, 8 * deltaTime)
     this.swayOffset.y = THREE.MathUtils.lerp(this.swayOffset.y, speedFactor * 0.02, 8 * deltaTime)
 
-    // ADS transition
+    // ADS transition (effective time = baseline * handling penalty factor)
     const target = this.isADS ? 1 : 0
-    const k = this.ADS_TIME > 0 ? Math.min(1, deltaTime / this.ADS_TIME) : 1
+    const adsTime = this.ADS_TIME * this.adsTimeFactor
+    const k = adsTime > 0 ? Math.min(1, deltaTime / adsTime) : 1
     this.adsProgress = THREE.MathUtils.lerp(this.adsProgress, target, k)
 
     // Apply FOV zoom when ADS (reduced zoom for less disorientation)
@@ -149,6 +155,16 @@ export class WeaponAnimations {
 
   getADSProgress(): number {
     return this.adsProgress
+  }
+
+  /**
+   * Scale the ADS-transition time by a handling penalty factor (1.0 = no
+   * penalty / baseline). Values > 1.0 slow the aim-down-sights transition;
+   * used by the selectable ammo load so heavier reserves cost handling speed.
+   * Clamped to a sane floor so a bad value can never speed ADS up.
+   */
+  setAdsTimeFactor(factor: number): void {
+    this.adsTimeFactor = Number.isFinite(factor) ? Math.max(1, factor) : 1
   }
 
   applyRecoilImpulse(recoilMultiplier: number): void {

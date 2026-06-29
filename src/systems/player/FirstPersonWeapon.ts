@@ -506,6 +506,18 @@ export class FirstPersonWeapon implements GameSystem {
     this.onAmmoChange(this.ammo.getAmmoState())
   }
 
+  /**
+   * Apply the selectable ammo-load handling penalty (from the deploy loadout).
+   * The factor (1.0 = baseline / STANDARD, > 1.0 for EXTENDED/HEAVY) slows the
+   * weapon's ADS-transition so carrying more reserve ammo costs handling speed.
+   * This is the tradeoff that pairs with setReserveAmmoFactor; magazine size is
+   * unchanged. Concrete-class capability only -- intentionally NOT on the
+   * fenced IFirstPersonWeapon interface; LoadoutService calls it optionally.
+   */
+  setHandlingFactor(factor: number): void {
+    this.animations.setAdsTimeFactor(factor)
+  }
+
   private startReload(): void {
     // Auto-exit ADS if aiming to allow reload
     if (this.animations.getADS()) {
