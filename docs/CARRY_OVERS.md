@@ -50,6 +50,23 @@ the cycle that re-opens it.
 
 History log:
 
+- 2026-06-28 — budget-ratchet admission (sks-rifle-wiring, Phase 4 Field
+  Readiness): `src/systems/player/weapon/WeaponRigManager.ts` crossed the 700-LOC
+  base limit (699→735 / 29 methods) and is admitted to the grandfather list.
+  Cause: the SKS semi-auto runtime weapon type (+36 LOC) on top of the marksman
+  DMR added the same cycle — the manager now wires nine weapons' rig load + spec
+  + switching. Split target: extract the per-weapon spec/core/rig registry out of
+  the manager (recorded in the entry's `round`/`reason`). Orchestrator-sanctioned
+  admission per the budget policy; within-cycle growth, **no new carry-over** —
+  the split-debt lives in `scripts/lint-source-budget.ts` like the other
+  grandfathered god-modules. Carry-overs 5→5.
+
+- 2026-06-28 — budget-ratchet re-base (route-corridor-exclusion, Phase 3 Field
+  Readiness): `src/systems/terrain/TerrainFeatureCompiler.ts` snapshot raised
+  764→767 LOC — the +3 LOC route veg-exclusion join block (the one-line merge of
+  route corridors into the `vegetationExclusionZones` stream + a 2-line comment).
+  Within-cycle growth, not a new carry-over; split target unchanged.
+
 - 2026-06-28 — budget-ratchet re-base (seat-and-fire-cues): two
   already-grandfathered files grew minimally to surface multi-crew seat/fire
   cues. `src/systems/vehicle/FixedWingModel.ts` snapshot raised 1166→1191 LOC /

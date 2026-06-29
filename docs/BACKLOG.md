@@ -57,6 +57,33 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-28-arsenal-expansion)
+
+Phase 4 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+3 PRs #441-#443, R1 (2 parallel) + R2 (1), zero fence changes, no reviewer
+scope (weapon/loadout/UI). Adds the NVA marksman + SKS the owner asked for —
+WIRING cataloged GLBs as new RUNTIME weapon types, not new art.
+`marksman-rifle-class` (#442): MARKSMAN/DMR runtime weapon (OPFOR NVA/VC),
+Dragunov SVD rig, own GunplayCore spec (rpm 80, dmg 75/55, tight spread,
+ADS divisor 2.6), wired all the way through WeaponSwitching/WeaponAmmo/
+ArmoryPreviewConfig so it is selectable. `sks-rifle-wiring` (#443): SKS
+semi-auto runtime weapon (OPFOR NVA/VC), iron sights, spec between AK and DMR
+(rpm 200, dmg 45/32). `ammo-load-tradeoff` (#441): EXTENDED/HEAVY now cost
+ADS-transition time (1.0/1.15/1.30) so they are a real tradeoff, not strictly
+better — reserve multiplier + mag size unchanged. **Perf gate PASS** (combat120
+A/B: steady-state p99 33.60→34.45ms R1 (+2.53%) → 31.65ms full Phase-4 (−5.80%),
+both under +5%; both weapons OPFOR-loadout-only and reachability-dormant in
+ai_sandbox — flat program/geometry ceiling proves no new weapon mesh executes).
+**Brief-gap fix:** a new LoadoutWeapon value compile-breaks the exhaustive
+Record<LoadoutWeapon,...> tables — found empirically by the marksman executor,
+Files-touched amended before re-dispatch. **Budget:** WeaponRigManager crossed
+700 (699→735) adding the SKS runtime type; admitted to the grandfather list with
+a split target (extract per-weapon spec/core/rig registry), CARRY_OVERS
+budget-ratchet note, no new carry-over. Carry-overs 5→5. Owner feel-walk row in
+PLAYTEST_PENDING (incl. the open ammo-load tradeoff-vs-collapse decision); memo
+at `docs/playtests/cycle-2026-06-28-arsenal-expansion.md`. Follow-up: the
+WeaponRigManager split (per-weapon registry extraction).
+
 ## Recently Completed (cycle-2026-06-28-terrain-vegetation-asset-defects)
 
 Phase 3 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
