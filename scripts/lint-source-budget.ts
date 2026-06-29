@@ -135,7 +135,15 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // the context the HUD already receives (derivation logic lives in
   // HudControlHints so only one method is added). In-cycle ratchet re-base; the
   // R3 split target is unchanged. See docs/CARRY_OVERS.md.
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud); +21 LOC/+1 method seat/fire cue wiring (seat-and-fire-cues, 2026-06-28)', loc: 809, methods: 86 },
+  // Snapshot raised 809 → 858 / 86 → 88 (situation-readout-hud, 2026-06-28): the
+  // situation-readout task mounts the readout on the shared control-hint surface
+  // and drives it on the existing 2Hz objective tick. Two methods are added —
+  // `updateSituationReadout` (reads zone/ticket/player state into a snapshot) and
+  // `setPlayerAlliance` (faction-relative ticket/objective split) — plus the
+  // mount/dispose wiring. The read rule itself lives in HudSituationReadout, so
+  // HUDSystem only forwards existing read paths. In-cycle ratchet re-base; the
+  // R3 split target is unchanged. See docs/CARRY_OVERS.md.
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud); +21 LOC/+1 method seat/fire cue wiring (seat-and-fire-cues, 2026-06-28); +49 LOC/+2 methods situation-readout mount/update wiring (situation-readout-hud, 2026-06-28)', loc: 858, methods: 88 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence); +28 LOC dropped-frame combat telemetry wiring', loc: 790, methods: 43 },
   // Admitted 2026-06-15/16 (dropped-frame-perf-harness): the main loop grew
   // with frame/presentation epoch recording and render-context attribution.
