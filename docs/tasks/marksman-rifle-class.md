@@ -16,7 +16,21 @@ for this weapon's offset + zoom — do not duplicate it.
 - `src/systems/player/weapon/WeaponRigManager.ts` (rig art entry + load the new rig)
 - `src/systems/player/weapon/WeaponAnimations.ts` (per-weapon ADS offset + deeper optical zoom)
 - `src/systems/assets/modelPaths.ts` (expose the Dragunov model path from the catalog, if not already)
+- `src/systems/player/weapon/WeaponSwitching.ts` (`RUNTIME_WEAPON_MAP` + `weaponAmmoMap` entries — see note)
+- `src/systems/player/weapon/WeaponAmmo.ts` (a marksman `AmmoManager` getter, mirroring the rifle)
+- `src/ui/screens/deploy/ArmoryPreviewConfig.ts` (legacy + kiln preview-table entries — exhaustive `Record`)
+- `src/systems/player/InventoryManager.ts` (weapon slot, if switchability needs it)
 - `*.test.ts` (new)
+
+> **Plumbing note (verified):** `LoadoutWeapon` is the key of exhaustive
+> `Record<>` types (`RUNTIME_WEAPON_MAP` in `WeaponSwitching.ts`,
+> `ArmoryPreviewConfigTable = Record<Exclude<LoadoutWeapon, RIFLE>, ...>` in
+> `ArmoryPreviewConfig.ts` — both legacy + kiln tables), so a new enum value is a
+> compile-break until those tables get an entry. This is a new RUNTIME weapon
+> type: map it through `WeaponSwitching`/`WeaponAmmo` so it is actually
+> selectable, not just an enum. Implementation may run ~150 LOC across ~10 files —
+> still well under the 400-LOC reassess line; keep it tight, no incidental
+> refactors.
 
 ## Scope
 

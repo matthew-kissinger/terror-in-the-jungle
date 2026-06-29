@@ -13,7 +13,18 @@ the SKS as a semi-auto OPFOR rifle option, reusing the rig-registry pattern that
 - `src/systems/weapons/GunplayCore.ts` (a `WeaponSpec` for the SKS)
 - `src/systems/player/weapon/WeaponRigManager.ts` (rig art entry + load the new rig)
 - `src/systems/assets/modelPaths.ts` (expose the SKS model path from the catalog, if not already)
+- `src/systems/player/weapon/WeaponSwitching.ts` (`RUNTIME_WEAPON_MAP` + `weaponAmmoMap` entries — see note)
+- `src/systems/player/weapon/WeaponAmmo.ts` (an SKS `AmmoManager` getter)
+- `src/ui/screens/deploy/ArmoryPreviewConfig.ts` (legacy + kiln preview-table entries — exhaustive `Record`)
+- `src/systems/player/InventoryManager.ts` (weapon slot, if switchability needs it)
 - `*.test.ts` (new)
+
+> **Plumbing note (verified):** like the marksman, adding an SKS `LoadoutWeapon`
+> value compile-breaks the exhaustive `Record<LoadoutWeapon,...>` tables
+> (`WeaponSwitching.RUNTIME_WEAPON_MAP`, `ArmoryPreviewConfig` legacy+kiln) until
+> they get entries. Follow the SAME runtime-weapon-type plumbing
+> `marksman-rifle-class` established (rebase onto it so its registry helpers and
+> table-entry pattern are already present).
 
 ## Scope
 
