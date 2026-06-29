@@ -99,6 +99,16 @@ const WEAPON_PREVIEW_CONFIGS_LEGACY: ArmoryPreviewConfigTable = {
     gripOffset: 0,
     socketMode: 'shouldered-forward',
   },
+  [LoadoutWeapon.MARKSMAN]: {
+    id: 'dragunov-svd',
+    modelPath: WeaponModels.DRAGUNOV_SVD,
+    lengthMeters: 1.29,
+    gripNames: ['Mesh_TriggerGuard', 'Mesh_GripCap', 'Mesh_Receiver'],
+    supportNames: ['Mesh_Handguard', 'Mesh_GasTube', 'Mesh_Barrel'],
+    muzzleNames: ['Mesh_FlashHider', 'Mesh_FrontSightBase', 'Mesh_Barrel'],
+    stockNames: ['Mesh_ButtPad', 'Mesh_Stock'],
+    ...COMMON_LONG_GUN_SOCKET,
+  },
 };
 
 // Kiln gen-2 repaint art (default). Node names verified by parsing each
@@ -164,6 +174,16 @@ const WEAPON_PREVIEW_CONFIGS_KILN: ArmoryPreviewConfigTable = {
     forwardHold: 0.08,
     gripOffset: 0,
     socketMode: 'shouldered-forward',
+  },
+  [LoadoutWeapon.MARKSMAN]: {
+    id: 'dragunov-svd-sniper-rifle',
+    modelPath: WeaponModels.DRAGUNOV_SVD_SNIPER_RIFLE,
+    lengthMeters: 1.21,
+    gripNames: ['Mesh_TriggerGuard', 'Mesh_Receiver', 'Mesh_SVD_Stock'],
+    supportNames: ['Mesh_Handguard', 'Mesh_GasTube', 'Mesh_Barrel'],
+    muzzleNames: ['Mesh_FlashHider', 'Mesh_FrontSightBase', 'Mesh_Barrel'],
+    stockNames: ['Mesh_Buttplate', 'Mesh_SVD_Stock'],
+    ...COMMON_LONG_GUN_SOCKET,
   },
 };
 

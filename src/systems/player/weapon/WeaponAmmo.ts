@@ -14,6 +14,7 @@ export class WeaponAmmo {
   private pistolAmmo: AmmoManager
   private lmgAmmo: AmmoManager
   private launcherAmmo: AmmoManager
+  private marksmanAmmo: AmmoManager
   private currentAmmoManager: AmmoManager
 
   // Callbacks
@@ -82,6 +83,15 @@ export class WeaponAmmo {
       if (this.onAmmoChange) this.onAmmoChange(state)
     })
 
+    // Marksman (Dragunov SVD): 10 round mag, 60 reserve (precision, low capacity)
+    this.marksmanAmmo = new AmmoManager(10, 60)
+    this.marksmanAmmo.setOnReloadComplete(() => {
+      if (this.onReloadComplete) this.onReloadComplete()
+    })
+    this.marksmanAmmo.setOnAmmoChange((state) => {
+      if (this.onAmmoChange) this.onAmmoChange(state)
+    })
+
     // Start with rifle ammo active
     this.currentAmmoManager = this.rifleAmmo
   }
@@ -110,6 +120,10 @@ export class WeaponAmmo {
     return this.launcherAmmo
   }
 
+  getMarksmanAmmo(): AmmoManager {
+    return this.marksmanAmmo
+  }
+
   getCurrentAmmoManager(): AmmoManager {
     return this.currentAmmoManager
   }
@@ -126,6 +140,7 @@ export class WeaponAmmo {
     this.pistolAmmo.setZoneManager(zoneManager)
     this.lmgAmmo.setZoneManager(zoneManager)
     this.launcherAmmo.setZoneManager(zoneManager)
+    this.marksmanAmmo.setZoneManager(zoneManager)
   }
 
   resetAll(): void {
@@ -135,6 +150,7 @@ export class WeaponAmmo {
     this.pistolAmmo.reset()
     this.lmgAmmo.reset()
     this.launcherAmmo.reset()
+    this.marksmanAmmo.reset()
   }
 
   /**
@@ -149,6 +165,7 @@ export class WeaponAmmo {
     this.pistolAmmo.setReserveFactor(factor)
     this.lmgAmmo.setReserveFactor(factor)
     this.launcherAmmo.setReserveFactor(factor)
+    this.marksmanAmmo.setReserveFactor(factor)
   }
 
   getAmmoState(): any {

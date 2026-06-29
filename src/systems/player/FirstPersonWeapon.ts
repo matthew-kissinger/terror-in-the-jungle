@@ -15,7 +15,7 @@ import { TicketSystem } from '../world/TicketSystem'
 import { InventoryManager } from './InventoryManager'
 import { PlayerStatsTracker } from './PlayerStatsTracker'
 import { WeaponRigManager } from './weapon/WeaponRigManager'
-import { WeaponAnimations } from './weapon/WeaponAnimations'
+import { WeaponAnimations, type WeaponAdsType } from './weapon/WeaponAnimations'
 import { WeaponFiring } from './weapon/WeaponFiring'
 import { WeaponReload } from './weapon/WeaponReload'
 import { WeaponModel } from './weapon/WeaponModel'
@@ -190,7 +190,9 @@ export class FirstPersonWeapon implements GameSystem {
     // Update animations (ADS, recoil, idle bob, sway, pump)
     this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_ANIMATIONS)
     try {
-      this.animations.update(deltaTime, isMoving, lookVelocity)
+      // Pass the equipped weapon type so the ADS FOV-zoom resolves per-weapon
+      // (the marksman zooms deeper than iron-sight weapons).
+      this.animations.update(deltaTime, isMoving, lookVelocity, this.rigManager.getCurrentWeaponType())
     } finally {
       this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_ANIMATIONS)
     }
@@ -487,7 +489,7 @@ export class FirstPersonWeapon implements GameSystem {
    * The weapon currently equipped in-hand. Used to verify that the deployed
    * weapon matches the selected loadout primary at spawn.
    */
-  getEquippedWeaponType(): 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' {
+  getEquippedWeaponType(): WeaponAdsType {
     return this.rigManager.getCurrentWeaponType()
   }
 

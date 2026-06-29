@@ -120,6 +120,7 @@ vi.mock('../../assets/modelPaths', () => ({
     M1911: 'weapons/m1911.glb',
     M60: 'weapons/m60.glb',
     M79: 'weapons/m79.glb',
+    DRAGUNOV_SVD: 'weapons/dragunov-svd.glb',
     // Kiln gen-2 repaint art (default selected by the kill-switch).
     M16A1_2: 'weapons/kiln-war-2026-06/m16a1-2.glb',
     AK_47: 'weapons/kiln-war-2026-06/ak-47.glb',
@@ -128,6 +129,7 @@ vi.mock('../../assets/modelPaths', () => ({
     M1911A1_COLT: 'weapons/kiln-war-2026-06/m1911a1-colt.glb',
     M60_PIG_GENERAL_PURPOSE: 'weapons/kiln-war-2026-06/m60-pig-general-purpose.glb',
     M79_THUMPER_40MM_GRENADE: 'weapons/kiln-war-2026-06/m79-thumper-40mm-grenade.glb',
+    DRAGUNOV_SVD_SNIPER_RIFLE: 'weapons/kiln-war-2026-06/dragunov-svd-sniper-rifle.glb',
   },
   // Minimal catalog slice mirroring the magazine/muzzle node metadata the rig
   // reads. Mirrors the shape of the generated warAssetCatalog without pulling
@@ -150,6 +152,7 @@ vi.mock('../../assets/modelPaths', () => ({
     'm1911a1-colt': { slug: 'm1911a1-colt', magazineNodes: ['Mesh_MagBase'], muzzleNodes: ['Mesh_Bore'] },
     'm60-pig-general-purpose': { slug: 'm60-pig-general-purpose', muzzleNodes: ['Mesh_FlashHider'] },
     'm79-thumper-40mm-grenade': { slug: 'm79-thumper-40mm-grenade' },
+    'dragunov-svd-sniper-rifle': { slug: 'dragunov-svd-sniper-rifle', magazineNodes: ['Mesh_Magazine'], muzzleNodes: ['Mesh_FlashHider'] },
     // Legacy slugs (used when ?weaponArt=legacy).
     m16a1: {
       slug: 'm16a1',
@@ -222,8 +225,8 @@ describe('WeaponRigManager', () => {
     it('adds all weapon rigs to scene', async () => {
       await manager.init()
 
-      // Scene.add should be called 7 times (M16, AK, shotgun, SMG, pistol, M60, M79)
-      expect(scene.add).toHaveBeenCalledTimes(7)
+      // Scene.add should be called 8 times (M16, AK, shotgun, SMG, pistol, M60, M79, marksman)
+      expect(scene.add).toHaveBeenCalledTimes(8)
     })
 
     it('sets rifle visible and others hidden initially', async () => {

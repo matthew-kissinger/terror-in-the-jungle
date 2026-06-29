@@ -10,7 +10,8 @@ export enum LoadoutWeapon {
   SMG = 'smg',
   PISTOL = 'pistol',
   LMG = 'lmg',
-  LAUNCHER = 'launcher'
+  LAUNCHER = 'launcher',
+  MARKSMAN = 'marksman'
 }
 
 export enum LoadoutEquipment {
@@ -76,6 +77,7 @@ const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> =
   { value: LoadoutWeapon.PISTOL, label: 'Pistol', shortLabel: 'PST' },
   { value: LoadoutWeapon.LMG, label: 'LMG', shortLabel: 'MG' },
   { value: LoadoutWeapon.LAUNCHER, label: 'Grenade Launcher', shortLabel: 'GL' },
+  { value: LoadoutWeapon.MARKSMAN, label: 'Marksman Rifle', shortLabel: 'DMR' },
 ];
 
 const LOADOUT_EQUIPMENT_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutEquipment>> = [
@@ -207,6 +209,7 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.RIFLE,
       LoadoutWeapon.SMG,
       LoadoutWeapon.PISTOL,
+      LoadoutWeapon.MARKSMAN,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -244,6 +247,16 @@ const LOADOUT_POOL_BY_FACTION: Record<
           equipment: LoadoutEquipment.MORTAR_KIT,
         },
       },
+      {
+        id: 'marksman',
+        name: 'Marksman',
+        description: 'Long-range Dragunov preset for picking off targets.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.MARKSMAN,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.SMOKE_GRENADE,
+        },
+      },
     ],
   },
   [Faction.VC]: {
@@ -251,6 +264,7 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.RIFLE,
       LoadoutWeapon.SHOTGUN,
       LoadoutWeapon.PISTOL,
+      LoadoutWeapon.MARKSMAN,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -286,6 +300,16 @@ const LOADOUT_POOL_BY_FACTION: Record<
           primaryWeapon: LoadoutWeapon.RIFLE,
           secondaryWeapon: LoadoutWeapon.PISTOL,
           equipment: LoadoutEquipment.SANDBAG_KIT,
+        },
+      },
+      {
+        id: 'sharpshooter',
+        name: 'Sharpshooter',
+        description: 'Dragunov overwatch preset for covering ambush lanes.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.MARKSMAN,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.SMOKE_GRENADE,
         },
       },
     ],
