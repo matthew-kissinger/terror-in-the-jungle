@@ -203,6 +203,7 @@ describe('PlayerRespawnManager', () => {
       setSpawnOptionClickCallback: vi.fn(),
       setVehicleDeployOptionCallback: vi.fn(),
       updateVehicleDeployOptions: vi.fn(),
+      setBoardVehicleHint: vi.fn(),
       updateAlliance: vi.fn(),
       updateSpawnOptions: vi.fn(),
       recordDecisionTime: vi.fn(),
@@ -1445,7 +1446,10 @@ describe('PlayerRespawnManager', () => {
       expect(markers).toEqual([]);
     });
 
-    it('routes a vehicle-option selection through an informational handler without teleporting the player', async () => {
+    // crew-vehicle-selectable: selecting a crewable vehicle is a real spawn
+    // choice, not a logging no-op. It must set a valid selected spawn so the
+    // Deploy button enables, and deploy must land the player at the vehicle.
+    it('selecting a crewable vehicle sets it as the selected spawn (Deploy enabled)', async () => {
       await respawnManager.init();
       vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.OPEN_FRONTIER);
       respawnManager.onPlayerDeath();
@@ -1453,9 +1457,76 @@ describe('PlayerRespawnManager', () => {
       const callback = vi.mocked((mockDeployScreen as any).setVehicleDeployOptionCallback).mock.calls[0][0];
       callback('m48_tank_of_us_fob', 'M48 Patton');
 
-      // Informational only: no spawn selection set, no player reposition.
-      expect(respawnManager['selectedSpawnPoint']).toBeUndefined();
-      expect(mockPlayerController.setPosition).not.toHaveBeenCalled();
+      // A valid spawn is now selected (no longer a no-op), so the timer display
+      // is told a selection exists — the gate that enables the Deploy button.
+      expect(respawnManager['selectedSpawnPoint']).toBe('m48_tank_of_us_fob');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('M48 Patton');
+      expect(mockDeployScreen.updateTimerDisplay).toHaveBeenLastCalledWith(expect.any(Number), true);
+      // And an F-to-board hint is surfaced for the chosen vehicle.
+      expect((mockDeployScreen as any).setBoardVehicleHint).toHaveBeenCalledWith(expect.stringContaining('F'));
+    });
+
+    it('deploys the player to the selected vehicle position', async () => {
+      await respawnManager.init();
+      respawnManager.setInventoryManager(mockInventoryManager);
+      respawnManager.setPlayerHealthSystem(mockPlayerHealthSystem);
+      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.OPEN_FRONTIER);
+      respawnManager.onPlayerDeath();
+
+      const selectVehicle = vi.mocked((mockDeployScreen as any).setVehicleDeployOptionCallback).mock.calls[0][0];
+      selectVehicle('m48_tank_of_us_fob', 'M48 Patton');
+
+      const vehicleOption = respawnManager['availableVehicleOptions']
+        .find(option => option.id === 'm48_tank_of_us_fob')!;
+      expect(vehicleOption).toBeDefined();
+
+      respawnManager['confirmRespawn']();
+
+      // Player is repositioned near the vehicle anchor (deploy adds a small
+      // ±5m randomization offset and grounds Y to terrain).
+      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3), 'respawn.manager');
+      const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls.at(-1)![0];
+      expect(callPosition.x).toBeGreaterThanOrEqual(vehicleOption.position.x - 5);
+      expect(callPosition.x).toBeLessThanOrEqual(vehicleOption.position.x + 5);
+      expect(callPosition.z).toBeGreaterThanOrEqual(vehicleOption.position.z - 5);
+      expect(callPosition.z).toBeLessThanOrEqual(vehicleOption.position.z + 5);
+    });
+
+    it('does not select a vehicle when the deploy session locks spawn selection', async () => {
+      await respawnManager.init();
+      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.OPEN_FRONTIER);
+      vi.mocked((mockGameModeManager as any).getDeploySession).mockReturnValue({
+        kind: 'respawn',
+        mode: GameMode.OPEN_FRONTIER,
+        modeName: 'Open Frontier',
+        modeDescription: 'Company-scale maneuver warfare.',
+        flow: 'standard',
+        mapVariant: 'frontier',
+        flowLabel: 'Frontline deployment',
+        headline: 'RETURN TO BATTLE',
+        subheadline: 'Choose a controlled position and return to the fight.',
+        mapTitle: 'TACTICAL MAP - SELECT DEPLOYMENT',
+        selectedSpawnTitle: 'SELECTED SPAWN POINT',
+        emptySelectionText: 'Default insertion will be used',
+        readySelectionText: 'Ready to deploy',
+        countdownLabel: 'Deployment available in',
+        readyLabel: 'Ready for deployment',
+        actionLabel: 'DEPLOY',
+        secondaryActionLabel: null,
+        allowSpawnSelection: false,
+        allowLoadoutEditing: false,
+        sequenceTitle: 'Redeploy Checklist',
+        sequenceSteps: [],
+      });
+      respawnManager.onPlayerDeath();
+
+      const selectedBefore = respawnManager['selectedSpawnPoint'];
+      const callback = vi.mocked((mockDeployScreen as any).setVehicleDeployOptionCallback).mock.calls[0][0];
+      callback('m48_tank_of_us_fob', 'M48 Patton');
+
+      // Spawn selection is locked: the vehicle choice must not override the
+      // mode-assigned spawn.
+      expect(respawnManager['selectedSpawnPoint']).toBe(selectedBefore);
     });
   });
 

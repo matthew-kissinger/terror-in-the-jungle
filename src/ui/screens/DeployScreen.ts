@@ -98,6 +98,7 @@ export class DeployScreen extends UIComponent {
   private selectedPanel?: HTMLDivElement;
   private selectedName?: HTMLDivElement;
   private selectedStatus?: HTMLDivElement;
+  private boardVehicleHint?: HTMLDivElement;
   private selectedTitle?: HTMLHeadingElement;
   private decisionMetric?: HTMLDivElement;
   private sequenceTitle?: HTMLHeadingElement;
@@ -391,6 +392,23 @@ export class DeployScreen extends UIComponent {
     if (this.selectedStatus) {
       this.selectedStatus.textContent = this.deploySession?.emptySelectionText ?? 'Select a spawn point on the map';
     }
+    this.setBoardVehicleHint(undefined);
+  }
+
+  /**
+   * Surface (or clear) the "F to board" hint shown when a crewable vehicle is
+   * the selected spawn. Pass the vehicle's controls hint to show it; pass
+   * `undefined` to hide it (e.g. when an on-foot spawn is picked instead).
+   */
+  setBoardVehicleHint(controlsHint: string | undefined): void {
+    if (!this.boardVehicleHint) return;
+    if (controlsHint) {
+      this.boardVehicleHint.textContent = `Press F to board — ${controlsHint}`;
+      this.boardVehicleHint.style.display = '';
+    } else {
+      this.boardVehicleHint.textContent = '';
+      this.boardVehicleHint.style.display = 'none';
+    }
   }
 
   setRespawnClickCallback(callback: () => void): void {
@@ -504,9 +522,13 @@ export class DeployScreen extends UIComponent {
     this.selectedStatus.textContent = 'Select a spawn point on the map';
     this.decisionMetric = this.createDiv(styles.decisionMetric, 'respawn-decision-time');
     this.decisionMetric.textContent = 'Decision time 0.0s';
+    // "F to board" hint shown only when a crewable vehicle is the selected spawn.
+    this.boardVehicleHint = this.createDiv(styles.statusText, 'respawn-board-vehicle-hint');
+    this.boardVehicleHint.style.display = 'none';
     panel.appendChild(this.selectedTitle);
     panel.appendChild(this.selectedName);
     panel.appendChild(this.selectedStatus);
+    panel.appendChild(this.boardVehicleHint);
     panel.appendChild(this.decisionMetric);
     return panel;
   }
