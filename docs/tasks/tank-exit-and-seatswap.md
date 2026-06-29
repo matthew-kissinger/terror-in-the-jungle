@@ -12,7 +12,7 @@ deferred the F-overload fix here).
 ## Files touched
 
 - `src/systems/player/PlayerVehicleController.ts` (add the ground/tracked exit branch)
-- `src/ui/PlayerInput.ts` (route the exit key; ~line 532)
+- `src/systems/player/PlayerInput.ts` (route the exit key; ~line 532)
 - `src/systems/vehicle/TankPlayerAdapter.ts` (seat-swap vs exit disambiguation; ~line 399)
 - `*.test.ts` (new — repro-first)
 
