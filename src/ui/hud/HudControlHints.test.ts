@@ -80,7 +80,10 @@ describe('HudControlHints', () => {
 
     const rows = legendRows(host).join(' | ');
     expect(rows).toContain('Throttle');
-    expect(rows).toContain('Exit / swap seat');
+    // Exit and seat-swap are surfaced as distinct binds: E exits, F swaps —
+    // a conflated single bind hid the dismount on a two-seat tank.
+    expect(rows).toContain('Exit vehicle');
+    expect(rows).toContain('Swap seat');
     expect(rows.toLowerCase()).toContain('fire');
     // On-foot-only binds should not bleed into the vehicle legend.
     expect(legendText(host)).not.toContain('Board vehicle');
