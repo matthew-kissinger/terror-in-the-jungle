@@ -54,6 +54,7 @@ import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import { TaskingDirector } from '../systems/missions/TaskingDirector';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { objectPool } from '../utils/ObjectPoolManager';
 import { markStartup } from './StartupTelemetry';
@@ -222,6 +223,7 @@ export class SystemInitializer {
     refs.loadoutService = new LoadoutService();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
+    refs.taskingDirector = new TaskingDirector();
     refs.spatialGridManager = spatialGridManager;
 
     // Initialize influence map system based on game mode world size
@@ -267,6 +269,7 @@ export class SystemInitializer {
       refs.ammoSupplySystem,
       refs.warSimulator,
       refs.strategicFeedback,
+      refs.taskingDirector,
       refs.airSupportManager,
       refs.aaEmplacementSystem,
       refs.vehicleManager,

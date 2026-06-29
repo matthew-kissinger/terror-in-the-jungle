@@ -13,6 +13,7 @@ import { HUDElements } from './HUDElements';
 import { HUDZoneDisplay } from './HUDZoneDisplay';
 import { HudControlHints } from './HudControlHints';
 import { HudSituationReadout } from './HudSituationReadout';
+import { HudTaskCard } from './HudTaskCard';
 import { Alliance, getAlliance } from '../../systems/combat/types';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
@@ -62,6 +63,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private zoneDisplay: HUDZoneDisplay;
   private controlHints: HudControlHints;
   private situationReadout: HudSituationReadout;
+  private taskCard: HudTaskCard;
   private playerAlliance: Alliance = Alliance.BLUFOR;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
@@ -89,6 +91,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.zoneDisplay = new HUDZoneDisplay(this.elements);
     this.controlHints = new HudControlHints();
     this.situationReadout = new HudSituationReadout();
+    this.taskCard = new HudTaskCard();
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.hudLayout = new HUDLayout();
@@ -168,6 +171,16 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     // root so the two read as one right-edge panel and never collide with the
     // health / ammo / scoreboard slots.
     this.situationReadout.mount(this.controlHints.getRoot());
+
+    // Tasking-director card (tasking-director-mvp): a distinct, higher-emphasis
+    // element atop the objectives list — "your assignment" above "all
+    // objectives". The director (a strategy system) owns the task logic and
+    // drives this card via HUDSystem.getTaskCard(); the card forwards its reward
+    // out to the existing score-popup surface so it never reaches HUD internals.
+    this.taskCard.mount(this.elements.objectivesList);
+    this.taskCard.setRewardDispatcher((type, points, multiplier) =>
+      this.spawnScorePopup(type, points, multiplier),
+    );
 
     // Initialize ticket display
     this.elements.ticketDisplay.setTickets(300, 300);
@@ -281,6 +294,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.eventUnsubscribes.length = 0;
     this.viewportUnsubscribe?.();
     this.situationReadout.dispose();
+    this.taskCard.dispose();
     this.controlHints.dispose();
     this.hudLayout.dispose();
     this.scoreboard.dispose();
@@ -357,6 +371,12 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void {
     this.elements.spawnScorePopup(type, points, multiplier);
+  }
+
+  /** The opt-in tasking-director card. The director drives it; the HUD owns its
+   *  DOM lifecycle and reward forwarding (tasking-director-mvp). */
+  getTaskCard(): HudTaskCard {
+    return this.taskCard;
   }
 
   startMatch(): void {
