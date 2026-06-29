@@ -57,6 +57,34 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-28-deploy-armory-faction-select)
+
+Phase 5 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+7 PRs #444-#450, R1 (4 parallel) + R2 (2) + R3 (1), zero fence changes, no
+reviewer scope (UI/deploy/player-spawn). **Not perf-gated** (UI/deploy work, no
+combat hot path — every PR's `perf` job skipped). Rebuilds the deploy surfaces
+the owner called out. `faction-side-picker` (#444): A Shau BLUFOR-vs-OPFOR side
+picker (`isFactionSelectable`/`FACTION_SELECTABLE_MODES`; `ModeSelectScreen`
+emits `{mode, alliance?}` into the existing `resolveLaunchSelection`) — A Shau +
+future premiere ONLY. `weapon-stats-panel` (#446): armory surfaces the existing
+`WeaponSpec` (rpm/damage/falloff/recoil/ADS) via `WEAPON_SPECS` + a static
+`getWeaponSpec` accessor. `deploy-map-navigation` (#447): bounded pan + zoom +
+recenter + spawn-cycling on the respawn map (`OpenFrontierRespawnMapUtils`),
+larger hit targets — A Shau's 21km canvas usable. `armory-layout-reflow` (#448):
+declutter the armory to a single selection affordance. `helipad-spawn-truth`
+(#449): helipad spawns relabel to "Forward Pad" when no boardable heli is
+provisioned (`BoardableHelicopterPresence` + `HelicopterModel.hasBoardableHelicopterForHelipad`,
+wired at `StartupPlayerRuntimeComposer`) — the label never lies.
+`crew-vehicle-selectable` (#450): CREW-A-VEHICLE is now a real spawn — adopts the
+vehicle position (Deploy enables), shows the vehicle marker + an "F to board"
+hint, lands the player at the vehicle via the shared `confirmRespawn→respawn`
+path (was a dead no-op). `deploy-map-3d-spike` (#445): feasibility doc for a fast
+3D map (recommends a baked low-poly proxy; no build this campaign). **Budget:**
+in-cycle ratchet (sanctioned, no CARRY_OVERS row) — `DeployScreen.ts`→1142 LOC,
+`PlayerRespawnManager.ts`→800 LOC across the co-edited tasks. Owner walk pending
+in PLAYTEST_PENDING (deploy/armory/map flow + faction read). Briefs archived at
+`docs/tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/`.
+
 ## Recently Completed (cycle-2026-06-28-arsenal-expansion)
 
 Phase 4 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
