@@ -1,7 +1,7 @@
 {
   "generator": "scripts/bake-vegetation-impostor.mjs",
   "generatedAt": "2026-06-29T19:41:42.135Z",
-  "modelUrl": "http://127.0.0.1:9232/assets/vegetation/coconut-palm/coconut-palm.glb",
+  "modelUrl": "/assets/vegetation/coconut-palm/coconut-palm.glb",
   "columns": 8,
   "rows": 3,
   "tileSize": [
