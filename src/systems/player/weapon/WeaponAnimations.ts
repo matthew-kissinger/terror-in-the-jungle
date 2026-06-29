@@ -4,6 +4,11 @@
 import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
 
+/** Weapon-type identity used to resolve the per-weapon ADS sight-line offset. */
+export type WeaponAdsType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
+
+type AdsOffset = { x: number; y: number; z: number }
+
 /**
  * Handles weapon animations: ADS transitions, recoil, idle bob, sway, pump action
  */
@@ -43,7 +48,18 @@ export class WeaponAnimations {
   // screenshot alignment (the rifle's front sight post lands on the reticle).
   // Previously -0.18, which sat the gun body above the crosshair so iron sights
   // never lined up. See tools/weapon/capture-ads-align.mjs.
-  private readonly adsPosition = { x: 0.0, y: -0.44, z: -0.55 }
+  // This is the GLOBAL DEFAULT (tuned for the M16); weapons whose body occludes
+  // the sight line at this pose get a per-weapon override in adsPositionOverrides.
+  private readonly adsPosition: AdsOffset = { x: 0.0, y: -0.44, z: -0.55 }
+  // Per-weapon ADS sight-line overrides, keyed by weapon type. The bulky M60
+  // ('lmg') is taller and longer than the M16, so the default pose lays its
+  // receiver across the sight line. Dropping it lower (more negative y) and
+  // pulling it slightly back (more negative z) clears the iron sights while
+  // leaving every other gun on the M16-tuned default. Weapons absent from this
+  // table fall back to adsPosition. ADS timing/recoil/hip pose are unchanged.
+  private readonly adsPositionOverrides: Partial<Record<WeaponAdsType, AdsOffset>> = {
+    lmg: { x: 0.0, y: -0.6, z: -0.62 },
+  }
 
   private baseFOV = 75 // Store base FOV for zoom effect
   private camera?: THREE.Camera
@@ -171,7 +187,16 @@ export class WeaponAnimations {
     return this.basePosition
   }
 
-  getADSPosition(): { x: number; y: number; z: number } {
+  /**
+   * Resolve the ADS sight-line offset for the active weapon. Returns the
+   * per-weapon override when one exists (e.g. the bulky M60 'lmg'), otherwise the
+   * M16-tuned global default. Call with no argument to get the default.
+   */
+  getADSPosition(weaponType?: WeaponAdsType): { x: number; y: number; z: number } {
+    if (weaponType) {
+      const override = this.adsPositionOverrides[weaponType]
+      if (override) return override
+    }
     return this.adsPosition
   }
 

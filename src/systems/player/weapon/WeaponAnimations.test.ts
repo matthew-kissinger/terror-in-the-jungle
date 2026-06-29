@@ -540,6 +540,33 @@ describe('WeaponAnimations', () => {
     })
   })
 
+  // Per-weapon ADS offset (sight-line clearance for bulky guns)
+  describe('Per-weapon ADS offset', () => {
+    it('the bulky M60 (lmg) resolves a distinct ADS offset from the rifle default', () => {
+      const rifle = animations.getADSPosition('rifle')
+      const lmg = animations.getADSPosition('lmg')
+      expect(lmg).not.toEqual(rifle)
+    })
+
+    it('drops and pulls back the M60 (lmg) so its body clears the sight line', () => {
+      const rifle = animations.getADSPosition('rifle')
+      const lmg = animations.getADSPosition('lmg')
+      // Lower in the frame (more negative y) and a touch further back (more
+      // negative z) than the rifle, so the receiver no longer crosses the sight.
+      expect(lmg.y).toBeLessThan(rifle.y)
+      expect(lmg.z).toBeLessThan(rifle.z)
+    })
+
+    it('the rifle (M16) keeps the global default ADS offset', () => {
+      expect(animations.getADSPosition('rifle')).toEqual(animations.getADSPosition())
+    })
+
+    it('a weapon without an override falls back to the global default', () => {
+      // The pistol has no per-weapon override, so it resolves the default pose.
+      expect(animations.getADSPosition('pistol')).toEqual(animations.getADSPosition())
+    })
+  })
+
   // reset()
   describe('reset()', () => {
     it('Resets ADS state to false, adsProgress to 0', () => {

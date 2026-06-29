@@ -9,6 +9,7 @@ import { modelLoader } from '../../assets/ModelLoader'
 import { WeaponModels, warAssetCatalog } from '../../assets/modelPaths'
 import { Faction, isBlufor } from '../../combat/types'
 import { getWeaponArtMode, type WeaponArtMode } from '../../../config/weaponArtMode'
+import type { WeaponAdsType } from './WeaponAnimations'
 
 /**
  * Per-rig catalog slug, so magazine/muzzle node discovery reads the normalized
@@ -575,8 +576,12 @@ export class WeaponRigManager {
     return this.isSwitchingWeapon
   }
 
-  /** The logical weapon currently equipped (independent of switch animation). */
-  getCurrentWeaponType(): 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' {
+  /**
+   * The logical weapon currently equipped (independent of switch animation).
+   * The return type is the shared `WeaponAdsType`, the key WeaponModel uses to
+   * resolve this weapon's per-weapon ADS sight-line offset.
+   */
+  getCurrentWeaponType(): WeaponAdsType {
     return this.currentWeaponType
   }
 
