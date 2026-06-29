@@ -15,6 +15,7 @@ export class WeaponAmmo {
   private lmgAmmo: AmmoManager
   private launcherAmmo: AmmoManager
   private marksmanAmmo: AmmoManager
+  private sksAmmo: AmmoManager
   private currentAmmoManager: AmmoManager
 
   // Callbacks
@@ -92,6 +93,15 @@ export class WeaponAmmo {
       if (this.onAmmoChange) this.onAmmoChange(state)
     })
 
+    // SKS carbine: 10 round (stripper-clip) mag, 80 reserve (semi-auto rifle)
+    this.sksAmmo = new AmmoManager(10, 80)
+    this.sksAmmo.setOnReloadComplete(() => {
+      if (this.onReloadComplete) this.onReloadComplete()
+    })
+    this.sksAmmo.setOnAmmoChange((state) => {
+      if (this.onAmmoChange) this.onAmmoChange(state)
+    })
+
     // Start with rifle ammo active
     this.currentAmmoManager = this.rifleAmmo
   }
@@ -124,6 +134,10 @@ export class WeaponAmmo {
     return this.marksmanAmmo
   }
 
+  getSksAmmo(): AmmoManager {
+    return this.sksAmmo
+  }
+
   getCurrentAmmoManager(): AmmoManager {
     return this.currentAmmoManager
   }
@@ -141,6 +155,7 @@ export class WeaponAmmo {
     this.lmgAmmo.setZoneManager(zoneManager)
     this.launcherAmmo.setZoneManager(zoneManager)
     this.marksmanAmmo.setZoneManager(zoneManager)
+    this.sksAmmo.setZoneManager(zoneManager)
   }
 
   resetAll(): void {
@@ -151,6 +166,7 @@ export class WeaponAmmo {
     this.lmgAmmo.reset()
     this.launcherAmmo.reset()
     this.marksmanAmmo.reset()
+    this.sksAmmo.reset()
   }
 
   /**
@@ -166,6 +182,7 @@ export class WeaponAmmo {
     this.lmgAmmo.setReserveFactor(factor)
     this.launcherAmmo.setReserveFactor(factor)
     this.marksmanAmmo.setReserveFactor(factor)
+    this.sksAmmo.setReserveFactor(factor)
   }
 
   getAmmoState(): any {

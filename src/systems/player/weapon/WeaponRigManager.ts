@@ -26,13 +26,13 @@ import type { WeaponAdsType } from './WeaponAnimations'
  */
 type WeaponRigSlug =
   | 'm16a1' | 'ak47' | 'ithaca37' | 'm3-grease-gun' | 'm1911' | 'm60' | 'm79'
-  | 'dragunov-svd'
+  | 'dragunov-svd' | 'sks'
   | 'm16a1-2' | 'ak-47' | 'ithaca-37-pump-action' | 'm3a1-grease-gun'
   | 'm1911a1-colt' | 'm60-pig-general-purpose' | 'm79-thumper-40mm-grenade'
-  | 'dragunov-svd-sniper-rifle'
+  | 'dragunov-svd-sniper-rifle' | 'sks-carbine'
 
 /** Runtime weapon-type identity (independent of the loadout enum). */
-type RuntimeWeaponType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman'
+type RuntimeWeaponType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman' | 'sks'
 
 interface WeaponRigArtEntry {
   model: string
@@ -55,6 +55,7 @@ const WEAPON_RIG_ART: Record<WeaponArtMode, {
   m60: WeaponRigArtEntry
   m79: WeaponRigArtEntry
   marksman: WeaponRigArtEntry
+  sks: WeaponRigArtEntry
 }> = {
   legacy: {
     m16: { model: WeaponModels.M16A1, slug: 'm16a1' },
@@ -65,6 +66,7 @@ const WEAPON_RIG_ART: Record<WeaponArtMode, {
     m60: { model: WeaponModels.M60, slug: 'm60' },
     m79: { model: WeaponModels.M79, slug: 'm79' },
     marksman: { model: WeaponModels.DRAGUNOV_SVD, slug: 'dragunov-svd' },
+    sks: { model: WeaponModels.SKS, slug: 'sks' },
   },
   kiln: {
     m16: { model: WeaponModels.M16A1_2, slug: 'm16a1-2' },
@@ -75,6 +77,7 @@ const WEAPON_RIG_ART: Record<WeaponArtMode, {
     m60: { model: WeaponModels.M60_PIG_GENERAL_PURPOSE, slug: 'm60-pig-general-purpose' },
     m79: { model: WeaponModels.M79_THUMPER_40MM_GRENADE, slug: 'm79-thumper-40mm-grenade' },
     marksman: { model: WeaponModels.DRAGUNOV_SVD_SNIPER_RIFLE, slug: 'dragunov-svd-sniper-rifle' },
+    sks: { model: WeaponModels.SKS_CARBINE, slug: 'sks-carbine' },
   },
 }
 
@@ -91,6 +94,7 @@ export class WeaponRigManager {
   private m60Rig?: THREE.Group
   private m79Rig?: THREE.Group
   private marksmanRig?: THREE.Group
+  private sksRig?: THREE.Group
   private weaponRig?: THREE.Group // Current active weapon rig root
   private muzzleRef?: THREE.Object3D
   private magazineRef?: THREE.Object3D
@@ -106,6 +110,7 @@ export class WeaponRigManager {
   private lmgCore: GunplayCore
   private launcherCore: GunplayCore
   private marksmanCore: GunplayCore
+  private sksCore: GunplayCore
   private gunCore: GunplayCore // Current active weapon core
 
   // Base position (relative to screen)
@@ -182,6 +187,19 @@ export class WeaponRigManager {
       headshotMultiplier: 2.2, penetrationPower: 1.5
     }
 
+    // SKS carbine: semi-auto OPFOR rifle. Cadence sits BETWEEN the full-auto AK
+    // assault rifle and the slow-bolt marksman DMR — a capped rpm conveys the
+    // semi-auto trigger-finger feel (no separate fire-control system). Damage,
+    // spread, and recoil all sit between the rifle and the marksman so it reads
+    // as a distinct mid-range aimed-fire option rather than a clone of either.
+    const sksSpec: WeaponSpec = {
+      name: 'SKS Carbine', rpm: 200, adsTime: 0.2,
+      baseSpreadDeg: 0.45, bloomPerShotDeg: 0.15,
+      recoilPerShotDeg: 0.95, recoilHorizontalDeg: 0.3,
+      damageNear: 45, damageFar: 32, falloffStart: 30, falloffEnd: 90,
+      headshotMultiplier: 1.9, penetrationPower: 1.1
+    }
+
     // Initialize all weapon cores
     this.rifleCore = new GunplayCore(rifleSpec)
     this.shotgunCore = new GunplayCore(shotgunSpec)
@@ -190,6 +208,7 @@ export class WeaponRigManager {
     this.lmgCore = new GunplayCore(lmgSpec)
     this.launcherCore = new GunplayCore(launcherSpec)
     this.marksmanCore = new GunplayCore(marksmanSpec)
+    this.sksCore = new GunplayCore(sksSpec)
     this.gunCore = this.rifleCore // Start with rifle
   }
 
@@ -198,7 +217,7 @@ export class WeaponRigManager {
     const art = WEAPON_RIG_ART[getWeaponArtMode()]
 
     // Load GLB weapon models in parallel
-    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene, m60Scene, m79Scene, marksmanScene] = await Promise.all([
+    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene, m60Scene, m79Scene, marksmanScene, sksScene] = await Promise.all([
       modelLoader.loadModel(art.m16.model),
       modelLoader.loadModel(art.ak.model),
       modelLoader.loadModel(art.shotgun.model),
@@ -207,6 +226,7 @@ export class WeaponRigManager {
       modelLoader.loadModel(art.m60.model),
       modelLoader.loadModel(art.m79.model),
       modelLoader.loadModel(art.marksman.model),
+      modelLoader.loadModel(art.sks.model),
     ])
 
     this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false, art.m16.slug)
@@ -247,6 +267,11 @@ export class WeaponRigManager {
     this.marksmanRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.marksmanRig.visible = false
     this.weaponScene.add(this.marksmanRig)
+
+    this.sksRig = this.prepareWeaponRig(sksScene, 1.5, false, art.sks.slug)
+    this.sksRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.sksRig.visible = false
+    this.weaponScene.add(this.sksRig)
 
     // Start with the BLUFOR rifle active
     this.currentWeaponType = 'rifle'
@@ -431,6 +456,10 @@ export class WeaponRigManager {
     return this.marksmanCore
   }
 
+  getSksCore(): GunplayCore {
+    return this.sksCore
+  }
+
   startWeaponSwitch(weaponType: RuntimeWeaponType, _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
     // A switch already in flight to a DIFFERENT target must be superseded, not
     // dropped. Dropping it desynced the equipped weapon from the selected
@@ -519,7 +548,7 @@ export class WeaponRigManager {
     this.currentWeaponType = weaponType
 
     // Actually switch the visible weapon models
-    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig || !this.m60Rig || !this.m79Rig || !this.marksmanRig) return
+    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig || !this.m60Rig || !this.m79Rig || !this.marksmanRig || !this.sksRig) return
 
     this.setRifleRigVisibility(false)
     this.shotgunRig.visible = false
@@ -528,6 +557,7 @@ export class WeaponRigManager {
     this.m60Rig.visible = false
     this.m79Rig.visible = false
     this.marksmanRig.visible = false
+    this.sksRig.visible = false
 
     switch (weaponType) {
       case 'rifle':
@@ -589,12 +619,20 @@ export class WeaponRigManager {
         this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
         this.pumpGripRef = undefined
         break
+      case 'sks':
+        this.sksRig.visible = true
+        this.weaponRig = this.sksRig
+        this.gunCore = this.sksCore
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
+        this.pumpGripRef = undefined
+        break
     }
 
     // Notify HUD about weapon switch
     if (hudSystem && hudSystem.showWeaponSwitch) {
-      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL', lmg: 'LMG', launcher: 'LAUNCHER', marksman: 'MARKSMAN' }
-      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT', lmg: 'MG', launcher: 'GL', marksman: 'DMR' }
+      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL', lmg: 'LMG', launcher: 'LAUNCHER', marksman: 'MARKSMAN', sks: 'SKS' }
+      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT', lmg: 'MG', launcher: 'GL', marksman: 'DMR', sks: 'SKS' }
       const ammoState = ammoManager?.getState() || { currentMagazine: 0, reserveAmmo: 0 }
       hudSystem.showWeaponSwitch(
         weaponNames[weaponType],
@@ -664,6 +702,7 @@ export class WeaponRigManager {
       this.m60Rig,
       this.m79Rig,
       this.marksmanRig,
+      this.sksRig,
     ]
     for (const rig of rigs) {
       if (rig) {

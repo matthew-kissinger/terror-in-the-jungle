@@ -5,7 +5,7 @@ import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
 
 /** Weapon-type identity used to resolve the per-weapon ADS sight-line offset. */
-export type WeaponAdsType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman'
+export type WeaponAdsType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman' | 'sks'
 
 type AdsOffset = { x: number; y: number; z: number }
 

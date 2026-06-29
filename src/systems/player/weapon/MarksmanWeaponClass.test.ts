@@ -89,6 +89,7 @@ vi.mock('../../assets/modelPaths', () => ({
     M1911A1_COLT: 'weapons/kiln/m1911a1.glb', M60_PIG_GENERAL_PURPOSE: 'weapons/kiln/m60.glb',
     M79_THUMPER_40MM_GRENADE: 'weapons/kiln/m79.glb',
     DRAGUNOV_SVD_SNIPER_RIFLE: 'weapons/kiln/dragunov-svd-sniper-rifle.glb',
+    SKS: 'weapons/sks.glb', SKS_CARBINE: 'weapons/kiln/sks-carbine.glb',
   },
   // Empty catalog slice: rigs fall back to bbox markers, which is fine here —
   // these tests assert gunplay/switching behavior, not node-graph wiring.
