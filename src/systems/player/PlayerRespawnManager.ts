@@ -33,7 +33,7 @@ import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
 import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import { InputContextManager } from '../input/InputContextManager';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
-import { SpawnPointSelector } from './SpawnPointSelector';
+import { SpawnPointSelector, type BoardableHelicopterPresence } from './SpawnPointSelector';
 import { MissionBriefing } from '../../ui/loading/MissionBriefing';
 import type { MissionBriefingInfo } from '../../ui/loading/MissionBriefing';
 import { DeployFlowController } from './DeployFlowController';
@@ -248,6 +248,11 @@ export class PlayerRespawnManager implements GameSystem {
 
   setHelipadSystem(helipadSystem: HelipadSystem): void {
     this.spawnPointSelector.setHelipadSystem(helipadSystem);
+  }
+
+  /** Wire boardable-helicopter presence so helipad spawn labels stay honest. */
+  setBoardableHelicopterPresence(presence: BoardableHelicopterPresence): void {
+    this.spawnPointSelector.setBoardableHelicopterPresence(presence);
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {

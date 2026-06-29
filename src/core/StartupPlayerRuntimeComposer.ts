@@ -321,6 +321,13 @@ function wirePlayerRuntime(
   playerHealthSystem.setRespawnManager(playerRespawnManager);
   playerHealthSystem.setHUDSystem(hudSystem);
 
+  // Helipad spawn labels only promise a helicopter when one is actually
+  // boardable at the pad (helipad-spawn-truth). Guarded for test doubles.
+  if (typeof playerRespawnManager.setBoardableHelicopterPresence === 'function'
+    && typeof helicopterModel?.hasBoardableHelicopterForHelipad === 'function') {
+    playerRespawnManager.setBoardableHelicopterPresence(helicopterModel);
+  }
+
   playerSuppressionSystem.setCameraShakeSystem(cameraShakeSystem);
   playerSuppressionSystem.setPlayerController(playerController);
 
