@@ -16,9 +16,14 @@ export function setMapWorldSize(size: number): void {
   if (size > 0) WORLD_SIZE = size;
 }
 
-/** Max zoom scales with world size so zones remain selectable on large maps. */
+/**
+ * Max zoom scales with world size so spawns on large maps (A Shau's 21km
+ * canvas) can be zoomed close enough to read and pick. The floor (4x) gives
+ * small maps a usable close-up too; the world-size term lets a 21km map zoom
+ * to ~26x so a single firebase fills the view instead of being a speck.
+ */
 export function getMaxZoom(): number {
-  return Math.max(2, WORLD_SIZE / 1600);
+  return Math.max(4, WORLD_SIZE / 800);
 }
 
 export function zoneHasSpawnPoint(zone: CaptureZone, spawnPoints: RespawnSpawnPoint[]): boolean {
@@ -71,6 +76,35 @@ export function getMapZoneRadius(zone: CaptureZone): number {
 }
 
 /**
+ * Largest pan offset (in canvas px) that keeps the map content covering the
+ * view at a given zoom. The renderer centers the map then shifts it by
+ * `panOffset`; the scaled content is `MAP_SIZE * zoom` wide, so the canvas edge
+ * reaches the map edge once the pan exceeds half the overhang. Zoomed out below
+ * 1 there is no overhang, so the bound is 0 (the map locks to centre and can't
+ * be flung into empty space).
+ */
+export function maxPanOffset(zoomLevel: number): number {
+  const zoom = zoomLevel > 0 ? zoomLevel : 1;
+  return Math.max(0, (MAP_SIZE * zoom - MAP_SIZE) / 2);
+}
+
+/**
+ * Clamps a pan offset to the map bounds so the canvas can't be dragged off into
+ * empty manila. Symmetric on both axes; returns a new object.
+ */
+export function clampPanToBounds(
+  panOffset: { x: number; y: number },
+  zoomLevel: number,
+): { x: number; y: number } {
+  const bound = maxPanOffset(zoomLevel);
+  // `+ 0` normalizes a clamped `-0` (from Math.max(-0, ...)) back to `+0`.
+  return {
+    x: Math.min(bound, Math.max(-bound, panOffset.x)) + 0,
+    y: Math.min(bound, Math.max(-bound, panOffset.y)) + 0,
+  };
+}
+
+/**
  * Returns the zone at the given canvas position, accounting for zoom and pan
  */
 export function transformCanvasToMapSpace(
@@ -92,9 +126,9 @@ export function transformCanvasToMapSpace(
 // mobile canvas. These translate a consistent on-screen finger target into
 // map-units, clamped so very zoomed-in pins stay pickable and very zoomed-out
 // taps never merge adjacent spawns.
-const TAP_TARGET_CSS_RADIUS_PX = 22; // ~44px diameter finger target
-const MIN_HIT_MAP_UNITS = 14;        // never smaller than the pin glyph
-const MAX_HIT_MAP_UNITS = 90;        // never so large adjacent spawns merge
+const TAP_TARGET_CSS_RADIUS_PX = 28; // ~56px diameter finger target (was 44px)
+const MIN_HIT_MAP_UNITS = 18;        // never smaller than the (enlarged) pin glyph
+const MAX_HIT_MAP_UNITS = 110;       // never so large adjacent spawns merge
 
 /**
  * Unzoomed-map-unit radius that corresponds to a ~22px on-screen tap target at
