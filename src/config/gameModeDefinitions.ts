@@ -12,6 +12,29 @@ import {
   GameModePolicies
 } from './gameModeTypes';
 
+/**
+ * Modes that expose the side/faction picker (BLUFOR vs OPFOR). Owner decision
+ * 2026-06-28: A Shau (and any future premiere-capable mode) only — the standard
+ * modes stay BLUFOR-only and show no picker. Driving this off an explicit set
+ * keeps the gate readable and future premiere modes one entry away.
+ */
+const FACTION_SELECTABLE_MODES: ReadonlySet<GameMode> = new Set([
+  GameMode.A_SHAU_VALLEY,
+]);
+
+/**
+ * True when this mode lets the player choose which side to fight on. Gated to
+ * premiere-capable modes that also field a two-sided faction mix; standard
+ * modes are BLUFOR-only and return false.
+ */
+export function isFactionSelectable(definition: GameModeDefinition): boolean {
+  if (!FACTION_SELECTABLE_MODES.has(definition.id)) {
+    return false;
+  }
+  const mix = definition.config.factionMix;
+  return Boolean(mix?.[Alliance.OPFOR]?.length);
+}
+
 function getCommandScaleForMode(config: GameModeConfig): CommandScale {
   switch (config.id) {
     case GameMode.ZONE_CONTROL:
@@ -151,6 +174,8 @@ export function getGameModeDefinition(mode: GameMode): GameModeDefinition {
       policies.command.scale = 'battalion';
       policies.mapIntel.showStrategicAgentsOnFullMap = true;
       policies.mapIntel.strategicLayer = 'optional';
+      // Premiere mode: the player may pick BLUFOR or OPFOR (see picker gate).
+      policies.teamRules.playableAlliances = [Alliance.BLUFOR, Alliance.OPFOR];
       break;
     case GameMode.ZONE_CONTROL:
     default:
