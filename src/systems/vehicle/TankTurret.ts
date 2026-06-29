@@ -39,9 +39,9 @@ const DEG = Math.PI / 180;
 const TWO_PI = Math.PI * 2;
 
 export interface TankTurretConfig {
-  /** Max yaw slew, radians per second. Default ~30°/s (M48 hydraulic). */
+  /** Max yaw slew, radians per second. Default ~75°/s (responsive, still capped). */
   yawSlewRate: number;
-  /** Max barrel pitch slew, radians per second. Default ~8°/s. */
+  /** Max barrel pitch slew, radians per second. Default ~25°/s. */
   barrelPitchSlewRate: number;
   /**
    * Pitch limits in radians (min, max). Default M48 envelope:
@@ -69,8 +69,11 @@ export interface TankTurretConfig {
 }
 
 export const DEFAULT_TANK_TURRET_CONFIG: TankTurretConfig = {
-  yawSlewRate: 30 * DEG,
-  barrelPitchSlewRate: 8 * DEG,
+  // Owner playtest 2026-06-28: the prior 30°/s traverse + 8°/s elevation
+  // crawled too slowly to be usable in combat. Raised to a responsive but
+  // still rate-capped feel (heavy-armor traverse, not arcade snap-to-aim).
+  yawSlewRate: 75 * DEG,
+  barrelPitchSlewRate: 25 * DEG,
   pitchLimits: { min: -10 * DEG, max: 20 * DEG },
   // Muzzle is 5 m forward of the trunnion along chassis-local -Z.
   barrelTipLocalOffset: new THREE.Vector3(0, 0, -5),
