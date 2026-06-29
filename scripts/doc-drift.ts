@@ -130,8 +130,6 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md::missing_code_path::src/systems/environment/WaterSystem.ts",
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md::missing_markdown_link::../../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md",
   "docs/rearch/TANK_SYSTEMS_2026-05-13.md::missing_code_path::src/systems/vehicle/TankCannonProjectile.ts",
-  "docs/rearch/TASKING_DIRECTOR_SPIKE_2026-06-28.md::missing_code_path::src/systems/missions/TaskingDirector.ts",
-  "docs/rearch/TASKING_DIRECTOR_SPIKE_2026-06-28.md::missing_code_path::src/ui/hud/HudTaskCard.ts",
   "docs/rearch/TERRAIN_COMPOSITOR_SPIKE_2026-05-27.md::missing_code_path::scripts/capture-of-water-airfield-shots.ts",
   "docs/rearch/WEBGPU_MIGRATION_REVIEW_PACKET_2026-05-12.md::missing_package_script::check:hydrology-bakes",
   "docs/rearch/WEBGPU_MIGRATION_STACK_RESEARCH_SPIKES_2026-05-11.md::missing_package_script::check:hydrology-bakes",
@@ -140,12 +138,6 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/file.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/other.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/test.test.ts",
-  "docs/tasks/situation-readout-hud.md::missing_code_path::src/ui/hud/HudSituationReadout.test.ts",
-  "docs/tasks/situation-readout-hud.md::missing_code_path::src/ui/hud/HudSituationReadout.ts",
-  "docs/tasks/tasking-director-mvp.md::missing_code_path::src/systems/missions/TaskingDirector.test.ts",
-  "docs/tasks/tasking-director-mvp.md::missing_code_path::src/systems/missions/TaskingDirector.ts",
-  "docs/tasks/tasking-director-mvp.md::missing_code_path::src/ui/hud/HudTaskCard.test.ts",
-  "docs/tasks/tasking-director-mvp.md::missing_code_path::src/ui/hud/HudTaskCard.ts",
 ]);
 // >>> GRANDFATHER-END <<<
 // ---------------------------------------------------------------------------

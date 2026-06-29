@@ -57,6 +57,34 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-28-ashau-purpose-and-missions)
+
+Phase 6 (FINAL) of CAMPAIGN_2026-06-28-field-readiness (overnight,
+autonomous-loop) — **campaign complete**. 5 PRs #451-#455, R1 (4 parallel) + R2
+(1), zero fence changes, no reviewer scope. Perf-gated (both rounds A/B PASS).
+Answers the owner's "what is A Shau for": `situation-readout-hud` (#454) surfaces
+war posture + nearest contested objective + a direction nudge on the HUD
+(read-only off `IZoneQuery`/`TicketSystem`, 2Hz tick); `tasking-director-mvp`
+(#455) adds an opt-in `TaskingDirector` (`src/systems/missions/`) + `HudTaskCard`
+with **capture + defend** archetypes from live zone/war state, explicit
+accept/decline, score-on-complete (throttled + event-driven; destroy deferred per
+the spike). Plus 3 design docs for future cycles: `tasking-director-spike` (#451,
+the MVP blueprint), `premiere-battle-royale-design` (#452, defer-the-build BR),
+`healing-and-looting-scope` (#453, healing + `WeaponPickupSystem` activation).
+**Perf:** R1 −5.6% (situation readout dormant in ai_sandbox, `usesZones=false`);
+R2 +0.6% (director dormant when war sim idle) — both well under +5%, validated
+with same-session multi-capture A/B (machine-noise outliers discarded; a real
++cost cannot dip below baseline, and R-captures did). **Wiring:** the
+StrategicFeedback analog is `OperationalRuntimeComposer.wireStrategyRuntime` (not
+GameplayRuntimeComposer). **Budget:** in-cycle ratchet (sanctioned, no CARRY_OVERS
+row) — `HUDSystem.ts`→878 LOC, `SystemManager.ts`→63 methods. **Gate-repair:**
+master went doc-drift-RED mid-phase (Phase 5 brief archival + Phase 6 spike
+forward-refs, undetected because docs-only commits are CI-path-ignored); repaired
+in `378a4313` and cleaned at close (links repointed to archives, grandfather back
+to baseline). Owner walk pending in PLAYTEST_PENDING (situation readout legibility
++ the opt-in task loop on A Shau). Briefs archived at
+`docs/tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/`.
+
 ## Recently Completed (cycle-2026-06-28-deploy-armory-faction-select)
 
 Phase 5 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).

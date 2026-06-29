@@ -6,7 +6,7 @@ battalion fighting ~25 NPC teams inside a closing storm on the 21 km A Shau DEM.
 a concrete, engine-grounded plan and an honest read on what must improve before
 the build is worth starting.
 
-Brief: [../tasks/premiere-battle-royale-design.md](../tasks/premiere-battle-royale-design.md).
+Brief: [premiere-battle-royale-design.md](../tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/premiere-battle-royale-design.md) (archived at cycle close).
 Campaign: [../CAMPAIGN_2026-06-28-field-readiness.md](../CAMPAIGN_2026-06-28-field-readiness.md) (Phase 6).
 Informed by the shipped Phase 5 `faction-side-picker`
 ([../tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/faction-side-picker.md](../tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/faction-side-picker.md)).

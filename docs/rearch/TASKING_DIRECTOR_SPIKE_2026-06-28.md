@@ -2,7 +2,7 @@
 # Tasking Director — Spike Memo (A Shau, opt-in dynamic tasking)
 
 **Cycle:** `cycle-2026-06-28-ashau-purpose-and-missions` (Field Readiness, Phase 6)
-**Brief:** [docs/tasks/tasking-director-spike.md](../tasks/tasking-director-spike.md)
+**Brief:** [tasking-director-spike.md](../tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/tasking-director-spike.md) (archived at cycle close)
 **Status:** Design spike. No code. This is the blueprint the follow-on
 `tasking-director-mvp` executor builds from.
 

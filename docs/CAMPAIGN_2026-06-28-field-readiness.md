@@ -7,8 +7,9 @@
 > this over attended despite hot-path touches; the perf hard-stop, reviewer
 > gates, and PLAYTEST_PENDING deferral are the safety net)
 > **Concurrency cap:** 5
-> **Status:** **SCAFFOLDED — ready to dispatch. Phase 1 briefs authored; Phases
-> 2-6 briefs authored at each phase's open per the tables below.**
+> **Status:** **COMPLETE (2026-06-29) — all 6 phases closed, 31 PRs #425-#455
+> merged, zero fence changes, NOT deployed (deploy is MANUAL). Owner walks
+> queued in `docs/PLAYTEST_PENDING.md`.**
 >
 > **Progress:**
 > ✅ 1 control-discoverability (#425-#428, playtest-deferred) ·
@@ -16,7 +17,11 @@
 > ✅ 3 terrain-vegetation-asset-defects (#434-#440, perf A/B PASS −23%, playtest-deferred) ·
 > ✅ 4 arsenal-expansion (#441-#443, perf A/B PASS, playtest-deferred) ·
 > ✅ 5 deploy-armory-faction-select (#444-#450, no perf gate — UI/deploy, playtest-deferred) ·
-> 🔄 6 ashau-purpose-and-missions
+> ✅ 6 ashau-purpose-and-missions (#451-#455, perf A/B PASS R1 −5.6% / R2 +0.6%, playtest-deferred)
+>
+> **CAMPAIGN COMPLETE 2026-06-29** — all 6 phases closed, 31 PRs (#425-#455)
+> merged, zero fence changes. NOT deployed (deploy is MANUAL). Owner-walk
+> deferrals for all 6 phases queued in `docs/PLAYTEST_PENDING.md`.
 
 Source: the 2026-06-28 owner playtest (voice transcript + a 5-agent codebase
 triage). The dominant finding: **~40% of the owner's complaints are

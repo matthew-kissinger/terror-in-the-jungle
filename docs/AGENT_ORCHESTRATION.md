@@ -208,9 +208,12 @@ playtest-deferred); Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) CLOSED
 perf A/B PASS −23%, playtest-deferred); Phase 4 (`cycle-2026-06-28-arsenal-expansion`)
 CLOSED 2026-06-28 (#441-#443, perf A/B PASS, playtest-deferred); Phase 5
 (`cycle-2026-06-28-deploy-armory-faction-select`) CLOSED 2026-06-29 (#444-#450,
-no perf gate — UI/deploy, playtest-deferred). **Phase 6
-(`cycle-2026-06-28-ashau-purpose-and-missions`) is now active** in "Current cycle"
-below — the final phase of the campaign.
+no perf gate — UI/deploy, playtest-deferred); Phase 6
+(`cycle-2026-06-28-ashau-purpose-and-missions`) CLOSED 2026-06-29 (#451-#455, perf
+A/B PASS R1 −5.6% / R2 +0.6%, playtest-deferred). **CAMPAIGN COMPLETE** — all 6
+phases closed; 31 PRs (#425-#455) merged, zero fence changes. NOT deployed (deploy
+is MANUAL — owner ships after the morning walk). The owner-walk deferrals for all 6
+phases are queued in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
 
 Prior campaigns (engineering closed; owner walks pending in
 [PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
@@ -236,39 +239,21 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-28-ashau-purpose-and-missions` — Phase 6 (FINAL) of
-  [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
-  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (last phase —
-  end-of-run summary on exit). Briefs:
-  `docs/tasks/{situation-readout-hud,tasking-director-spike,tasking-director-mvp,premiere-battle-royale-design,healing-and-looting-scope}.md`.
-
-  **Task DAG:**
-  ```
-  situation-readout-hud         (root; dep Phase 1 control-hints-hud — already merged)
-  tasking-director-spike ──► tasking-director-mvp   (design then conservative MVP)
-  premiere-battle-royale-design (root; doc only)
-  healing-and-looting-scope     (root; doc only)
-  ```
-  R1 (parallel, cap 5): `situation-readout-hud`, `tasking-director-spike`,
-  `premiere-battle-royale-design`, `healing-and-looting-scope` (4 roots — 1 HUD
-  task + 3 design docs).
-  R2: `tasking-director-mvp` (after `tasking-director-spike` — builds its
-  recommendation; **split into 2 PRs if net > 400 LOC**).
-  **Shared-file watch:** `situation-readout-hud` + `tasking-director-mvp` both
-  touch `HUDSystem.ts` (the MVP lands in R2, after the readout merges — serialize
-  the HUD wiring). New `src/systems/missions/*` is a fresh surface.
-  Reviewer: `combat-reviewer` ONLY if a diff touches `src/systems/combat/**`
-  (situation-readout reads `src/systems/strategy`; missions is a new surface —
-  neither should reach combat).
-  Perf: **PERF-GATED** (manifest: run `perf-analyst` after EVERY round; HALT on
-  combat120 p99 regression > 5%). The readout + tasking director read live war/
-  zone state — watch for an added per-frame hot path.
-  Fence watch: `tasking-director-mvp` must NOT widen `SystemInterfaces.ts` to
-  reach combat/zone state — reuse existing read paths (manifest fence note).
-  Exit gate: situation readout live on A Shau; director spike filed + MVP merged
-  (or documented deferral if it exceeds the conservative scope); BR +
-  healing/looting design docs filed. PLAYTEST_PENDING row.
-- **Previous:** `cycle-2026-06-28-deploy-armory-faction-select` (Phase 5, 7/7:
+- **Active:** none. **CAMPAIGN_2026-06-28-field-readiness COMPLETE** (all 6
+  phases closed 2026-06-28/29; 31 PRs #425-#455 merged, zero fence changes; NOT
+  deployed — deploy is MANUAL). All owner-walk deferrals are queued in
+  [PLAYTEST_PENDING](PLAYTEST_PENDING.md). The next cycle is owner-chosen (see
+  [BACKLOG](BACKLOG.md) "Proposed next cycle" / "Owner-gated cycles").
+- **Previous:** `cycle-2026-06-28-ashau-purpose-and-missions` (Phase 6 FINAL, 5/5:
+  #451-#455, R1 (4 parallel) + R2 (1), perf A/B PASS — R1 situation-readout −5.6%
+  (dormant in ai_sandbox), R2 tasking-director +0.6% (dormant when war sim idle),
+  closed 2026-06-29, playtest-deferred) — A Shau situation-readout HUD + opt-in
+  `TaskingDirector` (capture+defend) + 3 design docs (premiere BR, healing/looting,
+  director spike). No reviewer/fence scope. Mid-phase doc-drift gate-repair
+  (`378a4313`, cleaned at close). In-cycle budget ratchet (HUDSystem→878,
+  SystemManager→63 methods). See BACKLOG "Recently Completed" and PLAYTEST_PENDING.
+  Briefs archived at `docs/tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/`.
+- **Phase 5:** `cycle-2026-06-28-deploy-armory-faction-select` (7/7:
   #444-#450, R1 (4) + R2 (2) + R3 (1), no perf gate — UI/deploy, closed 2026-06-29,
   playtest-deferred) — A Shau faction picker, armory weapon-stats readout +
   layout reflow, respawn-map navigation (bounded pan/zoom/recenter/spawn-cycle),

@@ -3,7 +3,7 @@
 > **Date:** 2026-06-28
 > **Campaign:** [Field Readiness](../CAMPAIGN_2026-06-28-field-readiness.md), Phase 6
 > (`ashau-purpose-and-missions`)
-> **Brief:** [`docs/tasks/healing-and-looting-scope.md`](../tasks/healing-and-looting-scope.md)
+> **Brief:** [`healing-and-looting-scope.md`](../tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/healing-and-looting-scope.md) (archived at cycle close)
 > **Status:** DESIGN ONLY — greenfield. No code ships this campaign. A future
 > cycle acts on this doc.
 
