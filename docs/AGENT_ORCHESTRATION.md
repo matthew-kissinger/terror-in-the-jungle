@@ -202,9 +202,12 @@ manifest file as usual.
 (6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
 from the owner playtest triage). Phase 1
 (`cycle-2026-06-28-control-discoverability`) CLOSED 2026-06-28 (#425-#428,
-playtest-deferred). **Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) is now
-active** in "Current cycle" below. Phases 3-6 briefs are authored at each phase's
-open per the manifest tables.
+playtest-deferred); Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) CLOSED
+2026-06-28 (#429-#433, perf A/B PASS, playtest-deferred); Phase 3
+(`cycle-2026-06-28-terrain-vegetation-asset-defects`) CLOSED 2026-06-28 (#434-#440,
+perf A/B PASS −23%, playtest-deferred). **Phase 4
+(`cycle-2026-06-28-arsenal-expansion`) is now active** in "Current cycle" below.
+Phases 5-6 briefs are authored at each phase's open per the manifest tables.
 
 Prior campaigns (engineering closed; owner walks pending in
 [PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
@@ -230,36 +233,34 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-28-terrain-vegetation-asset-defects` — Phase 3 of
+- **Active:** `cycle-2026-06-28-arsenal-expansion` — Phase 4 of
   [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
-  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 4
-  `cycle-2026-06-28-arsenal-expansion` on the Phase-3 exit gate). Briefs:
-  `docs/tasks/{veg-poi-exclusion,route-corridor-exclusion,vegetation-density-retune,coconut-card-crossfade,structure-import-corruption-fix,sun-disc-banding-fix,asset-reroll-requests}.md`.
+  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 5
+  `cycle-2026-06-28-deploy-armory-faction-select` on the Phase-4 exit gate). Briefs:
+  `docs/tasks/{marksman-rifle-class,sks-rifle-wiring,ammo-load-tradeoff}.md`.
 
   **Task DAG:**
   ```
-  veg-poi-exclusion ──► route-corridor-exclusion   (shared exclusion plumbing)
-  vegetation-density-retune        (root; config)
-  coconut-card-crossfade           (root; ground-card LOD tier)
-  structure-import-corruption-fix  (root; importer + re-import)
-  sun-disc-banding-fix             (root; atmosphere)
-  asset-reroll-requests            (root; doc only — SKIP UH-1/A-1, already done)
+  marksman-rifle-class ──► sks-rifle-wiring   (shared LoadoutWeapon/rig registry; SERIALIZE merges)
+  ammo-load-tradeoff       (root; owner-decision default = add a real downside)
   ```
-  R1 (parallel, cap 5): `veg-poi-exclusion`, `vegetation-density-retune`,
-  `coconut-card-crossfade`, `structure-import-corruption-fix`, `sun-disc-banding-fix`.
-  R2: `route-corridor-exclusion` (after `veg-poi-exclusion`) + `asset-reroll-requests`
-  (doc, deferred for the cap).
-  Reviewer: terrain-nav for `veg-poi-exclusion`, `route-corridor-exclusion`,
-  `vegetation-density-retune`, `coconut-card-crossfade` (vegetation/terrain scope).
+  R1 (parallel, cap 5): `marksman-rifle-class`, `ammo-load-tradeoff`.
+  R2: `sks-rifle-wiring` (after `marksman-rifle-class` merges; rebases onto it).
+  **Cross-phase dep:** marksman/sks share `WeaponAnimations`/`WeaponRigManager`
+  with Phase 2's `weapon-ads-per-weapon-offset` (merged) — EXTEND the per-weapon
+  ADS table, don't duplicate; serialize so the second weapon PR rebases clean.
+  Reviewer: `combat-reviewer` ONLY if a PR touches `src/systems/combat/**` (the
+  weapon/loadout scope likely does not).
   Perf: run `perf-analyst` after each round — HALT on >5% combat120 p99 regression.
-  Exit gate: terrain-nav APPROVE; no hero trees on the airfield; coconut swap no
-  hard pop; sun reads as a body not dots; corrupted structures fixed; UH-1+A-1
-  re-rolls already landed, remaining re-roll specs filed.
-- **Previous:** `cycle-2026-06-28-combat-vehicle-feel` (Phase 2, 5/5: #429-#433,
-  perf A/B PASS Δp99 +1.6%, closed 2026-06-28, playtest-deferred) — tank exit
-  bug fix + turret/hill/jeep feel + per-weapon ADS offset. See BACKLOG "Recently
-  Completed" and PLAYTEST_PENDING. Briefs archived at
-  `docs/tasks/archive/cycle-2026-06-28-combat-vehicle-feel/`.
+  Exit gate: NVA can deploy a marksman + SKS; ammo-load is a real tradeoff (or
+  collapsed per the owner default); reviewer APPROVE if combat-path.
+- **Previous:** `cycle-2026-06-28-terrain-vegetation-asset-defects` (Phase 3, 7/7:
+  #434-#440, perf A/B PASS steady-state p99 40.70→31.20ms Δ−23.34% (veg dormant in
+  ai_sandbox — reachability gate), closed 2026-06-28, playtest-deferred) — hero +
+  route veg-exclusion, density retune, coconut-card crossfade, sun-disc band-limit,
+  structure re-import, re-roll ledger. terrain-nav APPROVE/APPROVE-WITH-NOTES on
+  the 3 terrain PRs. See BACKLOG "Recently Completed" and PLAYTEST_PENDING. Briefs
+  archived at `docs/tasks/archive/cycle-2026-06-28-terrain-vegetation-asset-defects/`.
 
 ## Dispatch protocol
 
