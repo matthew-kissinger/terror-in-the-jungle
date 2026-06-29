@@ -11,25 +11,35 @@ import type { TrackedVehiclePhysicsConfig } from '../../systems/vehicle/TrackedV
  *   - Hull length ~ 6.4 m, width ~ 3.6 m, height ~ 3.1 m.
  *   - Combat weight ~ 46 t (46000 kg).
  *   - Road speed ~ 45 km/h ≈ 12.5 m/s (per-track speed cap, before
- *     off-road slope-stall scaling).
- *   - Max climbable grade ~ 60% ≈ 31°, but tracked-vehicle ground
- *     pressure lets us push the engine envelope to ~35° before drive
- *     force fades to zero per the TANK_SYSTEMS memo.
+ *     off-road slope-stall scaling). We run the cap slightly low (11 m/s)
+ *     so the chassis reads "slower but stronger" off-road.
+ *   - Max climbable grade ~ 60% ≈ 31° historically, but tracked-vehicle
+ *     ground pressure lets us push the engine envelope to ~0.78 rad
+ *     (~45°) before drive force fades to zero. Sanity ceiling: stays well
+ *     below the near-vertical walls (≳ 1.0 rad / 57°) the slope-stall path
+ *     rejects, so the tank still cannot drive cliffs.
  *
- * Only fields that differ from `TrackedVehiclePhysics` defaults are
- * named; the physics class merges over its own defaults so passing
+ * Climb-authority tuning (2026-06-28 owner playtest — tanks bogged down
+ * and slid on jungle hills they should crest). Restated here so the
+ * config block documents the per-vehicle tuning the cycle brief calls out
+ * and stays in lockstep with the T-54 (see `t54-config.ts`):
+ *   - `maxClimbSlope` raised so steeper grades stay drivable.
+ *   - `slopeDriveFloor` raised so the tank keeps usable uphill power
+ *     instead of fading to a crawl before the ceiling.
+ *   - `slopeGravityScale` lowered so a stalled chassis slides back less.
+ *
+ * Only fields that differ in intent from `TrackedVehiclePhysics` defaults
+ * are named; the physics class merges over its own defaults so passing
  * `undefined` for an omitted field yields the same simulation.
- *
- * The 0.61 rad climb slope matches the `TrackedVehiclePhysics` default;
- * we restate it here so the config block stands as documentation for
- * the M48-specific tuning the cycle brief calls out.
  */
 export const M48_PHYSICS_CONFIG: Partial<TrackedVehiclePhysicsConfig> = {
   mass: 46000,
   trackSeparation: 2.92,
   hullLength: 6.4,
-  maxTrackSpeed: 12,
-  maxClimbSlope: 0.61,
+  maxTrackSpeed: 11,
+  maxClimbSlope: 0.78,
+  slopeDriveFloor: 0.62,
+  slopeGravityScale: 0.2,
 };
 
 /** Bounding-box dimensions (m) used by the procedural fallback mesh. */
