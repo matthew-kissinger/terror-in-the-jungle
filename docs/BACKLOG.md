@@ -57,6 +57,38 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-28-terrain-vegetation-asset-defects)
+
+Phase 3 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+7 PRs #434-#440, R1 (5 parallel) + R2 (2), zero fence changes,
+terrain-nav-reviewer gated 3 (all APPROVE / APPROVE-WITH-NOTES).
+`veg-poi-exclusion` (#435): hero scatterer now respects POI exclusion zones
+(`GLBHeroScatterer.setExclusionZones` + `isExcluded`, mirroring the ground-card
+path) — no more hero trees on the airfield runway. `route-corridor-exclusion`
+(#440): veg-exclusion corridors traced down each compiled route centerline so
+both scatterers skip the gray "trail" patches (joins the same
+`vegetationExclusionZones` stream via `TerrainFeatureCompiler`). `vegetation-
+density-retune` (#434): bamboo-thicket 2.8→1.8, riverbank coconut 1.25→0.7
+(config-only). `coconut-card-crossfade` (#437): ported `transitionFadeMeters`
+opacity blend into `GroundCardNearMeshTier` (default 28m) — coconut palm no
+longer hard-pops mesh↔card. `sun-disc-banding-fix` (#436): band-limited the
+sun-disc sine terms (×317→48) across TSL/GLSL/CPU mirrors — kills the LED-dot
+lattice, keeps a warm body. `structure-import-corruption-fix` (#438): aid-station
+double-root-yaw fixed at the importer (`stripRedundantRootYaw`) + re-imported;
+barracks-tent verified byte-clean (not corrupt); command-tent flagged same-class
+out-of-scope. `asset-reroll-requests` (#439, doc-only): UH-1 + A-1 re-rolls
+marked DONE (`f8c3518c`); B-52D fuselage-aspect + A-37 scale advisories filed.
+**Perf gate PASS** (same-machine combat120 A/B: steady-state p99 40.70→31.20ms,
+Δ−23.34%, an improvement; vegetation dormant in ai_sandbox — `veg=0/0 chunks=0` —
+so the veg PRs are reachability-dormant in the gate scenario, only #436/#438
+execute; absolute non-quiet-machine, A/B delta is the signal). One CI hiccup:
+route-corridor's +3 LOC tripped the `lint:budget` ratchet on grandfathered
+`TerrainFeatureCompiler.ts` (764→767) — resolved by sanctioned snapshot rebase,
+no new carry-over. Carry-overs 5→5. Owner visual walk row in PLAYTEST_PENDING;
+memo at `docs/playtests/cycle-2026-06-28-terrain-vegetation-asset-defects.md`.
+Follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost + card-fade
+runtime-knob plumbing; route-corridor edge-sliver + `map_only` latent over-clear.
+
 ## Recently Completed (cycle-2026-06-28-combat-vehicle-feel)
 
 Phase 2 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
