@@ -893,6 +893,46 @@ function classForward(cls: string): { forward: ForwardAxis; quat: readonly numbe
   return { forward: 'pos-z', quat: X_TO_Z, label: '+X forward -> +Z forward' };
 }
 
+/**
+ * True when two unit quaternions describe the same rotation (q and -q are the
+ * same rotation, so compare both signs) within a generous float epsilon.
+ */
+function sameRotation(a: readonly number[], b: readonly number[]): boolean {
+  if (a.length < 4 || b.length < 4) return false;
+  const eps = 1e-4;
+  const same = (s: number) =>
+    Math.abs(a[0] - s * b[0]) < eps && Math.abs(a[1] - s * b[1]) < eps && Math.abs(a[2] - s * b[2]) < eps && Math.abs(a[3] - s * b[3]) < eps;
+  return same(1) || same(-1);
+}
+
+/**
+ * Strip a redundant class-normalization yaw an artist baked into a single scene
+ * root before the importer wraps the scene in its own normalization node.
+ *
+ * Some sources arrive with the orientation correction already hand-applied
+ * ("whole tent yawed -90deg ... matching old TIJ asset orientation, placements
+ * assume it"). The importer's normalizeAxis then wraps the root under ANOTHER
+ * copy of the same class yaw, so the model is double-rotated (net 180deg ->
+ * ridge crosswise, entrance reversed) — the class of break that surfaced
+ * aid-station / command-tent as "corrupted" in-world. Removing the baked root
+ * rotation here lets the wrapper apply the canonical normalization exactly once,
+ * leaving the asset identical to a properly-authored (un-pre-yawed) source.
+ *
+ * Returns true when a redundant yaw was removed (so the caller can re-measure /
+ * report). Idempotent: the immutable source always re-presents the baked yaw, so
+ * every run strips it and the wrapper re-applies one — byte-stable output.
+ */
+function stripRedundantRootYaw(json: GlbJson, quat: readonly number[]): boolean {
+  const scene = json.scenes?.[json.scene ?? 0];
+  const roots = scene?.nodes ?? [];
+  if (roots.length !== 1) return false;
+  const root = json.nodes?.[roots[0]];
+  if (!root || root.name === AXIS_NODE_NAME || root.matrix) return false;
+  if (!sameRotation(root.rotation ?? [], quat)) return false;
+  delete root.rotation;
+  return true;
+}
+
 function normalizeAxis(json: GlbJson, quat: readonly number[], note: string, scale = 1): void {
   json.nodes ??= [];
   json.scenes ??= [{ nodes: [] }];
@@ -1251,6 +1291,12 @@ function main(): void {
     rigIssues.push(...rig.issues, ...validateRig(asset.slug, joints, ct));
     const { forward, quat, label } = classForward(asset.class);
 
+    // Cancel an artist-baked normalization yaw before measuring, so a pre-yawed
+    // source measures like an un-yawed one (X-long) and the on-disk swap below
+    // reports the true post-wrap dims. Prevents the aid-station / command-tent
+    // double-rotation (and its X-long catalog dims) from recurring.
+    stripRedundantRootYaw(json, quat);
+
     // Measure AFTER grafts (node graph changed) but BEFORE the axis wrap, then
     // swap the long axis to reflect the on-disk forward for clarity.
     const bbox = worldBbox(json, bin);
@@ -1399,4 +1445,11 @@ function printReport(reports: AssetReport[], entries: CatalogEntry[], rejects: u
   console.log(`Reject slugs: ${(rejects as Array<{ asset: { slug: string } }>).map((r) => r.asset.slug).sort().join(', ') || '(none)'}`);
 }
 
-main();
+// Run only as a CLI entrypoint. When imported (tests, the scoped re-import in
+// docs/tasks/structure-import-corruption-fix.md), the pipeline functions are
+// reused without triggering a full catalog rebuild.
+const invokedDirectly = process.argv[1] ? process.argv[1].replace(/\\/g, '/').endsWith('import-war-catalog.ts') : false;
+if (invokedDirectly) main();
+
+export { readGlb, writeGlb, normalizeAxis, normalizeRig, synthesizeIndices, canonicalizeBuffers, classForward, compileTaxonomy, sameRotation, stripRedundantRootYaw };
+export type { GlbJson, JointTaxonomy };
