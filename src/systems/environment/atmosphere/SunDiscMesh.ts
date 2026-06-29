@@ -52,6 +52,77 @@ const HOT_CORE_RADIUS = BODY_RADIUS * 0.86;
 const HOT_CORE_FEATHER = BODY_RADIUS * 1.04;
 const FALLBACK_TEXTURE_SIZE = 128;
 
+/**
+ * Band-limit for the plasma/filament/granule surface texture.
+ *
+ * The original terms stacked sine coefficients up to ~×317 over the
+ * unit-ish disc UV, whose interference aliased into a visible "LED-dot
+ * lattice" at render resolution (2026-06-28 owner playtest). Every sine
+ * coefficient in all three implementations (TSL / GLSL / CPU mirror) is
+ * now drawn from {@link SUN_DISC_SINE_FREQ} and is held at or below this
+ * cap so the disc reads as a warm solar BODY with low-frequency surface
+ * mottling rather than a screen of dots.
+ *
+ * Lowering this further flattens the disc toward a plain circle; raising
+ * it back toward the old values reintroduces the lattice.
+ */
+export const SUN_DISC_MAX_SINE_FREQUENCY = 48;
+
+/**
+ * Shared, band-limited sine coefficients for the three surface-texture
+ * terms. Coordinates are the centered disc UV (`uv - 0.5`, roughly
+ * −0.5..0.5 across the visible body). Exported so the TSL, GLSL, and CPU
+ * mirrors stay provably in sync and a test can assert the band-limit.
+ *
+ * Each term is `sin(ax + by [+ phase]) * sin(cx + dy [+ phase])`; the
+ * coefficients are deliberately incommensurate (non-harmonic) so the
+ * product reads as organic mottling, not a regular grid — while every
+ * coefficient stays at or below {@link SUN_DISC_MAX_SINE_FREQUENCY}.
+ */
+export const SUN_DISC_SINE_FREQ = {
+  plasmaAx: 17,
+  plasmaAy: 11,
+  plasmaBx: -13,
+  plasmaBy: 23,
+  filamentAx: 29,
+  filamentAy: -19,
+  filamentBx: 7,
+  filamentBy: 37,
+  granuleAx: 41,
+  granuleAy: 5,
+  granuleBx: -9,
+  granuleBy: 47,
+} as const;
+
+/**
+ * CPU mirror of the three band-limited surface-texture terms. Returns the
+ * `0..1`-remapped plasma/filament/granule values for a centered disc UV
+ * `(cx, cy)`. The fallback DataTexture and tests both consume this so the
+ * CPU path matches the GPU shaders' band-limited frequencies exactly.
+ */
+export function computeSunDiscSurfaceTerms(
+  cx: number,
+  cy: number,
+): { plasma: number; filament: number; granule: number } {
+  const f = SUN_DISC_SINE_FREQ;
+  const plasma =
+    Math.sin(cx * f.plasmaAx + cy * f.plasmaAy) *
+      Math.sin(cx * f.plasmaBx + cy * f.plasmaBy) *
+      0.5 +
+    0.5;
+  const filament =
+    Math.sin(cx * f.filamentAx + cy * f.filamentAy) *
+      Math.sin(cx * f.filamentBx + cy * f.filamentBy) *
+      0.5 +
+    0.5;
+  const granule =
+    Math.sin(cx * f.granuleAx + cy * f.granuleAy + plasma * 2.1) *
+      Math.sin(cx * f.granuleBx + cy * f.granuleBy - filament * 1.7) *
+      0.5 +
+    0.5;
+  return { plasma, filament, granule };
+}
+
 interface SunDiscUniforms {
   sunColor: { value: THREE.Color };
 }
@@ -85,12 +156,16 @@ const WEBGL_SUN_FRAGMENT = /* glsl */ `
   void main() {
     vec2 d = vUv - vec2(0.5);
     float r = length(d) * 2.0;
-    float plasma = sin(d.x * 142.0 + d.y * 86.0) * sin(d.x * -118.0 + d.y * 178.0);
+    // Band-limited surface terms (coefficients shared with TSL + CPU mirror;
+    // all <= SUN_DISC_MAX_SINE_FREQUENCY to avoid the dot-lattice aliasing).
+    float plasma = sin(d.x * ${SUN_DISC_SINE_FREQ.plasmaAx.toFixed(1)} + d.y * ${SUN_DISC_SINE_FREQ.plasmaAy.toFixed(1)}) *
+      sin(d.x * ${SUN_DISC_SINE_FREQ.plasmaBx.toFixed(1)} + d.y * ${SUN_DISC_SINE_FREQ.plasmaBy.toFixed(1)});
     plasma = plasma * 0.5 + 0.5;
-    float filament = sin(d.x * 231.0 + d.y * -73.0) * sin(d.x * 47.0 + d.y * 211.0);
+    float filament = sin(d.x * ${SUN_DISC_SINE_FREQ.filamentAx.toFixed(1)} + d.y * ${SUN_DISC_SINE_FREQ.filamentAy.toFixed(1)}) *
+      sin(d.x * ${SUN_DISC_SINE_FREQ.filamentBx.toFixed(1)} + d.y * ${SUN_DISC_SINE_FREQ.filamentBy.toFixed(1)});
     filament = filament * 0.5 + 0.5;
-    float granule = sin(d.x * 317.0 + d.y * 31.0 + plasma * 2.1) *
-      sin(d.x * -29.0 + d.y * 287.0 - filament * 1.7);
+    float granule = sin(d.x * ${SUN_DISC_SINE_FREQ.granuleAx.toFixed(1)} + d.y * ${SUN_DISC_SINE_FREQ.granuleAy.toFixed(1)} + plasma * 2.1) *
+      sin(d.x * ${SUN_DISC_SINE_FREQ.granuleBx.toFixed(1)} + d.y * ${SUN_DISC_SINE_FREQ.granuleBy.toFixed(1)} - filament * 1.7);
     granule = granule * 0.5 + 0.5;
     float bodyR = r + (plasma - 0.5) * 0.145 + (filament - 0.5) * 0.052;
     float coreR = r + (plasma - 0.5) * 0.038 + (granule - 0.5) * 0.012;
@@ -123,15 +198,9 @@ function createFallbackSunTexture(): THREE.DataTexture {
     for (let x = 0; x < FALLBACK_TEXTURE_SIZE; x += 1) {
       const nx = (x - half) / half;
       const ny = (y - half) / half;
-      const waveA = Math.sin(nx * 71 + ny * 43);
-      const waveB = Math.sin(nx * -59 + ny * 89);
-      const plasma = waveA * waveB * 0.5 + 0.5;
-      const filament = Math.sin(nx * 115.5 + ny * -36.5) * Math.sin(nx * 23.5 + ny * 105.5) * 0.5 + 0.5;
-      const granule =
-        Math.sin(nx * 158.5 + ny * 15.5 + plasma * 2.1) *
-          Math.sin(nx * -14.5 + ny * 143.5 - filament * 1.7) *
-          0.5 +
-        0.5;
+      // Centered disc UV (−0.5..0.5), the same domain the GLSL/TSL shaders
+      // sample, so the band-limited surface terms match across all backends.
+      const { plasma, filament, granule } = computeSunDiscSurfaceTerms(nx * 0.5, ny * 0.5);
       const r = Math.hypot(nx, ny);
       const bodyR = r + (plasma - 0.5) * 0.145 + (filament - 0.5) * 0.052;
       const coreR = r + (plasma - 0.5) * 0.038 + (granule - 0.5) * 0.012;
@@ -189,24 +258,35 @@ function createSunDiscMaterial(): { material: MeshBasicNodeMaterial; uniforms: S
     fog: false,
   });
 
+  // Band-limited surface terms (coefficients shared with GLSL + CPU mirror;
+  // all <= SUN_DISC_MAX_SINE_FREQUENCY to avoid the dot-lattice aliasing).
+  const F = SUN_DISC_SINE_FREQ;
   const centered = (uv() as any).sub(vec2(0.5, 0.5)) as any;
   const r = (length(centered) as any).mul(2.0);
-  const waveA = ((centered as any).x.mul(float(71)).add((centered as any).y.mul(float(43))) as any).sin();
-  const waveB = ((centered as any).x.mul(float(-59)).add((centered as any).y.mul(float(89))) as any).sin();
+  const waveA = (
+    (centered as any).x.mul(float(F.plasmaAx)).add((centered as any).y.mul(float(F.plasmaAy))) as any
+  ).sin();
+  const waveB = (
+    (centered as any).x.mul(float(F.plasmaBx)).add((centered as any).y.mul(float(F.plasmaBy))) as any
+  ).sin();
   const plasma = (waveA.mul(waveB) as any).mul(float(0.5)).add(float(0.5));
-  const waveC = ((centered as any).x.mul(float(115.5)).add((centered as any).y.mul(float(-36.5))) as any).sin();
-  const waveD = ((centered as any).x.mul(float(23.5)).add((centered as any).y.mul(float(105.5))) as any).sin();
+  const waveC = (
+    (centered as any).x.mul(float(F.filamentAx)).add((centered as any).y.mul(float(F.filamentAy))) as any
+  ).sin();
+  const waveD = (
+    (centered as any).x.mul(float(F.filamentBx)).add((centered as any).y.mul(float(F.filamentBy))) as any
+  ).sin();
   const filament = (waveC.mul(waveD) as any).mul(float(0.5)).add(float(0.5));
   const waveE = (
     (centered as any).x
-      .mul(float(158.5))
-      .add((centered as any).y.mul(float(15.5)))
+      .mul(float(F.granuleAx))
+      .add((centered as any).y.mul(float(F.granuleAy)))
       .add(plasma.mul(float(2.1))) as any
   ).sin();
   const waveF = (
     (centered as any).x
-      .mul(float(-14.5))
-      .add((centered as any).y.mul(float(143.5)))
+      .mul(float(F.granuleBx))
+      .add((centered as any).y.mul(float(F.granuleBy)))
       .sub(filament.mul(float(1.7))) as any
   ).sin();
   const granule = (waveE.mul(waveF) as any).mul(float(0.5)).add(float(0.5));
