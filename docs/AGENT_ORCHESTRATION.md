@@ -205,9 +205,10 @@ from the owner playtest triage). Phase 1
 playtest-deferred); Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) CLOSED
 2026-06-28 (#429-#433, perf A/B PASS, playtest-deferred); Phase 3
 (`cycle-2026-06-28-terrain-vegetation-asset-defects`) CLOSED 2026-06-28 (#434-#440,
-perf A/B PASS −23%, playtest-deferred). **Phase 4
-(`cycle-2026-06-28-arsenal-expansion`) is now active** in "Current cycle" below.
-Phases 5-6 briefs are authored at each phase's open per the manifest tables.
+perf A/B PASS −23%, playtest-deferred); Phase 4 (`cycle-2026-06-28-arsenal-expansion`)
+CLOSED 2026-06-28 (#441-#443, perf A/B PASS, playtest-deferred). **Phase 5
+(`cycle-2026-06-28-deploy-armory-faction-select`) is now active** in "Current cycle"
+below. Phase 6 briefs are authored at its open per the manifest tables.
 
 Prior campaigns (engineering closed; owner walks pending in
 [PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
@@ -233,34 +234,42 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-28-arsenal-expansion` — Phase 4 of
+- **Active:** `cycle-2026-06-28-deploy-armory-faction-select` — Phase 5 of
   [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
-  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 5
-  `cycle-2026-06-28-deploy-armory-faction-select` on the Phase-4 exit gate). Briefs:
-  `docs/tasks/{marksman-rifle-class,sks-rifle-wiring,ammo-load-tradeoff}.md`.
+  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 6
+  `cycle-2026-06-28-ashau-purpose-and-missions` on the Phase-5 exit gate). Briefs:
+  `docs/tasks/{weapon-stats-panel,armory-layout-reflow,faction-side-picker,deploy-map-navigation,helipad-spawn-truth,crew-vehicle-selectable,deploy-map-3d-spike}.md`.
 
   **Task DAG:**
   ```
-  marksman-rifle-class ──► sks-rifle-wiring   (shared LoadoutWeapon/rig registry; SERIALIZE merges)
-  ammo-load-tradeoff       (root; owner-decision default = add a real downside)
+  weapon-stats-panel ──► armory-layout-reflow                              (shared DeployScreen armory column)
+  faction-side-picker        (root; launch wiring — disjoint files)
+  deploy-map-navigation ──► helipad-spawn-truth ──► crew-vehicle-selectable (shared spawn/map path)
+  deploy-map-3d-spike        (root; doc only)
   ```
-  R1 (parallel, cap 5): `marksman-rifle-class`, `ammo-load-tradeoff`.
-  R2: `sks-rifle-wiring` (after `marksman-rifle-class` merges; rebases onto it).
-  **Cross-phase dep:** marksman/sks share `WeaponAnimations`/`WeaponRigManager`
-  with Phase 2's `weapon-ads-per-weapon-offset` (merged) — EXTEND the per-weapon
-  ADS table, don't duplicate; serialize so the second weapon PR rebases clean.
-  Reviewer: `combat-reviewer` ONLY if a PR touches `src/systems/combat/**` (the
-  weapon/loadout scope likely does not).
-  Perf: run `perf-analyst` after each round — HALT on >5% combat120 p99 regression.
-  Exit gate: NVA can deploy a marksman + SKS; ammo-load is a real tradeoff (or
-  collapsed per the owner default); reviewer APPROVE if combat-path.
-- **Previous:** `cycle-2026-06-28-terrain-vegetation-asset-defects` (Phase 3, 7/7:
-  #434-#440, perf A/B PASS steady-state p99 40.70→31.20ms Δ−23.34% (veg dormant in
-  ai_sandbox — reachability gate), closed 2026-06-28, playtest-deferred) — hero +
-  route veg-exclusion, density retune, coconut-card crossfade, sun-disc band-limit,
-  structure re-import, re-roll ledger. terrain-nav APPROVE/APPROVE-WITH-NOTES on
-  the 3 terrain PRs. See BACKLOG "Recently Completed" and PLAYTEST_PENDING. Briefs
-  archived at `docs/tasks/archive/cycle-2026-06-28-terrain-vegetation-asset-defects/`.
+  R1 (parallel, cap 5): `weapon-stats-panel`, `faction-side-picker`,
+  `deploy-map-navigation`, `deploy-map-3d-spike` (4 roots).
+  R2: `armory-layout-reflow` (after `weapon-stats-panel`), `helipad-spawn-truth`
+  (after `deploy-map-navigation`) — both rebase onto their dep.
+  R3: `crew-vehicle-selectable` (after `helipad-spawn-truth`).
+  **Shared-file watch:** `DeployScreen.ts` is co-edited by weapon-stats /
+  deploy-map-nav / armory-reflow / crew-vehicle (localize to distinct regions;
+  rebase later mergers). `PlayerRespawnManager.ts` co-edited by
+  helipad-spawn-truth + crew-vehicle (the DAG serializes them).
+  Reviewer: none expected (UI / deploy / spawn scope — no combat/terrain/nav).
+  Perf: NOT a perf-gated phase per the manifest (UI/deploy work; no combat hot
+  path) — run a sanity `perf-analyst` only if a PR unexpectedly touches a hot path.
+  Exit gate: faction picker on A Shau; stats panel + reflowed armory; map
+  navigable (bounded pan + recenter + larger targets); helipad + crew options
+  honest; 3D-map spike filed. PLAYTEST_PENDING row.
+- **Previous:** `cycle-2026-06-28-arsenal-expansion` (Phase 4, 3/3: #441-#443,
+  perf A/B PASS steady-state p99 33.60→31.65ms (both weapons OPFOR-loadout-only,
+  reachability-dormant in ai_sandbox), closed 2026-06-28, playtest-deferred) — NVA
+  marksman/DMR + SKS runtime weapon types (cataloged GLBs wired, not new art) +
+  ammo-load handling tradeoff. No reviewer scope. WeaponRigManager admitted to the
+  budget grandfather list (split target: per-weapon registry extraction). See
+  BACKLOG "Recently Completed" and PLAYTEST_PENDING. Briefs archived at
+  `docs/tasks/archive/cycle-2026-06-28-arsenal-expansion/`.
 
 ## Dispatch protocol
 

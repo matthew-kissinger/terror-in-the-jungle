@@ -14,8 +14,8 @@
 > ✅ 1 control-discoverability (#425-#428, playtest-deferred) ·
 > ✅ 2 combat-vehicle-feel (#429-#433, perf A/B PASS, playtest-deferred) ·
 > ✅ 3 terrain-vegetation-asset-defects (#434-#440, perf A/B PASS −23%, playtest-deferred) ·
-> 🔄 4 arsenal-expansion ·
-> ⬜ 5 deploy-armory-faction-select ·
+> ✅ 4 arsenal-expansion (#441-#443, perf A/B PASS, playtest-deferred) ·
+> 🔄 5 deploy-armory-faction-select ·
 > ⬜ 6 ashau-purpose-and-missions
 
 Source: the 2026-06-28 owner playtest (voice transcript + a 5-agent codebase
