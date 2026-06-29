@@ -11,7 +11,8 @@ export enum LoadoutWeapon {
   PISTOL = 'pistol',
   LMG = 'lmg',
   LAUNCHER = 'launcher',
-  MARKSMAN = 'marksman'
+  MARKSMAN = 'marksman',
+  SKS = 'sks'
 }
 
 export enum LoadoutEquipment {
@@ -78,6 +79,7 @@ const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> =
   { value: LoadoutWeapon.LMG, label: 'LMG', shortLabel: 'MG' },
   { value: LoadoutWeapon.LAUNCHER, label: 'Grenade Launcher', shortLabel: 'GL' },
   { value: LoadoutWeapon.MARKSMAN, label: 'Marksman Rifle', shortLabel: 'DMR' },
+  { value: LoadoutWeapon.SKS, label: 'SKS Carbine', shortLabel: 'SKS' },
 ];
 
 const LOADOUT_EQUIPMENT_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutEquipment>> = [
@@ -210,6 +212,7 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.SMG,
       LoadoutWeapon.PISTOL,
       LoadoutWeapon.MARKSMAN,
+      LoadoutWeapon.SKS,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -257,6 +260,16 @@ const LOADOUT_POOL_BY_FACTION: Record<
           equipment: LoadoutEquipment.SMOKE_GRENADE,
         },
       },
+      {
+        id: 'skirmisher',
+        name: 'Skirmisher',
+        description: 'Semi-auto SKS preset for steady mid-range fire.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.SKS,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.FRAG_GRENADE,
+        },
+      },
     ],
   },
   [Faction.VC]: {
@@ -265,6 +278,7 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.SHOTGUN,
       LoadoutWeapon.PISTOL,
       LoadoutWeapon.MARKSMAN,
+      LoadoutWeapon.SKS,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -310,6 +324,16 @@ const LOADOUT_POOL_BY_FACTION: Record<
           primaryWeapon: LoadoutWeapon.MARKSMAN,
           secondaryWeapon: LoadoutWeapon.PISTOL,
           equipment: LoadoutEquipment.SMOKE_GRENADE,
+        },
+      },
+      {
+        id: 'rifleman_sks',
+        name: 'Rifleman (SKS)',
+        description: 'Semi-auto SKS preset for disciplined aimed fire.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.SKS,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.FRAG_GRENADE,
         },
       },
     ],

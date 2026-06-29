@@ -165,6 +165,15 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // split target unchanged. See docs/CARRY_OVERS.md.
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
   'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
+  // Admitted 2026-06-28 (sks-rifle-wiring, cycle-2026-06-28-arsenal-expansion):
+  // the runtime-weapon-type plumbing established by marksman-rifle-class left
+  // this file at 699 LOC (1 under the base limit). Adding the SKS as its own
+  // semi-auto OPFOR weapon type (spec + core + rig field + art entries + load +
+  // rig prep + switch case + visibility + getter + HUD labels) crosses 700.
+  // The growth is per-weapon plumbing, not god-module drift; the natural split
+  // target is to extract the per-weapon spec/core registry out of the manager.
+  // In-cycle ratchet admission, no CARRY_OVERS row (sanctioned by the brief).
+  'src/systems/player/weapon/WeaponRigManager.ts': { round: 'P3R3', reason: 'extract the per-weapon spec/core/rig registry out of the manager; +36 LOC for the SKS semi-auto runtime weapon type (sks-rifle-wiring, 2026-06-28)', loc: 735, methods: 29 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy; +3 LOC route-corridor-exclusion: merge route veg-exclusion corridors into vegetationExclusionZones', loc: 767, methods: 0 },
   'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles; +10 LOC task/veg-glb-hero-scatter r185 WebGPU terrain-render restore', loc: 1192, methods: 0 },
   // Snapshot raised 898 → 904 / 69 → 75 (ashau-load-freeze, 2026-06-10): six

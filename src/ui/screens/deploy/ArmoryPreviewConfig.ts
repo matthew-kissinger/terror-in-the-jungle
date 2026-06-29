@@ -109,6 +109,16 @@ const WEAPON_PREVIEW_CONFIGS_LEGACY: ArmoryPreviewConfigTable = {
     stockNames: ['Mesh_ButtPad', 'Mesh_Stock'],
     ...COMMON_LONG_GUN_SOCKET,
   },
+  [LoadoutWeapon.SKS]: {
+    id: 'sks',
+    modelPath: WeaponModels.SKS,
+    lengthMeters: 1.0,
+    gripNames: ['Mesh_TriggerGuard', 'Mesh_Receiver', 'Mesh_Stock'],
+    supportNames: ['Mesh_Handguard', 'Mesh_GasTube', 'Mesh_Barrel'],
+    muzzleNames: ['Mesh_FrontSightBase', 'Mesh_Bayonet', 'Mesh_Barrel'],
+    stockNames: ['Mesh_Buttplate', 'Mesh_Stock'],
+    ...COMMON_LONG_GUN_SOCKET,
+  },
 };
 
 // Kiln gen-2 repaint art (default). Node names verified by parsing each
@@ -183,6 +193,16 @@ const WEAPON_PREVIEW_CONFIGS_KILN: ArmoryPreviewConfigTable = {
     supportNames: ['Mesh_Handguard', 'Mesh_GasTube', 'Mesh_Barrel'],
     muzzleNames: ['Mesh_FlashHider', 'Mesh_FrontSightBase', 'Mesh_Barrel'],
     stockNames: ['Mesh_Buttplate', 'Mesh_SVD_Stock'],
+    ...COMMON_LONG_GUN_SOCKET,
+  },
+  [LoadoutWeapon.SKS]: {
+    id: 'sks-carbine',
+    modelPath: WeaponModels.SKS_CARBINE,
+    lengthMeters: 1.04,
+    gripNames: ['Mesh_TriggerGuard', 'Mesh_Receiver', 'Mesh_Stock'],
+    supportNames: ['Mesh_Handguard', 'Mesh_GasTube', 'Mesh_Barrel'],
+    muzzleNames: ['Mesh_FrontSightBase', 'Mesh_Bayonet', 'Mesh_Barrel'],
+    stockNames: ['Mesh_Buttplate', 'Mesh_Stock'],
     ...COMMON_LONG_GUN_SOCKET,
   },
 };
