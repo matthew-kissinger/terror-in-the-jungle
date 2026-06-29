@@ -57,6 +57,26 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-28-combat-vehicle-feel)
+
+Phase 2 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+5 PRs #429-#433, one parallel round (all roots, disjoint files), zero fence
+changes, zero reviewers needed (vehicle/player/weapon/config scope).
+`tank-exit-and-seatswap` (#433): real bug — tanks were undismountable (F
+consumed by seat-swap, only Escape exited); `E` now exits (universal vehicle
+exit) with side-ejection, `F` keeps driver↔gunner swap; repro-first L3 test.
+`tank-turret-traverse` (#429): yaw 30→75°/s, barrel pitch 8→25°/s (rate cap
+kept). `tank-hill-authority` (#432): maxClimbSlope 0.6→0.78, slopeDriveFloor→
+0.62, slopeGravityScale→0.20 on M48+T-54 ("slower but stronger"). `ground-
+vehicle-speed-and-camera` (#431): faster jeep (damping 0.88→0.95, torque 420→
+520) + chassis-aware follow-cam (M35 truck framed from outside its bed).
+`weapon-ads-per-weapon-offset` (#430): per-weapon ADS offset so the M60 clears
+the sight line. **Perf gate PASS** (same-machine combat120 A/B: p99 37.10→
+37.70ms, Δ+1.6%, under the +5% HALT line; Vehicles system dormant in
+ai_sandbox so the delta is render noise, not Phase-2 cost). Carry-overs 5→5.
+Owner feel-walk row in PLAYTEST_PENDING; memo at
+`docs/playtests/cycle-2026-06-28-combat-vehicle-feel.md`.
+
 ## Recently Completed (cycle-2026-06-28-control-discoverability)
 
 Phase 1 of CAMPAIGN_2026-06-28-field-readiness (overnight, `posture:
