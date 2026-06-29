@@ -230,32 +230,36 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-28-combat-vehicle-feel` — Phase 2 of
+- **Active:** `cycle-2026-06-28-terrain-vegetation-asset-defects` — Phase 3 of
   [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
-  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 3
-  `cycle-2026-06-28-terrain-vegetation-asset-defects` on the Phase-2 exit gate).
-  Briefs: `docs/tasks/{tank-exit-and-seatswap,tank-turret-traverse,tank-hill-authority,ground-vehicle-speed-and-camera,weapon-ads-per-weapon-offset}.md`.
+  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 4
+  `cycle-2026-06-28-arsenal-expansion` on the Phase-3 exit gate). Briefs:
+  `docs/tasks/{veg-poi-exclusion,route-corridor-exclusion,vegetation-density-retune,coconut-card-crossfade,structure-import-corruption-fix,sun-disc-banding-fix,asset-reroll-requests}.md`.
 
-  **Task DAG:** all roots — fully parallel (disjoint files).
+  **Task DAG:**
   ```
-  tank-exit-and-seatswap            (root; vehicle input routing; FENCE WATCH)
-  tank-turret-traverse              (root; tuning)
-  tank-hill-authority               (root; tracked physics)
-  ground-vehicle-speed-and-camera   (root; wheeled physics + follow cam)
-  weapon-ads-per-weapon-offset      (root; weapon viewmodel) ── unblocks Phase 4
+  veg-poi-exclusion ──► route-corridor-exclusion   (shared exclusion plumbing)
+  vegetation-density-retune        (root; config)
+  coconut-card-crossfade           (root; ground-card LOD tier)
+  structure-import-corruption-fix  (root; importer + re-import)
+  sun-disc-banding-fix             (root; atmosphere)
+  asset-reroll-requests            (root; doc only — SKIP UH-1/A-1, already done)
   ```
-  R1 (parallel, all 5): the five tasks above.
-  Reviewer: none (files under `src/systems/vehicle/**`, `src/systems/player/**`,
-  `src/config/vehicles/**` — no combat/terrain/nav reviewer scope).
-  Perf: run `perf-analyst` after R1 — HALT on >5% combat120 p99 regression.
-  Hard-stops: campaign-level (see manifest), incl. fence change on
-  `tank-exit-and-seatswap`. Exit gate: combat120 p99 within +5%; tank exits
-  cleanly with a visible cue; jeep noticeably faster; M60 ADS sight clear.
-- **Previous:** `cycle-2026-06-28-control-discoverability` (Phase 1, 4/4:
-  #425-#428, closed 2026-06-28, playtest-deferred) — control legend + unified
-  radio menu + HUD de-overlap + seat/fire cues. See BACKLOG "Recently Completed"
-  and PLAYTEST_PENDING. Briefs archived at
-  `docs/tasks/archive/cycle-2026-06-28-control-discoverability/`.
+  R1 (parallel, cap 5): `veg-poi-exclusion`, `vegetation-density-retune`,
+  `coconut-card-crossfade`, `structure-import-corruption-fix`, `sun-disc-banding-fix`.
+  R2: `route-corridor-exclusion` (after `veg-poi-exclusion`) + `asset-reroll-requests`
+  (doc, deferred for the cap).
+  Reviewer: terrain-nav for `veg-poi-exclusion`, `route-corridor-exclusion`,
+  `vegetation-density-retune`, `coconut-card-crossfade` (vegetation/terrain scope).
+  Perf: run `perf-analyst` after each round — HALT on >5% combat120 p99 regression.
+  Exit gate: terrain-nav APPROVE; no hero trees on the airfield; coconut swap no
+  hard pop; sun reads as a body not dots; corrupted structures fixed; UH-1+A-1
+  re-rolls already landed, remaining re-roll specs filed.
+- **Previous:** `cycle-2026-06-28-combat-vehicle-feel` (Phase 2, 5/5: #429-#433,
+  perf A/B PASS Δp99 +1.6%, closed 2026-06-28, playtest-deferred) — tank exit
+  bug fix + turret/hill/jeep feel + per-weapon ADS offset. See BACKLOG "Recently
+  Completed" and PLAYTEST_PENDING. Briefs archived at
+  `docs/tasks/archive/cycle-2026-06-28-combat-vehicle-feel/`.
 
 ## Dispatch protocol
 

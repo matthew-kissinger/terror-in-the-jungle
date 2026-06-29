@@ -32,4 +32,4 @@
 ## Notes
 - No fence changes (tank-exit used the existing controller/adapter exit route, fence verified clean).
 - Phase 2 touched only `src/systems/vehicle/**`, `src/systems/player/**`, `src/systems/player/weapon/**`, `src/config/vehicles/**` — no reviewer scope (combat/terrain/nav), no render/AI-hot-path code.
-- One doc-drift hiccup during the cycle: an orchestrator typo in the tank-exit brief path (`src/ui/PlayerInput.ts` → `src/systems/player/PlayerInput.ts`) tripped the lint gate on all 5 branches; fixed on master + rebased. Not part of the walk.
+- One doc-drift hiccup during the cycle: an orchestrator typo put the tank-exit brief's PlayerInput path under `ui/` instead of `systems/player/`; it tripped the lint gate on all 5 branches, fixed on master + rebased. Not part of the walk.
