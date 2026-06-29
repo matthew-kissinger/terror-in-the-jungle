@@ -206,9 +206,11 @@ playtest-deferred); Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) CLOSED
 2026-06-28 (#429-#433, perf A/B PASS, playtest-deferred); Phase 3
 (`cycle-2026-06-28-terrain-vegetation-asset-defects`) CLOSED 2026-06-28 (#434-#440,
 perf A/B PASS −23%, playtest-deferred); Phase 4 (`cycle-2026-06-28-arsenal-expansion`)
-CLOSED 2026-06-28 (#441-#443, perf A/B PASS, playtest-deferred). **Phase 5
-(`cycle-2026-06-28-deploy-armory-faction-select`) is now active** in "Current cycle"
-below. Phase 6 briefs are authored at its open per the manifest tables.
+CLOSED 2026-06-28 (#441-#443, perf A/B PASS, playtest-deferred); Phase 5
+(`cycle-2026-06-28-deploy-armory-faction-select`) CLOSED 2026-06-29 (#444-#450,
+no perf gate — UI/deploy, playtest-deferred). **Phase 6
+(`cycle-2026-06-28-ashau-purpose-and-missions`) is now active** in "Current cycle"
+below — the final phase of the campaign.
 
 Prior campaigns (engineering closed; owner walks pending in
 [PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
@@ -234,42 +236,47 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-28-deploy-armory-faction-select` — Phase 5 of
+- **Active:** `cycle-2026-06-28-ashau-purpose-and-missions` — Phase 6 (FINAL) of
   [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md).
-  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (chain to Phase 6
-  `cycle-2026-06-28-ashau-purpose-and-missions` on the Phase-5 exit gate). Briefs:
-  `docs/tasks/{weapon-stats-panel,armory-layout-reflow,faction-side-picker,deploy-map-navigation,helipad-spawn-truth,crew-vehicle-selectable,deploy-map-3d-spike}.md`.
+  Concurrency 5; `posture: autonomous-loop`; `auto-advance: yes` (last phase —
+  end-of-run summary on exit). Briefs:
+  `docs/tasks/{situation-readout-hud,tasking-director-spike,tasking-director-mvp,premiere-battle-royale-design,healing-and-looting-scope}.md`.
 
   **Task DAG:**
   ```
-  weapon-stats-panel ──► armory-layout-reflow                              (shared DeployScreen armory column)
-  faction-side-picker        (root; launch wiring — disjoint files)
-  deploy-map-navigation ──► helipad-spawn-truth ──► crew-vehicle-selectable (shared spawn/map path)
-  deploy-map-3d-spike        (root; doc only)
+  situation-readout-hud         (root; dep Phase 1 control-hints-hud — already merged)
+  tasking-director-spike ──► tasking-director-mvp   (design then conservative MVP)
+  premiere-battle-royale-design (root; doc only)
+  healing-and-looting-scope     (root; doc only)
   ```
-  R1 (parallel, cap 5): `weapon-stats-panel`, `faction-side-picker`,
-  `deploy-map-navigation`, `deploy-map-3d-spike` (4 roots).
-  R2: `armory-layout-reflow` (after `weapon-stats-panel`), `helipad-spawn-truth`
-  (after `deploy-map-navigation`) — both rebase onto their dep.
-  R3: `crew-vehicle-selectable` (after `helipad-spawn-truth`).
-  **Shared-file watch:** `DeployScreen.ts` is co-edited by weapon-stats /
-  deploy-map-nav / armory-reflow / crew-vehicle (localize to distinct regions;
-  rebase later mergers). `PlayerRespawnManager.ts` co-edited by
-  helipad-spawn-truth + crew-vehicle (the DAG serializes them).
-  Reviewer: none expected (UI / deploy / spawn scope — no combat/terrain/nav).
-  Perf: NOT a perf-gated phase per the manifest (UI/deploy work; no combat hot
-  path) — run a sanity `perf-analyst` only if a PR unexpectedly touches a hot path.
-  Exit gate: faction picker on A Shau; stats panel + reflowed armory; map
-  navigable (bounded pan + recenter + larger targets); helipad + crew options
-  honest; 3D-map spike filed. PLAYTEST_PENDING row.
-- **Previous:** `cycle-2026-06-28-arsenal-expansion` (Phase 4, 3/3: #441-#443,
-  perf A/B PASS steady-state p99 33.60→31.65ms (both weapons OPFOR-loadout-only,
-  reachability-dormant in ai_sandbox), closed 2026-06-28, playtest-deferred) — NVA
-  marksman/DMR + SKS runtime weapon types (cataloged GLBs wired, not new art) +
-  ammo-load handling tradeoff. No reviewer scope. WeaponRigManager admitted to the
-  budget grandfather list (split target: per-weapon registry extraction). See
+  R1 (parallel, cap 5): `situation-readout-hud`, `tasking-director-spike`,
+  `premiere-battle-royale-design`, `healing-and-looting-scope` (4 roots — 1 HUD
+  task + 3 design docs).
+  R2: `tasking-director-mvp` (after `tasking-director-spike` — builds its
+  recommendation; **split into 2 PRs if net > 400 LOC**).
+  **Shared-file watch:** `situation-readout-hud` + `tasking-director-mvp` both
+  touch `HUDSystem.ts` (the MVP lands in R2, after the readout merges — serialize
+  the HUD wiring). New `src/systems/missions/*` is a fresh surface.
+  Reviewer: `combat-reviewer` ONLY if a diff touches `src/systems/combat/**`
+  (situation-readout reads `src/systems/strategy`; missions is a new surface —
+  neither should reach combat).
+  Perf: **PERF-GATED** (manifest: run `perf-analyst` after EVERY round; HALT on
+  combat120 p99 regression > 5%). The readout + tasking director read live war/
+  zone state — watch for an added per-frame hot path.
+  Fence watch: `tasking-director-mvp` must NOT widen `SystemInterfaces.ts` to
+  reach combat/zone state — reuse existing read paths (manifest fence note).
+  Exit gate: situation readout live on A Shau; director spike filed + MVP merged
+  (or documented deferral if it exceeds the conservative scope); BR +
+  healing/looting design docs filed. PLAYTEST_PENDING row.
+- **Previous:** `cycle-2026-06-28-deploy-armory-faction-select` (Phase 5, 7/7:
+  #444-#450, R1 (4) + R2 (2) + R3 (1), no perf gate — UI/deploy, closed 2026-06-29,
+  playtest-deferred) — A Shau faction picker, armory weapon-stats readout +
+  layout reflow, respawn-map navigation (bounded pan/zoom/recenter/spawn-cycle),
+  honest helipad labels, selectable crew-a-vehicle spawn, 3D-map feasibility spike.
+  Zero fence changes; no reviewer scope. In-cycle budget ratchet (sanctioned, no
+  CARRY_OVERS row): `DeployScreen.ts`→1142, `PlayerRespawnManager.ts`→800. See
   BACKLOG "Recently Completed" and PLAYTEST_PENDING. Briefs archived at
-  `docs/tasks/archive/cycle-2026-06-28-arsenal-expansion/`.
+  `docs/tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/`.
 
 ## Dispatch protocol
 
