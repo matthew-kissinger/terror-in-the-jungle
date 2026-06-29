@@ -178,6 +178,66 @@ describe('GLBHeroScatterer', () => {
   });
 });
 
+describe('GLBHeroScatterer POI exclusion', () => {
+  // Regression guard for the 2026-06-28 owner playtest bug: hero canopy trees
+  // grew on the airfield runway because the hero scatterer was never told about
+  // the exclusion zones. The behavior contract: a hero must never be placed
+  // inside an exclusion zone, while heroes outside it are unaffected.
+  it('places no hero inside an exclusion zone, but still places heroes outside it', async () => {
+    // Capture the world XZ of every hero the scatterer registers (the object's
+    // position is set before registration, mirroring production placement).
+    const placedXZ: Array<{ x: number; z: number }> = [];
+    const scene = new THREE.Scene();
+    const modelLoader = new FakeModelLoader();
+    const impostors: HeroImpostorRegistrar = {
+      registerInstance(params: { id: string; modelPath: string; object: THREE.Object3D }): boolean {
+        placedXZ.push({ x: params.object.position.x, z: params.object.position.z });
+        return true;
+      },
+      unregisterInstance(): void {},
+      update(): void {},
+    };
+    const scatterer = new GLBHeroScatterer(
+      {
+        scene,
+        modelLoader,
+        impostors,
+        getHeight: flatHeight,
+        archetypes: { 'jungle-tree': HERO_ARCHETYPE },
+      },
+      128,
+      2, // wide enough residency that heroes land both inside and outside the zone
+    );
+    scatterer.setWorldBounds(100_000, 200);
+    scatterer.configure(
+      'denseJungle',
+      new Map([['denseJungle', [{ typeId: 'jungle-tree', densityMultiplier: 0.2 }]]]),
+      [],
+    );
+
+    // A runway-sized exclusion zone centered at the world origin.
+    const zone = { x: 0, z: 0, radius: 120 };
+    scatterer.setExclusionZones([zone]);
+
+    await settle(scatterer, new THREE.Vector3(0, 0, 0));
+
+    expect(placedXZ.length).toBeGreaterThan(0);
+
+    const radiusSq = zone.radius * zone.radius;
+    const inside = placedXZ.filter((p) => {
+      const dx = p.x - zone.x;
+      const dz = p.z - zone.z;
+      return dx * dx + dz * dz <= radiusSq;
+    });
+    const outside = placedXZ.length - inside.length;
+
+    // The bug: heroes ignored the exclusion zone (inside.length > 0).
+    expect(inside.length).toBe(0);
+    // And the fix must not over-cull: heroes outside the zone still place.
+    expect(outside).toBeGreaterThan(0);
+  });
+});
+
 describe('GLBHeroScatterer real-config wiring', () => {
   // Regression guard for the asset cutover: proves the live catalog -> adapter ->
   // biome palette chain actually streams the baked canopy heroes, and that the
