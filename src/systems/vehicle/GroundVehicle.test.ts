@@ -10,7 +10,9 @@ import {
   GroundVehicle,
   isGroundVehicleModelPath,
   isM151ModelPath,
+  M151_PHYSICS_CONFIG,
 } from './GroundVehicle';
+import { GroundVehiclePhysics } from './GroundVehiclePhysics';
 import {
   createM151Jeep,
   M151_SCENARIO_SPAWNS,
@@ -197,6 +199,31 @@ describe('GroundVehicle', () => {
 
     vehicle.setTerrain(null);
     expect(terrain.unregisterCollisionObject).toHaveBeenCalledWith('m151_collision');
+  });
+
+  it('cruises noticeably faster than the old floaty tune (2026-06-28 owner feel)', () => {
+    const flat = makeTerrain();
+
+    // Drive a jeep to a stable cruise on flat ground and report ground speed.
+    function cruiseSpeed(config: Parameters<typeof GroundVehiclePhysics>[1]): number {
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1, 0), config);
+      physics.setEngineActive(true);
+      // Settle, then hold full throttle until speed plateaus.
+      for (let i = 0; i < 30; i += 1) physics.update(0.02, flat as any);
+      physics.setControls({ throttle: 1, steerAngle: 0 });
+      for (let i = 0; i < 1200; i += 1) physics.update(0.02, flat as any);
+      return physics.getGroundSpeed();
+    }
+
+    // Old feel: floaty damping + weaker torque the owner called "too slow".
+    const oldTune = { ...M151_PHYSICS_CONFIG, velocityDamping: 0.88, engineTorque: 420 };
+
+    const shipped = cruiseSpeed(M151_PHYSICS_CONFIG);
+    const previous = cruiseSpeed(oldTune);
+
+    // Both move; the shipped tune cruises clearly faster than before.
+    expect(previous).toBeGreaterThan(1);
+    expect(shipped).toBeGreaterThan(previous * 1.2);
   });
 });
 
