@@ -24,13 +24,27 @@ import {
   warAssetCatalog,
   type WarAssetEntry,
 } from '../src/systems/assets/modelPaths';
+import { classForward, normalizeAxis, stripRedundantRootYaw, type GlbJson } from './import-war-catalog';
 
 const MODELS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'models');
 
 const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const TYPE_COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
 
+// The yaw the structure class normalizes to (+X forward -> +Z forward).
+const Z_YAW = [0, -Math.SQRT1_2, 0, Math.SQRT1_2];
+
+interface GlbNode {
+  name?: string;
+  rotation?: number[];
+  matrix?: number[];
+  children?: number[];
+}
+
 interface GlbJsonChunk {
+  nodes?: GlbNode[];
+  scene?: number;
+  scenes?: Array<{ nodes?: number[] }>;
   meshes?: Array<{ primitives?: Array<{ indices?: number; attributes?: Record<string, number>; targets?: Array<Record<string, number>> }> }>;
   accessors?: Array<{ bufferView?: number; componentType?: number; type?: string }>;
   bufferViews?: Array<{ byteStride?: number }>;
@@ -40,6 +54,115 @@ function readGlbJson(glbPath: string): GlbJsonChunk {
   const buf = readFileSync(glbPath);
   const jsonLen = buf.readUInt32LE(12);
   return JSON.parse(buf.subarray(20, 20 + jsonLen).toString('utf-8')) as GlbJsonChunk;
+}
+
+interface FullGlb {
+  nodes: Array<Record<string, unknown>>;
+  meshes: Array<{ primitives?: Array<{ attributes?: Record<string, number> }> }>;
+  accessors: Array<{ bufferView?: number; byteOffset?: number; componentType?: number; type?: string; count?: number; min?: number[]; max?: number[] }>;
+  bufferViews: Array<{ byteOffset?: number; byteStride?: number }>;
+  scenes: Array<{ nodes?: number[] }>;
+  scene?: number;
+  bin: Buffer;
+}
+
+/** Read both GLB chunks (no deps) for a full geometry-space world-bbox measure. */
+function readFullGlb(glbPath: string): FullGlb {
+  const data = readFileSync(glbPath);
+  let off = 12;
+  let json: Record<string, unknown> = {};
+  let bin = Buffer.alloc(0);
+  while (off < data.length) {
+    const len = data.readUInt32LE(off);
+    const type = data.readUInt32LE(off + 4);
+    off += 8;
+    const chunk = data.subarray(off, off + len);
+    off += len;
+    if (type === 0x4e4f534a) json = JSON.parse(chunk.toString('utf-8').trim());
+    else if (type === 0x004e4942) bin = Buffer.from(chunk);
+  }
+  return { nodes: [], meshes: [], accessors: [], bufferViews: [], scenes: [], ...json, bin } as FullGlb;
+}
+
+type V3 = [number, number, number];
+type M4 = number[];
+
+function trs(t?: number[], q?: number[], s?: number[]): M4 {
+  const [tx, ty, tz] = t ?? [0, 0, 0];
+  const [x, y, z, w] = q ?? [0, 0, 0, 1];
+  const [sx, sy, sz] = s ?? [1, 1, 1];
+  const x2 = x + x, y2 = y + y, z2 = z + z;
+  const xx = x * x2, xy = x * y2, xz = x * z2, yy = y * y2, yz = y * z2, zz = z * z2;
+  const wx = w * x2, wy = w * y2, wz = w * z2;
+  return [(1 - (yy + zz)) * sx, (xy - wz) * sy, (xz + wy) * sz, tx, (xy + wz) * sx, (1 - (xx + zz)) * sy, (yz - wx) * sz, ty, (xz - wy) * sx, (yz + wx) * sy, (1 - (xx + yy)) * sz, tz, 0, 0, 0, 1];
+}
+
+function nodeMatrix(n: Record<string, unknown>): M4 {
+  const m = n.matrix as number[] | undefined;
+  if (m) return [m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]];
+  return trs(n.translation as number[], n.rotation as number[], n.scale as number[]);
+}
+
+function mul(a: M4, b: M4): M4 {
+  const o = new Array(16).fill(0) as M4;
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) for (let k = 0; k < 4; k++) o[r * 4 + c] += a[r * 4 + k] * b[k * 4 + c];
+  return o;
+}
+
+function applyPoint(m: M4, v: V3): V3 {
+  return [m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3], m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7], m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11]];
+}
+
+/** World-space bbox over the scene graph, buffer-decoding POSITION min/max. */
+function worldBboxFromGlb(glbPath: string): { min: V3; max: V3 } {
+  const g = readFullGlb(glbPath);
+  const wmin: V3 = [Infinity, Infinity, Infinity];
+  const wmax: V3 = [-Infinity, -Infinity, -Infinity];
+  const accMinMax = (idx: number): { min: V3; max: V3 } | null => {
+    const a = g.accessors[idx];
+    if (!a) return null;
+    if (a.min && a.max) return { min: a.min.slice(0, 3) as V3, max: a.max.slice(0, 3) as V3 };
+    const bv = a.bufferView !== undefined ? g.bufferViews[a.bufferView] : undefined;
+    if (!bv) return null;
+    const comp = COMPONENT_BYTES[a.componentType ?? 5126] ?? 4;
+    const nc = TYPE_COMPONENTS[a.type ?? 'VEC3'] ?? 3;
+    const stride = bv.byteStride ?? comp * nc;
+    const base = (bv.byteOffset ?? 0) + (a.byteOffset ?? 0);
+    const min: V3 = [Infinity, Infinity, Infinity];
+    const max: V3 = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < (a.count ?? 0); i++) {
+      const o = base + i * stride;
+      for (let c = 0; c < 3; c++) {
+        const v = g.bin.readFloatLE(o + c * 4);
+        if (v < min[c]) min[c] = v;
+        if (v > max[c]) max[c] = v;
+      }
+    }
+    return Number.isFinite(min[0]) ? { min, max } : null;
+  };
+  const recur = (idx: number, parent: M4): void => {
+    const n = g.nodes[idx];
+    if (!n) return;
+    const m = mul(parent, nodeMatrix(n));
+    if (n.mesh !== undefined) {
+      for (const p of g.meshes[n.mesh as number]?.primitives ?? []) {
+        const pos = p.attributes?.POSITION;
+        if (pos === undefined) continue;
+        const mm = accMinMax(pos);
+        if (!mm) continue;
+        for (let xi = 0; xi < 2; xi++) for (let yi = 0; yi < 2; yi++) for (let zi = 0; zi < 2; zi++) {
+          const w = applyPoint(m, [xi ? mm.max[0] : mm.min[0], yi ? mm.max[1] : mm.min[1], zi ? mm.max[2] : mm.min[2]]);
+          for (let c = 0; c < 3; c++) {
+            if (w[c] < wmin[c]) wmin[c] = w[c];
+            if (w[c] > wmax[c]) wmax[c] = w[c];
+          }
+        }
+      }
+    }
+    for (const c of (n.children as number[] | undefined) ?? []) recur(c, m);
+  };
+  for (const r of g.scenes[g.scene ?? 0]?.nodes ?? []) recur(r, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+  return { min: wmin, max: wmax };
 }
 
 /** Count indexed vs non-indexed primitives by reading the GLB JSON chunk. */
@@ -249,6 +372,108 @@ describe('imported GLBs use tightly-packed (de-interleaved) attribute storage', 
   it('de-interleaves the weapons whose mixed storage threw the gpuType merge error', () => {
     for (const path of [WeaponModels.M16A1, WeaponModels.AK47, WeaponModels.M60]) {
       expect(interleavedAttributeAccessors(join(MODELS_ROOT, path))).toBe(0);
+    }
+  });
+});
+
+describe('axis normalization does not double-rotate a pre-yawed source', () => {
+  // Some sources ship with the class normalization yaw already hand-baked into
+  // their single scene root ("whole tent yawed -90deg ... matching old TIJ asset
+  // orientation"). normalizeAxis then wrapped that root under another copy of the
+  // same yaw, so the model rendered net-180deg-rotated (ridge crosswise, entrance
+  // reversed) — the aid-station / command-tent "corruption" the owner playtest
+  // hit. The importer now cancels the redundant baked yaw before wrapping, so a
+  // pre-yawed source ends up identical to an un-yawed one. This guards that class.
+
+  function buildSource(rootRotation?: number[]): GlbJson {
+    return {
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+      nodes: [{ name: 'Tent', ...(rootRotation ? { rotation: rootRotation } : {}), children: [1] }, { name: 'Mesh_Body', mesh: 0 }],
+    } as unknown as GlbJson;
+  }
+
+  function appliedRotations(json: GlbJson): number[][] {
+    const out: number[][] = [];
+    for (const n of json.nodes ?? []) if (n.rotation) out.push(n.rotation);
+    return out;
+  }
+
+  it('cancels a baked root yaw equal to the class normalization (single net rotation)', () => {
+    const { quat } = classForward('structures');
+    const json = buildSource([...Z_YAW]);
+    const stripped = stripRedundantRootYaw(json, quat);
+    normalizeAxis(json, quat, 'test');
+    expect(stripped).toBe(true);
+    // Exactly one rotating node (the wrapper) — the baked root yaw was removed,
+    // so the two -90deg yaws don't stack into a 180deg flip.
+    expect(appliedRotations(json)).toEqual([[...Z_YAW]]);
+  });
+
+  it('leaves an un-yawed source untouched (only the wrapper rotates)', () => {
+    const { quat } = classForward('structures');
+    const json = buildSource(); // no baked root rotation (e.g. barracks-tent)
+    const stripped = stripRedundantRootYaw(json, quat);
+    normalizeAxis(json, quat, 'test');
+    expect(stripped).toBe(false);
+    expect(appliedRotations(json)).toEqual([[...Z_YAW]]);
+  });
+
+  it('does not strip a baked root rotation that is NOT the normalization yaw', () => {
+    const { quat } = classForward('structures');
+    const tilt = [0.1, 0, 0, 0.995];
+    const json = buildSource([...tilt]);
+    expect(stripRedundantRootYaw(json, quat)).toBe(false);
+    expect(json.nodes?.[0].rotation).toEqual(tilt);
+  });
+});
+
+describe('corrupted structures re-imported with a single, correct normalization', () => {
+  // The 2026-06-28 owner playtest flagged aid-station + barracks-tent as reading
+  // corrupted in-world. Root cause for aid-station was the double-yaw above; the
+  // re-import puts its ridge back along Z (+Z forward) with both roof halves.
+  // barracks-tent's source carries no baked yaw, so it was already correct — this
+  // pins that it stays correct.
+
+  function readStructure(slug: string): { json: GlbJsonChunk; roots: number[]; root: GlbNode } {
+    const path = warAssetCatalog[slug].path;
+    const json = readGlbJson(join(MODELS_ROOT, path));
+    const roots = json.scenes?.[json.scene ?? 0]?.nodes ?? [];
+    return { json, roots, root: json.nodes?.[roots[0]] ?? {} };
+  }
+
+  it.each(['aid-station', 'barracks-tent'])(
+    '%s has a single axis-normalize wrapper with no redundant double-yaw underneath',
+    (slug) => {
+      const { roots, root, json } = readStructure(slug);
+      expect(roots).toHaveLength(1);
+      expect(root.name).toBe('TIJ_AxisNormalize');
+      // The original model root sits directly under the wrapper and must NOT carry
+      // its own copy of the class yaw (that is the double-transform bug). If it
+      // did, stripRedundantRootYaw would find it removable.
+      const childIdx = root.children?.[0] ?? -1;
+      const probe = { scene: 0, scenes: [{ nodes: [childIdx] }], nodes: json.nodes } as unknown as GlbJson;
+      expect(stripRedundantRootYaw(probe, Z_YAW), `${slug} model root carries a redundant class yaw`).toBe(false);
+    },
+  );
+
+  it('keeps both aid-station roof halves (the "missing left roof" symptom was a mis-rotation)', () => {
+    const { json } = readStructure('aid-station');
+    const names = (json.nodes ?? []).map((n) => n.name);
+    expect(names).toContain('Mesh_RoofLeftMesh');
+    expect(names).toContain('Mesh_RoofRightMesh');
+  });
+
+  it('orients both tents +Z-forward (ridge along the long on-disk Z axis)', () => {
+    for (const slug of ['aid-station', 'barracks-tent']) {
+      expect(warAssetCatalog[slug].forward).toBe('pos-z');
+      // Measure the real on-disk geometry (not the catalog metadata): the world
+      // bbox after the single normalization wrap must be Z-long. Pre-fix the
+      // aid-station was X-long, contradicting its pos-z forward — the corruption.
+      const b = worldBboxFromGlb(join(MODELS_ROOT, warAssetCatalog[slug].path));
+      const dx = b.max[0] - b.min[0];
+      const dz = b.max[2] - b.min[2];
+      expect(dz, `${slug} should be Z-long (dz ${dz} > dx ${dx})`).toBeGreaterThan(dx);
     }
   });
 });
