@@ -173,7 +173,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // The growth is per-weapon plumbing, not god-module drift; the natural split
   // target is to extract the per-weapon spec/core registry out of the manager.
   // In-cycle ratchet admission, no CARRY_OVERS row (sanctioned by the brief).
-  'src/systems/player/weapon/WeaponRigManager.ts': { round: 'P3R3', reason: 'extract the per-weapon spec/core/rig registry out of the manager; +36 LOC for the SKS semi-auto runtime weapon type (sks-rifle-wiring, 2026-06-28)', loc: 735, methods: 29 },
+  // Snapshot raised 735 → 740 (weapon-stats-panel, 2026-06-28): the per-weapon
+  // spec literals moved out of the constructor into a module-level WEAPON_SPECS
+  // table (single source of truth) plus a small static `getWeaponSpec` accessor
+  // the deploy armory reads, so spec values are never duplicated into the UI.
+  // Net +5 LOC. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by the
+  // brief). This is the registry-extraction the split target above called for.
+  'src/systems/player/weapon/WeaponRigManager.ts': { round: 'P3R3', reason: 'extract the per-weapon spec/core/rig registry out of the manager; +36 LOC for the SKS semi-auto runtime weapon type (sks-rifle-wiring, 2026-06-28); +5 LOC module-level WEAPON_SPECS table + static getWeaponSpec accessor (weapon-stats-panel, 2026-06-28)', loc: 740, methods: 30 },
   'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy; +3 LOC route-corridor-exclusion: merge route veg-exclusion corridors into vegetationExclusionZones', loc: 767, methods: 0 },
   'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles; +10 LOC task/veg-glb-hero-scatter r185 WebGPU terrain-render restore', loc: 1192, methods: 0 },
   // Snapshot raised 898 → 904 / 69 → 75 (ashau-load-freeze, 2026-06-10): six
@@ -190,7 +196,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // `lint:budget`): grew during the 2026-06-03 deploy-loadout cycle (UX-3
   // faction-availability chips + the selectable-ammo 4th loadout slot).
   // Not relicense-related; queued for a presentation/loadout-panel split.
-  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade', loc: 1038, methods: 68 },
+  // Snapshot raised 1038 → 1118 LOC / 68 → 75 methods (weapon-stats-panel,
+  // 2026-06-28): the armory now surfaces a compact weapon-stats readout
+  // (rpm / damage near→far / falloff / recoil / ADS) for the focused weapon,
+  // built from the shared WeaponRigManager spec table and updated on cycle /
+  // chip select. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by
+  // the brief). The loadout/presentation split target above is unchanged.
+  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28)', loc: 1118, methods: 75 },
   'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff', loc: 355, methods: 62 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as

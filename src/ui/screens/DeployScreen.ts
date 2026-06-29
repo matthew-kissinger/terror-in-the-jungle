@@ -31,6 +31,8 @@ import {
   type VehicleDeployOption,
 } from '../loadout/LoadoutTypes';
 import { icon } from '../icons/IconRegistry';
+import { WeaponRigManager } from '../../systems/player/weapon/WeaponRigManager';
+import type { WeaponSpec } from '../../systems/weapons/GunplayCore';
 import styles from './DeployScreen.module.css';
 import { ArmoryCharacterPreview } from './deploy/ArmoryCharacterPreview';
 import {
@@ -78,6 +80,9 @@ export class DeployScreen extends UIComponent {
   private mapPanel?: HTMLDivElement;
   private armoryPreviewPanel?: HTMLDivElement;
   private armoryCharacterPreview?: ArmoryCharacterPreview;
+  private weaponStatsList?: HTMLDivElement;
+  private weaponStatsName?: HTMLDivElement;
+  private readonly weaponStatRows = new Map<string, HTMLSpanElement>();
   private insertionSideView?: HTMLDivElement;
   private armorySideView?: HTMLDivElement;
   private insertionViewButton?: HTMLButtonElement;
@@ -581,7 +586,80 @@ export class DeployScreen extends UIComponent {
     board.appendChild(kit);
     panel.appendChild(header);
     panel.appendChild(board);
+    panel.appendChild(this.createWeaponStatsPanel());
     return panel;
+  }
+
+  /**
+   * Compact stats readout for the focused armory weapon. Reads the per-weapon
+   * `WeaponSpec` (rpm / damage near→far / falloff range / recoil / ADS time)
+   * from the shared spec table via `WeaponRigManager.getWeaponSpec` — the same
+   * table the runtime weapon cores are built from, so the numbers are never
+   * duplicated. Updated reactively whenever the focused weapon changes (cycle,
+   * chip strip, or loadout update). Read-only: no spec or balance is touched.
+   */
+  private createWeaponStatsPanel(): HTMLDivElement {
+    const panel = this.createDiv(styles.armoryWeaponStats, 'respawn-armory-weapon-stats');
+    const head = this.createDiv(styles.armoryWeaponStatsHead);
+    const title = this.createDiv(styles.armoryPreviewSlot);
+    title.textContent = 'Weapon Stats';
+    this.weaponStatsName = this.createDiv(styles.armoryWeaponStatsName, 'respawn-armory-weapon-stats-name');
+    this.weaponStatsName.textContent = '--';
+    head.appendChild(title);
+    head.appendChild(this.weaponStatsName);
+
+    const list = this.createDiv(styles.armoryWeaponStatsList);
+    this.weaponStatsList = list;
+    const rows: Array<{ key: string; label: string }> = [
+      { key: 'rpm', label: 'Rate of Fire' },
+      { key: 'damage', label: 'Damage (near→far)' },
+      { key: 'falloff', label: 'Falloff Range' },
+      { key: 'recoil', label: 'Recoil / Shot' },
+      { key: 'ads', label: 'ADS Time' },
+    ];
+    for (const { key, label } of rows) {
+      const row = this.createDiv(styles.armoryWeaponStatRow, `respawn-armory-stat-${key}`);
+      const labelEl = document.createElement('span');
+      labelEl.className = styles.armoryWeaponStatLabel;
+      labelEl.textContent = label;
+      const valueEl = document.createElement('span');
+      valueEl.className = styles.armoryWeaponStatValue;
+      valueEl.textContent = '--';
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      list.appendChild(row);
+      this.weaponStatRows.set(key, valueEl);
+    }
+
+    panel.appendChild(head);
+    panel.appendChild(list);
+    return panel;
+  }
+
+  /**
+   * Refresh the weapon-stats readout for a focused armory weapon. The
+   * `LoadoutWeapon` enum values are exactly the runtime weapon-type ids the
+   * spec table is keyed by, so the focused weapon maps straight to its spec.
+   */
+  private updateWeaponStats(weapon: LoadoutWeapon): void {
+    if (!this.weaponStatsName || this.weaponStatRows.size === 0) return;
+    const spec: WeaponSpec | undefined = WeaponRigManager.getWeaponSpec(
+      weapon as Parameters<typeof WeaponRigManager.getWeaponSpec>[0],
+    );
+    this.weaponStatsName.textContent = spec?.name ?? getWeaponLabel(weapon);
+    const setStat = (key: string, value: string): void => {
+      const el = this.weaponStatRows.get(key);
+      if (el) el.textContent = value;
+    };
+    if (!spec) {
+      for (const key of this.weaponStatRows.keys()) setStat(key, '--');
+      return;
+    }
+    setStat('rpm', `${Math.round(spec.rpm)} rpm`);
+    setStat('damage', `${Math.round(spec.damageNear)} → ${Math.round(spec.damageFar)}`);
+    setStat('falloff', `${Math.round(spec.falloffStart)}–${Math.round(spec.falloffEnd)} m`);
+    setStat('recoil', `${spec.recoilPerShotDeg.toFixed(2)}°`);
+    setStat('ads', `${spec.adsTime.toFixed(2)} s`);
   }
 
   private createArmoryPreviewItem(slot: ArmoryPreviewSlot, label: string): HTMLDivElement {
@@ -951,6 +1029,7 @@ export class DeployScreen extends UIComponent {
     if (!this.loadoutEditingEnabled) return;
     if (field === 'primaryWeapon' || field === 'secondaryWeapon') {
       this.armoryFocusWeapon = value as LoadoutWeapon;
+      this.updateWeaponStats(this.armoryFocusWeapon);
       if (this.currentLoadout) {
         this.armoryCharacterPreview?.setLoadout(
           this.currentLoadout,
@@ -973,6 +1052,7 @@ export class DeployScreen extends UIComponent {
   private updateArmoryCharacterPreview(): void {
     if (!this.currentLoadout) return;
     const focusWeapon = this.armoryFocusWeapon ?? this.currentLoadout.primaryWeapon;
+    this.updateWeaponStats(focusWeapon);
     this.armoryCharacterPreview?.setLoadout(
       this.currentLoadout,
       this.loadoutPresentation?.context.faction,

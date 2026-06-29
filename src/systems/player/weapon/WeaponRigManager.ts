@@ -34,6 +34,75 @@ type WeaponRigSlug =
 /** Runtime weapon-type identity (independent of the loadout enum). */
 type RuntimeWeaponType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman' | 'sks'
 
+/**
+ * Single source of truth for every selectable weapon's tuning: the runtime
+ * cores are built from this table and the deploy armory reads it via the static
+ * `WeaponRigManager.getWeaponSpec`, so spec values are never duplicated. Keys are
+ * the `RuntimeWeaponType` strings, which match the `LoadoutWeapon` enum values.
+ */
+const WEAPON_SPECS: Record<RuntimeWeaponType, WeaponSpec> = {
+  rifle: {
+    name: 'Rifle', rpm: 700, adsTime: 0.18,
+    baseSpreadDeg: 0.8, bloomPerShotDeg: 0.25,
+    recoilPerShotDeg: 0.65, recoilHorizontalDeg: 0.35,
+    damageNear: 34, damageFar: 24, falloffStart: 20, falloffEnd: 60,
+    headshotMultiplier: 1.7, penetrationPower: 1
+  },
+  shotgun: {
+    name: 'Shotgun', rpm: 75, adsTime: 0.22,
+    baseSpreadDeg: 2.5, bloomPerShotDeg: 1.0,
+    recoilPerShotDeg: 2.5, recoilHorizontalDeg: 0.8,
+    damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25,
+    headshotMultiplier: 1.5, penetrationPower: 0.5,
+    pelletCount: 10, pelletSpreadDeg: 8
+  },
+  smg: {
+    name: 'SMG', rpm: 900, adsTime: 0.15,
+    baseSpreadDeg: 1.2, bloomPerShotDeg: 0.15,
+    recoilPerShotDeg: 0.35, recoilHorizontalDeg: 0.25,
+    damageNear: 22, damageFar: 12, falloffStart: 15, falloffEnd: 40,
+    headshotMultiplier: 1.4, penetrationPower: 0.8
+  },
+  pistol: {
+    name: 'Pistol', rpm: 300, adsTime: 0.1,
+    baseSpreadDeg: 0.6, bloomPerShotDeg: 0.2,
+    recoilPerShotDeg: 0.5, recoilHorizontalDeg: 0.3,
+    damageNear: 25, damageFar: 15, falloffStart: 12, falloffEnd: 35,
+    headshotMultiplier: 1.6, penetrationPower: 0.7
+  },
+  lmg: {
+    name: 'LMG', rpm: 550, adsTime: 0.3,
+    baseSpreadDeg: 1.5, bloomPerShotDeg: 0.12,
+    recoilPerShotDeg: 0.8, recoilHorizontalDeg: 0.5,
+    damageNear: 38, damageFar: 28, falloffStart: 25, falloffEnd: 80,
+    headshotMultiplier: 1.5, penetrationPower: 1.2
+  },
+  launcher: {
+    name: 'Grenade Launcher', rpm: 30, adsTime: 0.25,
+    baseSpreadDeg: 0.5, bloomPerShotDeg: 0,
+    recoilPerShotDeg: 3.0, recoilHorizontalDeg: 0.5,
+    damageNear: 0, damageFar: 0, falloffStart: 0, falloffEnd: 0,
+    headshotMultiplier: 1.0, penetrationPower: 0
+  },
+  // Marksman (Dragunov SVD): precise slow-cadence DMR (low rpm, high
+  // range-carrying damage, tight resting spread). SKS: semi-auto OPFOR carbine
+  // tuned BETWEEN the AK rifle and the marksman DMR so it reads as distinct.
+  marksman: {
+    name: 'Marksman Rifle', rpm: 80, adsTime: 0.28,
+    baseSpreadDeg: 0.18, bloomPerShotDeg: 0.08,
+    recoilPerShotDeg: 1.4, recoilHorizontalDeg: 0.25,
+    damageNear: 75, damageFar: 55, falloffStart: 40, falloffEnd: 120,
+    headshotMultiplier: 2.2, penetrationPower: 1.5
+  },
+  sks: {
+    name: 'SKS Carbine', rpm: 200, adsTime: 0.2,
+    baseSpreadDeg: 0.45, bloomPerShotDeg: 0.15,
+    recoilPerShotDeg: 0.95, recoilHorizontalDeg: 0.3,
+    damageNear: 45, damageFar: 32, falloffStart: 30, falloffEnd: 90,
+    headshotMultiplier: 1.9, penetrationPower: 1.1
+  },
+}
+
 interface WeaponRigArtEntry {
   model: string
   slug: WeaponRigSlug
@@ -126,90 +195,26 @@ export class WeaponRigManager {
   constructor(weaponScene: THREE.Scene) {
     this.weaponScene = weaponScene
 
-    // Initialize weapon specs
-    const rifleSpec: WeaponSpec = {
-      name: 'Rifle', rpm: 700, adsTime: 0.18,
-      baseSpreadDeg: 0.8, bloomPerShotDeg: 0.25,
-      recoilPerShotDeg: 0.65, recoilHorizontalDeg: 0.35,
-      damageNear: 34, damageFar: 24, falloffStart: 20, falloffEnd: 60,
-      headshotMultiplier: 1.7, penetrationPower: 1
-    }
-
-    const shotgunSpec: WeaponSpec = {
-      name: 'Shotgun', rpm: 75, adsTime: 0.22,
-      baseSpreadDeg: 2.5, bloomPerShotDeg: 1.0,
-      recoilPerShotDeg: 2.5, recoilHorizontalDeg: 0.8,
-      damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25,
-      headshotMultiplier: 1.5, penetrationPower: 0.5,
-      pelletCount: 10, pelletSpreadDeg: 8
-    }
-
-    const smgSpec: WeaponSpec = {
-      name: 'SMG', rpm: 900, adsTime: 0.15,
-      baseSpreadDeg: 1.2, bloomPerShotDeg: 0.15,
-      recoilPerShotDeg: 0.35, recoilHorizontalDeg: 0.25,
-      damageNear: 22, damageFar: 12, falloffStart: 15, falloffEnd: 40,
-      headshotMultiplier: 1.4, penetrationPower: 0.8
-    }
-
-    const pistolSpec: WeaponSpec = {
-      name: 'Pistol', rpm: 300, adsTime: 0.1,
-      baseSpreadDeg: 0.6, bloomPerShotDeg: 0.2,
-      recoilPerShotDeg: 0.5, recoilHorizontalDeg: 0.3,
-      damageNear: 25, damageFar: 15, falloffStart: 12, falloffEnd: 35,
-      headshotMultiplier: 1.6, penetrationPower: 0.7
-    }
-
-    const lmgSpec: WeaponSpec = {
-      name: 'LMG', rpm: 550, adsTime: 0.3,
-      baseSpreadDeg: 1.5, bloomPerShotDeg: 0.12,
-      recoilPerShotDeg: 0.8, recoilHorizontalDeg: 0.5,
-      damageNear: 38, damageFar: 28, falloffStart: 25, falloffEnd: 80,
-      headshotMultiplier: 1.5, penetrationPower: 1.2
-    }
-
-    const launcherSpec: WeaponSpec = {
-      name: 'Grenade Launcher', rpm: 30, adsTime: 0.25,
-      baseSpreadDeg: 0.5, bloomPerShotDeg: 0,
-      recoilPerShotDeg: 3.0, recoilHorizontalDeg: 0.5,
-      damageNear: 0, damageFar: 0, falloffStart: 0, falloffEnd: 0,
-      headshotMultiplier: 1.0, penetrationPower: 0
-    }
-
-    // Marksman (Dragunov SVD): precise, slow-cadence DMR. Far lower rpm than the
-    // assault rifle (semi-auto feel via cadence), higher range-carrying damage,
-    // and very tight resting spread/bloom so aimed shots land where it points.
-    const marksmanSpec: WeaponSpec = {
-      name: 'Marksman Rifle', rpm: 80, adsTime: 0.28,
-      baseSpreadDeg: 0.18, bloomPerShotDeg: 0.08,
-      recoilPerShotDeg: 1.4, recoilHorizontalDeg: 0.25,
-      damageNear: 75, damageFar: 55, falloffStart: 40, falloffEnd: 120,
-      headshotMultiplier: 2.2, penetrationPower: 1.5
-    }
-
-    // SKS carbine: semi-auto OPFOR rifle. Cadence sits BETWEEN the full-auto AK
-    // assault rifle and the slow-bolt marksman DMR — a capped rpm conveys the
-    // semi-auto trigger-finger feel (no separate fire-control system). Damage,
-    // spread, and recoil all sit between the rifle and the marksman so it reads
-    // as a distinct mid-range aimed-fire option rather than a clone of either.
-    const sksSpec: WeaponSpec = {
-      name: 'SKS Carbine', rpm: 200, adsTime: 0.2,
-      baseSpreadDeg: 0.45, bloomPerShotDeg: 0.15,
-      recoilPerShotDeg: 0.95, recoilHorizontalDeg: 0.3,
-      damageNear: 45, damageFar: 32, falloffStart: 30, falloffEnd: 90,
-      headshotMultiplier: 1.9, penetrationPower: 1.1
-    }
-
-    // Initialize all weapon cores
-    this.rifleCore = new GunplayCore(rifleSpec)
-    this.shotgunCore = new GunplayCore(shotgunSpec)
-    this.smgCore = new GunplayCore(smgSpec)
-    this.pistolCore = new GunplayCore(pistolSpec)
-    this.lmgCore = new GunplayCore(lmgSpec)
-    this.launcherCore = new GunplayCore(launcherSpec)
-    this.marksmanCore = new GunplayCore(marksmanSpec)
-    this.sksCore = new GunplayCore(sksSpec)
+    // Build all weapon cores from the shared WEAPON_SPECS table (single source).
+    this.rifleCore = new GunplayCore(WEAPON_SPECS.rifle)
+    this.shotgunCore = new GunplayCore(WEAPON_SPECS.shotgun)
+    this.smgCore = new GunplayCore(WEAPON_SPECS.smg)
+    this.pistolCore = new GunplayCore(WEAPON_SPECS.pistol)
+    this.lmgCore = new GunplayCore(WEAPON_SPECS.lmg)
+    this.launcherCore = new GunplayCore(WEAPON_SPECS.launcher)
+    this.marksmanCore = new GunplayCore(WEAPON_SPECS.marksman)
+    this.sksCore = new GunplayCore(WEAPON_SPECS.sks)
     this.gunCore = this.rifleCore // Start with rifle
+  }
+
+  /**
+   * Read-only access to a weapon's tuning spec by runtime type id (which matches
+   * the `LoadoutWeapon` enum value). Returns the shared table entry so callers
+   * (e.g. the deploy armory stats readout) never duplicate spec values. Static
+   * because the deploy UI has no weapon scene to construct a full rig manager.
+   */
+  static getWeaponSpec(weaponType: RuntimeWeaponType): WeaponSpec {
+    return WEAPON_SPECS[weaponType]
   }
 
   async init(): Promise<void> {

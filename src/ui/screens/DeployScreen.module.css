@@ -605,6 +605,57 @@
   white-space: nowrap;
 }
 
+.armoryWeaponStats {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--paper-edge);
+}
+
+.armoryWeaponStatsHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.armoryWeaponStatsName {
+  overflow: hidden;
+  color: var(--green-dk);
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.armoryWeaponStatsList {
+  display: grid;
+  gap: 2px;
+}
+
+.armoryWeaponStatRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 2px 0;
+}
+
+.armoryWeaponStatLabel {
+  color: var(--ink-faint);
+  font-size: var(--font-size-2xs);
+  text-transform: uppercase;
+}
+
+.armoryWeaponStatValue {
+  color: var(--ink);
+  font-family: var(--type-stamp);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .presetMeta {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
