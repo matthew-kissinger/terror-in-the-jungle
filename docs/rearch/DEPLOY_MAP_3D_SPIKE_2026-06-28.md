@@ -6,7 +6,8 @@ campaign.** The committed code for Phase 5 is the 2D `deploy-map-navigation`
 overhaul; this memo gives the owner and a future cycle something concrete to
 act on.
 
-Brief: [../tasks/deploy-map-3d-spike.md](../tasks/deploy-map-3d-spike.md).
+Brief: [../tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/deploy-map-3d-spike.md](../tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/deploy-map-3d-spike.md)
+(archived at cycle close).
 Campaign: [../CAMPAIGN_2026-06-28-field-readiness.md](../CAMPAIGN_2026-06-28-field-readiness.md) (Phase 5).
 
 ## What "fast 3D deploy map" means here

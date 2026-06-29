@@ -288,11 +288,12 @@ outcomes the war systems already produce. It cannot fabricate strategic effects.
 offer, event-driven clear, score-popup reward scaled by `ticketBleedRate`
 band.** Concretely the MVP is:
 
-1. `TaskingDirector` system (`src/systems/strategy/TaskingDirector.ts`) —
+1. `TaskingDirector` system (`src/systems/missions/TaskingDirector.ts` — its own
+   opt-in module surface per the manifest; modeled on `StrategicFeedback`) —
    throttled candidate derivation for archetypes A + B, the one-task/one-offer
    state machine, event subscription for clear/complete, reward dispatch.
    (~180–230 LOC.)
-2. A small HUD task-card element (`src/ui/hud/TaskCard.ts` or folded into the
+2. A small HUD task-card element (`src/ui/hud/HudTaskCard.ts` or folded into the
    objectives column) — render offer/active/complete/failed states; accept and
    dismiss affordances. (~110–150 LOC.)
 3. Wiring: construction in `SystemInitializer`, registry entry, setter injection,
