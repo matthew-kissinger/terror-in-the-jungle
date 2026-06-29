@@ -273,6 +273,7 @@ export class TerrainVegetationRuntime {
   setExclusionZones(zones: TerrainExclusionZone[]): void {
     this.vegetationScatterer.setExclusionZones(zones);
     this.jungleGroundRing.setExclusionZones(zones);
+    this.glbHeroScatterer?.setExclusionZones(zones);
     this.groundCardScatterer?.setExclusionZones(zones);
   }
 

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { StaticImpostorArchetype } from '../../config/staticImpostorArchetypes';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
+import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 import { classifyBiome, computeSlopeDeg } from './BiomeClassifier';
 
 /**
@@ -96,6 +97,7 @@ export class GLBHeroScatterer {
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
   private biomePalettes = new Map<string, BiomeVegetationEntry[]>();
+  private exclusionZones: Array<{ x: number; z: number; radiusSq: number }> = [];
 
   private worldHalfExtent = Infinity;
   private visualMargin = 200;
@@ -129,6 +131,19 @@ export class GLBHeroScatterer {
     this.defaultBiomeId = defaultBiomeId;
     this.biomePalettes = new Map(biomePalettes);
     this.biomeRules = biomeRules.slice();
+  }
+
+  /**
+   * POI exclusion zones (runways, bases, structures). Heroes share ONE exclusion
+   * contract with the ground-card scatterer: same data source, same gate. Zones
+   * are stored as squared radii so the placement-time test is a cheap dot product.
+   */
+  setExclusionZones(zones: TerrainExclusionZone[]): void {
+    this.exclusionZones = zones.map((zone) => ({
+      x: zone.x,
+      z: zone.z,
+      radiusSq: zone.radius * zone.radius,
+    }));
   }
 
   /** Whether any configured palette places at least one hero archetype. */
@@ -394,6 +409,7 @@ export class GLBHeroScatterer {
         if (h < 0) continue; // underwater
         const slope = computeSlopeDeg(worldX, worldZ, GLBHeroScatterer.SLOPE_SAMPLE_DIST_M, this.deps.getHeight);
         if (slope > GLBHeroScatterer.MAX_SLOPE_DEG) continue;
+        if (this.isExcluded(worldX, worldZ)) continue;
 
         const yawHash = hashInts(gx + cellX * 977, gz + cellZ * 977, salt ^ 0xA5A5);
         const yaw = (yawHash / 0xffffffff) * 360 * DEG2RAD;
@@ -411,6 +427,15 @@ export class GLBHeroScatterer {
         });
       }
     }
+  }
+
+  private isExcluded(worldX: number, worldZ: number): boolean {
+    for (const zone of this.exclusionZones) {
+      const dx = worldX - zone.x;
+      const dz = worldZ - zone.z;
+      if (dx * dx + dz * dz <= zone.radiusSq) return true;
+    }
+    return false;
   }
 }
 
