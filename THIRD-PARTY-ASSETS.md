@@ -140,6 +140,35 @@ loop). Full provenance in
   (source URL + author + license) here. The `SoundscapeDirector` is
   bed-agnostic — no code change needed.
 
+### Radio station music — THIRD-PARTY CC BY 4.0 (Kevin MacLeod, incompetech.com)
+
+Files: `public/assets/audio/music/{station-volatile-reaction,station-five-armies,station-ossuary-air}.ogg`.
+Added in `cycle-2026-06-29-radio-stations-music` to back the headless
+`RadioStationSystem` (the selectable radio stations that replaced the removed
+single music loop). Music is **default-OFF** and lazy-loaded only when the
+player tunes a station. Full per-track provenance in
+[`docs/asset-provenance/audio-2026-06/`](docs/asset-provenance/audio-2026-06/).
+
+These are **genuine third-party CC BY 4.0 tracks** by **Kevin MacLeod**
+(incompetech.com), fetched directly (no credentials) and re-encoded to Opus
+stereo ~80 kbps. **Attribution is REQUIRED** and must remain wherever the game
+credits assets:
+
+- "Volatile Reaction" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+- "Five Armies" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+- "Ossuary 6 - Air" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+
+Sourcing note: the campaign brief cited Bartmann CC0 drones / AFN CC-BY surf for
+the ambient station, but those sources are account/credential-bound and could not
+be fetched license-clean in the autonomous run. The ambient station ships
+"Ossuary 6 - Air" (CC BY 4.0) instead — same license posture, fully attributed,
+no invented provenance. The station catalog (`src/config/radioStations.ts`) is
+swap-friendly: replacing a track with a different license-clean clip needs no
+code change beyond that file plus an entry here.
+
 ## Note: "Pixel Forge" assets are FIRST-PARTY (not third-party)
 
 Models under `public/models/**/pixel-forge*/` and the imported aircraft GLBs are

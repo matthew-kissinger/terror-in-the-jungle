@@ -121,6 +121,22 @@ export class SettingsModal extends UIComponent {
               <label class="${styles.label}" for="setting-masterVolume">Master Volume <span data-ref="volumeLabel">70</span>%</label>
               <input type="range" id="setting-masterVolume" min="0" max="100" value="70" data-setting="masterVolume" class="${styles.range}">
             </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-ambientVolume">Ambient Volume <span data-ref="ambientVolumeLabel">100</span>%</label>
+              <input type="range" id="setting-ambientVolume" min="0" max="100" value="100" data-setting="ambientVolume" class="${styles.range}">
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.check}">
+                <input type="checkbox" data-setting="musicEnabled"> Radio Music
+              </label>
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-musicVolume">Music Volume <span data-ref="musicVolumeLabel">50</span>%</label>
+              <input type="range" id="setting-musicVolume" min="0" max="100" value="50" data-setting="musicVolume" class="${styles.range}">
+            </div>
           </fieldset>
 
           <fieldset class="${styles.fieldset}">
@@ -351,6 +367,38 @@ export class SettingsModal extends UIComponent {
         const val = Number(volumeSlider.value);
         if (volumeLabel) volumeLabel.textContent = String(val);
         settings.set('masterVolume', val);
+      });
+    }
+
+    const ambientVolumeSlider = this.$('[data-setting="ambientVolume"]') as HTMLInputElement | null;
+    const ambientVolumeLabel = this.$('[data-ref="ambientVolumeLabel"]');
+    if (ambientVolumeSlider) {
+      ambientVolumeSlider.value = String(current.ambientVolume);
+      if (ambientVolumeLabel) ambientVolumeLabel.textContent = String(current.ambientVolume);
+      this.listen(ambientVolumeSlider, 'input', () => {
+        const val = Number(ambientVolumeSlider.value);
+        if (ambientVolumeLabel) ambientVolumeLabel.textContent = String(val);
+        settings.set('ambientVolume', val);
+      });
+    }
+
+    const musicEnabledCheck = this.$('[data-setting="musicEnabled"]') as HTMLInputElement | null;
+    if (musicEnabledCheck) {
+      musicEnabledCheck.checked = current.musicEnabled;
+      this.listen(musicEnabledCheck, 'change', () => {
+        settings.set('musicEnabled', musicEnabledCheck.checked);
+      });
+    }
+
+    const musicVolumeSlider = this.$('[data-setting="musicVolume"]') as HTMLInputElement | null;
+    const musicVolumeLabel = this.$('[data-ref="musicVolumeLabel"]');
+    if (musicVolumeSlider) {
+      musicVolumeSlider.value = String(current.musicVolume);
+      if (musicVolumeLabel) musicVolumeLabel.textContent = String(current.musicVolume);
+      this.listen(musicVolumeSlider, 'input', () => {
+        const val = Number(musicVolumeSlider.value);
+        if (musicVolumeLabel) musicVolumeLabel.textContent = String(val);
+        settings.set('musicVolume', val);
       });
     }
 

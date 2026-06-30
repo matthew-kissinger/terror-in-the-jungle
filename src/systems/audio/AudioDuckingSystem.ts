@@ -31,11 +31,21 @@ export class AudioDuckingSystem {
   }
 
   /**
-   * Update ducking state and apply to ambient beds. Each bed's `gainBeforeDuck`
-   * is the gain the director wants it to hold (base * crossfade * master); the
-   * duck multiplier scales every bed uniformly, preserving the mix.
+   * Update ducking state and apply to ambient beds (and, when music is enabled,
+   * the active radio bed). Each bed's `gainBeforeDuck` is the gain its owner
+   * wants it to hold (base * crossfade * master); the duck multiplier scales
+   * every bed uniformly, preserving the mix.
+   *
+   * `musicBed` is the radio's active bed handle, passed ONLY while music is
+   * enabled (`RadioStationSystem.getActiveMusicBed()` returns `null` otherwise),
+   * so the music-duck path never runs when music is off — the duck is purely
+   * additive and gated entirely behind the `musicEnabled` flag at the call site.
    */
-  update(deltaTime: number, beds: SoundscapeBedHandle[]): void {
+  update(
+    deltaTime: number,
+    beds: SoundscapeBedHandle[],
+    musicBed?: SoundscapeBedHandle | null,
+  ): void {
     if (!this.hasCombatSound && !this.isDucking && this.duckingProgress === 0) {
       return;
     }
@@ -62,10 +72,13 @@ export class AudioDuckingSystem {
       this.duckingProgress = Math.max(0, this.duckingProgress - duckSpeed * deltaTime);
     }
 
-    // Apply ducking on top of each bed's director-supplied gain.
+    // Apply ducking on top of each bed's owner-supplied gain.
     const duckMultiplier = 1 - this.duckingProgress * this.DUCKING_AMOUNT;
     for (const bed of beds) {
       bed.sound.setVolume(bed.gainBeforeDuck * duckMultiplier);
+    }
+    if (musicBed) {
+      musicBed.sound.setVolume(musicBed.gainBeforeDuck * duckMultiplier);
     }
   }
 }

@@ -45,3 +45,55 @@ attribution (source URL + author + license) in `THIRD-PARTY-ASSETS.md`.
 
 The placeholders are deterministic-ish ffmpeg synthesis. See `generate-beds.sh`
 in this directory; it requires `ffmpeg` built with `libopus`.
+
+---
+
+# Radio station music — provenance (audio-2026-06)
+
+Cycle: `cycle-2026-06-29-radio-stations-music` (Phase 4 of the Cinematic Field
+Pass campaign). These tracks back the headless `RadioStationSystem` — the
+selectable radio stations that replaced the old (removed) single music loop.
+Music is **default-OFF** (especially on touch: no cellular auto-download); the
+tracks are lazy-loaded only when the player tunes to a station.
+
+## What shipped — genuine CC BY 4.0 tracks (Kevin MacLeod, incompetech.com)
+
+Three Opus stereo `.ogg` tracks under `public/assets/audio/music/`:
+
+| File | Station | Title / Author | License |
+|------|---------|----------------|---------|
+| `station-volatile-reaction.ogg` | Firebase (tense combat) | "Volatile Reaction" — Kevin MacLeod | **CC BY 4.0** |
+| `station-five-armies.ogg` | Thunder (martial score) | "Five Armies" — Kevin MacLeod | **CC BY 4.0** |
+| `station-ossuary-air.ogg` | Green Static (ambient drone) | "Ossuary 6 - Air" — Kevin MacLeod | **CC BY 4.0** |
+
+All are stereo, Opus ~80 kbps (within the 64-96 kbps band), 2.5-4 min.
+
+These are **real third-party CC-BY tracks**, not placeholders. They were fetched
+directly from `incompetech.com` (HTTP 200, no credentials) and re-encoded to
+Opus with ffmpeg/libopus (metadata stripped). incompetech music is published
+under "Creative Commons: By Attribution 4.0 License" — attribution is required
+and is recorded in `THIRD-PARTY-ASSETS.md` and the per-track `.provenance.json`
+files in this directory.
+
+### Required attribution (must remain in `THIRD-PARTY-ASSETS.md`)
+
+- "Volatile Reaction" by Kevin MacLeod (incompetech.com) — CC BY 4.0.
+- "Five Armies" by Kevin MacLeod (incompetech.com) — CC BY 4.0.
+- "Ossuary 6 - Air" by Kevin MacLeod (incompetech.com) — CC BY 4.0.
+
+License text: https://creativecommons.org/licenses/by/4.0/
+
+## Sourcing note — substitution for the ambient station
+
+The brief cited Bartmann CC0 drones and a hand-verified AFN CC-BY surf clip for
+the ambient/AFN stations. Those sources are account/credential-bound and could
+not be fetched license-clean in this autonomous run, so the ambient station ships
+Kevin MacLeod's "Ossuary 6 - Air" (CC BY 4.0) from incompetech instead — same
+license posture, fully attributed, no invented provenance. Swapping in a
+genuine CC0 drone later needs no code change beyond `src/config/radioStations.ts`.
+
+## Reproducing the station encode
+
+See `fetch-stations.sh` in this directory; it requires `curl` and `ffmpeg` built
+with `libopus`. It re-downloads the three incompetech MP3s and re-encodes them to
+the shipped Opus `.ogg` files.
