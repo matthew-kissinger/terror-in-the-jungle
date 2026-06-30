@@ -4,23 +4,38 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { SOUND_CONFIGS, SoundConfig } from '../../config/audio';
+import { SOUNDSCAPE_CONFIG, soundscapeBedKeys } from '../../config/soundscape';
+import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { AudioPoolManager } from './AudioPoolManager';
 import { AudioDuckingSystem } from './AudioDuckingSystem';
-import { AmbientSoundManager } from './AmbientSoundManager';
+import { SoundscapeDirector } from './SoundscapeDirector';
+import { RadioStationSystem } from './RadioStationSystem';
 import { AudioWeaponSounds } from './AudioWeaponSounds';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import { Logger } from '../../utils/Logger';
 import { GameEventBus } from '../../core/GameEventBus';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 import { markStartup } from '../../core/StartupTelemetry';
 
+// The soundscape beds + one-shots are not in SOUND_CONFIGS; assemble a
+// combined config map so the loader can decode them alongside the SFX bank.
+const SOUNDSCAPE_SOUND_CONFIGS: Record<string, SoundConfig> = {
+  [SOUNDSCAPE_CONFIG.dayBed.key]: { path: SOUNDSCAPE_CONFIG.dayBed.path, loop: true },
+  [SOUNDSCAPE_CONFIG.nightBed.key]: { path: SOUNDSCAPE_CONFIG.nightBed.path, loop: true },
+  ...Object.fromEntries(
+    SOUNDSCAPE_CONFIG.oneShots.map((o) => [o.key, { path: o.path } as SoundConfig]),
+  ),
+};
+
 // Boot-critical sounds are awaited by `init()` so the ambient layer can
 // start the moment `startAmbient()` fires. Everything else (the SFX bank,
-// hit-feedback, etc.) decodes in the background so it does not block the
-// startup tail. Per `cycle-mobile-webgl2-fallback-fix` /
+// hit-feedback, one-shot wildlife, etc.) decodes in the background so it
+// does not block the startup tail. Per `cycle-mobile-webgl2-fallback-fix` /
 // `asset-audio-defer`: mobile-emulation startup spent ~31 s in
 // `systems.audio.{begin,end}` awaiting the full bank; deferring SFX
-// trims that tail below the playable-frame bracket.
-const BOOT_CRITICAL_SOUND_KEYS: ReadonlyArray<string> = ['jungle1', 'jungle2'];
+// trims that tail below the playable-frame bracket. The day/night beds are
+// the only soundscape assets needed before `startAmbient()` mixes.
+const BOOT_CRITICAL_SOUND_KEYS: ReadonlyArray<string> = soundscapeBedKeys();
 
 export class AudioManager implements GameSystem {
     private scene: THREE.Scene;
@@ -34,11 +49,16 @@ export class AudioManager implements GameSystem {
     // Extracted modules
     private poolManager: AudioPoolManager;
     private duckingSystem: AudioDuckingSystem;
-    private ambientManager: AmbientSoundManager;
+    private soundscape: SoundscapeDirector;
+    private radioStation: RadioStationSystem;
     private weaponSounds: AudioWeaponSounds;
 
-    // Sound configurations
-    private readonly soundConfigs: Record<string, SoundConfig> = SOUND_CONFIGS;
+    // Sound configurations: SFX bank + the soundscape beds/one-shots so the
+    // loader decodes the ambient layer alongside everything else.
+    private readonly soundConfigs: Record<string, SoundConfig> = {
+        ...SOUND_CONFIGS,
+        ...SOUNDSCAPE_SOUND_CONFIGS,
+    };
     private static loggedLoadFailures: Set<string> = new Set();
     private static loggedOptionalMissing: Set<string> = new Set();
     private hitFeedbackMissingLogged = false;
@@ -68,7 +88,15 @@ export class AudioManager implements GameSystem {
         // Initialize modules (will be fully set up after audio loads)
         this.poolManager = new AudioPoolManager(this.listener, this.scene, this.audioBuffers);
         this.duckingSystem = new AudioDuckingSystem();
-        this.ambientManager = new AmbientSoundManager(this.listener, this.audioBuffers);
+        this.soundscape = new SoundscapeDirector(this.listener, this.audioBuffers);
+        // Headless radio runs on its own music bus, default-OFF. It lazy-decodes
+        // a station track only once the player enables music and tunes in, so
+        // nothing is fetched at boot (esp. on touch — no cellular auto-download).
+        this.radioStation = new RadioStationSystem(
+            this.listener,
+            (path) => this.loadAudio('__radio__', path),
+            { isTouch: shouldUseTouchControls() },
+        );
         this.weaponSounds = new AudioWeaponSounds(this.scene, this.listener, this.poolManager, this.duckingSystem);
 
         // Resume AudioContext on first user interaction
@@ -132,7 +160,16 @@ export class AudioManager implements GameSystem {
 
     // Call this when the game actually starts
     public startAmbient(): void {
-        this.ambientManager.start();
+        this.soundscape.start();
+    }
+
+    /**
+     * Inject the read-only sky runtime so the soundscape crossfades the
+     * day/night beds by sun elevation. Optional: without it the soundscape
+     * degrades to a fixed day bed (sandbox / sun-pinned scenarios).
+     */
+    public setSkyRuntime(sky: ISkyRuntime | undefined): void {
+        this.soundscape.setSkyRuntime(sky);
     }
 
     /**
@@ -291,7 +328,33 @@ export class AudioManager implements GameSystem {
 
     // Set ambient volume
     setAmbientVolume(volume: number): void {
-        this.ambientManager.setVolume(volume);
+        this.soundscape.setVolume(volume);
+    }
+
+    /**
+     * Radio music controls. Concrete (NOT on the fenced `IAudioManager`): these
+     * are called only from concrete-`AudioManager`-typed sites (GameEngine
+     * settings + live-entry audio start) and the dial-tuner wire in
+     * SystemInitializer. Music is default-OFF — enabling it tunes to the
+     * selected station and starts the lazy decode.
+     */
+    setMusicEnabled(enabled: boolean): void {
+        this.radioStation.setEnabled(enabled);
+    }
+
+    // Set radio music volume (0..1)
+    setMusicVolume(volume: number): void {
+        this.radioStation.setMusicVolume(Math.max(0, Math.min(1, volume)));
+    }
+
+    /** Tune the radio to a station id (no-op fetch while music is disabled). */
+    tuneRadioStation(stationId: string): Promise<void> {
+        return this.radioStation.tuneTo(stationId);
+    }
+
+    /** The station id the dial should preselect (persisted or default). */
+    getSelectedRadioStationId(): string {
+        return this.radioStation.getSelectedStationId();
     }
 
     // Mute/unmute all sounds
@@ -359,8 +422,18 @@ export class AudioManager implements GameSystem {
     }
 
     update(deltaTime: number): void {
-        // Update audio ducking for combat emphasis
-        this.duckingSystem.update(deltaTime, this.ambientManager.getAmbientSounds());
+        // Advance the day/night crossfade + wildlife one-shots and the radio
+        // music crossfade, then apply combat ducking on top of the
+        // director-supplied bed gains plus the active radio bed (which is
+        // `null` whenever music is disabled, keeping the duck path off the
+        // table while music is off).
+        this.soundscape.update(deltaTime);
+        this.radioStation.update(deltaTime);
+        this.duckingSystem.update(
+            deltaTime,
+            this.soundscape.getActiveBeds(),
+            this.radioStation.getActiveMusicBed(),
+        );
         this.applyWorldBuilderAmbientFlag();
     }
 
@@ -370,7 +443,7 @@ export class AudioManager implements GameSystem {
         const shouldMute = Boolean(wb && wb.ambientAudioEnabled === false);
         if (shouldMute === this.worldBuilderAmbientMuted) return;
         this.worldBuilderAmbientMuted = shouldMute;
-        this.ambientManager.setVolume(shouldMute ? 0 : 1);
+        this.soundscape.setVolume(shouldMute ? 0 : 1);
     }
 
     /**
@@ -417,7 +490,8 @@ export class AudioManager implements GameSystem {
 
         // Dispose modules
         this.poolManager.dispose();
-        this.ambientManager.dispose();
+        this.soundscape.dispose();
+        this.radioStation.dispose();
 
         // Clear buffers
         this.audioBuffers.clear();

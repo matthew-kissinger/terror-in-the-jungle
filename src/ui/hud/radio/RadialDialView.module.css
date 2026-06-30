@@ -1,0 +1,90 @@
+/**
+ * RadialDialView — desktop SVG annular radio wheel.
+ * Centered modal overlay; inner ring = category, outer ring = options.
+ */
+
+.dial {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  z-index: 14;
+}
+
+.dial[data-visible="true"] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.dial::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.16), rgba(0, 0, 0, 0.5));
+}
+
+.wheel {
+  position: relative;
+  pointer-events: auto;
+  filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.45));
+}
+
+.svg {
+  display: block;
+}
+
+.sector {
+  cursor: pointer;
+}
+
+.sectorPath {
+  fill: rgba(43, 38, 32, 0.88);
+  stroke: rgba(231, 217, 186, 0.22);
+  stroke-width: 1.5;
+  transition: fill 120ms ease, stroke 120ms ease;
+}
+
+.sector:hover .sectorPath {
+  fill: rgba(58, 79, 42, 0.86);
+  stroke: rgba(168, 116, 42, 0.5);
+}
+
+.sectorPath.focused {
+  fill: rgba(58, 79, 42, 0.92);
+  stroke: rgba(79, 107, 58, 0.6);
+}
+
+.sectorPath.disabled {
+  fill: rgba(43, 38, 32, 0.55);
+  stroke: rgba(231, 217, 186, 0.12);
+  cursor: default;
+}
+
+.sectorLabel {
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  fill: rgba(231, 217, 186, 0.95);
+  pointer-events: none;
+  user-select: none;
+}
+
+.sectorPath.disabled + .sectorLabel,
+.sector:has(.disabled) .sectorLabel {
+  fill: rgba(168, 116, 42, 0.85);
+}
+
+.centerText {
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  fill: rgba(231, 217, 186, 0.95);
+  pointer-events: none;
+  user-select: none;
+}

@@ -10,7 +10,9 @@ export enum LoadoutWeapon {
   SMG = 'smg',
   PISTOL = 'pistol',
   LMG = 'lmg',
-  LAUNCHER = 'launcher'
+  LAUNCHER = 'launcher',
+  MARKSMAN = 'marksman',
+  SKS = 'sks'
 }
 
 export enum LoadoutEquipment {
@@ -76,6 +78,8 @@ const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> =
   { value: LoadoutWeapon.PISTOL, label: 'Pistol', shortLabel: 'PST' },
   { value: LoadoutWeapon.LMG, label: 'LMG', shortLabel: 'MG' },
   { value: LoadoutWeapon.LAUNCHER, label: 'Grenade Launcher', shortLabel: 'GL' },
+  { value: LoadoutWeapon.MARKSMAN, label: 'Marksman Rifle', shortLabel: 'DMR' },
+  { value: LoadoutWeapon.SKS, label: 'SKS Carbine', shortLabel: 'SKS' },
 ];
 
 const LOADOUT_EQUIPMENT_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutEquipment>> = [
@@ -207,6 +211,8 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.RIFLE,
       LoadoutWeapon.SMG,
       LoadoutWeapon.PISTOL,
+      LoadoutWeapon.MARKSMAN,
+      LoadoutWeapon.SKS,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -244,6 +250,26 @@ const LOADOUT_POOL_BY_FACTION: Record<
           equipment: LoadoutEquipment.MORTAR_KIT,
         },
       },
+      {
+        id: 'marksman',
+        name: 'Marksman',
+        description: 'Long-range Dragunov preset for picking off targets.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.MARKSMAN,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.SMOKE_GRENADE,
+        },
+      },
+      {
+        id: 'skirmisher',
+        name: 'Skirmisher',
+        description: 'Semi-auto SKS preset for steady mid-range fire.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.SKS,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.FRAG_GRENADE,
+        },
+      },
     ],
   },
   [Faction.VC]: {
@@ -251,6 +277,8 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.RIFLE,
       LoadoutWeapon.SHOTGUN,
       LoadoutWeapon.PISTOL,
+      LoadoutWeapon.MARKSMAN,
+      LoadoutWeapon.SKS,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -286,6 +314,26 @@ const LOADOUT_POOL_BY_FACTION: Record<
           primaryWeapon: LoadoutWeapon.RIFLE,
           secondaryWeapon: LoadoutWeapon.PISTOL,
           equipment: LoadoutEquipment.SANDBAG_KIT,
+        },
+      },
+      {
+        id: 'sharpshooter',
+        name: 'Sharpshooter',
+        description: 'Dragunov overwatch preset for covering ambush lanes.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.MARKSMAN,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.SMOKE_GRENADE,
+        },
+      },
+      {
+        id: 'rifleman_sks',
+        name: 'Rifleman (SKS)',
+        description: 'Semi-auto SKS preset for disciplined aimed fire.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.SKS,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.FRAG_GRENADE,
         },
       },
     ],
@@ -327,6 +375,27 @@ export function getAmmoLoadReserveFactor(load: AmmoLoad): number {
       return 1.5;
     case AmmoLoad.HEAVY:
       return 2.0;
+    case AmmoLoad.STANDARD:
+    default:
+      return 1.0;
+  }
+}
+
+/**
+ * Weapon-handling penalty multiplier for an ammo load. STANDARD is the baseline
+ * (1.0 -- no penalty); EXTENDED and HEAVY return a value > 1.0 that scales with
+ * the extra reserve they grant, so carrying more ammo costs handling speed. A
+ * caller multiplies a "time to do X" handling lever (e.g. ADS-transition time)
+ * by this factor: a larger factor = a slower, heavier-feeling action. This makes
+ * EXTENDED/HEAVY a genuine tradeoff rather than strictly better than STANDARD.
+ * Mirrors `getAmmoLoadReserveFactor` so the deploy UI / stats can read it later.
+ */
+export function getAmmoLoadHandlingFactor(load: AmmoLoad): number {
+  switch (load) {
+    case AmmoLoad.EXTENDED:
+      return 1.15;
+    case AmmoLoad.HEAVY:
+      return 1.3;
     case AmmoLoad.STANDARD:
     default:
       return 1.0;

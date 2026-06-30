@@ -11,6 +11,11 @@ import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
 import { HUDZoneDisplay } from './HUDZoneDisplay';
+import { HudControlHints } from './HudControlHints';
+import { HudSituationReadout } from './HudSituationReadout';
+import { HudTaskCard } from './HudTaskCard';
+import { Alliance, getAlliance } from '../../systems/combat/types';
+import { isTouchDevice } from '../../utils/DeviceDetector';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { movementStatsTracker } from '../../systems/player/MovementStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
@@ -56,6 +61,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private styles: HUDStyles;
   private elements: HUDElements;
   private zoneDisplay: HUDZoneDisplay;
+  private controlHints: HudControlHints;
+  private situationReadout: HudSituationReadout;
+  private taskCard: HudTaskCard;
+  private playerAlliance: Alliance = Alliance.BLUFOR;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
   private scoreboard: ScoreboardPanel;
@@ -80,6 +89,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.styles = HUDStyles.getInstance();
     this.elements = new HUDElements(camera);
     this.zoneDisplay = new HUDZoneDisplay(this.elements);
+    this.controlHints = new HudControlHints();
+    this.situationReadout = new HudSituationReadout();
+    this.taskCard = new HudTaskCard();
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.hudLayout = new HUDLayout();
@@ -152,6 +164,23 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.attachToDOM(this.hudLayout);
     this.scoreboard.mount(this.hudLayout.getRoot());
     this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
+    // Context-sensitive control legend in its dedicated right-rail grid slot; suppressed on touch.
+    this.controlHints.mount(this.hudLayout.getSlot('control-hints'), isTouchDevice());
+    // Situation readout (war posture + nearest contested objective + a direction
+    // nudge) shares the control-hint panel surface — mounted into the legend
+    // root so the two read as one right-edge panel and never collide with the
+    // health / ammo / scoreboard slots.
+    this.situationReadout.mount(this.controlHints.getRoot());
+
+    // Tasking-director card (tasking-director-mvp): a distinct, higher-emphasis
+    // element. Desktop homes it as a sibling atop the objectives slot ("your
+    // assignment" above "all objectives"); the objectives slot is display:none on
+    // touch, so there it lives under the MobileStatusBar (status-bar slot). The
+    // director owns the task logic; the card forwards rewards to the score popup.
+    this.taskCard.mount(this.hudLayout.getSlot(isTouchDevice() ? 'status-bar' : 'objectives'));
+    this.taskCard.setRewardDispatcher((type, points, multiplier) =>
+      this.spawnScorePopup(type, points, multiplier),
+    );
 
     // Initialize ticket display
     this.elements.ticketDisplay.setTickets(300, 300);
@@ -185,6 +214,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       if (this.ticketSystem) {
         this.updateGameStatus(this.ticketSystem);
       }
+      this.updateSituationReadout(isTDM);
       this.objectiveAccumulator = 0;
     }
 
@@ -263,6 +293,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     for (const unsub of this.eventUnsubscribes) unsub();
     this.eventUnsubscribes.length = 0;
     this.viewportUnsubscribe?.();
+    this.situationReadout.dispose();
+    this.taskCard.dispose();
+    this.controlHints.dispose();
     this.hudLayout.dispose();
     this.scoreboard.dispose();
     this.personalStatsPanel.dispose();
@@ -340,6 +373,12 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.spawnScorePopup(type, points, multiplier);
   }
 
+  /** The opt-in tasking-director card. The director drives it; the HUD owns its
+   *  DOM lifecycle and reward forwarding (tasking-director-mvp). */
+  getTaskCard(): HudTaskCard {
+    return this.taskCard;
+  }
+
   startMatch(): void {
     this.statsTracker.startMatch();
     movementStatsTracker.startMatch();
@@ -349,6 +388,32 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       scoreboardVisible: false,
     });
     Logger.info('hud', ' Match statistics tracking started');
+  }
+
+  /**
+   * Drive the situation readout from EXISTING zone + ticket + player state.
+   * Read-only: it pulls capturable zones off the zone query, ticket counts off
+   * the ticket system, and the player position off the camera — no new strategy
+   * computation, and no WarSimulator / zone-capture mutation. Runs on the same
+   * 2Hz objective tick as the zone display, so it adds no extra per-frame work.
+   * Hidden (null) in TDM or before zones/tickets exist.
+   */
+  private updateSituationReadout(isTDM: boolean): void {
+    if (isTDM || !this.zoneQuery || !this.ticketSystem || !this.camera) {
+      this.situationReadout.setSituation(null);
+      return;
+    }
+
+    const friendlyFaction = this.playerAlliance === Alliance.BLUFOR ? Faction.US : Faction.NVA;
+    const hostileFaction = this.playerAlliance === Alliance.BLUFOR ? Faction.NVA : Faction.US;
+    const snapshot = HudSituationReadout.buildSnapshot({
+      capturableZones: this.zoneQuery.getCapturableZones(),
+      friendlyTickets: this.ticketSystem.getTickets(friendlyFaction),
+      hostileTickets: this.ticketSystem.getTickets(hostileFaction),
+      playerAlliance: this.playerAlliance,
+      playerPosition: { x: this.camera.position.x, z: this.camera.position.z },
+    });
+    this.situationReadout.setSituation(snapshot);
   }
 
   private updateGameStatus(ticketSystem: TicketSystem): void {
@@ -456,6 +521,17 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.ticketDisplay.setFactionLabels(blufor, opfor);
   }
 
+  /**
+   * Set the player's alliance so faction-relative HUD readouts (the situation
+   * readout's friendly/hostile ticket split and nearest-objective ownership)
+   * read from the right side. Defaults to BLUFOR. Forwarded to the zone display
+   * so its tactical status colouring agrees with the readout.
+   */
+  setPlayerAlliance(faction: Faction): void {
+    this.playerAlliance = getAlliance(faction);
+    this.zoneDisplay.setPlayerAlliance(this.playerAlliance);
+  }
+
   setAudioManager(audioManager: AudioManager): void {
     this.personalStatsPanel.setAudioManager(audioManager);
   }
@@ -528,6 +604,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   showHelicopterInstruments(): void {
     this.elements.showHelicopterInstruments();
     this.hudLayout.setState({ actorMode: 'helicopter' });
+    this.controlHints.setContextForActor('helicopter');
   }
 
   hideHelicopterInstruments(): void {
@@ -536,6 +613,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       actorMode: 'infantry',
       vehicleContext: null,
     });
+    this.controlHints.setContextForActor('infantry');
   }
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
@@ -562,6 +640,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   showFixedWingInstruments(): void {
     this.elements.showFixedWingInstruments();
     this.hudLayout.setState({ actorMode: 'plane' });
+    this.controlHints.setContextForActor('plane');
   }
 
   hideFixedWingInstruments(): void {
@@ -570,6 +649,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       actorMode: 'infantry',
       vehicleContext: null,
     });
+    this.controlHints.setContextForActor('infantry');
   }
 
   updateFixedWingFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
@@ -618,6 +698,14 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string): void {
     this.elements.updateFixedWingAmmo(rounds, capacity, weaponName);
+  }
+
+  /**
+   * Flash the FixedWingHUD "Airborne to fire" hint. Polled by FixedWingModel
+   * when the player pulls the trigger on the ground (the gun no-ops there).
+   */
+  flashFixedWingAirborneHint(): void {
+    this.elements.flashFixedWingAirborneHint();
   }
 
   // Squad deploy prompt methods (IHUDSystem)
@@ -737,6 +825,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   /** Set the vehicle context (hides infantry-only slots in helicopter). */
   setVehicle(vehicle: ActorMode): void {
     this.hudLayout.setState({ actorMode: vehicle });
+    this.controlHints.setContextForActor(vehicle);
   }
 
   /** Set ADS state (dims non-essential HUD when aiming). */
@@ -765,10 +854,25 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   setVehicleContext(context: VehicleUIContext | null): void {
+    const actorMode: ActorMode = context?.kind ?? 'infantry';
     this.hudLayout.setState({
       vehicleContext: context,
-      actorMode: context?.kind ?? 'infantry',
+      actorMode,
     });
+    this.controlHints.setContextForActor(actorMode);
+    // Surface the seat label + F/LMB cues for multi-crew / armed craft, derived
+    // from the same context the HUD already receives (null when on foot or in a
+    // single-seat unarmed vehicle).
+    this.controlHints.setSeatHint(HudControlHints.seatHintFromContext(context));
+    // Fixed wing carries its seat / fire cue on the FixedWingHUD instrument
+    // stack: name the pilot seat, light LMB-fire when armed, and the AC-47
+    // broadside gun-cam note when the side view is available.
+    if (context?.kind === 'plane') {
+      this.elements.setFixedWingSeatFireCue(
+        context.capabilities.canFirePrimary,
+        context.viewToggle !== undefined,
+      );
+    }
   }
 
   isScoreboardCurrentlyVisible(): boolean {

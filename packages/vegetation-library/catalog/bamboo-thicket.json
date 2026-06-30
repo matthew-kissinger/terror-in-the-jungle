@@ -11,7 +11,7 @@
     "license": "CC-BY-4.0",
     "attributionRequired": true,
     "sourceTris": 37834,
-    "notes": "Ground-card variant of the bamboo-grove clump (free_bamboo_set, 3 culms re-clustered, 0.34 uniform scale -> ~14.3m). Reuses the normalized bamboo-grove GLB, baked to a front-view alpha card for DENSE high-density concealment placement; the hero bamboo-grove keeps its mesh+octa bands for sparse use. Distinct id so the GLBHeroScatterer (mesh+octa) and GroundCardScatterer (mesh+groundCard) never double-place the same clump. Credit in THIRD-PARTY-ASSETS.md."
+    "notes": "Ground-card variant of the original bamboo-grove clump (free_bamboo_set, 3 culms re-clustered, 0.34 uniform scale -> ~14.3m). Reuses the normalized 3-culm GLB, baked to a front-view alpha card for DENSE high-density concealment placement. The sparse bamboo-grove asset now uses a single-culm mesh + single-culm static impostor instead, so side views do not duplicate or collapse a multi-culm clump. Distinct id so dense thickets and sparse groves can be tuned independently. Credit in THIRD-PARTY-ASSETS.md."
   },
   "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
   "materialBuckets": [],
@@ -32,7 +32,7 @@
       "baseColorPath": "bamboo-thicket/card/atlas.base-color.png",
       "normalPath": "bamboo-thicket/card/atlas.normal.png",
       "worldSize": [13.06, 14.3],
-      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 0.4 }
+      "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1, "textureMb": 0.4 }
     }
   ],
   "lod": {
@@ -40,7 +40,7 @@
     "rationale": "Dense bamboo reads as vertical culms with alpha leaf fans up close (cheap instanced mesh, globally capped near-mesh tier), then flattens to a baked alpha card past ~35m so a high-density thicket costs one draw + one atlas instead of a GLB clone per clump.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 35, "representationId": "mesh-thicket", "budget": { "trisPerInstance": 9162, "drawCallsPerBatch": 4 } },
-      { "minDistanceMeters": 35, "maxDistanceMeters": 85, "representationId": "card-thicket", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 85m." }
+      { "minDistanceMeters": 35, "maxDistanceMeters": 85, "representationId": "card-thicket", "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced two-sided cross + hard-culled at 85m." }
     ]
   },
   "ecology": {

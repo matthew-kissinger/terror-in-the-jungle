@@ -32,7 +32,7 @@
       "baseColorPath": "taro-elephant-ear/card/atlas.base-color.png",
       "normalPath": "taro-elephant-ear/card/atlas.normal.png",
       "worldSize": [4.728, 2.369],
-      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.0 }
+      "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1, "textureMb": 1.0 }
     }
   ],
   "lod": {
@@ -40,7 +40,7 @@
     "rationale": "Large elephant-ear leaves are a distinct understory silhouette up close (real mesh), flattening to an alpha card past ~28m. Far band is a baked ground card; a 2.4m broadleaf clump does not warrant an impostor.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 28, "representationId": "mesh-taro", "budget": { "trisPerInstance": 2516, "drawCallsPerBatch": 2 } },
-      { "minDistanceMeters": 28, "maxDistanceMeters": 65, "representationId": "card-taro", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 65m." }
+      { "minDistanceMeters": 28, "maxDistanceMeters": 65, "representationId": "card-taro", "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced two-sided cross + hard-culled at 65m." }
     ]
   },
   "ecology": {

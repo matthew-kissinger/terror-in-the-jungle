@@ -331,6 +331,16 @@ export class GroundVehiclePhysics {
     return Math.sqrt(vx * vx + vz * vz);
   }
 
+  /**
+   * Approximate bumper-to-bumper chassis length in metres, estimated from the
+   * configured wheelbase (axle-to-axle plus typical front/rear overhang). Used
+   * by the follow camera to frame longer chassis (e.g. the M35 truck) from
+   * behind the body instead of from inside the bed.
+   */
+  getChassisLength(): number {
+    return this.cfg.wheelbase * 1.6;
+  }
+
   /** Forward-aligned signed speed (negative = reversing). */
   getForwardSpeed(): number {
     _forward.set(0, 0, -1).applyQuaternion(this.state.quaternion);

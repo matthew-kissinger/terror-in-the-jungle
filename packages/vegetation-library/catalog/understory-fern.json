@@ -32,7 +32,7 @@
       "baseColorPath": "understory-fern/card/atlas.base-color.png",
       "normalPath": "understory-fern/card/atlas.normal.png",
       "worldSize": [2.498, 0.688],
-      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 0.6 }
+      "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1, "textureMb": 0.6 }
     }
   ],
   "lod": {
@@ -40,7 +40,7 @@
     "rationale": "A low-lying fern reads as real fronds up close (single-material 1.1k mesh) but is indistinguishable from a single alpha card past ~14m, so the far band is a baked ground card. Culls before any impostor range.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 14, "representationId": "mesh-fern", "budget": { "trisPerInstance": 1152, "drawCallsPerBatch": 1 } },
-      { "minDistanceMeters": 14, "maxDistanceMeters": 40, "representationId": "card-fern", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 40m." }
+      { "minDistanceMeters": 14, "maxDistanceMeters": 40, "representationId": "card-fern", "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced two-sided cross + hard-culled at 40m." }
     ]
   },
   "ecology": {

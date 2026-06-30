@@ -47,6 +47,8 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { TrackedVehiclePhysics } from './TrackedVehiclePhysics';
+import { M48_PHYSICS_CONFIG } from '../../config/vehicles/m48-config';
+import { T54_PHYSICS_CONFIG } from '../../config/vehicles/t54-config';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // =============================================================================
@@ -469,6 +471,92 @@ describe('TrackedVehiclePhysics', () => {
       // makes much less (or negative) forward progress.
       expect(fwdWall).toBeLessThan(fwdGentle);
       expect(fwdWall).toBeLessThan(0.5);
+    });
+  });
+
+  // Climb-authority tuning from the 2026-06-28 owner playtest
+  // (tank-hill-authority): tanks bogged down and slid back on jungle hills
+  // they should crest. The fix raises the climbable ceiling + on-slope drive
+  // floor and lowers downhill gravity drag, applied identically to the M48
+  // (US) and T-54 (NVA). These tests pin the *behavior* — a steep grade that
+  // would previously stall now crests, and an unpowered chassis on that grade
+  // slides back only a bounded amount — not the specific tuning magnitudes.
+  describe('Hill-climb authority (M48 + T-54)', () => {
+    // ~0.675 rad (~39 deg): a steep jungle grade that sits ABOVE the old
+    // per-vehicle climbable ceiling (~0.6 rad, drive faded to a crawl/stall)
+    // but BELOW the raised ceiling, so both chassis should now power up it.
+    const STEEP_GRADE = 0.8; // rise per forward meter -> atan(0.8) ~ 0.675 rad
+
+    function climbsSteepGrade(config: Partial<typeof M48_PHYSICS_CONFIG>): void {
+      const ramp = makeForwardRampTerrain(STEEP_GRADE);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0), config);
+      settle(physics, ramp, 30, DT);
+
+      const start = physics.getState().position.clone();
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 360; i += 1) physics.update(DT, ramp);
+
+      const state = physics.getState();
+      // Crested forward (forward is -Z; the ramp rises toward -z).
+      expect(state.position.z).toBeLessThan(start.z - 5);
+      // Gained real elevation rather than spinning in place.
+      expect(state.position.y).toBeGreaterThan(start.y + 2);
+      // Still making forward headway at the top of the run (no stall).
+      expect(physics.getForwardSpeed()).toBeGreaterThan(0.5);
+    }
+
+    it('M48 powers up a steep grade that previously stalled it', () => {
+      climbsSteepGrade(M48_PHYSICS_CONFIG);
+    });
+
+    it('T-54 powers up the same steep grade (NVA armor stays in sync)', () => {
+      climbsSteepGrade(T54_PHYSICS_CONFIG);
+    });
+
+    it('keeps the slide-back bounded when an M48 idles on the steep grade', () => {
+      const ramp = makeForwardRampTerrain(STEEP_GRADE);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0), M48_PHYSICS_CONFIG);
+      // Settle, then drive a short way up so we are mid-slope.
+      settle(physics, ramp, 30, DT);
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 120; i += 1) physics.update(DT, ramp);
+
+      // Cut throttle: the chassis is now unpowered on a steep grade. Residual
+      // climb momentum first carries it a little further uphill (-z), then
+      // gravity tugs it back downhill (+z). The lowered slopeGravityScale must
+      // keep that drift-back bounded rather than letting the tank run away
+      // down the hill. Measure the slide from the highest point it coasts to
+      // (the apex), which is the worst case for a runaway.
+      physics.setControls(0, 0, false);
+      let apexZ = physics.getState().position.z; // most negative z = highest up
+      let maxSlideFromApex = 0;
+      for (let i = 0; i < 600; i += 1) {
+        physics.update(DT, ramp);
+        const z = physics.getState().position.z;
+        if (z < apexZ) apexZ = z;
+        const slide = z - apexZ; // +z = downhill from the apex
+        if (slide > maxSlideFromApex) maxSlideFromApex = slide;
+      }
+
+      // Bounded: from the highest point it reaches, the unpowered chassis
+      // slides back only a small, finite distance — no runaway down the grade.
+      expect(maxSlideFromApex).toBeLessThan(8);
+    });
+
+    it('still rejects a near-vertical wall (keeps a believable climb ceiling)', () => {
+      // ~63 deg wall — well above the raised ceiling. The tank must NOT be able
+      // to drive a cliff: forward drive fades to ~zero and gravity dominates.
+      const wall = makeSlopedTerrain(2.0);
+      const physics = new TrackedVehiclePhysics(new THREE.Vector3(0, 1.0, 0), M48_PHYSICS_CONFIG);
+      settle(physics, wall, 30, DT);
+      const start = physics.getState().position.clone();
+
+      physics.setControls(1.0, 0, false);
+      for (let i = 0; i < 360; i += 1) physics.update(DT, wall);
+
+      // No meaningful uphill progress against the wall.
+      expect(physics.getForwardSpeed()).toBeLessThan(0.5);
+      expect(physics.getState().position.y).toBeLessThan(start.y + 1);
     });
   });
 

@@ -57,6 +57,218 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-29-cinematic-field-pass)
+
+CAMPAIGN_2026-06-29-cinematic-field-pass — a visual + audio + map + HUD pass,
+9 PRs (#457-#465) merged to `master` 2026-06-29 (autonomous-loop, **NOT
+deployed** — deploy is MANUAL). Zero fence changes across all 9 PRs; full suite
+7238 green; combat120 baseline restored (P0).
+
+- **P0 cinematic-foundations** (#457): restored the `combat120` perf baseline
+  (`perf-baselines.json`), added the shared `src/core/tsl/` node-material library,
+  and the non-fenced `TerrainSystem.getBakedHeightmap()` facade.
+- **P1 soundscape-loop-replacement** (`e7e0c516`): killed the permanent jungle
+  loop; day/night `SoundscapeDirector` crossfades beds by sun elevation. Beds are
+  FIRST-PARTY CC BY-SA 4.0 **placeholders** — owner-action to source production
+  CC0/CC-BY field recordings (THIRD-PARTY-ASSETS.md).
+- **P2 task-card-hud-fit** (`3d90cddd`): device-aware home for the tasking-director
+  card (no more objective overlap; real mobile placement).
+- **P3 radio-dial-revival** (`5a307960`): revived radial dial (desktop wheel + touch
+  bottom-sheet, one model) on a dedicated non-weapon HUD slot; squad/fire-support
+  issue through the existing paths. combat-reviewer PASS-WITH-NOTES.
+- **P4 radio-stations-music** (`f1ca489d`) + **P4b station-wiring** (`a34124f7`):
+  headless `RadioStationSystem` (lazy decode, ≤2-buffer cache, own music bus,
+  DEFAULT-OFF) wired through `AudioManager` (concrete, off-fence) → the dial tuner +
+  `musicEnabled`/`musicVolume` settings. Ships 3 Kevin MacLeod (incompetech) **CC BY
+  4.0** tracks (substituted for the brief-cited credential-bound sources; honest
+  provenance in `docs/asset-provenance/audio-2026-06/`). Combat ducking attenuates
+  the music bed only while enabled.
+- **P5 orbital-topo-map** (`a5247e95`): 3D orbital topo map on deploy/pause (rich 3D)
+  + opt-in hold-M (default stays 2D). CPU-displaced `.f32` PlaneGeometry; NASADEM
+  (CC0) for the seed DEMs (A Shau covered live via `getBakedHeightmap()`). WebGL2
+  Lambert + WebGPU/TSL upgrade. Render-on-demand → ~0 steady-state combat cost closed.
+- **P6 visual-post-stack** (`5e1060da`): filled the no-op post shim with a TSL stack
+  (filmic grade + 3 LUTs + tier-gated bloom + atmospheric depth), **DEFAULT-OFF**
+  behind `DEFAULT_POST_ENABLED_DESKTOP`. Only phase on the combat hot path → flip to
+  default-on-desktop AFTER a MAIN-worktree combat120 p99 neutrality proof.
+- **PX terrain-spike-fix** (`950764c1`): the owner-reported random ~100m terrain
+  "towers" were **inflated GLB impostor billboard cards** (card vertical scale from a
+  live `Box3` Y-extent with no upper clamp), NOT terrain — the DEM was proven clean by
+  direct `.f32` scan. Fixed by clamping card height to authored bounds + a one-time
+  warn-log naming any over-inflated archetype at runtime.
+
+**Deferred / carry-overs** (owner walks in `docs/PLAYTEST_PENDING.md`):
+- The **post default-on flip** + the combat120 baseline finalization (multiple MAIN
+  captures, ±6ms noise) — held for a low-load window per the owner's machine-use note.
+- **Pre-existing** `check:tod-coherence` foliage FAIL (correlation 0.810 / rangeRatio
+  2.735) — master-state, P6 proved it is not a regression; the known foliage
+  clamp-band signature, a candidate for a future visual pass.
+- `AShauValleyConfig` worldSize/DEM-box ~1.93% mismatch (edge-droop latent bug) and
+  re-normalizing the one over-inflated hero GLB (the PX warn-log names it at runtime).
+- P1 ambient beds = production-field-recording sourcing; the N1 test nit
+  (`CommandInputManager.test.ts:193` etc. hardcode catalog counts 7/7/6).
+
+Briefs archived at `docs/tasks/archive/cycle-2026-06-29-cinematic-field-pass/`.
+
+## Recently Completed (cycle-2026-06-28-ashau-purpose-and-missions)
+
+Phase 6 (FINAL) of CAMPAIGN_2026-06-28-field-readiness (overnight,
+autonomous-loop) — **campaign complete**. 5 PRs #451-#455, R1 (4 parallel) + R2
+(1), zero fence changes, no reviewer scope. Perf-gated (both rounds A/B PASS).
+Answers the owner's "what is A Shau for": `situation-readout-hud` (#454) surfaces
+war posture + nearest contested objective + a direction nudge on the HUD
+(read-only off `IZoneQuery`/`TicketSystem`, 2Hz tick); `tasking-director-mvp`
+(#455) adds an opt-in `TaskingDirector` (`src/systems/missions/`) + `HudTaskCard`
+with **capture + defend** archetypes from live zone/war state, explicit
+accept/decline, score-on-complete (throttled + event-driven; destroy deferred per
+the spike). Plus 3 design docs for future cycles: `tasking-director-spike` (#451,
+the MVP blueprint), `premiere-battle-royale-design` (#452, defer-the-build BR),
+`healing-and-looting-scope` (#453, healing + `WeaponPickupSystem` activation).
+**Perf:** R1 −5.6% (situation readout dormant in ai_sandbox, `usesZones=false`);
+R2 +0.6% (director dormant when war sim idle) — both well under +5%, validated
+with same-session multi-capture A/B (machine-noise outliers discarded; a real
++cost cannot dip below baseline, and R-captures did). **Wiring:** the
+StrategicFeedback analog is `OperationalRuntimeComposer.wireStrategyRuntime` (not
+GameplayRuntimeComposer). **Budget:** in-cycle ratchet (sanctioned, no CARRY_OVERS
+row) — `HUDSystem.ts`→878 LOC, `SystemManager.ts`→63 methods. **Gate-repair:**
+master went doc-drift-RED mid-phase (Phase 5 brief archival + Phase 6 spike
+forward-refs, undetected because docs-only commits are CI-path-ignored); repaired
+in `378a4313` and cleaned at close (links repointed to archives, grandfather back
+to baseline). Owner walk pending in PLAYTEST_PENDING (situation readout legibility
++ the opt-in task loop on A Shau). Briefs archived at
+`docs/tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/`.
+
+## Recently Completed (cycle-2026-06-28-deploy-armory-faction-select)
+
+Phase 5 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+7 PRs #444-#450, R1 (4 parallel) + R2 (2) + R3 (1), zero fence changes, no
+reviewer scope (UI/deploy/player-spawn). **Not perf-gated** (UI/deploy work, no
+combat hot path — every PR's `perf` job skipped). Rebuilds the deploy surfaces
+the owner called out. `faction-side-picker` (#444): A Shau BLUFOR-vs-OPFOR side
+picker (`isFactionSelectable`/`FACTION_SELECTABLE_MODES`; `ModeSelectScreen`
+emits `{mode, alliance?}` into the existing `resolveLaunchSelection`) — A Shau +
+future premiere ONLY. `weapon-stats-panel` (#446): armory surfaces the existing
+`WeaponSpec` (rpm/damage/falloff/recoil/ADS) via `WEAPON_SPECS` + a static
+`getWeaponSpec` accessor. `deploy-map-navigation` (#447): bounded pan + zoom +
+recenter + spawn-cycling on the respawn map (`OpenFrontierRespawnMapUtils`),
+larger hit targets — A Shau's 21km canvas usable. `armory-layout-reflow` (#448):
+declutter the armory to a single selection affordance. `helipad-spawn-truth`
+(#449): helipad spawns relabel to "Forward Pad" when no boardable heli is
+provisioned (`BoardableHelicopterPresence` + `HelicopterModel.hasBoardableHelicopterForHelipad`,
+wired at `StartupPlayerRuntimeComposer`) — the label never lies.
+`crew-vehicle-selectable` (#450): CREW-A-VEHICLE is now a real spawn — adopts the
+vehicle position (Deploy enables), shows the vehicle marker + an "F to board"
+hint, lands the player at the vehicle via the shared `confirmRespawn→respawn`
+path (was a dead no-op). `deploy-map-3d-spike` (#445): feasibility doc for a fast
+3D map (recommends a baked low-poly proxy; no build this campaign). **Budget:**
+in-cycle ratchet (sanctioned, no CARRY_OVERS row) — `DeployScreen.ts`→1142 LOC,
+`PlayerRespawnManager.ts`→800 LOC across the co-edited tasks. Owner walk pending
+in PLAYTEST_PENDING (deploy/armory/map flow + faction read). Briefs archived at
+`docs/tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/`.
+
+## Recently Completed (cycle-2026-06-28-arsenal-expansion)
+
+Phase 4 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+3 PRs #441-#443, R1 (2 parallel) + R2 (1), zero fence changes, no reviewer
+scope (weapon/loadout/UI). Adds the NVA marksman + SKS the owner asked for —
+WIRING cataloged GLBs as new RUNTIME weapon types, not new art.
+`marksman-rifle-class` (#442): MARKSMAN/DMR runtime weapon (OPFOR NVA/VC),
+Dragunov SVD rig, own GunplayCore spec (rpm 80, dmg 75/55, tight spread,
+ADS divisor 2.6), wired all the way through WeaponSwitching/WeaponAmmo/
+ArmoryPreviewConfig so it is selectable. `sks-rifle-wiring` (#443): SKS
+semi-auto runtime weapon (OPFOR NVA/VC), iron sights, spec between AK and DMR
+(rpm 200, dmg 45/32). `ammo-load-tradeoff` (#441): EXTENDED/HEAVY now cost
+ADS-transition time (1.0/1.15/1.30) so they are a real tradeoff, not strictly
+better — reserve multiplier + mag size unchanged. **Perf gate PASS** (combat120
+A/B: steady-state p99 33.60→34.45ms R1 (+2.53%) → 31.65ms full Phase-4 (−5.80%),
+both under +5%; both weapons OPFOR-loadout-only and reachability-dormant in
+ai_sandbox — flat program/geometry ceiling proves no new weapon mesh executes).
+**Brief-gap fix:** a new LoadoutWeapon value compile-breaks the exhaustive
+Record<LoadoutWeapon,...> tables — found empirically by the marksman executor,
+Files-touched amended before re-dispatch. **Budget:** WeaponRigManager crossed
+700 (699→735) adding the SKS runtime type; admitted to the grandfather list with
+a split target (extract per-weapon spec/core/rig registry), CARRY_OVERS
+budget-ratchet note, no new carry-over. Carry-overs 5→5. Owner feel-walk row in
+PLAYTEST_PENDING (incl. the open ammo-load tradeoff-vs-collapse decision); memo
+at `docs/playtests/cycle-2026-06-28-arsenal-expansion.md`. Follow-up: the
+WeaponRigManager split (per-weapon registry extraction).
+
+## Recently Completed (cycle-2026-06-28-terrain-vegetation-asset-defects)
+
+Phase 3 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+7 PRs #434-#440, R1 (5 parallel) + R2 (2), zero fence changes,
+terrain-nav-reviewer gated 3 (all APPROVE / APPROVE-WITH-NOTES).
+`veg-poi-exclusion` (#435): hero scatterer now respects POI exclusion zones
+(`GLBHeroScatterer.setExclusionZones` + `isExcluded`, mirroring the ground-card
+path) — no more hero trees on the airfield runway. `route-corridor-exclusion`
+(#440): veg-exclusion corridors traced down each compiled route centerline so
+both scatterers skip the gray "trail" patches (joins the same
+`vegetationExclusionZones` stream via `TerrainFeatureCompiler`). `vegetation-
+density-retune` (#434): bamboo-thicket 2.8→1.8, riverbank coconut 1.25→0.7
+(config-only). `coconut-card-crossfade` (#437): ported `transitionFadeMeters`
+opacity blend into `GroundCardNearMeshTier` (default 28m) — coconut palm no
+longer hard-pops mesh↔card. `sun-disc-banding-fix` (#436): band-limited the
+sun-disc sine terms (×317→48) across TSL/GLSL/CPU mirrors — kills the LED-dot
+lattice, keeps a warm body. `structure-import-corruption-fix` (#438): aid-station
+double-root-yaw fixed at the importer (`stripRedundantRootYaw`) + re-imported;
+barracks-tent verified byte-clean (not corrupt); command-tent flagged same-class
+out-of-scope. `asset-reroll-requests` (#439, doc-only): UH-1 + A-1 re-rolls
+marked DONE (`f8c3518c`); B-52D fuselage-aspect + A-37 scale advisories filed.
+**Perf gate PASS** (same-machine combat120 A/B: steady-state p99 40.70→31.20ms,
+Δ−23.34%, an improvement; vegetation dormant in ai_sandbox — `veg=0/0 chunks=0` —
+so the veg PRs are reachability-dormant in the gate scenario, only #436/#438
+execute; absolute non-quiet-machine, A/B delta is the signal). One CI hiccup:
+route-corridor's +3 LOC tripped the `lint:budget` ratchet on grandfathered
+`TerrainFeatureCompiler.ts` (764→767) — resolved by sanctioned snapshot rebase,
+no new carry-over. Carry-overs 5→5. Owner visual walk row in PLAYTEST_PENDING;
+memo at `docs/playtests/cycle-2026-06-28-terrain-vegetation-asset-defects.md`.
+Follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost remains in the
+straightened mesh-near / card-far `coconut-palm` route; route-corridor edge-sliver
+and `map_only` latent over-clear.
+
+## Recently Completed (cycle-2026-06-28-combat-vehicle-feel)
+
+Phase 2 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+5 PRs #429-#433, one parallel round (all roots, disjoint files), zero fence
+changes, zero reviewers needed (vehicle/player/weapon/config scope).
+`tank-exit-and-seatswap` (#433): real bug — tanks were undismountable (F
+consumed by seat-swap, only Escape exited); `E` now exits (universal vehicle
+exit) with side-ejection, `F` keeps driver↔gunner swap; repro-first L3 test.
+`tank-turret-traverse` (#429): yaw 30→75°/s, barrel pitch 8→25°/s (rate cap
+kept). `tank-hill-authority` (#432): maxClimbSlope 0.6→0.78, slopeDriveFloor→
+0.62, slopeGravityScale→0.20 on M48+T-54 ("slower but stronger"). `ground-
+vehicle-speed-and-camera` (#431): faster jeep (damping 0.88→0.95, torque 420→
+520) + chassis-aware follow-cam (M35 truck framed from outside its bed).
+`weapon-ads-per-weapon-offset` (#430): per-weapon ADS offset so the M60 clears
+the sight line. **Perf gate PASS** (same-machine combat120 A/B: p99 37.10→
+37.70ms, Δ+1.6%, under the +5% HALT line; Vehicles system dormant in
+ai_sandbox so the delta is render noise, not Phase-2 cost). Carry-overs 5→5.
+Owner feel-walk row in PLAYTEST_PENDING; memo at
+`docs/playtests/cycle-2026-06-28-combat-vehicle-feel.md`.
+
+## Recently Completed (cycle-2026-06-28-control-discoverability)
+
+Phase 1 of CAMPAIGN_2026-06-28-field-readiness (overnight, `posture:
+autonomous-loop`). 4 PRs #425-#428, R1 (3 parallel) + R2 (1), zero fence
+changes, zero dropped tasks. Closes the campaign's dominant finding — the game
+does more than it shows. `control-hints-hud` (#426): a persistent right-edge
+context-sensitive control legend (foot/vehicle/aircraft) sourced from the live
+keybinds — surfaces T radio / Z squad / F board / TAB scoreboard. `radio-command-menu`
+(#427, combat-reviewer APPROVE-WITH-NOTES): unified `T` menu listing all 7
+fire-support sorties (+ cooldowns + SMOKE/WP/GRID marks) AND the 6 squad orders
+(Shift+1-6 with plain effect lines), driving the existing `requestSupport` path.
+`hud-overlap-and-scoreboard` (#425): attribution notice moved bottom-left →
+bottom-center (off the health pill); hold-Tab scoreboard hint (tracking was
+always correct). `seat-and-fire-cues` (#428): seat label + F-swap (multi-crew
+only) + LMB-fire cue + transient "Airborne to fire" on a grounded fixed-wing
+fire attempt. No perf gate (additive HUD, no hot path). The campaign base
+`348e935b` arrived CI-red (doc-drift gate from briefs committed ahead of code +
+a pre-existing FixedWingConfigs gear-clearance failure from the `f8c3518c` A-1
+re-roll); both healed inside #426 (the keystone that creates the doc-drift-named
+files). Carry-overs 5→5. Owner walk row in PLAYTEST_PENDING; memo at
+`docs/playtests/cycle-2026-06-28-control-discoverability.md`. Follow-up: confirm
+`CommandModeOverlay` tolerates `hasSquad:false` without the squad-loss auto-close.
+
 ## Recently Completed (cycle-2026-06-11-war-asset-repaint)
 
 KATALOG-1 → code-complete (owner walk pending). 12 PRs #383-#394, 4 rounds,

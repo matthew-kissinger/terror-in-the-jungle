@@ -8,6 +8,9 @@ import type { WeaponRigManager } from './WeaponRigManager';
 import type { WeaponAnimations } from './WeaponAnimations';
 import type { WeaponReload } from './WeaponReload';
 
+const DEFAULT_ADS = { x: 0.0, y: -0.18, z: -0.55 };
+const LMG_ADS = { x: 0.0, y: -0.35, z: -0.62 };
+
 function makeAnimations(
   adsProgress = 0,
   basePosition = { x: 0.5, y: -0.6, z: -0.82 },
@@ -15,7 +18,10 @@ function makeAnimations(
   return {
     getADSProgress: () => adsProgress,
     getBasePosition: () => basePosition,
-    getADSPosition: () => ({ x: 0.0, y: -0.18, z: -0.55 }),
+    // Mirror the real per-weapon resolution: the bulky lmg gets a lower offset,
+    // every other weapon (and the no-arg call) gets the default.
+    getADSPosition: (weaponType?: string) =>
+      weaponType === 'lmg' ? LMG_ADS : DEFAULT_ADS,
     getRecoilOffset: () => ({ x: 0, y: 0, z: 0, rotX: 0 }),
     getBobOffset: () => ({ x: 0, y: 0 }),
     getSwayOffset: () => ({ x: 0, y: 0 }),
@@ -36,10 +42,14 @@ function makeModel(
   return new WeaponModel(animations, reload);
 }
 
-function makeRigManager(rig: THREE.Group): WeaponRigManager {
+function makeRigManager(
+  rig: THREE.Group,
+  weaponType = 'rifle',
+): WeaponRigManager {
   return {
     getCurrentRig: () => rig,
     getSwitchOffset: () => ({ y: 0, rotX: 0 }),
+    getCurrentWeaponType: () => weaponType,
   } as unknown as WeaponRigManager;
 }
 
@@ -80,6 +90,19 @@ describe('WeaponModel presentation', () => {
 
     expect(rig.rotation.x).toBeCloseTo(0, 4);
     expect(rig.position.y).toBeCloseTo(-0.18, 4);
+  });
+
+  it('applies the per-weapon ADS offset routed through the rig manager so the bulky LMG sits lower than the rifle when aimed', () => {
+    const rifleRig = new THREE.Group();
+    const lmgRig = new THREE.Group();
+    model = makeModel(makeAnimations(1)); // fully aimed
+
+    model.updateTransform(makeRigManager(rifleRig, 'rifle'));
+    model.updateTransform(makeRigManager(lmgRig, 'lmg'));
+
+    // The LMG resolves a distinct, lower sight-line pose than the rifle default,
+    // clearing its receiver from the sights.
+    expect(lmgRig.position.y).toBeLessThan(rifleRig.position.y);
   });
 
   it('opts the overlay scene out of automatic full-scene matrix walks', () => {

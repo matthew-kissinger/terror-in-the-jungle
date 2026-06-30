@@ -31,6 +31,7 @@ import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import type { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
 import type { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import type { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import type { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import type { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import type { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
@@ -38,6 +39,7 @@ import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import type { LoadoutService } from '../systems/player/LoadoutService';
 import type { WarSimulator } from '../systems/strategy/WarSimulator';
 import type { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import type { TaskingDirector } from '../systems/missions/TaskingDirector';
 import type { SpatialGridManager } from '../systems/combat/SpatialGridManager';
 import type { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 
@@ -81,12 +83,14 @@ export interface SystemKeyToType {
   playerSuppressionSystem: PlayerSuppressionSystem;
   flashbangScreenEffect: FlashbangScreenEffect;
   smokeCloudSystem: SmokeCloudSystem;
+  zoneCaptureEffects: ZoneCaptureEffects;
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
   loadoutService: LoadoutService;
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
+  taskingDirector: TaskingDirector;
   spatialGridManager: SpatialGridManager;
   worldFeatureSystem: WorldFeatureSystem;
   navmeshSystem: NavmeshSystem;
@@ -169,12 +173,14 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'playerSuppressionSystem',
   'flashbangScreenEffect',
   'smokeCloudSystem',
+  'zoneCaptureEffects',
   'influenceMapSystem',
   'ammoSupplySystem',
   'footstepAudioSystem',
   'loadoutService',
   'warSimulator',
   'strategicFeedback',
+  'taskingDirector',
   'spatialGridManager',
   'worldFeatureSystem',
   'navmeshSystem',

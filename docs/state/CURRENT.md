@@ -30,6 +30,24 @@ and phase summary.
 
 The most recent shipped work, newest first:
 
+- **2026-06-29 — cinematic field pass campaign** (`CAMPAIGN_2026-06-29-cinematic-field-pass`,
+  9 PRs #457-#465, autonomous-loop, **NOT deployed**): a visual + audio + map + HUD
+  pass merged to `master` behind safe defaults. P0 restored the `combat120` perf
+  baseline + a shared `src/core/tsl/` node lib + the non-fenced
+  `TerrainSystem.getBakedHeightmap()`. Shipped: a TSL post-stack (filmic grade +
+  tier-gated bloom + atmospheric depth) **DEFAULT-OFF** behind
+  `DEFAULT_POST_ENABLED_DESKTOP`; a 3D orbital topo map (deploy/pause rich-3D +
+  opt-in hold-M, **default stays 2D**); a revived radial radio dial (desktop wheel +
+  touch sheet) on a dedicated HUD slot; a day/night `SoundscapeDirector` replacing
+  the permanent loop; a headless `RadioStationSystem` (3 Kevin MacLeod CC-BY tracks,
+  lazy, **DEFAULT-OFF**) wired to the dial (P4b); a device-aware tasking-director task
+  card; and a terrain-tower fix (impostor card height clamped to authored bounds — the
+  ~100m "towers" were inflated GLB billboard cards, **NOT** terrain — DEM proven clean).
+  **Zero fence changes across all 9 PRs; full suite 7238 green.** Deferred to
+  PLAYTEST_PENDING: the post default-on flip (after a MAIN-worktree combat120 p99
+  neutrality proof) + all owner feel-walks. Pre-existing `check:tod-coherence`
+  foliage FAIL is master-state (P6 proved it is not a regression), tracked as a
+  carry-over.
 - **2026-06-17 local / 2026-06-18 UTC — active-driver route recovery checkpoint**:
   The perf driver now cools down the route target id when a no-lock
   nearest-OPFOR `combat_approach_unavailable` path fails or when a

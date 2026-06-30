@@ -528,7 +528,7 @@ export class PlayerInput {
       this.callbacks.onEscape?.();
     }
 
-    // Handle vehicle entry/exit with E key
+    // E: universal vehicle exit — heli/fixed-wing AND seated ground/tracked (jeep/tank); tap-F stays the tank seat-swap.
     if (event.code === 'KeyE') {
       (this.callbacks.onEnterExitVehicle ?? this.callbacks.onEnterExitHelicopter)?.();
     }

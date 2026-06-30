@@ -1,0 +1,13 @@
+{
+  "slug": "jungle-night",
+  "role": "ambient night bed (persistent loop)",
+  "provider": "first-party (synthesized)",
+  "sourceUrl": null,
+  "license": "CC BY-SA 4.0",
+  "status": "shipped-placeholder",
+  "localPath": "public/assets/audio/ambient/jungle-night.ogg",
+  "attributionRequired": false,
+  "author": "Matthew Kissinger (ffmpeg/libopus synthesis)",
+  "format": "Opus .ogg, mono, ~40 kbps, ~18 s loop",
+  "notes": "FIRST-PARTY PLACEHOLDER, not a field recording. Cited Freesound night bed #175020 (CC0) could not be fetched without account credentials during the autonomous run; synthesized from scratch instead (see generate-beds.sh). Owner follow-up: replace with a genuine CC0/CC-BY night field recording; SoundscapeDirector needs no code change."
+}

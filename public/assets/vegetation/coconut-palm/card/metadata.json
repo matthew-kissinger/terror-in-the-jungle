@@ -1,18 +1,18 @@
 {
   "generator": "scripts/bake-veg-card.mjs",
-  "generatedAt": "2026-06-26T15:21:58.335Z",
+  "generatedAt": "2026-06-29T21:41:32.364Z",
   "id": "coconut-palm",
   "modelUrl": "/assets/vegetation/coconut-palm/coconut-palm.glb",
   "projection": "single-front-card",
   "crossQuadCapable": true,
   "elevationDeg": 12,
   "worldSize": [
-    17.619349559418005,
+    17.71780551338607,
     27.079299926757812
   ],
   "tileSize": [
-    332,
-    512
+    670,
+    1024
   ],
   "bounds": {
     "center": [
@@ -21,10 +21,10 @@
       0
     ],
     "size": [
-      12.752389907836914,
+      12.84851360321045,
       27.079299926757812,
-      12.15804386138916
+      12.199849605560303
     ],
-    "radius": 16.153404930697036
+    "radius": 16.18030528708806
   }
 }

@@ -7,7 +7,9 @@
   "status": "normalized",
   "localPath": "public/assets/vegetation/source/bamboo-set/free_bamboo_set.glb",
   "normalizedPath": "public/assets/vegetation/bamboo-grove/bamboo-grove.glb",
+  "currentRuntimePath": "public/assets/vegetation/bamboo-culm/bamboo-culm.glb",
+  "currentImpostorPath": "public/assets/vegetation/bamboo-culm/impostor/",
   "attributionRequired": true,
   "author": "verify",
-  "notes": "Tier 3 #11 — staged 'free_bamboo_set.glb' (30 culms, 37834 tris). Normalized 2026-06-25 (step 2): extracted a representative 3-culm clump (bambooBlock 008/011/009 = 9162 tris), re-clustered tight, uniform 0.34 scale to a realistic ~14.3m height, ground-center pivot, 12 textures webp-compressed (5.12MB -> 2.0MB). Descriptor: packages/vegetation-library/catalog/bamboo-grove.json (status:ready). Author handle still to be confirmed from the staged set's metadata."
+  "notes": "Tier 3 #11 — staged 'free_bamboo_set.glb' (30 culms, 37834 tris). Normalized 2026-06-25 (step 2): extracted a representative 3-culm clump (bambooBlock 008/011/009 = 9162 tris), re-clustered tight, uniform 0.34 scale to a realistic ~14.3m height, ground-center pivot, 12 textures webp-compressed (5.12MB -> 2.0MB). Visual review on 2026-06-29 rejected the 3-culm static impostor and sparse ground-card workarounds; current bamboo-grove runtime now uses one extracted bambooBlock.009 culm (3054 tris, 333KB) plus a matching 8x3 static impostor so groves are formed by scatter placement. Descriptor: packages/vegetation-library/catalog/bamboo-grove.json (status:ready). Author handle still to be confirmed from the staged set's metadata."
 }

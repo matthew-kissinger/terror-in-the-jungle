@@ -18,7 +18,7 @@ import { GroundCardNearMeshTier } from './GroundCardNearMeshTier';
  *
  * Two cheap LOD tiers per species, keyed off the per-archetype distances from the
  * vegetation-library catalog:
- *  - FAR (meshFarEdge .. cull): one INSTANCED 2-plane alpha cross per (cell, species),
+ *  - FAR (meshFarEdge .. cull): one INSTANCED two-sided 2-plane alpha cross per (cell, species),
  *    sharing ONE unit cross geometry + ONE baked-atlas material per species. Hundreds
  *    of plants in a cell cost a single draw + a single texture; per-cell distance +
  *    frustum culling drop cells outside the cull radius. Cards are NEVER one clone each.
@@ -449,7 +449,7 @@ export class GroundCardScatterer {
     const material = new THREE.MeshStandardMaterial({
       alphaTest: 0.5,
       transparent: false,
-      side: THREE.DoubleSide,
+      side: THREE.FrontSide,
       roughness: 1,
       metalness: 0,
     });
@@ -549,7 +549,9 @@ export class GroundCardScatterer {
  * A unit 2-plane cross, base-anchored: two perpendicular vertical quads spanning
  * x/z in [-0.5, 0.5] and y in [0, 1], so the instance origin sits on the terrain and a
  * per-instance scale of (cardWidth, cardHeight, cardWidth) yields the world footprint.
- * Up-facing vertex normals keep both planes evenly lit (no dark backside) under DoubleSide.
+ * The reverse-wound triangles make the cards physically two-sided while keeping FrontSide
+ * material normals up-facing; Three's DoubleSide shader path flips backface normals and
+ * makes one side of vertical foliage cards read dark.
  */
 function buildCrossGeometry(): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
@@ -569,7 +571,9 @@ function buildCrossGeometry(): THREE.BufferGeometry {
   ]);
   const indices = [
     0, 1, 2, 0, 2, 3,
+    2, 1, 0, 3, 2, 0,
     4, 5, 6, 4, 6, 7,
+    6, 5, 4, 7, 6, 4,
   ];
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));

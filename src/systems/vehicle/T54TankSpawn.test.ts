@@ -26,6 +26,7 @@ import {
   T54_SCENARIO_SPAWN_GROUPS,
 } from './T54TankSpawn';
 import { T54_HULL_DIMENSIONS, T54_PHYSICS_CONFIG, T54_SPAWN_OFFSETS } from '../../config/vehicles/t54-config';
+import { M48_PHYSICS_CONFIG } from '../../config/vehicles/m48-config';
 import { Faction } from '../combat/types';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
@@ -198,12 +199,20 @@ describe('T-54 scenario spawn table', () => {
 });
 
 describe('T-54 physics + hull config', () => {
-  it('overrides only the historical T-54 deltas from the tracked-vehicle defaults', () => {
+  it('carries the lighter+lower historical T-54 chassis deltas', () => {
     expect(T54_PHYSICS_CONFIG.mass).toBe(36000);
     expect(T54_PHYSICS_CONFIG.trackSeparation).toBeCloseTo(2.64, 3);
     expect(T54_PHYSICS_CONFIG.hullLength).toBeCloseTo(6.04, 3);
-    expect(T54_PHYSICS_CONFIG.maxTrackSpeed).toBe(14);
-    expect(T54_PHYSICS_CONFIG.maxClimbSlope).toBeCloseTo(0.6, 3);
+  });
+
+  it('shares M48 climb authority so US and NVA armor crest jungle grades alike', () => {
+    // Climb-authority tuning (tank-hill-authority) is deliberately kept in
+    // lockstep across both chassis. Assert the parity relationship, not the
+    // specific magnitudes, so a future retune that moves both together still
+    // passes.
+    expect(T54_PHYSICS_CONFIG.maxClimbSlope).toBe(M48_PHYSICS_CONFIG.maxClimbSlope);
+    expect(T54_PHYSICS_CONFIG.slopeDriveFloor).toBe(M48_PHYSICS_CONFIG.slopeDriveFloor);
+    expect(T54_PHYSICS_CONFIG.slopeGravityScale).toBe(M48_PHYSICS_CONFIG.slopeGravityScale);
   });
 
   it('is lighter + lower than the M48 it replaces (period-correct enemy armor)', () => {

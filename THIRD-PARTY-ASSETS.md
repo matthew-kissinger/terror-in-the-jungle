@@ -31,6 +31,23 @@ reference overlays (`*-rivers.json`, `*-firebases.json`).
   and record source + license + conversion per the pipeline's "Processing
   Contract".
 
+### Orbital topo map — baked coarse DEMs
+
+Files: `public/data/heightmaps/*-topo-*.f32` (+ `*.json` sidecars) — the coarse
+(96²) relief grids the 3D orbital topographic map CPU-displaces. Produced by
+`scripts/bake-topo-dem.ts`, which **downsamples** the existing committed
+`.f32` DEMs already in the repo (no fresh clip, no network):
+
+- `a-shau-topo-*.f32` derives from the **NASADEM**-based A Shau `z14` clip
+  (`public/data/vietnam/big-map/a-shau-z14-9x9.f32`). NASADEM is a
+  **public-domain / CC0** US-government product (no copyright, no relicensing).
+  The A Shau source DEM is git-ignored (large binary), so this baked topo may be
+  absent in CI checkouts; the live map covers A Shau via the runtime heightmap.
+- `open_frontier-*-topo-*.f32`, `zone_control-*-topo-*.f32`, `tdm-*-topo-*.f32`
+  derive from the **procedurally generated** seed DEMs (original project work).
+- These generated `.f32`/`.json` carry **no SPDX header** (generated data); their
+  provenance is recorded here and in `docs/asset-provenance/orbital-topo-2026-06/`.
+
 ## Fonts — third-party, SIL Open Font License 1.1
 
 Bundled via npm and shipped in the build:
@@ -118,6 +135,56 @@ with its origin.
 
 - **Action for owner:** confirm every audio file is originally authored, or
   list the exceptions here.
+
+### Ambient soundscape beds — FIRST-PARTY placeholders (CC BY-SA 4.0)
+
+Files: `public/assets/audio/ambient/{jungle-day,jungle-night,wildlife-bird,wildlife-call}.ogg`.
+Added in `cycle-2026-06-29-soundscape-loop-replacement` to back the layered
+day/night `SoundscapeDirector` (which replaced the old always-on `jungle1`/`jungle2`
+loop). Full provenance in
+[`docs/asset-provenance/audio-2026-06/`](docs/asset-provenance/audio-2026-06/).
+
+- These four beds/one-shots are **first-party placeholders synthesized from
+  scratch** (ffmpeg/libopus — see `generate-beds.sh`), original work under
+  **CC BY-SA 4.0**. They are **not** field recordings and **not** third-party —
+  they are listed here only to make their placeholder status unambiguous.
+- The campaign plan cited Freesound beds to source (day `#427400` CC-BY; night
+  `#175020` CC0); **Freesound downloads require account credentials the
+  autonomous run did not have**, so genuine beds were not fetched. No invented
+  attribution was recorded.
+- **Action for owner:** when production CC0/CC-BY field recordings are sourced,
+  replace these files (same paths) and record the real upstream attribution
+  (source URL + author + license) here. The `SoundscapeDirector` is
+  bed-agnostic — no code change needed.
+
+### Radio station music — THIRD-PARTY CC BY 4.0 (Kevin MacLeod, incompetech.com)
+
+Files: `public/assets/audio/music/{station-volatile-reaction,station-five-armies,station-ossuary-air}.ogg`.
+Added in `cycle-2026-06-29-radio-stations-music` to back the headless
+`RadioStationSystem` (the selectable radio stations that replaced the removed
+single music loop). Music is **default-OFF** and lazy-loaded only when the
+player tunes a station. Full per-track provenance in
+[`docs/asset-provenance/audio-2026-06/`](docs/asset-provenance/audio-2026-06/).
+
+These are **genuine third-party CC BY 4.0 tracks** by **Kevin MacLeod**
+(incompetech.com), fetched directly (no credentials) and re-encoded to Opus
+stereo ~80 kbps. **Attribution is REQUIRED** and must remain wherever the game
+credits assets:
+
+- "Volatile Reaction" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+- "Five Armies" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+- "Ossuary 6 - Air" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+
+Sourcing note: the campaign brief cited Bartmann CC0 drones / AFN CC-BY surf for
+the ambient station, but those sources are account/credential-bound and could not
+be fetched license-clean in the autonomous run. The ambient station ships
+"Ossuary 6 - Air" (CC BY 4.0) instead — same license posture, fully attributed,
+no invented provenance. The station catalog (`src/config/radioStations.ts`) is
+swap-friendly: replacing a track with a different license-clean clip needs no
+code change beyond that file plus an entry here.
 
 ## Note: "Pixel Forge" assets are FIRST-PARTY (not third-party)
 

@@ -17,6 +17,14 @@ export interface StaticImpostorAtlasBounds {
   readonly radius: number;
 }
 
+export interface StaticImpostorMaterialTuningOverride {
+  readonly fogStrength?: number;
+  readonly foliageExposureScale?: number;
+  readonly foliageColorGamma?: number;
+  readonly foliageSaturation?: number;
+  readonly azimuthBlendBand?: number;
+}
+
 export interface StaticImpostorArchetype {
   readonly slug: string;
   readonly modelPath: string;
@@ -32,7 +40,19 @@ export interface StaticImpostorArchetype {
   readonly bounds: StaticImpostorAtlasBounds;
   readonly promotionDistanceMeters: number;
   readonly demotionDistanceMeters: number;
+  /** Optional outer residency hint for procedurally scattered vegetation impostors. */
+  readonly cullDistanceMeters?: number;
   readonly parallaxStrength: number;
+  readonly materialTuning?: StaticImpostorMaterialTuningOverride;
+  /**
+   * Lighting response used by the runtime impostor material.
+   *
+   * Omitted/default keeps the surface-normal path for hard static props and
+   * vehicles. Vegetation uses the foliage-card path so baked tree impostors read
+   * through the accepted foliage rig response while preserving atlas normal
+   * shape detail.
+   */
+  readonly lightingProfile?: 'surface-normal' | 'foliage-card';
 }
 
 const atlasPath = (slug: string, file: string): string => `./assets/static-impostors/${slug}/${file}`;
@@ -58,6 +78,7 @@ interface StaticImpostorArchetypeInput {
   readonly promotionDistanceMeters: number;
   readonly demotionDistanceMeters: number;
   readonly parallaxStrength: number;
+  readonly lightingProfile?: StaticImpostorArchetype['lightingProfile'];
 }
 
 function createStaticImpostorArchetype(input: StaticImpostorArchetypeInput): StaticImpostorArchetype {
@@ -81,6 +102,7 @@ function createStaticImpostorArchetype(input: StaticImpostorArchetypeInput): Sta
     promotionDistanceMeters: input.promotionDistanceMeters,
     demotionDistanceMeters: input.demotionDistanceMeters,
     parallaxStrength: input.parallaxStrength,
+    ...(input.lightingProfile ? { lightingProfile: input.lightingProfile } : {}),
   };
 }
 
@@ -180,6 +202,7 @@ export const STATIC_IMPOSTOR_ARCHETYPES: Record<string, StaticImpostorArchetype>
     promotionDistanceMeters: 115,
     demotionDistanceMeters: 90,
     parallaxStrength: 0.025,
+    lightingProfile: 'foliage-card',
   }),
   [PixelForgeStaticPropModels.PATCH_GRASS_LARGE]: createStaticImpostorArchetype({
     slug: 'pixel-forge-patch-grass-large',
@@ -188,6 +211,7 @@ export const STATIC_IMPOSTOR_ARCHETYPES: Record<string, StaticImpostorArchetype>
     promotionDistanceMeters: 115,
     demotionDistanceMeters: 90,
     parallaxStrength: 0.02,
+    lightingProfile: 'foliage-card',
   }),
   [PixelForgeStaticPropModels.ROCK_FLAT_GRASS]: createStaticImpostorArchetype({
     slug: 'pixel-forge-rock-flat-grass',
@@ -196,6 +220,7 @@ export const STATIC_IMPOSTOR_ARCHETYPES: Record<string, StaticImpostorArchetype>
     promotionDistanceMeters: 135,
     demotionDistanceMeters: 105,
     parallaxStrength: 0.025,
+    lightingProfile: 'foliage-card',
   }),
   [PixelForgeStaticPropModels.TREE]: createStaticImpostorArchetype({
     slug: 'pixel-forge-tree',
@@ -204,6 +229,7 @@ export const STATIC_IMPOSTOR_ARCHETYPES: Record<string, StaticImpostorArchetype>
     promotionDistanceMeters: 170,
     demotionDistanceMeters: 135,
     parallaxStrength: 0.04,
+    lightingProfile: 'foliage-card',
   }),
   [PixelForgeStaticPropModels.TREE_TALL]: createStaticImpostorArchetype({
     slug: 'pixel-forge-tree-tall',
@@ -212,6 +238,7 @@ export const STATIC_IMPOSTOR_ARCHETYPES: Record<string, StaticImpostorArchetype>
     promotionDistanceMeters: 190,
     demotionDistanceMeters: 150,
     parallaxStrength: 0.045,
+    lightingProfile: 'foliage-card',
   }),
 };
 

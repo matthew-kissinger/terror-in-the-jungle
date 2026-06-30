@@ -15,7 +15,7 @@ import { runUiTransition } from '../engine/UITransitions';
 import { GameLaunchSelection, GameMode } from '../../config/gameModeTypes';
 import { SettingsModal } from '../loading/SettingsModal';
 import { TitleScreen } from './TitleScreen';
-import { ModeSelectScreen } from './ModeSelectScreen';
+import { ModeSelectScreen, ModeSelection } from './ModeSelectScreen';
 import {
   getGameModeDefinition,
   resolveLaunchSelection,
@@ -65,7 +65,7 @@ export class GameUI extends UIComponent {
     this.titleScreen.setOnStart(() => this.showModeSelect());
     this.titleScreen.setOnSettings(() => this.settingsModal.show());
 
-    this.modeSelectScreen.setOnModeSelect((mode) => this.handleModeSelected(mode));
+    this.modeSelectScreen.setOnModeSelect((selection) => this.handleModeSelected(selection));
     this.modeSelectScreen.setOnBack(() => this.showTitle());
   }
 
@@ -183,15 +183,21 @@ export class GameUI extends UIComponent {
     });
   }
 
-  private handleModeSelected(mode: GameMode): void {
+  private handleModeSelected(choice: ModeSelection): void {
     if (this.isLaunching) return;
 
-    // Resolve default alliance/faction for this mode
-    const definition = getGameModeDefinition(mode);
-    const resolved = resolveLaunchSelection(definition);
+    // Feed the (optional) chosen side through the existing launch path.
+    // resolveLaunchSelection normalizes/validates against the mode's playable
+    // alliances and picks the default faction; for standard modes no alliance is
+    // passed, so the current default (BLUFOR/US) is preserved.
+    const definition = getGameModeDefinition(choice.mode);
+    const resolved = resolveLaunchSelection(
+      definition,
+      choice.alliance ? { alliance: choice.alliance } : undefined
+    );
 
     const selection: GameLaunchSelection = {
-      mode,
+      mode: choice.mode,
       alliance: resolved.alliance,
       faction: resolved.faction,
     };
