@@ -2,15 +2,17 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import type { HeightProviderConfig, IHeightProvider } from './IHeightProvider';
+import {
+  collarExtrapolatedHeight,
+  computePlayableHeightEnvelope,
+  type PlayableHeightEnvelope,
+} from './collarExtrapolation';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
 const SOURCE_DELTA_EPSILON_METERS = 0.01;
-const MIN_EDGE_SLOPE_SAMPLE_METERS = 8;
-const MAX_EDGE_SLOPE_SAMPLE_METERS = 64;
-const MAX_EDGE_EXTRAPOLATION_METERS = 320;
 
 /**
  * Render-source provider for finite-map visual continuation.
@@ -30,6 +32,7 @@ export class VisualExtentHeightProvider implements IHeightProvider {
   private readonly sourceProvider: IHeightProvider;
   private readonly halfPlayable: number;
   private readonly halfVisual: number;
+  private playableEnvelope: PlayableHeightEnvelope | null = null;
 
   constructor(
     baseProvider: IHeightProvider,
@@ -61,7 +64,23 @@ export class VisualExtentHeightProvider implements IHeightProvider {
       return edgeBaseHeight + sourceDelta;
     }
 
-    return edgeBaseHeight + this.estimateEdgeSlopeDelta(worldX, worldZ, clampedX, clampedZ);
+    // No real source data beyond the edge: continue with the bounded,
+    // envelope-clamped collar extrapolation (single source of truth so the
+    // main-thread and worker bakes can never drift). See collarExtrapolation.ts.
+    const sampleBase = (x: number, z: number): number => this.baseProvider.getHeightAt(x, z);
+    if (this.playableEnvelope === null) {
+      this.playableEnvelope = computePlayableHeightEnvelope(sampleBase, this.halfPlayable);
+    }
+    return collarExtrapolatedHeight(
+      sampleBase,
+      worldX,
+      worldZ,
+      clampedX,
+      clampedZ,
+      this.halfPlayable,
+      edgeBaseHeight,
+      this.playableEnvelope,
+    );
   }
 
   getWorkerConfig(): HeightProviderConfig {
@@ -72,53 +91,5 @@ export class VisualExtentHeightProvider implements IHeightProvider {
       playableWorldSize: this.halfPlayable * 2,
       visualMargin: Math.max(0, this.halfVisual - this.halfPlayable),
     };
-  }
-
-  private estimateEdgeSlopeDelta(worldX: number, worldZ: number, clampedX: number, clampedZ: number): number {
-    const outsideX = worldX - clampedX;
-    const outsideZ = worldZ - clampedZ;
-    const outsideDistance = Math.hypot(outsideX, outsideZ);
-    if (outsideDistance <= 0) return 0;
-
-    const sampleStep = clamp(
-      this.halfPlayable / 128,
-      MIN_EDGE_SLOPE_SAMPLE_METERS,
-      MAX_EDGE_SLOPE_SAMPLE_METERS,
-    );
-    let delta = 0;
-    let weight = 0;
-
-    if (Math.abs(outsideX) > 0) {
-      const signX = Math.sign(outsideX);
-      const innerX = clamp(clampedX - signX * sampleStep, -this.halfPlayable, this.halfPlayable);
-      const inwardDistance = Math.abs(clampedX - innerX);
-      if (inwardDistance > 0) {
-        const edge = this.baseProvider.getHeightAt(clampedX, clampedZ);
-        const inner = this.baseProvider.getHeightAt(innerX, clampedZ);
-        delta += ((edge - inner) / inwardDistance) * Math.abs(outsideX);
-        weight++;
-      }
-    }
-
-    if (Math.abs(outsideZ) > 0) {
-      const signZ = Math.sign(outsideZ);
-      const innerZ = clamp(clampedZ - signZ * sampleStep, -this.halfPlayable, this.halfPlayable);
-      const inwardDistance = Math.abs(clampedZ - innerZ);
-      if (inwardDistance > 0) {
-        const edge = this.baseProvider.getHeightAt(clampedX, clampedZ);
-        const inner = this.baseProvider.getHeightAt(clampedX, innerZ);
-        delta += ((edge - inner) / inwardDistance) * Math.abs(outsideZ);
-        weight++;
-      }
-    }
-
-    if (weight === 0) return 0;
-    const averagedDelta = delta / weight;
-    const fade = 1 - clamp(outsideDistance / Math.max(1, this.halfVisual - this.halfPlayable), 0, 1) * 0.35;
-    return clamp(
-      averagedDelta * fade,
-      -MAX_EDGE_EXTRAPOLATION_METERS,
-      MAX_EDGE_EXTRAPOLATION_METERS,
-    );
   }
 }
