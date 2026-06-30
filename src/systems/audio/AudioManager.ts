@@ -9,7 +9,9 @@ import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { AudioPoolManager } from './AudioPoolManager';
 import { AudioDuckingSystem } from './AudioDuckingSystem';
 import { SoundscapeDirector } from './SoundscapeDirector';
+import { RadioStationSystem } from './RadioStationSystem';
 import { AudioWeaponSounds } from './AudioWeaponSounds';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import { Logger } from '../../utils/Logger';
 import { GameEventBus } from '../../core/GameEventBus';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
@@ -48,6 +50,7 @@ export class AudioManager implements GameSystem {
     private poolManager: AudioPoolManager;
     private duckingSystem: AudioDuckingSystem;
     private soundscape: SoundscapeDirector;
+    private radioStation: RadioStationSystem;
     private weaponSounds: AudioWeaponSounds;
 
     // Sound configurations: SFX bank + the soundscape beds/one-shots so the
@@ -86,6 +89,14 @@ export class AudioManager implements GameSystem {
         this.poolManager = new AudioPoolManager(this.listener, this.scene, this.audioBuffers);
         this.duckingSystem = new AudioDuckingSystem();
         this.soundscape = new SoundscapeDirector(this.listener, this.audioBuffers);
+        // Headless radio runs on its own music bus, default-OFF. It lazy-decodes
+        // a station track only once the player enables music and tunes in, so
+        // nothing is fetched at boot (esp. on touch — no cellular auto-download).
+        this.radioStation = new RadioStationSystem(
+            this.listener,
+            (path) => this.loadAudio('__radio__', path),
+            { isTouch: shouldUseTouchControls() },
+        );
         this.weaponSounds = new AudioWeaponSounds(this.scene, this.listener, this.poolManager, this.duckingSystem);
 
         // Resume AudioContext on first user interaction
@@ -320,6 +331,32 @@ export class AudioManager implements GameSystem {
         this.soundscape.setVolume(volume);
     }
 
+    /**
+     * Radio music controls. Concrete (NOT on the fenced `IAudioManager`): these
+     * are called only from concrete-`AudioManager`-typed sites (GameEngine
+     * settings + live-entry audio start) and the dial-tuner wire in
+     * SystemInitializer. Music is default-OFF — enabling it tunes to the
+     * selected station and starts the lazy decode.
+     */
+    setMusicEnabled(enabled: boolean): void {
+        this.radioStation.setEnabled(enabled);
+    }
+
+    // Set radio music volume (0..1)
+    setMusicVolume(volume: number): void {
+        this.radioStation.setMusicVolume(Math.max(0, Math.min(1, volume)));
+    }
+
+    /** Tune the radio to a station id (no-op fetch while music is disabled). */
+    tuneRadioStation(stationId: string): Promise<void> {
+        return this.radioStation.tuneTo(stationId);
+    }
+
+    /** The station id the dial should preselect (persisted or default). */
+    getSelectedRadioStationId(): string {
+        return this.radioStation.getSelectedStationId();
+    }
+
     // Mute/unmute all sounds
     toggleMute(): void {
         const currentVolume = this.listener.getMasterVolume();
@@ -385,10 +422,18 @@ export class AudioManager implements GameSystem {
     }
 
     update(deltaTime: number): void {
-        // Advance the day/night crossfade + wildlife one-shots, then apply
-        // combat ducking on top of the director-supplied bed gains.
+        // Advance the day/night crossfade + wildlife one-shots and the radio
+        // music crossfade, then apply combat ducking on top of the
+        // director-supplied bed gains plus the active radio bed (which is
+        // `null` whenever music is disabled, keeping the duck path off the
+        // table while music is off).
         this.soundscape.update(deltaTime);
-        this.duckingSystem.update(deltaTime, this.soundscape.getActiveBeds());
+        this.radioStation.update(deltaTime);
+        this.duckingSystem.update(
+            deltaTime,
+            this.soundscape.getActiveBeds(),
+            this.radioStation.getActiveMusicBed(),
+        );
         this.applyWorldBuilderAmbientFlag();
     }
 
@@ -446,6 +491,7 @@ export class AudioManager implements GameSystem {
         // Dispose modules
         this.poolManager.dispose();
         this.soundscape.dispose();
+        this.radioStation.dispose();
 
         // Clear buffers
         this.audioBuffers.clear();

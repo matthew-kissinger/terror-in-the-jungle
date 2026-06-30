@@ -190,9 +190,15 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
 
   markStepBegin('audio-start');
   if (engine.systemManager.audioManager) {
-    engine.systemManager.audioManager.startAmbient();
+    const audioManager = engine.systemManager.audioManager;
+    audioManager.startAmbient();
     const settings = SettingsManager.getInstance();
-    engine.systemManager.audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
+    audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
+    // Apply the persisted radio music state. Default-OFF: enabling here is the
+    // only path that starts a lazy station decode, so music stays silent unless
+    // the player turned it on in settings.
+    audioManager.setMusicVolume(settings.getMusicVolumeNormalized());
+    audioManager.setMusicEnabled(settings.get('musicEnabled'));
   }
   markStepEnd('audio-start');
 
