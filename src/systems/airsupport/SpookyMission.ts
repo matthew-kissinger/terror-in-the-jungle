@@ -139,7 +139,7 @@ export function updateSpooky(
           _targetPos,
           3,
           DAMAGE_PER_ROUND,
-          undefined,
+          'PLAYER', // credit the player who called the gunship: hit/kill markers
           'spooky_minigun',
           shooterFaction,
         );

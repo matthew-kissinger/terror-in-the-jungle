@@ -15,9 +15,21 @@ import { handleCombatantDeath } from './CombatantDeathPipeline';
 import { spatialGridManager } from './SpatialGridManager';
 import type { IVehicle } from '../vehicle/IVehicle';
 import { Tank, type TankDamageType } from '../vehicle/Tank';
+import type { AudioManager } from '../audio/AudioManager';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
+
+// Player-attributed explosions surface the same crosshair hit/kill feedback as
+// direct fire. Kills always punch through (discrete); non-kill hits are
+// coalesced on this cooldown so a damage-over-time source (napalm burn ticks at
+// 0.5s across 6 zones) does not strobe the marker.
+const PLAYER_HIT_FEEDBACK_COOLDOWN_MS = 200;
+
+interface ExplosionHitFeedback {
+  position: THREE.Vector3;
+  damage: number;
+}
 
 export interface VehicleExplosionDamageQuery {
   getVehiclesInRadius(center: THREE.Vector3, radius: number): readonly IVehicle[];
@@ -39,7 +51,10 @@ interface GenericVehicleDamageTarget extends IVehicle {
 export class CombatantSystemDamage {
   private ticketSystem?: TicketSystem;
   private hudSystem?: IHUDSystem;
+  private audioManager?: AudioManager;
   private vehicleDamageQuery?: VehicleExplosionDamageQuery;
+  private lastPlayerHitFeedbackAt = 0;
+  private playerFaction: Faction = Faction.US;
 
   constructor(
     private combatants: Map<string, Combatant>,
@@ -58,6 +73,14 @@ export class CombatantSystemDamage {
 
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
+  }
+
+  setAudioManager(audioManager: AudioManager): void {
+    this.audioManager = audioManager;
+  }
+
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction;
   }
 
   setVehicleDamageQuery(query: VehicleExplosionDamageQuery | null): void {
@@ -87,6 +110,14 @@ export class CombatantSystemDamage {
     const playerOneShotActive = attackerId === 'PLAYER'
       && import.meta.env.DEV
       && isWorldBuilderFlagActive('oneShotKills');
+
+    // Crosshair hit/kill feedback for explosions the player caused (thrown
+    // grenades, the M79, and player-called air support all arrive as
+    // `attackerId === 'PLAYER'`). Only enemies of the player count; friendlies
+    // caught in a blast never raise a marker.
+    const playerAttributed = attackerId === 'PLAYER';
+    const playerKills: ExplosionHitFeedback[] = [];
+    let bestNonKillHit: ExplosionHitFeedback | null = null;
 
     // Query the spatial grid for combatants near the blast instead of an O(N)
     // scan over every combatant. The octree returns a (possibly conservative)
@@ -170,17 +201,28 @@ export class CombatantSystemDamage {
           // Track killed combatants for kill feed
           if (wasAlive) {
             killedCombatants.push(combatant);
+            if (playerAttributed && !isAlly(combatant.faction, this.playerFaction)) {
+              playerKills.push({ position: combatant.position.clone(), damage });
+            }
           }
 
           Logger.info('Combat', `${combatant.faction} soldier killed by explosion (${damage.toFixed(0)} damage)`);
         } else {
           combatant.lastHitTime = Date.now();
+          if (playerAttributed && damage > 0 && !isAlly(combatant.faction, this.playerFaction)
+            && (!bestNonKillHit || damage > bestNonKillHit.damage)) {
+            bestNonKillHit = { position: combatant.position.clone(), damage };
+          }
           Logger.debug('Combat', `${combatant.faction} soldier hit by explosion (${damage.toFixed(0)} damage, ${combatant.health.toFixed(0)} HP left)`);
         }
 
         hitCount++;
       }
     });
+
+    if (playerAttributed) {
+      this.showPlayerExplosionFeedback(playerKills, bestNonKillHit);
+    }
 
     const hudSystem = this.hudSystem;
     // Report kills to kill feed + emit `npc_killed` so subscribers
@@ -239,6 +281,41 @@ export class CombatantSystemDamage {
     }
 
     this.applyExplosionDamageToVehicles(center, radius, maxDamage, weaponType, shooterFaction);
+  }
+
+  /**
+   * Surface crosshair feedback for a player-caused explosion, mirroring the
+   * direct-fire path (`WeaponShotExecutor`): a damage number per victim, one
+   * marker, and the matching hit/kill sound. Kills always show; a non-kill hit
+   * is gated by {@link PLAYER_HIT_FEEDBACK_COOLDOWN_MS} so damage-over-time
+   * sources (napalm) do not strobe the marker.
+   */
+  private showPlayerExplosionFeedback(
+    kills: ExplosionHitFeedback[],
+    bestNonKillHit: ExplosionHitFeedback | null,
+  ): void {
+    const hudSystem = this.hudSystem;
+    if (!hudSystem) return;
+
+    if (kills.length > 0) {
+      for (const kill of kills) {
+        hudSystem.spawnDamageNumber(kill.position, kill.damage, false, true);
+      }
+      hudSystem.showHitMarker('kill');
+      this.audioManager?.playHitFeedback('kill');
+      this.lastPlayerHitFeedbackAt = performance.now();
+      return;
+    }
+
+    if (!bestNonKillHit) return;
+
+    const now = performance.now();
+    if (now - this.lastPlayerHitFeedbackAt < PLAYER_HIT_FEEDBACK_COOLDOWN_MS) return;
+    this.lastPlayerHitFeedbackAt = now;
+
+    hudSystem.spawnDamageNumber(bestNonKillHit.position, bestNonKillHit.damage, false, false);
+    hudSystem.showHitMarker('hit');
+    this.audioManager?.playHitFeedback('hit');
   }
 
   private applyExplosionDamageToVehicles(

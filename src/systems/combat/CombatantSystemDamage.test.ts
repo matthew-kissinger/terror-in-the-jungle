@@ -78,6 +78,94 @@ describe('CombatantSystemDamage', () => {
     expect(target.state).not.toBe(CombatantState.DEAD);
   });
 
+  describe('player explosion hit/kill feedback', () => {
+    function makeHud() {
+      return {
+        showHitMarker: vi.fn(),
+        spawnDamageNumber: vi.fn(),
+        addKillToFeed: vi.fn(),
+      };
+    }
+    function addEnemy(id: string, health: number, x: number) {
+      const e = createTestCombatant({ id, faction: Faction.NVA, health, position: new THREE.Vector3(x, 0, 0) });
+      combatants.set(id, e);
+      return e;
+    }
+
+    it('shows a hit marker + damage number when a player explosion wounds an enemy', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      const enemy = addEnemy('e1', 100, 2);
+
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+
+      expect(enemy.state).not.toBe(CombatantState.DEAD);
+      expect(hud.showHitMarker).toHaveBeenCalledWith('hit');
+      expect(hud.spawnDamageNumber).toHaveBeenCalledTimes(1);
+      const [, , isHeadshot, isKill] = hud.spawnDamageNumber.mock.calls[0];
+      expect(isHeadshot).toBe(false);
+      expect(isKill).toBe(false);
+    });
+
+    it('shows a kill marker + kill damage number when a player explosion kills an enemy', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      const enemy = addEnemy('e1', 10, 0.5);
+
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
+
+      expect(enemy.state).toBe(CombatantState.DEAD);
+      expect(hud.showHitMarker).toHaveBeenCalledWith('kill');
+      const isKill = hud.spawnDamageNumber.mock.calls[0][3];
+      expect(isKill).toBe(true);
+    });
+
+    it('shows no player feedback for an explosion the player did not cause', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      addEnemy('e1', 100, 2);
+
+      // NPC-attributed (mortar / tank cannon) — no 'PLAYER' attacker id.
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, undefined, 'mortar');
+
+      expect(hud.showHitMarker).not.toHaveBeenCalled();
+      expect(hud.spawnDamageNumber).not.toHaveBeenCalled();
+    });
+
+    it('gives no enemy feedback when a player explosion only catches friendlies', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      const friendly = createTestCombatant({ id: 'f1', faction: Faction.US, health: 100, position: new THREE.Vector3(2, 0, 0) });
+      combatants.set(friendly.id, friendly);
+
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+
+      expect(friendly.health).toBeLessThan(100); // bare grenades still hurt friendlies
+      expect(hud.showHitMarker).not.toHaveBeenCalled(); // but no enemy marker
+    });
+
+    it('rate-limits rapid non-kill hit markers yet never suppresses a kill', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000);
+
+      addEnemy('e1', 100, 2);
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+      expect(hud.showHitMarker).toHaveBeenCalledTimes(1); // first hit shows
+
+      addEnemy('e2', 100, 2);
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+      expect(hud.showHitMarker).toHaveBeenCalledTimes(1); // within cooldown: suppressed
+
+      addEnemy('e3', 5, 0.5); // dies this blast
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
+      expect(hud.showHitMarker).toHaveBeenCalledTimes(2); // kill punches through
+      expect(hud.showHitMarker).toHaveBeenLastCalledWith('kill');
+
+      nowSpy.mockRestore();
+    });
+  });
+
   it('ignores conservative spatial-grid combatant candidates outside the explosion radius', () => {
     const target = createTestCombatant({
       id: 'target-outside-radius',

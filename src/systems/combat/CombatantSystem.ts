@@ -663,20 +663,19 @@ export class CombatantSystem implements GameSystem {
     this.combatantMovement.setGameModeManager(gameModeManager);
     this.spawnManager.setGameModeManager(gameModeManager);
     this.lodManager.setGameModeManager(gameModeManager);
-    // Reinitialize spatial grid with correct world size
-    const worldSize = gameModeManager.getWorldSize();
-    this.spatialGridManager.reinitialize(worldSize);
-    Logger.info('combat', `Spatial grid reinitialized with world size ${worldSize}`);
+    this.spatialGridManager.reinitialize(gameModeManager.getWorldSize());
   }
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
     this.combatantCombat.setAudioManager(audioManager);
+    this.damageHandler.setAudioManager(audioManager);
   }
 
   setPlayerFaction(faction: Faction): void {
     this.combatantAI.setPlayerFaction(faction);
     this.spawnManager.setPlayerFaction(faction);
+    this.damageHandler.setPlayerFaction(faction);
   }
 
   setPlayerSuppressionSystem(system: PlayerSuppressionSystem): void {

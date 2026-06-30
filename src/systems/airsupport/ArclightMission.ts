@@ -149,7 +149,7 @@ function releaseBomb(
     impact,
     BOMB_RADIUS,
     BOMB_MAX_DAMAGE,
-    undefined,
+    'PLAYER', // credit the player who called the strike: hit/kill markers
     'arclight',
     shooterFaction,
   );

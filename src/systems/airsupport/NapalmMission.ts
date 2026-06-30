@@ -92,7 +92,7 @@ export function updateNapalm(
         targetPosition,
         FIRE_ZONE_RADIUS,
         FIRE_ZONE_MAX_DAMAGE,
-        undefined,
+        'PLAYER', // credit the player who called the strike: hit/kill markers
         'napalm',
         shooterFaction,
       );
@@ -144,7 +144,7 @@ export function updateNapalm(
             _firePos,
             8,
             30,
-            undefined,
+            'PLAYER', // credit the player who called the strike: hit/kill markers (rate-limited)
             'napalm',
             shooterFaction,
           );
