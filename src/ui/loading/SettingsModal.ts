@@ -29,6 +29,8 @@ interface GameplayMenuActions {
   onResume: () => void;
   onSquadCommands: () => void;
   onQuitToMenu: () => void;
+  /** Optional opt-in: open the 3D orbital topographic map from the pause menu. */
+  onTopographicMap?: () => void;
 }
 
 export class SettingsModal extends UIComponent {
@@ -87,6 +89,7 @@ export class SettingsModal extends UIComponent {
           <div class="${styles.gameplayActionsGrid}">
             <button class="${styles.secondaryBtn}" data-ref="resume" type="button">Resume</button>
             <button class="${styles.secondaryBtn}" data-ref="squad" type="button">Squad Commands</button>
+            <button class="${styles.secondaryBtn}" data-ref="topomap" type="button">Topographic Map</button>
             <button class="${styles.secondaryBtn}" data-ref="fullscreen" type="button">Toggle Fullscreen</button>
             <button class="${styles.secondaryBtn}" data-ref="quit" type="button">Quit to Menu</button>
           </div>
@@ -120,6 +123,22 @@ export class SettingsModal extends UIComponent {
             <div class="${styles.field}">
               <label class="${styles.label}" for="setting-masterVolume">Master Volume <span data-ref="volumeLabel">70</span>%</label>
               <input type="range" id="setting-masterVolume" min="0" max="100" value="70" data-setting="masterVolume" class="${styles.range}">
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-ambientVolume">Ambient Volume <span data-ref="ambientVolumeLabel">100</span>%</label>
+              <input type="range" id="setting-ambientVolume" min="0" max="100" value="100" data-setting="ambientVolume" class="${styles.range}">
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.check}">
+                <input type="checkbox" data-setting="musicEnabled"> Radio Music
+              </label>
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-musicVolume">Music Volume <span data-ref="musicVolumeLabel">50</span>%</label>
+              <input type="range" id="setting-musicVolume" min="0" max="100" value="50" data-setting="musicVolume" class="${styles.range}">
             </div>
           </fieldset>
 
@@ -240,6 +259,12 @@ export class SettingsModal extends UIComponent {
       this.listen(squadBtn, 'click', (e) => e.preventDefault());
     }
 
+    const topoMapBtn = this.$('[data-ref="topomap"]');
+    if (topoMapBtn) {
+      this.listen(topoMapBtn, 'pointerdown', () => this.gameplayMenuActions?.onTopographicMap?.());
+      this.listen(topoMapBtn, 'click', (e) => e.preventDefault());
+    }
+
     const fullscreenBtn = this.$('[data-ref="fullscreen"]');
     if (fullscreenBtn && document.fullscreenEnabled) {
       // Must use 'click' event - Android Chrome requires it for fullscreen user gesture.
@@ -315,6 +340,11 @@ export class SettingsModal extends UIComponent {
   setGameplayMenuActions(actions: GameplayMenuActions | null): void {
     this.gameplayMenuActions = actions ?? undefined;
     this.gameplayActionsEnabled.value = Boolean(actions);
+    // Topographic-map button only shows when a host wires the opt-in action.
+    const topoMapBtn = this.$('[data-ref="topomap"]');
+    if (topoMapBtn) {
+      (topoMapBtn as HTMLElement).style.display = actions?.onTopographicMap ? '' : 'none';
+    }
   }
 
   // --- Settings binding ---
@@ -351,6 +381,38 @@ export class SettingsModal extends UIComponent {
         const val = Number(volumeSlider.value);
         if (volumeLabel) volumeLabel.textContent = String(val);
         settings.set('masterVolume', val);
+      });
+    }
+
+    const ambientVolumeSlider = this.$('[data-setting="ambientVolume"]') as HTMLInputElement | null;
+    const ambientVolumeLabel = this.$('[data-ref="ambientVolumeLabel"]');
+    if (ambientVolumeSlider) {
+      ambientVolumeSlider.value = String(current.ambientVolume);
+      if (ambientVolumeLabel) ambientVolumeLabel.textContent = String(current.ambientVolume);
+      this.listen(ambientVolumeSlider, 'input', () => {
+        const val = Number(ambientVolumeSlider.value);
+        if (ambientVolumeLabel) ambientVolumeLabel.textContent = String(val);
+        settings.set('ambientVolume', val);
+      });
+    }
+
+    const musicEnabledCheck = this.$('[data-setting="musicEnabled"]') as HTMLInputElement | null;
+    if (musicEnabledCheck) {
+      musicEnabledCheck.checked = current.musicEnabled;
+      this.listen(musicEnabledCheck, 'change', () => {
+        settings.set('musicEnabled', musicEnabledCheck.checked);
+      });
+    }
+
+    const musicVolumeSlider = this.$('[data-setting="musicVolume"]') as HTMLInputElement | null;
+    const musicVolumeLabel = this.$('[data-ref="musicVolumeLabel"]');
+    if (musicVolumeSlider) {
+      musicVolumeSlider.value = String(current.musicVolume);
+      if (musicVolumeLabel) musicVolumeLabel.textContent = String(current.musicVolume);
+      this.listen(musicVolumeSlider, 'input', () => {
+        const val = Number(musicVolumeSlider.value);
+        if (musicVolumeLabel) musicVolumeLabel.textContent = String(val);
+        settings.set('musicVolume', val);
       });
     }
 

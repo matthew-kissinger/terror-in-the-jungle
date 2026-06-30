@@ -8,7 +8,12 @@
 >   change, >2 CI red/round, combat120 p99 regression >5%, carry-over growth,
 >   worktree failure, twice-rejected reviewer)
 > **Concurrency cap:** 5
-> **Status:** KICKED OFF 2026-06-29 (autonomous-loop). In progress.
+> **Status:** ✅ CLOSED 2026-06-29 (autonomous-loop). All phases merged to
+> `master` — P0-P6 + P4b (radio-station wiring) + PX (terrain-spike). 9 PRs
+> #457-#465, ZERO fence changes, combat120 baseline restored, full suite 7238
+> green. Visual post-stack + orbital topo ship DEFAULT-OFF/opt-in; the post
+> default-on flip is deferred behind a MAIN-worktree combat120 p99 proof. NOT
+> deployed (deploy is MANUAL). Owner feel-walks queued in PLAYTEST_PENDING.md.
 >
 > **Owner-gated open questions resolved to defaults at kickoff** (autonomous run,
 > revisit in owner walk): post default-on uses the full evidence-matrix gate then
@@ -18,9 +23,10 @@
 > degrades to load-time bed selection (acceptable).
 >
 > **Progress:**
-> ⬜ P0 cinematic-foundations · ⬜ P1 soundscape-loop-replacement ·
-> ⬜ P2 task-card-hud-fit · ⬜ P3 radio-dial-revival ·
-> ⬜ P4 radio-stations-music · ⬜ P5 orbital-topo-map · ⬜ P6 visual-post-stack
+> ✅ P0 cinematic-foundations · ✅ P1 soundscape-loop-replacement ·
+> ✅ P2 task-card-hud-fit · ✅ P3 radio-dial-revival ·
+> ✅ P4 radio-stations-music (+ ✅ P4b station-wiring) · ✅ P5 orbital-topo-map ·
+> ✅ P6 visual-post-stack · ✅ PX terrain-spike-fix
 
 Source: the 2026-06-29 owner playtest + consultation (voice transcript) and a
 multi-agent design pass (`titj-big-cycle-design` workflow: 5 parallel designs,

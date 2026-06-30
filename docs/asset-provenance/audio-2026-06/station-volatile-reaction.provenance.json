@@ -1,0 +1,18 @@
+{
+  "slug": "station-volatile-reaction",
+  "role": "radio station track (tense combat)",
+  "title": "Volatile Reaction",
+  "author": "Kevin MacLeod",
+  "provider": "incompetech.com",
+  "sourceUrl": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Volatile%20Reaction.mp3",
+  "infoUrl": "https://incompetech.com/music/royalty-free/index.html?keywords=Volatile+Reaction",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "status": "shipped-third-party",
+  "localPath": "public/assets/audio/music/station-volatile-reaction.ogg",
+  "attributionRequired": true,
+  "attributionText": "\"Volatile Reaction\" by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License (https://creativecommons.org/licenses/by/4.0/).",
+  "format": "Opus .ogg, stereo, ~80 kbps, ~165 s",
+  "fetchedOn": "2026-06-29",
+  "notes": "Fetched directly from incompetech.com (HTTP 200) during cycle-2026-06-29-radio-stations-music and re-encoded MP3 256kbps -> Opus stereo 80kbps with ffmpeg/libopus (metadata stripped). incompetech music is published under 'Creative Commons: By Attribution 4.0 License' per the incompetech site. Lazy-loaded only when the player tunes to this station (music default-OFF)."
+}

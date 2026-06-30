@@ -169,6 +169,42 @@ export const HUD_LAYOUT_STYLES = `
     align-items: flex-start;
   }
 
+  /* Objectives slot stacks its children vertically (tasking-director card atop
+   * the objectives panel) and stays right-aligned. overflow:visible so the
+   * stacked card is never clipped by the slot's measured bounds. */
+  .hud-slot[data-region="objectives"] {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  /* Objectives panel: cap its height so capture-progress / a growing zone list
+   * cannot push the right rail around (stable dimensions per UI guidance). The
+   * panel scrolls internally past the cap rather than reflowing neighbours. */
+  [data-device="desktop"] .hud-slot[data-region="objectives"] .objectives-panel {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  /* Contextual control legend lives in its OWN right-column row (desktop).
+   * Right-aligned, top of its row, in-grid — no more position:fixed overlay. */
+  .hud-slot[data-region="control-hints"] {
+    justify-content: flex-end;
+    align-items: flex-start;
+    overflow: visible;
+  }
+  [data-device="desktop"] .hud-slot[data-region="control-hints"] {
+    padding-right: 10px;
+  }
+  /* The legend now flows inside its slot — neutralise the legacy fixed anchor. */
+  .hud-slot[data-region="control-hints"] .hud-control-hints {
+    position: static;
+    right: auto;
+    top: auto;
+    transform: none;
+  }
+
   /* On mobile, minimap is in the left column — align flush top-left */
   [data-device="touch"] .hud-slot[data-region="minimap"] {
     justify-content: flex-start;
@@ -221,9 +257,14 @@ export const HUD_LAYOUT_STYLES = `
    *  timer      |  tickets   | minimap
    *  game-status|  compass   | minimap
    *  stats      |            | objectives
-   *             |  center    | kill-feed  <- top-right
+   *             |            | control-hints  <- own row, col 3 only
+   *             |  center    | kill-feed
    *  health     |            | ammo
    *             | weapon-bar |
+   *
+   * control-hints gets its OWN right-column row so a growing objectives panel
+   * or a tall legend never overlaps a neighbour or inflates a row shared with
+   * the centered weapon-bar. The 1fr (center/kill-feed) row absorbs the slack.
    * ========================================================= */
   #game-hud-root {
     display: grid;
@@ -232,13 +273,15 @@ export const HUD_LAYOUT_STYLES = `
       auto     /* timer / tickets / minimap top */
       auto     /* game-status / compass / minimap bottom */
       auto     /* stats / . / objectives */
-      1fr      /* center (flexible) / kill-feed top-right */
+      auto     /* . / . / control-hints */
+      1fr      /* center (flexible) / kill-feed */
       auto     /* health / . / ammo */
       auto;    /* . / weapon-bar / . */
     grid-template-areas:
       "timer        tickets     minimap"
       "game-status  compass     minimap"
       "stats        .           objectives"
+      ".            .           control-hints"
       ".            center      kill-feed"
       "health       .           ammo"
       ".            weapon-bar  .";
@@ -252,6 +295,7 @@ export const HUD_LAYOUT_STYLES = `
   .hud-slot[data-region="game-status"] { grid-area: game-status; }
   .hud-slot[data-region="compass"]     { grid-area: compass; }
   .hud-slot[data-region="objectives"]  { grid-area: objectives; }
+  .hud-slot[data-region="control-hints"] { grid-area: control-hints; }
   .hud-slot[data-region="stats"]       { grid-area: stats; }
   .hud-slot[data-region="center"]      { grid-area: center; }
   .hud-slot[data-region="kill-feed"]   { grid-area: kill-feed; }
@@ -281,8 +325,10 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
-  /* Objectives hidden on touch */
-  [data-device="touch"] .hud-slot[data-region="objectives"] {
+  /* Objectives + desktop control-hints legend hidden on touch (on-screen
+   * buttons carry the controls; the mobile grid has no control-hints area). */
+  [data-device="touch"] .hud-slot[data-region="objectives"],
+  [data-device="touch"] .hud-slot[data-region="control-hints"] {
     display: none !important;
   }
 

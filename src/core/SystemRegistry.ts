@@ -31,6 +31,7 @@ import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import type { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
 import type { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import type { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import type { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import type { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import type { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
@@ -82,6 +83,7 @@ export interface SystemKeyToType {
   playerSuppressionSystem: PlayerSuppressionSystem;
   flashbangScreenEffect: FlashbangScreenEffect;
   smokeCloudSystem: SmokeCloudSystem;
+  zoneCaptureEffects: ZoneCaptureEffects;
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
@@ -171,6 +173,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'playerSuppressionSystem',
   'flashbangScreenEffect',
   'smokeCloudSystem',
+  'zoneCaptureEffects',
   'influenceMapSystem',
   'ammoSupplySystem',
   'footstepAudioSystem',

@@ -59,16 +59,19 @@ describe('HudControlHints', () => {
     document.querySelectorAll('.hud-control-hints').forEach((el) => el.remove());
   });
 
-  it('shows the on-foot binds by default', () => {
+  it('shows the on-foot binds by default (non-obvious verbs only)', () => {
     const hints = new HudControlHints();
     hints.mount(host);
 
     const text = legendText(host);
-    expect(text).toContain('Move');
+    // The on-foot legend is trimmed to this game's non-obvious verbs; standard
+    // FPS controls (WASD/Move, sprint, jump, reload, weapon-swap) are omitted.
+    expect(text).not.toContain('Move');
     expect(text).toContain('Board vehicle');
     // The dominant finding: players could not tell the radio / squad menu exist.
     expect(text).toContain('Air support radio');
     expect(text).toContain('Squad commands');
+    expect(text).toContain('Scoreboard');
     hints.dispose();
   });
 

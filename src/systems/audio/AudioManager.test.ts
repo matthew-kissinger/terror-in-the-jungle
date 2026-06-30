@@ -45,10 +45,43 @@ vi.mock('./AudioDuckingSystem', () => ({
   AudioDuckingSystem: class { update = vi.fn(); },
 }));
 const setVolumeSpy = vi.fn();
-vi.mock('./AmbientSoundManager', () => ({
-  AmbientSoundManager: class { start = vi.fn(); setVolume = setVolumeSpy; getAmbientSounds = vi.fn().mockReturnValue([]); dispose = vi.fn(); },
+vi.mock('./SoundscapeDirector', () => ({
+  SoundscapeDirector: class {
+    start = vi.fn();
+    setVolume = setVolumeSpy;
+    setSkyRuntime = vi.fn();
+    update = vi.fn();
+    getActiveBeds = vi.fn().mockReturnValue([]);
+    dispose = vi.fn();
+  },
 }));
 vi.mock('./AudioWeaponSounds', () => ({ AudioWeaponSounds: class {} }));
+// Radio is its own system (covered by RadioStationSystem.test.ts); here we only
+// assert AudioManager routes the music controls through it. Capture the spies on
+// the constructed instance so a test can observe the routing.
+const radioSpies = {
+  setEnabled: vi.fn(),
+  setMusicVolume: vi.fn(),
+  tuneTo: vi.fn().mockResolvedValue(undefined),
+  getSelectedStationId: vi.fn().mockReturnValue('firebase-tension'),
+  getActiveMusicBed: vi.fn().mockReturnValue(null),
+  update: vi.fn(),
+  dispose: vi.fn(),
+};
+vi.mock('./RadioStationSystem', () => ({
+  RadioStationSystem: class {
+    setEnabled = radioSpies.setEnabled;
+    setMusicVolume = radioSpies.setMusicVolume;
+    tuneTo = radioSpies.tuneTo;
+    getSelectedStationId = radioSpies.getSelectedStationId;
+    getActiveMusicBed = radioSpies.getActiveMusicBed;
+    update = radioSpies.update;
+    dispose = radioSpies.dispose;
+  },
+}));
+vi.mock('../../utils/DeviceDetector', () => ({
+  shouldUseTouchControls: vi.fn().mockReturnValue(false),
+}));
 vi.mock('../../core/GameEventBus', () => ({
   GameEventBus: { subscribe: vi.fn().mockReturnValue(() => {}) },
 }));
@@ -127,8 +160,8 @@ describe('AudioManager — SFX bank decode deferred beyond critical path', () =>
   let pendingLoads: PendingLoad[];
 
   const BOOT_CRITICAL_PATHS = new Set([
-    'assets/optimized/jungle1.ogg',
-    'assets/optimized/jungle2.ogg',
+    'assets/audio/ambient/jungle-day.ogg',
+    'assets/audio/ambient/jungle-night.ogg',
   ]);
 
   beforeEach(() => {
@@ -232,5 +265,52 @@ describe('AudioManager — SFX bank decode deferred beyond critical path', () =>
     const { AudioManager } = await import('./AudioManager');
     const manager: any = new AudioManager(scene, camera);
     await expect(manager.whenSfxReady()).resolves.toBeUndefined();
+  });
+});
+
+describe('AudioManager — radio music routes through the radio system', () => {
+  let scene: THREE.Scene;
+  let camera: THREE.Camera;
+
+  beforeEach(() => {
+    radioSpies.setEnabled.mockClear();
+    radioSpies.setMusicVolume.mockClear();
+    radioSpies.tuneTo.mockClear();
+    radioSpies.getActiveMusicBed.mockClear();
+    radioSpies.update.mockClear();
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera();
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).document = (globalThis as any).document ?? {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+  });
+
+  it('does not enable music until asked (default-OFF)', () => {
+    new AudioManager(scene, camera);
+    expect(radioSpies.setEnabled).not.toHaveBeenCalledWith(true);
+  });
+
+  it('enabling music and tuning a station reaches the radio system', () => {
+    const manager = new AudioManager(scene, camera);
+    manager.setMusicEnabled(true);
+    expect(radioSpies.setEnabled).toHaveBeenCalledWith(true);
+
+    manager.tuneRadioStation('rolling-thunder');
+    expect(radioSpies.tuneTo).toHaveBeenCalledWith('rolling-thunder');
+  });
+
+  it('forwards the music volume to the radio system', () => {
+    const manager = new AudioManager(scene, camera);
+    manager.setMusicVolume(0.4);
+    expect(radioSpies.setMusicVolume).toHaveBeenCalledWith(0.4);
+  });
+
+  it('feeds the active radio bed into ducking each update', () => {
+    const manager = new AudioManager(scene, camera);
+    manager.update(0.016);
+    expect(radioSpies.update).toHaveBeenCalled();
+    expect(radioSpies.getActiveMusicBed).toHaveBeenCalled();
   });
 });

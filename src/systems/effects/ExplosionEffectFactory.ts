@@ -3,6 +3,17 @@
 
 import * as THREE from 'three';
 
+/**
+ * Over-bright multipliers applied to the additively-blended explosion flash +
+ * fire colours so they clear the P6 post-stack bloom threshold
+ * (`BloomPass.BLOOM_THRESHOLD` = 1.0) and bloom, while ordinary lit surfaces do
+ * not. Additive blending already reads > 1.0 colours; the boosted colours
+ * guarantee the hot core blooms. Harmless when post is off (additive blend just
+ * saturates as before).
+ */
+const EXPLOSION_FLASH_BLOOM_GAIN = 2.0;
+const EXPLOSION_FIRE_BLOOM_GAIN = 1.8;
+
 export const EXPLOSION_EFFECT_REPRESENTATION = {
   flashPrimitive: 'pooled_unlit_billboard_flash',
   smokePrimitive: 'pooled_points',
@@ -45,6 +56,8 @@ export function createExplosionEffect(
   // Flash sprite for visual burst - larger initial size
   const flashSpriteMaterial = new THREE.SpriteMaterial({
     map: flashTexture,
+    // Over-bright so the flash core clears the post-stack bloom threshold.
+    color: new THREE.Color(EXPLOSION_FLASH_BLOOM_GAIN, EXPLOSION_FLASH_BLOOM_GAIN, EXPLOSION_FLASH_BLOOM_GAIN),
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     opacity: 1
@@ -88,7 +101,8 @@ export function createExplosionEffect(
   fireGeometry.setAttribute('position', firePositionAttribute);
 
   const fireMaterial = new THREE.PointsMaterial({
-    color: 0xff6600,
+    // Over-bright orange so the fire core clears the post-stack bloom threshold.
+    color: new THREE.Color(0xff6600).multiplyScalar(EXPLOSION_FIRE_BLOOM_GAIN),
     size: 1.2,
     transparent: true,
     opacity: 1,

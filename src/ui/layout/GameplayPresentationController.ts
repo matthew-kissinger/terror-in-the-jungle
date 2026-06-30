@@ -10,6 +10,7 @@ import type {
   UIState,
 } from './types';
 import { ViewportManager } from '../design/responsive';
+import { setAttributionVisible } from '../AttributionNotice';
 
 function deriveLayoutMode(vp: { isTouch: boolean; isPortrait: boolean }): LayoutMode {
   if (!vp.isTouch) return 'desktop';
@@ -167,6 +168,10 @@ export class GameplayPresentationController {
     this.root.dataset.interaction = this.state.interaction?.kind ?? 'none';
     this.root.dataset.ads = String(this.state.ads);
     this.root.dataset.layout = this.state.layout;
+    // Persistent attribution footer lives on menu-like screens only; hide it in
+    // the live play scene where it would overlap the bottom weapon bar. Full
+    // attribution remains in the Credits/About panel (AGPL notices preserved).
+    setAttributionVisible(this.state.phase !== 'playing' && this.state.phase !== 'paused');
   }
 
   private emit(): void {

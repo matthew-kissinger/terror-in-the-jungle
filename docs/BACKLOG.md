@@ -57,6 +57,59 @@ Merge-hardening left: Open Frontier and A Shau visual review of the coarse
 source-delta cache used for the render-only visual margin; if rejected, promote
 persistent/prebaked visual-surface artifacts or an IndexedDB/OPFS bake cache.
 
+## Recently Completed (cycle-2026-06-29-cinematic-field-pass)
+
+CAMPAIGN_2026-06-29-cinematic-field-pass — a visual + audio + map + HUD pass,
+9 PRs (#457-#465) merged to `master` 2026-06-29 (autonomous-loop, **NOT
+deployed** — deploy is MANUAL). Zero fence changes across all 9 PRs; full suite
+7238 green; combat120 baseline restored (P0).
+
+- **P0 cinematic-foundations** (#457): restored the `combat120` perf baseline
+  (`perf-baselines.json`), added the shared `src/core/tsl/` node-material library,
+  and the non-fenced `TerrainSystem.getBakedHeightmap()` facade.
+- **P1 soundscape-loop-replacement** (`e7e0c516`): killed the permanent jungle
+  loop; day/night `SoundscapeDirector` crossfades beds by sun elevation. Beds are
+  FIRST-PARTY CC BY-SA 4.0 **placeholders** — owner-action to source production
+  CC0/CC-BY field recordings (THIRD-PARTY-ASSETS.md).
+- **P2 task-card-hud-fit** (`3d90cddd`): device-aware home for the tasking-director
+  card (no more objective overlap; real mobile placement).
+- **P3 radio-dial-revival** (`5a307960`): revived radial dial (desktop wheel + touch
+  bottom-sheet, one model) on a dedicated non-weapon HUD slot; squad/fire-support
+  issue through the existing paths. combat-reviewer PASS-WITH-NOTES.
+- **P4 radio-stations-music** (`f1ca489d`) + **P4b station-wiring** (`a34124f7`):
+  headless `RadioStationSystem` (lazy decode, ≤2-buffer cache, own music bus,
+  DEFAULT-OFF) wired through `AudioManager` (concrete, off-fence) → the dial tuner +
+  `musicEnabled`/`musicVolume` settings. Ships 3 Kevin MacLeod (incompetech) **CC BY
+  4.0** tracks (substituted for the brief-cited credential-bound sources; honest
+  provenance in `docs/asset-provenance/audio-2026-06/`). Combat ducking attenuates
+  the music bed only while enabled.
+- **P5 orbital-topo-map** (`a5247e95`): 3D orbital topo map on deploy/pause (rich 3D)
+  + opt-in hold-M (default stays 2D). CPU-displaced `.f32` PlaneGeometry; NASADEM
+  (CC0) for the seed DEMs (A Shau covered live via `getBakedHeightmap()`). WebGL2
+  Lambert + WebGPU/TSL upgrade. Render-on-demand → ~0 steady-state combat cost closed.
+- **P6 visual-post-stack** (`5e1060da`): filled the no-op post shim with a TSL stack
+  (filmic grade + 3 LUTs + tier-gated bloom + atmospheric depth), **DEFAULT-OFF**
+  behind `DEFAULT_POST_ENABLED_DESKTOP`. Only phase on the combat hot path → flip to
+  default-on-desktop AFTER a MAIN-worktree combat120 p99 neutrality proof.
+- **PX terrain-spike-fix** (`950764c1`): the owner-reported random ~100m terrain
+  "towers" were **inflated GLB impostor billboard cards** (card vertical scale from a
+  live `Box3` Y-extent with no upper clamp), NOT terrain — the DEM was proven clean by
+  direct `.f32` scan. Fixed by clamping card height to authored bounds + a one-time
+  warn-log naming any over-inflated archetype at runtime.
+
+**Deferred / carry-overs** (owner walks in `docs/PLAYTEST_PENDING.md`):
+- The **post default-on flip** + the combat120 baseline finalization (multiple MAIN
+  captures, ±6ms noise) — held for a low-load window per the owner's machine-use note.
+- **Pre-existing** `check:tod-coherence` foliage FAIL (correlation 0.810 / rangeRatio
+  2.735) — master-state, P6 proved it is not a regression; the known foliage
+  clamp-band signature, a candidate for a future visual pass.
+- `AShauValleyConfig` worldSize/DEM-box ~1.93% mismatch (edge-droop latent bug) and
+  re-normalizing the one over-inflated hero GLB (the PX warn-log names it at runtime).
+- P1 ambient beds = production-field-recording sourcing; the N1 test nit
+  (`CommandInputManager.test.ts:193` etc. hardcode catalog counts 7/7/6).
+
+Briefs archived at `docs/tasks/archive/cycle-2026-06-29-cinematic-field-pass/`.
+
 ## Recently Completed (cycle-2026-06-28-ashau-purpose-and-missions)
 
 Phase 6 (FINAL) of CAMPAIGN_2026-06-28-field-readiness (overnight,

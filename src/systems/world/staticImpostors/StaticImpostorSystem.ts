@@ -158,6 +158,7 @@ export class StaticImpostorSystem {
   private readonly instances = new Map<string, RegisteredStaticImpostorInstance>();
   private readonly atlasRecords = new Map<string, StaticImpostorAtlasRecord>();
   private readonly batches = new Map<string, StaticImpostorBatch>();
+  private readonly inflatedBoundsWarned = new Set<string>();
   private readonly debugSource: string;
   private readonly materialTuning: StaticImpostorMaterialTuning | undefined;
   private readonly transitionFadeMeters: number;
@@ -183,6 +184,26 @@ export class StaticImpostorSystem {
     return this.archetypeOverrides[modelPath] ?? getStaticImpostorArchetype(modelPath);
   }
 
+  /**
+   * Surfaces a one-time warning (deduped per archetype) when an instance's live
+   * AABB-Y grossly exceeds the archetype's authored bounds. The card height is
+   * still clamped, but the log names the offending GLB so a mis-normalized
+   * asset is caught at registration rather than silently rendered as a tower.
+   */
+  private warnIfBoundsInflated(archetype: StaticImpostorArchetype, liveHeight: number): void {
+    const authoredHeight = archetype.bounds.size[1];
+    if (liveHeight <= authoredHeight * 2 || this.inflatedBoundsWarned.has(archetype.slug)) {
+      return;
+    }
+    this.inflatedBoundsWarned.add(archetype.slug);
+    Logger.warn(
+      'world',
+      `Static impostor "${archetype.slug}" runtime AABB height ${liveHeight.toFixed(2)}m far exceeds `
+        + `authored bounds ${authoredHeight.toFixed(2)}m (${archetype.modelPath}); card height clamped. `
+        + 'Re-normalize the GLB.',
+    );
+  }
+
   registerInstance(params: {
     id: string;
     modelPath: string;
@@ -203,10 +224,18 @@ export class StaticImpostorSystem {
     params.object.getWorldQuaternion(_worldQuaternion);
     _worldEuler.setFromQuaternion(_worldQuaternion);
 
+    this.warnIfBoundsInflated(archetype, _size.y);
+
     tagStaticImpostorControlled(params.object, params.id);
     const fadeMaterials = this.transitionFadeMeters > 0
       ? prepareStaticImpostorFadeMaterials(params.object)
       : [];
+    // Card height is upper-clamped to the archetype's authored bounds so a
+    // GLB with an inflated runtime AABB-Y (mis-normalized asset, stray distant
+    // vertex, off-origin child) can never render as a tall vertical card at
+    // impostor distance. The horizontal scale keeps the live footprint.
+    const authoredHeight = archetype.bounds.size[1];
+    const cardHeight = THREE.MathUtils.clamp(_size.y, 0.1, authoredHeight * 1.5);
     const instance: RegisteredStaticImpostorInstance = {
       id: params.id,
       modelPath: params.modelPath,
@@ -215,7 +244,7 @@ export class StaticImpostorSystem {
       center: _center.clone(),
       scale: new THREE.Vector2(
         Math.hypot(_size.x, _size.z) * archetype.planePaddingScale,
-        Math.max(_size.y, 0.1) * archetype.planePaddingScale,
+        cardHeight * archetype.planePaddingScale,
       ),
       yaw: _worldEuler.y,
       slot: null,
