@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { GrenadeType } from '../combat/types';
+import type { Faction } from '../combat/types';
 
 export interface Grenade {
   id: string;
@@ -16,6 +17,12 @@ export interface Grenade {
   isActive: boolean;
   /** Kill feed weapon type override (default: 'grenade'). */
   killFeedWeaponType?: string;
+  /**
+   * Faction that fired this projectile. When set, the explosion spares
+   * same-alliance combatants (IFF); undefined preserves the legacy
+   * damage-everyone behaviour of player-thrown grenades.
+   */
+  ownerFaction?: Faction;
 }
 
 type GroundHeightFn = (x: number, z: number) => number;

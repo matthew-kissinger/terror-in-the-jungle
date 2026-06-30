@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { initRocketRun, updateRocketRun } from './RocketRunMission';
+import { Faction } from '../combat/types';
 import { createAirSupportMission, flatTerrainHeight } from '../../test-utils/airSupportMission';
 
 /**
@@ -30,6 +31,7 @@ function runRun(opts: {
   grenadeSystem?: any;
   audio?: any;
   approach?: THREE.Vector3;
+  faction?: Faction;
 } = {}) {
   const mission = createAirSupportMission('rocket_run', {
     x: -120,
@@ -43,7 +45,7 @@ function runRun(opts: {
   const steps = Math.round((opts.seconds ?? 30) / dt);
   for (let i = 0; i < steps; i++) {
     mission.elapsed += dt;
-    updateRocketRun(mission, dt, grenadeSystem, audio, flatTerrainHeight());
+    updateRocketRun(mission, dt, grenadeSystem, audio, flatTerrainHeight(), opts.faction);
     if (mission.state === 'outbound') break;
   }
   return { mission, grenadeSystem, audio };
@@ -81,6 +83,25 @@ describe('RocketRunMission', () => {
     expect(calls.length).toBeGreaterThan(0);
     for (const call of calls) {
       expect(call).toContain('rocket');
+    }
+  });
+
+  it('threads the requester faction into launched rockets so friendlies are spared (IFF)', () => {
+    const { grenadeSystem } = runRun({ faction: Faction.US });
+    const calls = grenadeSystem.spawnProjectile.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // spawnProjectile(position, velocity, fuseTime, killFeedWeaponType, ownerFaction)
+    for (const call of calls) {
+      expect(call[4]).toBe(Faction.US);
+    }
+  });
+
+  it('leaves ownerFaction undefined when no requester faction is supplied (legacy path)', () => {
+    const { grenadeSystem } = runRun({});
+    const calls = grenadeSystem.spawnProjectile.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call[4]).toBeUndefined();
     }
   });
 

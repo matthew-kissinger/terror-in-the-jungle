@@ -31,10 +31,20 @@ interface AirSupportManagerDependencies {
   hudSystem: IHUDSystem;
   terrainSystem: ITerrainRuntime;
   explosionEffectsPool?: ExplosionEffectsPool;
+  /** Distance-attenuated camera shake at an ordnance impact (player-relative). */
+  impactShake?: (position: THREE.Vector3, radius: number) => void;
 }
 
 const OUTBOUND_DURATION = 10; // seconds to fly away before cleanup
 const DEFAULT_APPROACH = new THREE.Vector3(0, 0, 1); // south to north
+
+// Per-ordnance shake radius handed to the distance-attenuated camera shake. The
+// bomber's stick walks toward the player, so successive Arc Light craters
+// escalate naturally via the falloff already in `shakeFromExplosion`.
+const IMPACT_SHAKE_RADIUS: Partial<Record<AirSupportType, number>> = {
+  arclight: 14, // matches BOMB_RADIUS
+  napalm: 22, // one firm WHUMP per fire zone
+};
 
 let nextMissionId = 1;
 
@@ -50,6 +60,7 @@ export class AirSupportManager implements GameSystem {
   private hudSystem?: IHUDSystem;
   private terrainSystem?: ITerrainRuntime;
   private explosionEffectsPool?: ExplosionEffectsPool;
+  private impactShake?: (position: THREE.Vector3, radius: number) => void;
 
   // State
   private activeMissions: AirSupportMission[] = [];
@@ -75,6 +86,9 @@ export class AirSupportManager implements GameSystem {
     this.setTerrainSystem(dependencies.terrainSystem);
     if (dependencies.explosionEffectsPool) {
       this.setExplosionEffectsPool(dependencies.explosionEffectsPool);
+    }
+    if (dependencies.impactShake) {
+      this.setImpactShake(dependencies.impactShake);
     }
   }
 
@@ -104,6 +118,10 @@ export class AirSupportManager implements GameSystem {
     this.explosionEffectsPool = pool;
   }
 
+  setImpactShake(fn: (position: THREE.Vector3, radius: number) => void): void {
+    this.impactShake = fn;
+  }
+
   // ── Public API ──
 
   requestSupport(request: AirSupportRequest): boolean {
@@ -120,6 +138,10 @@ export class AirSupportManager implements GameSystem {
     // Queue request
     this.pendingRequests.push({ request, requestedAt: this.gameElapsed });
     this.hudSystem?.showMessage(`${formatSupportName(request.type)} inbound - ${config.delay}s`, 3000);
+
+    // "Cleared hot" confirm chime — single funnel for every call-in surface
+    // (laze-confirm, tactical map). Reuses the existing radio beep sound.
+    this.audioManager?.play('airSupportRadio');
 
     GameEventBus.emit('air_support_inbound', {
       type: request.type,
@@ -309,8 +331,12 @@ export class AirSupportManager implements GameSystem {
     const getHeight = (x: number, z: number) =>
       this.terrainSystem?.getHeightAt(x, z) ?? 0;
 
+    const shakeRadius = IMPACT_SHAKE_RADIUS[mission.type];
     const explosionSpawn = this.explosionEffectsPool
-      ? (pos: THREE.Vector3) => this.explosionEffectsPool!.spawn(pos)
+      ? (pos: THREE.Vector3) => {
+          this.explosionEffectsPool!.spawn(pos);
+          if (shakeRadius !== undefined) this.impactShake?.(pos, shakeRadius);
+        }
       : undefined;
 
     switch (mission.type) {
@@ -331,7 +357,7 @@ export class AirSupportManager implements GameSystem {
         break;
 
       case 'rocket_run':
-        updateRocketRun(mission, dt, this.grenadeSystem, this.audioManager, getHeight);
+        updateRocketRun(mission, dt, this.grenadeSystem, this.audioManager, getHeight, mission.requesterFaction);
         break;
 
       case 'recon':

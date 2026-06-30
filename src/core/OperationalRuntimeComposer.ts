@@ -510,6 +510,7 @@ function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRunt
       hudSystem: runtime.hudSystem,
       terrainSystem: runtime.terrainSystem,
       explosionEffectsPool,
+      impactShake: (pos, radius) => runtime.playerController.applyExplosionShake(pos, radius),
     });
   } else {
     runtime.airSupportManager.setCombatantSystem(runtime.combatantSystem);

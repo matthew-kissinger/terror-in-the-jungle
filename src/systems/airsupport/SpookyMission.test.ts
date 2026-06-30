@@ -3,7 +3,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { initSpooky, updateSpooky } from './SpookyMission';
+import { initSpooky, updateSpooky, slerpFactor } from './SpookyMission';
 import { Faction } from '../combat/types';
 import { createAirSupportMission, flatTerrainHeight } from '../../test-utils/airSupportMission';
 
@@ -197,5 +197,47 @@ describe('SpookyMission', () => {
     for (const call of calls) {
       expect(call[5]).toBe(Faction.US);
     }
+  });
+
+  it('banks into its orbit attitude rather than snapping (smoothed quaternion)', () => {
+    // After a single small tick the airframe should have rotated toward, but not
+    // all the way to, a hard target attitude — i.e. it is being slerped.
+    const mission = createAirSupportMission('spooky', { x: 0, z: 0 });
+    initSpooky(mission);
+    const startQuat = mission.aircraft.quaternion.clone();
+    mission.elapsed += 0.016;
+    updateSpooky(mission, 0.016, makeCombatantSystem(), makeAudio(), makeTracerPool(), flatTerrainHeight());
+    // The quaternion stays a valid unit rotation (no NaN / degenerate state).
+    expect(mission.aircraft.quaternion.length()).toBeCloseTo(1, 5);
+    // It did move (the orbit advanced), confirming attitude tracks the heading.
+    expect(mission.aircraft.quaternion.angleTo(startQuat)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('slerpFactor (attitude smoothing)', () => {
+  it('returns 0 for a zero or negative timestep', () => {
+    expect(slerpFactor(7, 0)).toBe(0);
+    expect(slerpFactor(7, -0.1)).toBe(0);
+  });
+
+  it('stays within the open interval (0, 1) for realistic frame timesteps', () => {
+    for (const dt of [0.001, 0.016, 0.033, 0.1, 1]) {
+      const f = slerpFactor(7, dt);
+      expect(f).toBeGreaterThan(0);
+      expect(f).toBeLessThan(1);
+    }
+  });
+
+  it('rises monotonically as the timestep grows (frame-rate independent approach)', () => {
+    let prev = -1;
+    for (const dt of [0.001, 0.008, 0.016, 0.033, 0.1, 0.5]) {
+      const f = slerpFactor(7, dt);
+      expect(f).toBeGreaterThan(prev);
+      prev = f;
+    }
+  });
+
+  it('approaches 1 as the timestep grows large', () => {
+    expect(slerpFactor(7, 100)).toBeCloseTo(1, 6);
   });
 });

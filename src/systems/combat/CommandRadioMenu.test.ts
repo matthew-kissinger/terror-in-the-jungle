@@ -147,7 +147,7 @@ describe('revived radio dial', () => {
     layout.dispose();
   });
 
-  it('drives the existing requestSupport path when a fire-support sector is selected', () => {
+  it('arms designate on fire-support select, then drives requestSupport on confirm', () => {
     const requestSupport = vi.fn(() => true);
     const { manager } = openDial((m) => {
       m.setAirSupportManager({ requestSupport, getCooldownRemaining: vi.fn(() => 0) } as any);
@@ -160,13 +160,19 @@ describe('revived radio dial', () => {
       new MouseEvent('click', { bubbles: true }),
     );
 
+    // Selecting a sector no longer fires immediately: it closes the dial and
+    // enters DESIGNATE (re-aimable). The strike only goes out on confirm.
+    expect(requestSupport).not.toHaveBeenCalled();
+    expect(visibleDial()).toBeNull();
+
+    manager.update(0.1); // track the view ray onto the ground
+    expect(manager.handleStrikeConfirm()).toBe(true);
+
     expect(requestSupport).toHaveBeenCalledTimes(1);
     const request = requestSupport.mock.calls[0][0];
     expect(request.type).toBe('rocket_run'); // cobra run fulfils via the rocket_run sortie
     expect(request.requesterFaction).toBe(Faction.US); // called strikes spare friendlies
     expect(request.targetPosition).toBeInstanceOf(THREE.Vector3);
-    // The dial dismisses after a launched strike.
-    expect(visibleDial()).toBeNull();
 
     manager.dispose();
     layout.dispose();

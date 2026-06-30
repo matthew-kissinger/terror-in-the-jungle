@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { AirSupportMission } from './AirSupportTypes';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
+import type { Faction } from '../combat/types';
 import type { IAudioManager } from '../../types/SystemInterfaces';
 
 // Rocket run parameters
@@ -31,6 +32,7 @@ export function updateRocketRun(
   grenadeSystem: GrenadeSystem | undefined,
   audioManager: IAudioManager | undefined,
   getTerrainHeight: (x: number, z: number) => number,
+  shooterFaction?: Faction,
 ): void {
   const { aircraft, targetPosition, approachDirection } = mission;
   const speed = 60;
@@ -78,7 +80,7 @@ export function updateRocketRun(
           // Slight downward angle toward ground
           _rocketVel.y = -20;
 
-          grenadeSystem.spawnProjectile(_rocketPos.clone(), _rocketVel.clone(), ROCKET_FUSE, 'rocket');
+          grenadeSystem.spawnProjectile(_rocketPos.clone(), _rocketVel.clone(), ROCKET_FUSE, 'rocket', shooterFaction);
         }
 
         audioManager?.play('rocketLaunch', aircraft.position, 0.6);

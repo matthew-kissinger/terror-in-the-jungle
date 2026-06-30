@@ -5,6 +5,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { GrenadeType } from '../combat/types';
+import type { Faction } from '../combat/types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -408,11 +409,21 @@ export class GrenadeSystem implements GameSystem {
 
   /**
    * Spawn a grenade projectile with a given position and velocity.
-   * Used by the M79 grenade launcher - no cooking/aiming flow, just physics + fuse.
+   * Used by the M79 grenade launcher and air-support rocket runs - no
+   * cooking/aiming flow, just physics + fuse. `ownerFaction`, when supplied,
+   * makes the impact respect IFF (friendlies in the blast are spared); omitting
+   * it keeps the legacy damage-everyone behaviour for player ordnance.
    */
-  spawnProjectile(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number, killFeedWeaponType?: string): void {
+  spawnProjectile(
+    position: THREE.Vector3,
+    velocity: THREE.Vector3,
+    fuseTime: number,
+    killFeedWeaponType?: string,
+    ownerFaction?: Faction,
+  ): void {
     const grenade = this.spawner.spawnGrenade(position, velocity, fuseTime, this.nextGrenadeId++, GrenadeType.FRAG);
     if (killFeedWeaponType) grenade.killFeedWeaponType = killFeedWeaponType;
+    if (ownerFaction !== undefined) grenade.ownerFaction = ownerFaction;
     this.grenades.push(grenade);
 
     if (this.audioManager) {

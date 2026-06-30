@@ -326,4 +326,43 @@ describe('GamepadManager', () => {
       expect(mgr.isConnected()).toBe(false);
     });
   });
+
+  describe('rumble', () => {
+    /** Connect a gamepad carrying a vibration actuator with a spy playEffect. */
+    function connectWithActuator(playEffect = vi.fn(() => Promise.resolve())) {
+      const gp = buildGamepad();
+      (gp as any).vibrationActuator = { playEffect };
+      setGamepad(gp);
+      window.dispatchEvent(new GamepadEvent('gamepadconnected', { gamepad: gp }));
+      return playEffect;
+    }
+
+    it('plays a dual-rumble effect when an actuator is present', () => {
+      const playEffect = connectWithActuator();
+      mgr.rumble(0.6, 0.3, 180);
+      expect(playEffect).toHaveBeenCalledTimes(1);
+      const [type, params] = playEffect.mock.calls[0];
+      expect(type).toBe('dual-rumble');
+      expect(params).toMatchObject({ duration: 180, strongMagnitude: 0.6, weakMagnitude: 0.3 });
+    });
+
+    it('clamps magnitudes into the 0-1 range', () => {
+      const playEffect = connectWithActuator();
+      mgr.rumble(5, -2, 100);
+      const params = playEffect.mock.calls[0][1] as any;
+      expect(params.strongMagnitude).toBe(1);
+      expect(params.weakMagnitude).toBe(0);
+    });
+
+    it('no-ops without throwing when no gamepad is connected', () => {
+      expect(() => mgr.rumble(1, 1, 100)).not.toThrow();
+    });
+
+    it('no-ops without throwing when the pad has no vibration actuator', () => {
+      const gp = buildGamepad(); // vibrationActuator: null
+      setGamepad(gp);
+      window.dispatchEvent(new GamepadEvent('gamepadconnected', { gamepad: gp }));
+      expect(() => mgr.rumble(1, 1, 100)).not.toThrow();
+    });
+  });
 });

@@ -11,6 +11,18 @@ import type { TracerPool } from '../effects/TracerPool';
 // Orbit parameters
 const ORBIT_RADIUS = 170; // tighter circle than before (was 200) for a snappier pylon turn
 const BANK_ANGLE = 0.44; // ~25 degrees left bank
+const ATTITUDE_SLERP_K = 7; // attitude smoothing rate (per second); higher = tighter tracking
+
+/**
+ * Frame-rate-independent smoothing factor for an exponential approach:
+ * `value += (target - value) * slerpFactor(k, dt)`. Returns a value in (0, 1)
+ * that rises monotonically with dt and with k, so the same `k` produces the
+ * same time-constant regardless of frame rate. Exported for unit coverage.
+ */
+export function slerpFactor(k: number, dt: number): number {
+  if (dt <= 0) return 0;
+  return 1 - Math.exp(-k * dt);
+}
 
 // Weapon parameters
 const BURST_INTERVAL_MIN = 2.0;
@@ -23,6 +35,10 @@ const GROUND_SCATTER = 15; // meters scatter around target
 const _tracerStart = new THREE.Vector3();
 const _tracerEnd = new THREE.Vector3();
 const _targetPos = new THREE.Vector3();
+
+// Scratch attitude (module-level; never reallocated per frame).
+const _targetEuler = new THREE.Euler();
+const _targetQuat = new THREE.Quaternion();
 
 export function initSpooky(mission: AirSupportMission): void {
   // Start at a random angle on the orbit
@@ -74,8 +90,12 @@ export function updateSpooky(
     const terrainH = getTerrainHeight(aircraft.position.x, aircraft.position.z);
     aircraft.position.y = terrainH + 300;
 
-    // Face tangent to orbit (left pylon turn)
-    aircraft.rotation.set(0, angle + Math.PI / 2, -BANK_ANGLE);
+    // Face tangent to orbit (left pylon turn), slerping the airframe toward the
+    // target attitude instead of snapping each frame. On a steady circle this
+    // tracks tightly; at transitions it banks in smoothly rather than popping.
+    _targetEuler.set(0, angle + Math.PI / 2, -BANK_ANGLE);
+    _targetQuat.setFromEuler(_targetEuler);
+    aircraft.quaternion.slerp(_targetQuat, slerpFactor(ATTITUDE_SLERP_K, dt));
   }
 
   // Weapon fire logic

@@ -187,6 +187,29 @@ export class GamepadManager {
     return { x, y };
   }
 
+  /**
+   * Fire a controller haptic pulse via the Gamepad vibration actuator when one
+   * is present. No-ops on pads / browsers without rumble support. Additive: not
+   * part of any fenced interface.
+   * @param strongMagnitude low-frequency (heavy) motor, 0-1
+   * @param weakMagnitude high-frequency (light) motor, 0-1
+   * @param durationMs pulse length in milliseconds
+   */
+  rumble(strongMagnitude: number, weakMagnitude: number, durationMs: number): void {
+    if (this.gamepadIndex === null) return;
+    if (typeof navigator.getGamepads !== 'function') return;
+    const gp = navigator.getGamepads()[this.gamepadIndex] as
+      | { vibrationActuator?: { playEffect?: (type: string, params: object) => Promise<unknown> } | null }
+      | null;
+    const actuator = gp?.vibrationActuator;
+    if (!actuator || typeof actuator.playEffect !== 'function') return;
+    void actuator.playEffect('dual-rumble', {
+      duration: durationMs,
+      strongMagnitude: Math.min(1, Math.max(0, strongMagnitude)),
+      weakMagnitude: Math.min(1, Math.max(0, weakMagnitude)),
+    })?.catch(() => { /* actuator busy or unsupported effect; ignore */ });
+  }
+
   /** Update look sensitivity from settings */
   updateSensitivity(): void {
     this.lookSensitivity = SettingsManager.getInstance().getMouseSensitivityRaw() * 14;

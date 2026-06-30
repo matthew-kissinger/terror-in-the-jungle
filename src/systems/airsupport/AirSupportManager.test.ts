@@ -105,6 +105,18 @@ describe('AirSupportManager', () => {
     expect(result).toBe(true);
   });
 
+  it('plays the cleared-hot confirm chime when a call-in is accepted', () => {
+    manager.setHUDSystem(createMockHUD());
+    const audio = { play: vi.fn() } as any;
+    manager.setAudioManager(audio);
+
+    manager.requestSupport({
+      type: 'napalm',
+      targetPosition: new THREE.Vector3(100, 0, 100),
+    });
+    expect(audio.play).toHaveBeenCalledWith('airSupportRadio');
+  });
+
   it('rejects request during cooldown', async () => {
     const hud = createMockHUD();
     manager.setHUDSystem(hud);

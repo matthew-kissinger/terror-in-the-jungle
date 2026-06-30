@@ -143,7 +143,8 @@ export class GrenadeEffects {
             this.DAMAGE_RADIUS,
             this.MAX_DAMAGE,
             'PLAYER',
-            grenade.killFeedWeaponType ?? 'grenade'
+            grenade.killFeedWeaponType ?? 'grenade',
+            grenade.ownerFaction
           );
         }
       });

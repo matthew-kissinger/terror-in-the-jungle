@@ -362,7 +362,30 @@ describe('GrenadeEffects', () => {
         15, // DAMAGE_RADIUS
         150, // MAX_DAMAGE
         'PLAYER',
-        'grenade'
+        'grenade',
+        undefined // no ownerFaction: legacy player grenade damages everyone in radius
+      );
+    });
+
+    it('threads ownerFaction into the explosion so friendlies are spared (IFF)', () => {
+      const rocket = createMockGrenade(GrenadeType.FRAG, new THREE.Vector3(5, 0, 5));
+      rocket.killFeedWeaponType = 'rocket';
+      rocket.ownerFaction = Faction.US;
+      grenadeEffects.explodeGrenade(
+        rocket,
+        mockImpactEffectsPool,
+        mockExplosionEffectsPool,
+        mockAudioManager,
+        mockCombatantSystem,
+        mockPlayerController
+      );
+      expect(mockCombatantSystem.applyExplosionDamage).toHaveBeenCalledWith(
+        rocket.position,
+        15,
+        150,
+        'PLAYER',
+        'rocket',
+        Faction.US
       );
     });
 
