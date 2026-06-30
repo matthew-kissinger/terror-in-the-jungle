@@ -12,6 +12,12 @@ interface FullMapInputCallbacks {
   onShow: () => void;
   onHide: () => void;
   onRender: () => void;
+  /**
+   * Optional opt-in 3D orbital map toggle (Shift+M). When wired, holding Shift
+   * while pressing M opens the rich 3D relief map instead of the fast 2D map;
+   * plain M still opens the 2D map (owner decision: hold-M default stays 2D).
+   */
+  onToggleOrbital3D?: () => void;
 }
 
 /** Touch gesture state machine */
@@ -93,6 +99,11 @@ export class FullMapInput {
 
   private handleKeyDown(e: KeyboardEvent): void {
     if (e.key === 'm' || e.key === 'M') {
+      // Shift+M opens the opt-in 3D orbital map (toggle); plain M opens 2D.
+      if (e.shiftKey && this.callbacks.onToggleOrbital3D) {
+        if (!e.repeat) this.callbacks.onToggleOrbital3D();
+        return;
+      }
       if (!e.repeat) {
         this.isVisible = true;
         this.contextManager.setContext('map');

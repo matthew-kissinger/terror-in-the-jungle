@@ -29,6 +29,7 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
 import { worldToNorthUpMap, factionMarkerFill } from './MapProjection';
 import { refreshVehicleMarkersFromSource, type VehicleMarker, type VehicleMarkerSource } from './VehicleMarkers';
+import { mountHoldMOrbitalToggle, type HoldMOrbitalHandle } from './orbital/OrbitalHoldMMount';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -79,6 +80,9 @@ export class FullMapSystem implements GameSystem {
   private inputHandler: FullMapInput;
   private visibilityListeners = new Set<(visible: boolean) => void>();
 
+  // Opt-in 3D orbital map (Shift+M). Lazily created; default hold-M stays 2D.
+  private orbital3D: HoldMOrbitalHandle | null = null;
+
   constructor(camera: THREE.Camera) {
     this.camera = camera;
 
@@ -87,6 +91,7 @@ export class FullMapSystem implements GameSystem {
       onShow: () => this.show(),
       onHide: () => this.hide(),
       onRender: () => this.render(),
+      onToggleOrbital3D: () => this.toggleOrbital3D(),
     });
 
     // Create map container
@@ -214,6 +219,23 @@ export class FullMapSystem implements GameSystem {
 
   toggleVisibility(): void {
     this.inputHandler.toggle();
+  }
+
+  /**
+   * Opt-in 3D orbital relief map (Shift+M, or the pause-menu "Topographic Map"
+   * button). Lazily mounts the shared orbital component over the live terrain +
+   * zones; all wiring lives in the host mount helper so this stays a 1-call
+   * toggle. Default hold-M remains the fast 2D map.
+   */
+  toggleOrbital3D(): void {
+    if (!this.orbital3D) {
+      this.orbital3D = mountHoldMOrbitalToggle({
+        camera: this.camera,
+        zoneQuery: this.zoneQuery,
+        worldSize: this.worldSize,
+      });
+    }
+    this.orbital3D?.toggle();
   }
 
   onVisibilityChange(listener: (visible: boolean) => void): () => void {
@@ -796,6 +818,8 @@ export class FullMapSystem implements GameSystem {
 
   dispose(): void {
     this.inputHandler.dispose();
+    this.orbital3D?.dispose();
+    this.orbital3D = null;
     if (this.mapContainer.parentNode) {
       this.mapContainer.parentNode.removeChild(this.mapContainer);
     }

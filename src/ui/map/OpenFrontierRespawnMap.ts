@@ -40,6 +40,8 @@ export class OpenFrontierRespawnMap {
   // Selection state
   private selectedZoneId?: string;
   private onZoneSelected?: (zoneId: string, zoneName: string) => void;
+  // Opt-in 3D orbital topo map toggle (deploy screen). Default deploy map is 2D.
+  private onToggleOrbital3D?: () => void;
 
   // Spawn zones
   private spawnPoints: RespawnSpawnPoint[] = [];
@@ -312,6 +314,11 @@ export class OpenFrontierRespawnMap {
     this.onZoneSelected = callback;
   }
 
+  /** Wire the opt-in 3D orbital-map toggle button (deploy screen). */
+  setOrbitalToggleCallback(callback: () => void): void {
+    this.onToggleOrbital3D = callback;
+  }
+
   setSpawnPoints(spawnPoints: RespawnSpawnPoint[]): void {
     this.spawnPoints = spawnPoints.map(spawnPoint => ({
       ...spawnPoint,
@@ -546,8 +553,12 @@ export class OpenFrontierRespawnMap {
     spawnGroup.appendChild(this.buildControlButton('respawn-map-prev-spawn', '◀', 'Previous spawn', () => this.cycleSpawn(-1)));
     spawnGroup.appendChild(this.buildControlButton('respawn-map-next-spawn', '▶', 'Next spawn', () => this.cycleSpawn(1)));
 
+    const viewGroup = this.buildControlGroup();
+    viewGroup.appendChild(this.buildControlButton('respawn-map-3d', '3D', '3D topographic map', () => this.onToggleOrbital3D?.()));
+
     overlay.appendChild(zoomGroup);
     overlay.appendChild(spawnGroup);
+    overlay.appendChild(viewGroup);
     return overlay;
   }
 
