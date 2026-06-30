@@ -31,6 +31,8 @@ import {
   type VehicleDeployOption,
 } from '../loadout/LoadoutTypes';
 import { icon } from '../icons/IconRegistry';
+import { WeaponRigManager } from '../../systems/player/weapon/WeaponRigManager';
+import type { WeaponSpec } from '../../systems/weapons/GunplayCore';
 import styles from './DeployScreen.module.css';
 import { ArmoryCharacterPreview } from './deploy/ArmoryCharacterPreview';
 import {
@@ -49,8 +51,6 @@ import {
 
 interface LoadoutFieldControl {
   value: HTMLDivElement;
-  previousButton: HTMLButtonElement;
-  nextButton: HTMLButtonElement;
   availability: HTMLDivElement;
   optionButtons: HTMLButtonElement[];
 }
@@ -78,6 +78,9 @@ export class DeployScreen extends UIComponent {
   private mapPanel?: HTMLDivElement;
   private armoryPreviewPanel?: HTMLDivElement;
   private armoryCharacterPreview?: ArmoryCharacterPreview;
+  private weaponStatsList?: HTMLDivElement;
+  private weaponStatsName?: HTMLDivElement;
+  private readonly weaponStatRows = new Map<string, HTMLSpanElement>();
   private insertionSideView?: HTMLDivElement;
   private armorySideView?: HTMLDivElement;
   private insertionViewButton?: HTMLButtonElement;
@@ -95,6 +98,7 @@ export class DeployScreen extends UIComponent {
   private selectedPanel?: HTMLDivElement;
   private selectedName?: HTMLDivElement;
   private selectedStatus?: HTMLDivElement;
+  private boardVehicleHint?: HTMLDivElement;
   private selectedTitle?: HTMLHeadingElement;
   private decisionMetric?: HTMLDivElement;
   private sequenceTitle?: HTMLHeadingElement;
@@ -173,11 +177,17 @@ export class DeployScreen extends UIComponent {
     header.appendChild(headerCopy);
     header.appendChild(headerMeta);
 
+    // The insertion map and the armory are too tall to read together, so they
+    // share one column behind an explicit, labeled toggle. The label makes it
+    // obvious the two views are alternatives (not a hidden either/or).
     const viewTabs = this.createDiv(styles.viewTabs, 'respawn-view-tabs');
-    this.insertionViewButton = this.makeButton('respawn-view-insertion', 'Insertion', () => this.setActiveView('insertion'));
-    this.armoryViewButton = this.makeButton('respawn-view-armory', 'Armory', () => this.setActiveView('armory'));
+    const viewTabsLabel = this.createDiv(styles.viewTabsLabel);
+    viewTabsLabel.textContent = 'View';
+    this.insertionViewButton = this.makeButton('respawn-view-insertion', 'Insertion Map', () => this.setActiveView('insertion'));
+    this.armoryViewButton = this.makeButton('respawn-view-armory', 'Armory Kit', () => this.setActiveView('armory'));
     this.insertionViewButton.classList.add(styles.viewTab);
     this.armoryViewButton.classList.add(styles.viewTab);
+    viewTabs.appendChild(viewTabsLabel);
     viewTabs.appendChild(this.insertionViewButton);
     viewTabs.appendChild(this.armoryViewButton);
 
@@ -190,6 +200,9 @@ export class DeployScreen extends UIComponent {
     const mapHelper = this.createDiv(styles.mapHelper);
     mapHelper.textContent = 'Tap or click a sector to select your insertion point — or pick from the spawn list below.';
     this.mapContainer = this.createDiv(styles.map, 'respawn-map');
+    // Positioning context for the map's self-mounted navigation controls
+    // (zoom / recenter / spawn-cycle overlay lives inside this container).
+    this.mapContainer.style.position = 'relative';
     mapHeader.appendChild(this.mapTitle);
     mapHeader.appendChild(mapHelper);
     mapPanel.appendChild(mapHeader);
@@ -294,10 +307,6 @@ export class DeployScreen extends UIComponent {
     if (this.headerLoadoutValue) {
       this.headerLoadoutValue.textContent = enabled ? 'Editable' : 'Locked';
     }
-    for (const control of this.loadoutControls.values()) {
-      this.applyButtonState(control.previousButton, enabled);
-      this.applyButtonState(control.nextButton, enabled);
-    }
     this.setLoadoutOptionButtonsEnabled(enabled);
     if (this.presetPreviousButton) this.applyButtonState(this.presetPreviousButton, enabled);
     if (this.presetNextButton) this.applyButtonState(this.presetNextButton, enabled);
@@ -382,6 +391,23 @@ export class DeployScreen extends UIComponent {
     if (this.selectedName) this.selectedName.textContent = 'NONE';
     if (this.selectedStatus) {
       this.selectedStatus.textContent = this.deploySession?.emptySelectionText ?? 'Select a spawn point on the map';
+    }
+    this.setBoardVehicleHint(undefined);
+  }
+
+  /**
+   * Surface (or clear) the "F to board" hint shown when a crewable vehicle is
+   * the selected spawn. Pass the vehicle's controls hint to show it; pass
+   * `undefined` to hide it (e.g. when an on-foot spawn is picked instead).
+   */
+  setBoardVehicleHint(controlsHint: string | undefined): void {
+    if (!this.boardVehicleHint) return;
+    if (controlsHint) {
+      this.boardVehicleHint.textContent = `Press F to board — ${controlsHint}`;
+      this.boardVehicleHint.style.display = '';
+    } else {
+      this.boardVehicleHint.textContent = '';
+      this.boardVehicleHint.style.display = 'none';
     }
   }
 
@@ -496,9 +522,13 @@ export class DeployScreen extends UIComponent {
     this.selectedStatus.textContent = 'Select a spawn point on the map';
     this.decisionMetric = this.createDiv(styles.decisionMetric, 'respawn-decision-time');
     this.decisionMetric.textContent = 'Decision time 0.0s';
+    // "F to board" hint shown only when a crewable vehicle is the selected spawn.
+    this.boardVehicleHint = this.createDiv(styles.statusText, 'respawn-board-vehicle-hint');
+    this.boardVehicleHint.style.display = 'none';
     panel.appendChild(this.selectedTitle);
     panel.appendChild(this.selectedName);
     panel.appendChild(this.selectedStatus);
+    panel.appendChild(this.boardVehicleHint);
     panel.appendChild(this.decisionMetric);
     return panel;
   }
@@ -581,7 +611,80 @@ export class DeployScreen extends UIComponent {
     board.appendChild(kit);
     panel.appendChild(header);
     panel.appendChild(board);
+    panel.appendChild(this.createWeaponStatsPanel());
     return panel;
+  }
+
+  /**
+   * Compact stats readout for the focused armory weapon. Reads the per-weapon
+   * `WeaponSpec` (rpm / damage near→far / falloff range / recoil / ADS time)
+   * from the shared spec table via `WeaponRigManager.getWeaponSpec` — the same
+   * table the runtime weapon cores are built from, so the numbers are never
+   * duplicated. Updated reactively whenever the focused weapon changes (cycle,
+   * chip strip, or loadout update). Read-only: no spec or balance is touched.
+   */
+  private createWeaponStatsPanel(): HTMLDivElement {
+    const panel = this.createDiv(styles.armoryWeaponStats, 'respawn-armory-weapon-stats');
+    const head = this.createDiv(styles.armoryWeaponStatsHead);
+    const title = this.createDiv(styles.armoryPreviewSlot);
+    title.textContent = 'Weapon Stats';
+    this.weaponStatsName = this.createDiv(styles.armoryWeaponStatsName, 'respawn-armory-weapon-stats-name');
+    this.weaponStatsName.textContent = '--';
+    head.appendChild(title);
+    head.appendChild(this.weaponStatsName);
+
+    const list = this.createDiv(styles.armoryWeaponStatsList);
+    this.weaponStatsList = list;
+    const rows: Array<{ key: string; label: string }> = [
+      { key: 'rpm', label: 'Rate of Fire' },
+      { key: 'damage', label: 'Damage (near→far)' },
+      { key: 'falloff', label: 'Falloff Range' },
+      { key: 'recoil', label: 'Recoil / Shot' },
+      { key: 'ads', label: 'ADS Time' },
+    ];
+    for (const { key, label } of rows) {
+      const row = this.createDiv(styles.armoryWeaponStatRow, `respawn-armory-stat-${key}`);
+      const labelEl = document.createElement('span');
+      labelEl.className = styles.armoryWeaponStatLabel;
+      labelEl.textContent = label;
+      const valueEl = document.createElement('span');
+      valueEl.className = styles.armoryWeaponStatValue;
+      valueEl.textContent = '--';
+      row.appendChild(labelEl);
+      row.appendChild(valueEl);
+      list.appendChild(row);
+      this.weaponStatRows.set(key, valueEl);
+    }
+
+    panel.appendChild(head);
+    panel.appendChild(list);
+    return panel;
+  }
+
+  /**
+   * Refresh the weapon-stats readout for a focused armory weapon. The
+   * `LoadoutWeapon` enum values are exactly the runtime weapon-type ids the
+   * spec table is keyed by, so the focused weapon maps straight to its spec.
+   */
+  private updateWeaponStats(weapon: LoadoutWeapon): void {
+    if (!this.weaponStatsName || this.weaponStatRows.size === 0) return;
+    const spec: WeaponSpec | undefined = WeaponRigManager.getWeaponSpec(
+      weapon as Parameters<typeof WeaponRigManager.getWeaponSpec>[0],
+    );
+    this.weaponStatsName.textContent = spec?.name ?? getWeaponLabel(weapon);
+    const setStat = (key: string, value: string): void => {
+      const el = this.weaponStatRows.get(key);
+      if (el) el.textContent = value;
+    };
+    if (!spec) {
+      for (const key of this.weaponStatRows.keys()) setStat(key, '--');
+      return;
+    }
+    setStat('rpm', `${Math.round(spec.rpm)} rpm`);
+    setStat('damage', `${Math.round(spec.damageNear)} → ${Math.round(spec.damageFar)}`);
+    setStat('falloff', `${Math.round(spec.falloffStart)}–${Math.round(spec.falloffEnd)} m`);
+    setStat('recoil', `${spec.recoilPerShotDeg.toFixed(2)}°`);
+    setStat('ads', `${spec.adsTime.toFixed(2)} s`);
   }
 
   private createArmoryPreviewItem(slot: ArmoryPreviewSlot, label: string): HTMLDivElement {
@@ -636,6 +739,12 @@ export class DeployScreen extends UIComponent {
     return panel;
   }
 
+  // Each loadout slot has ONE selection affordance: the chip strip below the
+  // current value. The chip strip both shows the faction's available pool and
+  // selects directly, so the old PREV/NEXT cycle buttons (which were hidden by
+  // CSS in the only view this panel appears in) were removed as redundant. The
+  // `onLoadoutChange` cycle callback stays on the public API for callers, but
+  // the screen no longer fires it from a duplicate control.
   private createLoadoutRow(field: LoadoutFieldKey, label: string): HTMLDivElement {
     const row = this.createDiv(styles.loadoutSection, `respawn-loadout-${field}-section`);
     const header = this.createDiv(styles.loadoutSectionHeader);
@@ -647,18 +756,11 @@ export class DeployScreen extends UIComponent {
     valueBlock.appendChild(labelEl);
     valueBlock.appendChild(valueEl);
 
-    const buttons = this.createDiv(styles.loadoutButtons);
-    const prev = this.makeButton(undefined, 'PREV', () => this.onLoadoutChange?.(field, -1));
-    const next = this.makeButton(undefined, 'NEXT', () => this.onLoadoutChange?.(field, 1));
-    buttons.appendChild(prev);
-    buttons.appendChild(next);
-
     header.appendChild(valueBlock);
-    header.appendChild(buttons);
     const availability = this.createDiv(styles.loadoutOptionGrid, `respawn-loadout-${field}-options`);
     row.appendChild(header);
     row.appendChild(availability);
-    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next, availability, optionButtons: [] });
+    this.loadoutControls.set(field, { value: valueEl, availability, optionButtons: [] });
     return row;
   }
 
@@ -951,6 +1053,7 @@ export class DeployScreen extends UIComponent {
     if (!this.loadoutEditingEnabled) return;
     if (field === 'primaryWeapon' || field === 'secondaryWeapon') {
       this.armoryFocusWeapon = value as LoadoutWeapon;
+      this.updateWeaponStats(this.armoryFocusWeapon);
       if (this.currentLoadout) {
         this.armoryCharacterPreview?.setLoadout(
           this.currentLoadout,
@@ -973,6 +1076,7 @@ export class DeployScreen extends UIComponent {
   private updateArmoryCharacterPreview(): void {
     if (!this.currentLoadout) return;
     const focusWeapon = this.armoryFocusWeapon ?? this.currentLoadout.primaryWeapon;
+    this.updateWeaponStats(focusWeapon);
     this.armoryCharacterPreview?.setLoadout(
       this.currentLoadout,
       this.loadoutPresentation?.context.faction,

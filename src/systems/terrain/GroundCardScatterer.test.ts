@@ -145,6 +145,24 @@ describe('GroundCardScatterer', () => {
     expect(scale.y).toBeLessThan(0.69 * 1.2 + 1e-3);
   });
 
+  it('uses front-side two-sided card geometry so backfaces do not shade dark', () => {
+    const { scatterer, scene } = makeScatterer();
+    settle(scatterer, new THREE.Vector3(0, 0, 0));
+
+    const mesh = cardMeshes(scene)[0];
+    expect(mesh).toBeDefined();
+    expect((mesh.material as THREE.Material).side).toBe(THREE.FrontSide);
+    expect(mesh.geometry.index?.count).toBe(24); // two crossed quads, front + reverse winding
+
+    const normals = mesh.geometry.getAttribute('normal');
+    expect(normals).toBeDefined();
+    for (let i = 0; i < normals.count; i++) {
+      expect(normals.getX(i)).toBe(0);
+      expect(normals.getY(i)).toBe(1);
+      expect(normals.getZ(i)).toBe(0);
+    }
+  });
+
   it('rejects underwater and steep-slope placements', () => {
     // All terrain underwater -> zero cards despite a non-empty card palette.
     const underwater = makeScatterer({ getHeight: () => -5 });
@@ -265,13 +283,16 @@ describe('GroundCardScatterer real-config wiring', () => {
     settle(scatterer, new THREE.Vector3(0, 0, 0));
     await settleNearMeshes(scatterer);
 
-    // denseJungle wires understory-fern + taro-elephant-ear + banana-plant cards
-    // (rice-paddy is riverbank-only).
+    // denseJungle wires understory-fern + taro-elephant-ear + coconut-palm +
+    // banana-plant cards (bamboo-grove is a single-culm hero impostor again;
+    // rice-paddy is riverbank-only).
     const slugs = new Set(
       cardMeshes(scene).map((m) => m.name.split(':')[1]),
     );
     expect(slugs.has('understory-fern')).toBe(true);
     expect(slugs.has('taro-elephant-ear')).toBe(true);
+    expect(slugs.has('bamboo-grove')).toBe(false);
+    expect(slugs.has('coconut-palm')).toBe(true);
     expect(slugs.has('banana-plant')).toBe(true);
     expect(slugs.has('rice-paddy')).toBe(false);
     // Nothing outside the ground-card archetype set ever produces a card batch.

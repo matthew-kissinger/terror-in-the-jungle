@@ -82,7 +82,9 @@ function createRefs() {
       setTerrainManager: vi.fn(),
       setVegetationSystem: vi.fn(),
     },
-    hudSystem: {},
+    hudSystem: {
+      getTaskCard: vi.fn(() => ({ id: 'task-card' })),
+    },
     influenceMapSystem: {},
     m2hbEmplacementSystem: {
       setCombatantSystem: vi.fn(),
@@ -110,6 +112,12 @@ function createRefs() {
       setAudioManager: vi.fn(),
       setHUDSystem: vi.fn(),
       setWarSimulator: vi.fn(),
+    },
+    taskingDirector: {
+      setWarSimulator: vi.fn(),
+      setZoneQuery: vi.fn(),
+      setTicketSystem: vi.fn(),
+      setTaskCard: vi.fn(),
     },
     terrainSystem: {
       getHeightAt: vi.fn((_x: number, _z: number) => 12),
@@ -174,6 +182,11 @@ describe('OperationalRuntimeComposer', () => {
     expect(refs.strategicFeedback.setWarSimulator).toHaveBeenCalledWith(refs.warSimulator);
     expect(refs.strategicFeedback.setHUDSystem).toHaveBeenCalledWith(refs.hudSystem);
     expect(refs.strategicFeedback.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
+    // The opt-in tasking director gets the same read-only war/zone/ticket handles.
+    expect(refs.taskingDirector.setWarSimulator).toHaveBeenCalledWith(refs.warSimulator);
+    expect(refs.taskingDirector.setZoneQuery).toHaveBeenCalledWith(refs.zoneManager);
+    expect(refs.taskingDirector.setTicketSystem).toHaveBeenCalledWith(refs.ticketSystem);
+    expect(refs.taskingDirector.setTaskCard).toHaveBeenCalled();
     expect(refs.gameModeManager.setWarSimulator).toHaveBeenCalledWith(refs.warSimulator);
     expect(refs.minimapSystem.setWarSimulator).toHaveBeenCalledWith(refs.warSimulator);
     expect(refs.fullMapSystem.setWarSimulator).toHaveBeenCalledWith(refs.warSimulator);

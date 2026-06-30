@@ -26,6 +26,21 @@ import {
 // ── Ground-vehicle control tuning ──
 const DEFAULT_BRAKE_PEDAL = 1.0;
 
+// ── Follow-camera framing ──
+// Follow distance scales with chassis length so a long chassis is framed from
+// BEHIND the body, not from inside it (2026-06-28 owner playtest: the M35
+// truck's ~6.7m bed engulfed the shared 12m chassis-centre follow distance).
+// CAMERA_BASE_DISTANCE + CAMERA_DISTANCE_PER_METER * length lands the jeep
+// (~3.3m chassis) at ~12m (its prior framing) and the M35 (~6.7m) well past
+// the rear bumper.
+const CAMERA_BASE_DISTANCE = 7.0;
+const CAMERA_DISTANCE_PER_METER = 1.5;
+// Height tracks distance so the look-down angle stays in the same shallow band
+// regardless of chassis length (no bird's-eye on the truck).
+const CAMERA_HEIGHT_RATIO = 0.5;
+// Jeep-equivalent fallback length when no physics/chassis dimension is known.
+const DEFAULT_CHASSIS_LENGTH = 3.3;
+
 /**
  * Minimal contract the adapter needs from the integration layer. The
  * integration task (`m151-jeep-integration`) wires the concrete
@@ -91,10 +106,12 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
   // movement keys + fire suppression as needed by the session controller.
   readonly inputContext: InputContext = 'gameplay';
 
-  // Shared follow tuning must clear jeeps, cargo trucks, and APCs because all
-  // promoted support vehicles use this adapter today.
-  cameraDistance = 12.0;
-  cameraHeight = 6.0;
+  // Follow tuning is recomputed per chassis on enter (see applyChassisFraming)
+  // because jeeps, cargo trucks, and APCs all share this adapter but differ in
+  // length. The seeded values match the jeep so a no-physics fallback frames the
+  // smallest chassis correctly.
+  cameraDistance = CAMERA_BASE_DISTANCE + CAMERA_DISTANCE_PER_METER * DEFAULT_CHASSIS_LENGTH;
+  cameraHeight = (CAMERA_BASE_DISTANCE + CAMERA_DISTANCE_PER_METER * DEFAULT_CHASSIS_LENGTH) * CAMERA_HEIGHT_RATIO;
   cameraLookHeight = 2.0;
   cameraLookAhead = 20.0;
 
@@ -119,6 +136,10 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     this.resetControlState();
     this.activeVehicleId = ctx.vehicleId;
     this.activePhysics = this.model.getPhysics(ctx.vehicleId);
+
+    // Frame the follow camera for this chassis before it is handed to the
+    // camera controller, so a long truck sits outside its own body.
+    this.applyChassisFraming(this.activePhysics);
 
     // Take the player out of infantry motion and snap them onto the seat.
     seatPlayer(ctx, 'ground-vehicle.enter');
@@ -248,6 +269,18 @@ export class GroundVehiclePlayerAdapter implements PlayerVehicleAdapter {
     this.controls.steerAngle = 0;
     this.controls.brake = 0;
     this.controls.handbrake = false;
+  }
+
+  /**
+   * Size the follow camera to the chassis being driven. Longer chassis push the
+   * camera further back (and proportionally higher) so the view sits behind the
+   * body rather than inside it. Falls back to the jeep-equivalent length when no
+   * physics instance is available (e.g. a test/model stub without one).
+   */
+  private applyChassisFraming(physics: GroundVehiclePhysics | null): void {
+    const chassisLength = physics?.getChassisLength() ?? DEFAULT_CHASSIS_LENGTH;
+    this.cameraDistance = CAMERA_BASE_DISTANCE + CAMERA_DISTANCE_PER_METER * chassisLength;
+    this.cameraHeight = this.cameraDistance * CAMERA_HEIGHT_RATIO;
   }
 
   // ── Accessors (for integration + tests) ────────────────────────────────────

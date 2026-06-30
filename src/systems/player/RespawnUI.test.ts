@@ -336,14 +336,30 @@ describe('DeployScreen', () => {
       expect(elementMap.get('loadout-equipment-value')?.textContent).toBe('Mortar Kit');
     });
 
-    it('should route loadout button presses to the callback', () => {
+    it('should route loadout chip selection to the select callback', () => {
       const callback = vi.fn();
-      ui.setLoadoutChangeCallback(callback);
+      ui.configureSession(editableSession);
+      ui.setLoadoutSelectCallback(callback);
+      ui.setLoadoutEditingEnabled(true);
+      ui.updateLoadoutPresentation({
+        context: { mode: GameMode.ZONE_CONTROL, alliance: Alliance.BLUFOR, faction: Faction.US },
+        factionLabel: 'US',
+        presetIndex: 0,
+        presetCount: 3,
+        presetName: 'Rifleman',
+        presetDescription: 'Balanced.',
+        presetDirty: false,
+        availableWeapons: [LoadoutWeapon.RIFLE, LoadoutWeapon.SHOTGUN],
+        availableEquipment: [LoadoutEquipment.FRAG_GRENADE],
+      });
 
       const controls = (ui as any).loadoutControls.get('primaryWeapon');
-      controls.nextButton.dispatchEvent(new Event('pointerdown'));
+      const shotgunChip = controls.optionButtons.find(
+        (b: any) => b.dataset.loadoutOption === LoadoutWeapon.SHOTGUN,
+      );
+      shotgunChip.dispatchEvent(new Event('pointerdown'));
 
-      expect(callback).toHaveBeenCalledWith('primaryWeapon', 1);
+      expect(callback).toHaveBeenCalledWith('primaryWeapon', LoadoutWeapon.SHOTGUN);
     });
 
     it('should render faction-aware preset metadata', () => {
@@ -416,11 +432,24 @@ describe('DeployScreen', () => {
     });
 
     it('should disable loadout controls when editing is locked', () => {
+      ui.updateLoadoutPresentation({
+        context: { mode: GameMode.ZONE_CONTROL, alliance: Alliance.BLUFOR, faction: Faction.US },
+        factionLabel: 'US',
+        presetIndex: 0,
+        presetCount: 3,
+        presetName: 'Rifleman',
+        presetDescription: 'Balanced.',
+        presetDirty: false,
+        availableWeapons: [LoadoutWeapon.RIFLE, LoadoutWeapon.SHOTGUN],
+        availableEquipment: [LoadoutEquipment.FRAG_GRENADE],
+      });
       ui.setLoadoutEditingEnabled(false);
 
       const controls = (ui as any).loadoutControls.get('equipment');
-      expect(controls.previousButton.disabled).toBe(true);
-      expect(controls.nextButton.disabled).toBe(true);
+      // The chip strip is the single selection affordance — locked editing must
+      // disable every chip so no slot can be changed.
+      expect(controls.optionButtons.length).toBeGreaterThan(0);
+      expect(controls.optionButtons.every((b: any) => b.disabled === true)).toBe(true);
       expect(elementMap.get('respawn-loadout-preset-prev')?.disabled).toBe(true);
       expect(elementMap.get('respawn-loadout-preset-next')?.disabled).toBe(true);
       expect(elementMap.get('respawn-loadout-preset-save')?.disabled).toBe(true);

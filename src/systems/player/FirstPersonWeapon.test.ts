@@ -150,6 +150,7 @@ describe('FirstPersonWeapon', () => {
       init: vi.fn().mockResolvedValue(undefined),
       setRifleFaction: vi.fn(),
       getCurrentRig: vi.fn(() => ({})),
+      getCurrentWeaponType: vi.fn(() => 'rifle'),
       getCurrentCore: vi.fn(() => mockGunCore),
       getSMGCore: vi.fn(() => mockGunCore),
       getPistolCore: vi.fn(() => mockGunCore),
@@ -413,7 +414,9 @@ describe('FirstPersonWeapon', () => {
       expect(mockAnimations.update).toHaveBeenCalledWith(
         0.016,
         false,
-        expect.any(THREE.Vector3)
+        expect.any(THREE.Vector3),
+        // The equipped weapon type drives the per-weapon ADS FOV-zoom.
+        expect.any(String)
       );
     });
 
@@ -851,7 +854,8 @@ describe('FirstPersonWeapon', () => {
       expect(mockAnimations.update).toHaveBeenCalledWith(
         0.016,
         false,
-        expect.objectContaining({ x: 0, y: 0, z: 0 })
+        expect.objectContaining({ x: 0, y: 0, z: 0 }),
+        expect.any(String)
       );
     });
   });

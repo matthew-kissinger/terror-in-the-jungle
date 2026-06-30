@@ -89,6 +89,55 @@ describe('TankTurret', () => {
     });
   });
 
+  describe('default traverse feel (owner playtest 2026-06-28)', () => {
+    // The default M48 turret must aim fast enough to be usable in combat
+    // (the prior 30°/s yaw + 8°/s pitch crawled), while still being a
+    // rate-capped crew-served weapon — never snap-to-aim. These tests
+    // exercise the *default* config (no override) through the public
+    // contract so the feel guarantee is locked without enshrining the
+    // exact tuning number.
+
+    it('defaults to a responsive traverse + elevation that out-paces the old crawl', () => {
+      const chassis = makeChassis();
+      const turret = new TankTurret(chassis);
+      const rates = turret.getSlewRates();
+      // Comfortably faster than the prior 30°/s yaw / 8°/s pitch crawl,
+      // without demanding an exact value (assert the floor, not equality).
+      expect(rates.yaw).toBeGreaterThan(45 * DEG);
+      expect(rates.pitch).toBeGreaterThan(15 * DEG);
+    });
+
+    it('keeps the default traverse rate-limited — a large yaw delta needs multiple ticks', () => {
+      const chassis = makeChassis();
+      const turret = new TankTurret(chassis);
+
+      // Request a 90° swing and step a single short tick. A snap-to-aim
+      // turret would already be at the target; a rate-capped one is not.
+      turret.setTargetYaw(90 * DEG);
+      turret.update(0.1);
+      const afterOneTick = turret.getYaw();
+      expect(afterOneTick).toBeGreaterThan(0); // it does move
+      expect(afterOneTick).toBeLessThan(90 * DEG); // but not all the way
+
+      // Repeated ticks keep advancing toward the target (still capped).
+      turret.update(0.1);
+      expect(turret.getYaw()).toBeGreaterThan(afterOneTick);
+      expect(turret.getYaw()).toBeLessThan(90 * DEG);
+    });
+
+    it('keeps the default elevation rate-limited — a full-envelope pitch needs multiple ticks', () => {
+      const chassis = makeChassis();
+      const turret = new TankTurret(chassis);
+
+      // Request the top of the envelope; one short tick must not snap there.
+      turret.setTargetPitch(20 * DEG);
+      turret.update(0.1);
+      const afterOneTick = turret.getPitch();
+      expect(afterOneTick).toBeGreaterThan(0);
+      expect(afterOneTick).toBeLessThan(20 * DEG);
+    });
+  });
+
   describe('slew capping', () => {
     it('caps yaw movement at the configured slew rate over a single tick (target far away → ramp not jump)', () => {
       const chassis = makeChassis();

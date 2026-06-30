@@ -14,6 +14,10 @@
  * 7. Damage bar (health percentage)
  * 8. Gun ammo counter (rounds remaining; LOW state under 20%) + per-airframe
  *    weapon name on the panel label
+ * 9. Seat / fire cue: names the pilot seat, shows the LMB-fire cue when the
+ *    airframe is armed (and the AC-47 RMB broadside-cam clarification), and
+ *    flashes a transient "Airborne to fire" hint when the player pulls the
+ *    trigger on the runway (the gun silently no-ops there).
  */
 
 import { UIComponent } from '../engine/UIComponent';
@@ -107,6 +111,12 @@ export class FixedWingHUD extends UIComponent {
   private ammoCapacity = this.signal(0);
   private weaponName = this.signal('GUN');
 
+  // Seat / fire cue + airborne-gate hint
+  private armed = this.signal(false);
+  private broadside = this.signal(false);
+  private airborneHint = this.signal(false);
+  private airborneHintTimer: ReturnType<typeof setTimeout> | null = null;
+
   private readonly isTouch = isTouchDevice();
 
   protected build(): void {
@@ -159,6 +169,14 @@ export class FixedWingHUD extends UIComponent {
       <div data-ref="ammoPanel" class="${styles.panel} ${styles.ammoSection}">
         <div data-ref="ammoValue" class="${styles.ammoValue}">0</div>
         <div data-ref="weaponLabel" class="${styles.dataLabel}">GUN</div>
+      </div>
+      <div data-ref="seatPanel" class="${styles.panel} ${styles.seatSection}">
+        <div class="${styles.seatLabel}">PILOT</div>
+        <div data-ref="seatFireCue" class="${styles.seatCue}">LMB: FIRE</div>
+        <div data-ref="seatBroadsideCue" class="${styles.seatNote}">RMB: GUN CAM</div>
+      </div>
+      <div data-ref="airborneHint" class="${styles.panel} ${styles.airborneHint}">
+        AIRBORNE TO FIRE
       </div>
     `;
   }
@@ -330,6 +348,24 @@ export class FixedWingHUD extends UIComponent {
     this.effect(() => {
       this.text('[data-ref="weaponLabel"]', this.weaponName.value);
     });
+
+    // Effect: seat / fire cue. The pilot seat label is always shown while flying;
+    // the LMB-fire cue lights only on armed airframes, and the RMB broadside
+    // gun-cam note only on the AC-47 (broadside battery).
+    this.effect(() => {
+      const fireCue = this.$('[data-ref="seatFireCue"]');
+      if (fireCue) fireCue.style.display = this.armed.value ? '' : 'none';
+      const broadsideCue = this.$('[data-ref="seatBroadsideCue"]');
+      if (broadsideCue) broadsideCue.style.display = this.broadside.value ? '' : 'none';
+    });
+
+    // Effect: transient "Airborne to fire" hint when a ground fire attempt was
+    // rejected. Surfaces the airborne gate instead of leaving the trigger silent.
+    this.effect(() => {
+      const el = this.$('[data-ref="airborneHint"]');
+      if (!el) return;
+      el.classList.toggle(styles.airborneHintVisible, this.airborneHint.value);
+    });
   }
 
   // --- Public API ---
@@ -370,6 +406,40 @@ export class FixedWingHUD extends UIComponent {
     this.ammoCapacity.value = capacity;
     if (weaponName !== undefined && weaponName !== '') {
       this.weaponName.value = weaponName;
+    }
+  }
+
+  /**
+   * Configure the seat / fire cue for the boarded airframe: `armed` lights the
+   * `LMB: FIRE` cue, `broadside` lights the AC-47 `RMB: GUN CAM` note. Both
+   * default off so an unarmed transport shows just the pilot seat label.
+   */
+  setSeatFireCue(armed: boolean, broadside = false): void {
+    this.armed.value = armed;
+    this.broadside.value = broadside;
+  }
+
+  /**
+   * Flash the transient "Airborne to fire" hint for a moment. Called when the
+   * player pulls the trigger on the ground (the gun no-ops there) so the
+   * silence reads as "not yet" rather than a broken weapon. Re-arming the hint
+   * restarts the fade timer.
+   */
+  flashAirborneHint(durationMs = 1500): void {
+    this.airborneHint.value = true;
+    if (this.airborneHintTimer !== null) {
+      clearTimeout(this.airborneHintTimer);
+    }
+    this.airborneHintTimer = setTimeout(() => {
+      this.airborneHint.value = false;
+      this.airborneHintTimer = null;
+    }, durationMs);
+  }
+
+  protected onUnmount(): void {
+    if (this.airborneHintTimer !== null) {
+      clearTimeout(this.airborneHintTimer);
+      this.airborneHintTimer = null;
     }
   }
 }

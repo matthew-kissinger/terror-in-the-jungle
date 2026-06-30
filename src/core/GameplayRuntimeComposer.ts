@@ -348,6 +348,10 @@ function wireEnvironmentRuntime(
     if (camera) {
       runtime.atmosphereSystem.setShadowFollowTarget(camera);
     }
+    // Drive the ambient day/night crossfade from the sky's sun elevation.
+    // Optional dependency: when atmosphere is absent (sandbox/tests) the
+    // soundscape degrades to a fixed day bed.
+    runtime.audioManager.setSkyRuntime(runtime.atmosphereSystem);
   }
 
 }

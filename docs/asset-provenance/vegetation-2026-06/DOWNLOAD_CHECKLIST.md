@@ -96,7 +96,8 @@ Order follows the manifest's "Acquisition order" (matches implementation phases)
 - [x] **LordSamueliSolo Bamboo** (alpha leaf PNGs, DONE + NORMALIZED 2026-06-25) — `CC-BY`
   - URL: https://sketchfab.com/search?q=bamboo&type=models  (pick CC-BY)
   - Dest: `public/assets/vegetation/source/lordsamueli-bamboo/`
-  - Note: catalog `bamboo-grove` (`ready`, 3-culm clump, webp 5.1→2.0MB). CC-BY,
+  - Note: catalog `bamboo-grove` (`ready`, current runtime is a single extracted
+    culm + 8x3 static impostor; 3-culm clump retained as source/provenance). CC-BY,
     author handle still `verify`.
 - [ ] **Quaternius Ultimate Stylized Nature** — `CC0`
   - URL: https://quaternius.com

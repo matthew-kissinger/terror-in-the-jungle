@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { GroundVehiclePlayerAdapter, type IGroundVehicleModel } from './GroundVehiclePlayerAdapter';
-import { GroundVehiclePhysics } from './GroundVehiclePhysics';
+import { GroundVehiclePhysics, type GroundVehiclePhysicsConfig } from './GroundVehiclePhysics';
 import type { VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
 import type { PlayerState } from '../../types';
 
@@ -47,8 +47,9 @@ interface MockGroundModel extends IGroundVehicleModel {
 
 function createMockGroundVehicleModel(
   physicsAt: THREE.Vector3 = new THREE.Vector3(0, 1, 0),
+  physicsConfig?: Partial<GroundVehiclePhysicsConfig>,
 ): MockGroundModel {
-  const physics = new GroundVehiclePhysics(physicsAt);
+  const physics = new GroundVehiclePhysics(physicsAt, physicsConfig);
   return {
     __physics: physics,
     getVehiclePositionTo: vi.fn((_id: string, target: THREE.Vector3) => {
@@ -326,6 +327,40 @@ describe('GroundVehiclePlayerAdapter', () => {
     it('returns false when no vehicle is active', () => {
       const ok = adapter.computeThirdPersonCamera(new THREE.Vector3(), new THREE.Vector3());
       expect(ok).toBe(false);
+    });
+
+    it('frames a long chassis from further back than the jeep, outside its body', () => {
+      // Jeep (default config, ~2m wheelbase).
+      const jeepAdapter = new GroundVehiclePlayerAdapter(createMockGroundVehicleModel());
+      jeepAdapter.onEnter(createTransitionContext(createPlayerState(), 'jeep_x'));
+      const jeepDistance = jeepAdapter.cameraDistance;
+
+      // M35-class cargo truck (~4.2m wheelbase => ~6.7m chassis).
+      const truckModel = createMockGroundVehicleModel(new THREE.Vector3(0, 1, 0), { wheelbase: 4.2 });
+      const truckAdapter = new GroundVehiclePlayerAdapter(truckModel);
+      truckAdapter.onEnter(createTransitionContext(createPlayerState(), 'm35_x'));
+      const truckDistance = truckAdapter.cameraDistance;
+      const truckChassisLength = truckModel.__physics.getChassisLength();
+
+      // 2026-06-28 owner playtest: the truck follow-cam used to sit inside the
+      // 6.7m bed. The longer chassis must now be framed from further back.
+      expect(truckDistance).toBeGreaterThan(jeepDistance);
+      // And the camera must clear the chassis — it sits behind the rear of the
+      // truck body, not inside it.
+      expect(truckDistance).toBeGreaterThan(truckChassisLength);
+
+      // Both chassis keep the same shallow look-down band (no bird's-eye on the
+      // truck despite the larger distance).
+      function downAngle(adapter: GroundVehiclePlayerAdapter): number {
+        const camPos = new THREE.Vector3();
+        const lookAt = new THREE.Vector3();
+        adapter.computeThirdPersonCamera(camPos, lookAt);
+        return THREE.MathUtils.radToDeg(Math.atan2(camPos.y, Math.hypot(camPos.x, camPos.z)));
+      }
+      for (const angle of [downAngle(jeepAdapter), downAngle(truckAdapter)]) {
+        expect(angle).toBeGreaterThan(15);
+        expect(angle).toBeLessThan(40);
+      }
     });
   });
 

@@ -5,9 +5,16 @@ import type { LayoutComponent } from '../layout/types';
 import type { InputMode } from '../../systems/input/InputManager';
 import { SquadCommand } from '../../systems/combat/types';
 import {
+  getSquadCommandKeyHint,
   getSquadCommandLabel,
   SQUAD_QUICK_COMMAND_OPTIONS
 } from '../../systems/combat/SquadCommandPresentation';
+import type {
+  AirSupportRadioAssetId,
+  AirSupportRadioCooldowns,
+  AirSupportTargetMarking
+} from '../../systems/airsupport/AirSupportRadioCatalog';
+import { CommandRadioFireSupportPanel } from './CommandRadioFireSupportPanel';
 import { CommandTacticalMap, type CommandTacticalMapRenderState } from './CommandTacticalMap';
 import * as THREE from 'three';
 
@@ -43,6 +50,7 @@ export class CommandModeOverlay implements LayoutComponent {
   private readonly selectedFactionValue: HTMLSpanElement;
   private readonly hintValue: HTMLSpanElement;
   private readonly tacticalMap: CommandTacticalMap;
+  private readonly fireSupportPanel: CommandRadioFireSupportPanel;
   private readonly commandButtons = new Map<number, OverlayButtonRefs>();
   private inputMode: InputMode = 'keyboardMouse';
   private visible = false;
@@ -62,6 +70,8 @@ export class CommandModeOverlay implements LayoutComponent {
   private onRadioRequested?: () => void;
   private onMapPointSelected?: (position: THREE.Vector3) => void;
   private onSquadSelected?: (squadId: string) => void;
+  private onFireSupportSelected?: (assetId: AirSupportRadioAssetId) => void;
+  private onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
   private backdropPointerId: number | null = null;
 
   constructor() {
@@ -152,6 +162,17 @@ export class CommandModeOverlay implements LayoutComponent {
     sidebar.className = 'command-mode-overlay__sidebar';
     body.appendChild(sidebar);
 
+    // ── FIRE SUPPORT section: the 7 call-in assets + smoke/WP/grid mark. ──
+    this.fireSupportPanel = new CommandRadioFireSupportPanel();
+    this.fireSupportPanel.setCallbacks({
+      onAssetSelected: (assetId) => this.onFireSupportSelected?.(assetId),
+      onMarkingSelected: (marking) => this.onMarkingSelected?.(marking)
+    });
+    sidebar.appendChild(this.fireSupportPanel.getElement());
+
+    // ── SQUAD section: the six Shift+1-6 orders, each with key + effect. ──
+    this.appendSection(sidebar, 'Squad', 'Order your fire team. Shift+1-6, or click a row.');
+
     const detailPanel = document.createElement('div');
     detailPanel.className = 'command-mode-overlay__detail-panel';
     sidebar.appendChild(detailPanel);
@@ -164,7 +185,12 @@ export class CommandModeOverlay implements LayoutComponent {
     const grid = document.createElement('div');
     grid.className = 'command-mode-overlay__grid';
     for (const option of SQUAD_QUICK_COMMAND_OPTIONS) {
-      const refs = this.createCommandButton(option.slot, option.shortLabel, option.fullLabel);
+      const refs = this.createCommandButton(
+        option.slot,
+        option.shortLabel,
+        option.fullLabel,
+        option.effect
+      );
       this.commandButtons.set(option.slot, refs);
       grid.appendChild(refs.button);
     }
@@ -194,12 +220,16 @@ export class CommandModeOverlay implements LayoutComponent {
     onRadioRequested?: () => void;
     onMapPointSelected?: (position: THREE.Vector3) => void;
     onSquadSelected?: (squadId: string) => void;
+    onFireSupportSelected?: (assetId: AirSupportRadioAssetId) => void;
+    onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
   }): void {
     this.onQuickCommandSelected = callbacks.onQuickCommandSelected;
     this.onCloseRequested = callbacks.onCloseRequested;
     this.onRadioRequested = callbacks.onRadioRequested;
     this.onMapPointSelected = callbacks.onMapPointSelected;
     this.onSquadSelected = callbacks.onSquadSelected;
+    this.onFireSupportSelected = callbacks.onFireSupportSelected;
+    this.onMarkingSelected = callbacks.onMarkingSelected;
   }
 
   setInputMode(inputMode: InputMode): void {
@@ -215,9 +245,17 @@ export class CommandModeOverlay implements LayoutComponent {
     this.render();
   }
 
-  setState(state: CommandModeOverlayState): void {
-    this.state = state;
+  setState(state: Partial<CommandModeOverlayState>): void {
+    this.state = { ...this.state, ...state };
     this.render();
+  }
+
+  setFireSupportCooldowns(cooldowns: AirSupportRadioCooldowns): void {
+    this.fireSupportPanel.setCooldowns(cooldowns);
+  }
+
+  setSelectedMarking(marking: AirSupportTargetMarking): void {
+    this.fireSupportPanel.setSelectedMarking(marking);
   }
 
   setMapState(state: CommandTacticalMapRenderState): void {
@@ -246,6 +284,7 @@ export class CommandModeOverlay implements LayoutComponent {
 
   dispose(): void {
     this.tacticalMap.dispose();
+    this.fireSupportPanel.dispose();
     this.unmount();
     document.getElementById(CommandModeOverlay.STYLE_ID)?.remove();
   }
@@ -284,12 +323,29 @@ export class CommandModeOverlay implements LayoutComponent {
     return value;
   }
 
-  private createCommandButton(slot: number, shortLabel: string, fullLabel: string): OverlayButtonRefs {
+  private appendSection(parent: HTMLElement, title: string, hint: string): void {
+    const heading = document.createElement('span');
+    heading.className = 'command-mode-overlay__section-title';
+    heading.textContent = title;
+    parent.appendChild(heading);
+
+    const sub = document.createElement('span');
+    sub.className = 'command-mode-overlay__section-sub';
+    sub.textContent = hint;
+    parent.appendChild(sub);
+  }
+
+  private createCommandButton(
+    slot: number,
+    shortLabel: string,
+    fullLabel: string,
+    effect: string
+  ): OverlayButtonRefs {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'command-mode-overlay__button';
     button.dataset.action = `slot-${slot}`;
-    button.title = fullLabel;
+    button.title = `${fullLabel} — ${effect}`;
 
     let downAt = 0;
     /** Browser timer id (`window.setTimeout` is a number; Node typings use Timeout). */
@@ -341,8 +397,13 @@ export class CommandModeOverlay implements LayoutComponent {
     label.className = 'command-mode-overlay__button-label';
     label.textContent = shortLabel;
 
+    const effectText = document.createElement('span');
+    effectText.className = 'command-mode-overlay__button-effect';
+    effectText.textContent = effect;
+
     button.appendChild(hint);
     button.appendChild(label);
+    button.appendChild(effectText);
     return { button, hint, label };
   }
 
@@ -399,7 +460,7 @@ export class CommandModeOverlay implements LayoutComponent {
       case 'gamepad':
         return slot <= 4 ? `D-${['UP', 'R', 'DN', 'L'][slot - 1]}` : slot === 5 ? 'STAND' : 'ATTK';
       default:
-        return `SHIFT+${slot}`;
+        return getSquadCommandKeyHint(slot);
     }
   }
 
@@ -578,6 +639,24 @@ export class CommandModeOverlay implements LayoutComponent {
         background: rgba(43, 38, 32, 0.66);
       }
 
+      .command-mode-overlay__section-title {
+        margin-top: 2px;
+        font-family: var(--font-primary);
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(231, 217, 186, 0.95);
+      }
+
+      .command-mode-overlay__section-sub,
+      .command-mode-overlay__button-effect {
+        font-family: var(--font-primary);
+        font-size: 11px;
+        line-height: 1.3;
+        color: rgba(182, 164, 135, 0.8);
+      }
+
       .command-mode-overlay__summary-value,
       .command-mode-overlay__button-label,
       .command-mode-overlay__note {
@@ -693,99 +772,16 @@ export class CommandModeOverlay implements LayoutComponent {
         grid-column: 1 / -1;
       }
 
-      @media (max-width: 620px) {
+      /* Compact / short-viewport layout: bottom-sheet panel, single-column body,
+         hidden detail panel. The two triggers (narrow width OR coarse + short)
+         share one rule set; only the panel sizing + command-grid columns differ. */
+      @media (max-width: 620px), (pointer: coarse) and (max-height: 520px) {
         .command-mode-overlay {
           padding: 8px;
           align-items: flex-end;
         }
 
         .command-mode-overlay__panel {
-          width: 100%;
-          max-height: 85vh;
-          gap: 10px;
-          padding: 12px;
-          border-radius: 14px 14px 0 0;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        .command-mode-overlay__header {
-          flex-direction: row;
-          align-items: center;
-        }
-
-        .command-mode-overlay__title {
-          font-size: 20px;
-        }
-
-        .command-mode-overlay__close {
-          min-width: 56px;
-          min-height: 40px;
-          font-size: 13px;
-        }
-
-        .command-mode-overlay__radio {
-          min-width: 56px;
-          min-height: 40px;
-          font-size: 13px;
-        }
-
-        .command-mode-overlay__body {
-          grid-template-columns: 1fr;
-        }
-
-        .command-mode-overlay__summary {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .command-mode-overlay__summary-item {
-          padding: 6px 8px;
-        }
-
-        .command-mode-overlay__detail-panel {
-          display: none;
-        }
-
-        .command-mode-overlay__grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 8px;
-        }
-
-        .command-mode-overlay__button {
-          min-height: 56px;
-          padding: 10px;
-          border-radius: 10px;
-        }
-
-        .command-mode-overlay__button-label {
-          font-size: 14px;
-        }
-
-        .command-mode-overlay__footer {
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .command-mode-overlay__note {
-          text-align: left;
-          font-size: 11px;
-        }
-
-        .command-mode-overlay__hint {
-          font-size: 11px;
-        }
-      }
-
-      @media (pointer: coarse) and (max-height: 520px) {
-        .command-mode-overlay {
-          padding: 8px;
-          align-items: flex-end;
-        }
-
-        .command-mode-overlay__panel {
-          width: min(100%, 560px);
-          max-height: calc(100dvh - 16px);
           gap: 10px;
           padding: 12px;
           overflow-y: auto;
@@ -800,12 +796,7 @@ export class CommandModeOverlay implements LayoutComponent {
           font-size: 20px;
         }
 
-        .command-mode-overlay__close {
-          min-width: 56px;
-          min-height: 40px;
-          font-size: 13px;
-        }
-
+        .command-mode-overlay__close,
         .command-mode-overlay__radio {
           min-width: 56px;
           min-height: 40px;
@@ -856,6 +847,21 @@ export class CommandModeOverlay implements LayoutComponent {
 
         .command-mode-overlay__hint {
           font-size: 11px;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .command-mode-overlay__panel {
+          width: 100%;
+          max-height: 85vh;
+          border-radius: 14px 14px 0 0;
+        }
+      }
+
+      @media (pointer: coarse) and (max-height: 520px) {
+        .command-mode-overlay__panel {
+          width: min(100%, 560px);
+          max-height: calc(100dvh - 16px);
         }
       }
     `;

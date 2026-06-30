@@ -35,6 +35,7 @@ import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSyst
 import { getRenderDistanceMultiplier } from '../utils/DeviceDetector';
 import { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
@@ -54,6 +55,7 @@ import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import { TaskingDirector } from '../systems/missions/TaskingDirector';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { objectPool } from '../utils/ObjectPoolManager';
 import { markStartup } from './StartupTelemetry';
@@ -153,6 +155,7 @@ export class SystemInitializer {
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
     refs.zoneManager = new ZoneManager(scene);
+    refs.zoneCaptureEffects = new ZoneCaptureEffects(scene);
     refs.ticketSystem = new TicketSystem();
     refs.playerHealthSystem = new PlayerHealthSystem();
     refs.playerRespawnManager = new PlayerRespawnManager(scene, camera);
@@ -207,6 +210,17 @@ export class SystemInitializer {
     if (refs.terrainSystem) {
       refs.commandInputManager.setTerrainSystem(refs.terrainSystem);
     }
+    // Radio dial -> headless RadioStationSystem (cycle-2026-06-29-radio-station-
+    // wiring, P4b). The dial's STATIONS slot routes a tune to the concrete
+    // AudioManager (off the fence); the selected id pre-highlights the dial.
+    // Tuning while music is disabled only records the choice (no fetch/play).
+    // Capture the (already-constructed) AudioManager so the tune callback keeps
+    // a stable, defined handle.
+    const radioAudioManager = refs.audioManager;
+    refs.commandInputManager.setStationTuner((stationId) => {
+      void radioAudioManager.tuneRadioStation(stationId);
+    });
+    refs.commandInputManager.setSelectedStation(radioAudioManager.getSelectedRadioStationId());
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
     refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.terrainSystem);
@@ -222,6 +236,7 @@ export class SystemInitializer {
     refs.loadoutService = new LoadoutService();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
+    refs.taskingDirector = new TaskingDirector();
     refs.spatialGridManager = spatialGridManager;
 
     // Initialize influence map system based on game mode world size
@@ -241,6 +256,7 @@ export class SystemInitializer {
       refs.firstPersonWeapon,
       refs.combatantSystem,
       refs.zoneManager,
+      refs.zoneCaptureEffects,
       refs.ticketSystem,
       refs.playerHealthSystem,
       refs.playerRespawnManager,
@@ -267,6 +283,7 @@ export class SystemInitializer {
       refs.ammoSupplySystem,
       refs.warSimulator,
       refs.strategicFeedback,
+      refs.taskingDirector,
       refs.airSupportManager,
       refs.aaEmplacementSystem,
       refs.vehicleManager,

@@ -123,6 +123,16 @@ export interface PerfBudget {
   textureMb?: number;
 }
 
+/** Optional renderer-neutral scalar tuning for foliage impostor material response. */
+export interface ImpostorMaterialTuning {
+  fogStrength?: number;
+  foliageExposureScale?: number;
+  foliageColorGamma?: number;
+  foliageSaturation?: number;
+  /** Fraction of each azimuth tile interval spent blending to the next tile; 1 preserves full-interval blending. */
+  azimuthBlendBand?: number;
+}
+
 /**
  * An engine-neutral way to render the asset. An asset offers one or more; the lod
  * chain sequences them by distance. All are pure descriptors — no GPU objects.
@@ -169,6 +179,7 @@ export type Representation =
       columns: number;
       rows: number;
       bounds: Bounds;
+      materialTuning?: ImpostorMaterialTuning;
       budget?: PerfBudget;
     }
   | {

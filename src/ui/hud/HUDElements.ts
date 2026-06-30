@@ -10,6 +10,7 @@ import { HitMarkerFeedback } from './HitMarkerFeedback';
 import { WeaponSwitchFeedback } from './WeaponSwitchFeedback';
 import { UnifiedWeaponBar } from './UnifiedWeaponBar';
 import { WeaponPill } from './WeaponPill';
+import { RadioHotbarSlot } from './radio/RadioHotbarSlot';
 import { MobileStatusBar } from './MobileStatusBar';
 import { ObjectiveDisplay } from './ObjectiveDisplay';
 import { TicketDisplay } from './TicketDisplay';
@@ -59,6 +60,9 @@ export class HUDElements extends HUDVehicleHud {
   public zoneCaptureNotification?: ZoneCaptureNotification;
   public unifiedWeaponBar: UnifiedWeaponBar;
   public weaponPill: WeaponPill;
+  // Dedicated, non-weapon Radio HUD affordance (a sibling pill — NOT a 7th
+  // weapon slot, NOT a carried loadout item). Tapping it opens the radio dial.
+  public radioHotbarSlot: RadioHotbarSlot;
   public mobileStatusBar: MobileStatusBar;
 
   // Legacy module instances (not yet migrated to UIComponent)
@@ -122,6 +126,9 @@ export class HUDElements extends HUDVehicleHud {
     // Initialize mobile-only components
     this.weaponPill = new WeaponPill();
     this.mobileStatusBar = new MobileStatusBar();
+
+    // Dedicated Radio HUD slot (open-the-dial affordance; both desktop + touch)
+    this.radioHotbarSlot = new RadioHotbarSlot();
 
     // Initial mount to hudContainer; attachToDOM() remounts into grid slots
     this.hudContainer.appendChild(this.objectivesList);
@@ -322,6 +329,11 @@ export class HUDElements extends HUDVehicleHud {
     weaponSlot.dataset.show = 'infantry';
     this.unifiedWeaponBar.mount(weaponSlot);
 
+    // Radio HUD slot — a sibling pill in the weapon-bar region (NOT a weapon
+    // slot). Sits alongside the weapon bar / pill on both desktop and touch.
+    this.radioHotbarSlot.unmount();
+    this.radioHotbarSlot.mount(weaponSlot);
+
     // Mobile-only: WeaponPill replaces UnifiedWeaponBar on touch devices
     const isTouch = ViewportManager.getInstance().info.isTouch;
     if (isTouch) {
@@ -422,6 +434,7 @@ export class HUDElements extends HUDVehicleHud {
     }
     this.unifiedWeaponBar.dispose();
     this.weaponPill.dispose();
+    this.radioHotbarSlot.dispose();
     this.mobileStatusBar.dispose();
     this.interactionPromptPanel.dispose();
     this.grenadeMeter.dispose();

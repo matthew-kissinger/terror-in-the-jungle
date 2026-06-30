@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ZoneManager, ZoneState, CaptureZone } from './ZoneManager';
 import { Faction, CombatantState } from '../combat/types';
+import { GameEventBus } from '../../core/GameEventBus';
 import * as THREE from 'three';
 
 // Mock Logger
@@ -490,8 +491,36 @@ describe('ZoneManager', () => {
       zone.state = ZoneState.OPFOR_CONTROLLED;
       
       zoneManager.update(0.1);
-      
+
       expect(mockHUD.addZoneCapture).not.toHaveBeenCalled();
+    });
+
+    it('emits zone_captured with the zone position and radius for capture-feedback consumers', () => {
+      const emitSpy = vi.spyOn(GameEventBus, 'emit');
+
+      const zone = zoneManager['zones'].get('test_zone')!;
+      zone.position.set(42, 3, -17);
+      zone.radius = 28;
+      zoneManager['previousZoneState'].set('test_zone', null);
+
+      zone.owner = Faction.US;
+      zone.state = ZoneState.BLUFOR_CONTROLLED;
+
+      zoneManager.update(0.1);
+
+      expect(emitSpy).toHaveBeenCalledWith('zone_captured', expect.objectContaining({
+        zoneId: 'test_zone',
+        faction: Faction.US,
+        radius: 28,
+      }));
+      const [, payload] = emitSpy.mock.calls.find(([event]) => event === 'zone_captured')!;
+      const emitted = payload as { position: THREE.Vector3 };
+      expect(emitted.position.equals(new THREE.Vector3(42, 3, -17))).toBe(true);
+      // The emitted position must be an independent copy, not a live reference
+      // to the zone's own (mutable) position vector.
+      expect(emitted.position).not.toBe(zone.position);
+
+      emitSpy.mockRestore();
     });
   });
 

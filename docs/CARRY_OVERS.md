@@ -30,11 +30,11 @@ started, the cycle is `INCOMPLETE` per the rule in
 
 | ID | Title | Opened | Cycles open | Owning subsystem | Blocking? | Notes |
 |----|-------|--------|------------:|------------------|-----------|-------|
-| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 25 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** **2026-06-01: the combat-side p99 lever — NPC convergence terrain-stall cost + oscillation — shipped via `task/combat-convergence-stall-fix` (contour re-score cache, serve-stale-on-throttle, hold dispersal, opt-in stagger); frame-time certification is what the quiet-machine refresh still owes. See [docs/state/perf-trust.md](state/perf-trust.md) 2026-06-01 update.** **2026-06-02: `perf-baselines.json` was removed from the repo; with no tracked baseline `perf:compare` prints raw latest-capture metrics and does not gate (the CI perf step is advisory). "Refresh" now means re-establishing a baseline via `perf:update-baseline` if/when the owner re-queues — this item stays open as the frame-time-certification gap, not a file-refresh task.** |
-| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 24 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
-| KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 22 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
-| KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 18 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
-| cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 20 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
+| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 27 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** **2026-06-01: the combat-side p99 lever — NPC convergence terrain-stall cost + oscillation — shipped via `task/combat-convergence-stall-fix` (contour re-score cache, serve-stale-on-throttle, hold dispersal, opt-in stagger); frame-time certification is what the quiet-machine refresh still owes. See [docs/state/perf-trust.md](state/perf-trust.md) 2026-06-01 update.** **2026-06-02: `perf-baselines.json` was removed from the repo; with no tracked baseline `perf:compare` prints raw latest-capture metrics and does not gate (the CI perf step is advisory). "Refresh" now means re-establishing a baseline via `perf:update-baseline` if/when the owner re-queues — this item stays open as the frame-time-certification gap, not a file-refresh task.** |
+| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 26 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
+| KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 24 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
+| KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 20 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
+| cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 22 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
 
 ## Parked
 
@@ -49,6 +49,36 @@ the cycle that re-opens it.
 | AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | 2026-05-12 vision-pivot park | cycle-2026-04-22-heap-and-polish (7 cycles open at park) | Audit memo exists at `docs/rearch/helicopter-parity-audit.md`; work is documented, not actioned. Not vision-critical under the 2026-05-12 directions. | Phase 4 F5 close-out resumes, or the helicopter-adapter cluster is touched again. |
 
 History log:
+
+- 2026-06-28 — budget-ratchet admission (sks-rifle-wiring, Phase 4 Field
+  Readiness): `src/systems/player/weapon/WeaponRigManager.ts` crossed the 700-LOC
+  base limit (699→735 / 29 methods) and is admitted to the grandfather list.
+  Cause: the SKS semi-auto runtime weapon type (+36 LOC) on top of the marksman
+  DMR added the same cycle — the manager now wires nine weapons' rig load + spec
+  + switching. Split target: extract the per-weapon spec/core/rig registry out of
+  the manager (recorded in the entry's `round`/`reason`). Orchestrator-sanctioned
+  admission per the budget policy; within-cycle growth, **no new carry-over** —
+  the split-debt lives in `scripts/lint-source-budget.ts` like the other
+  grandfathered god-modules. Carry-overs 5→5.
+
+- 2026-06-28 — budget-ratchet re-base (route-corridor-exclusion, Phase 3 Field
+  Readiness): `src/systems/terrain/TerrainFeatureCompiler.ts` snapshot raised
+  764→767 LOC — the +3 LOC route veg-exclusion join block (the one-line merge of
+  route corridors into the `vegetationExclusionZones` stream + a 2-line comment).
+  Within-cycle growth, not a new carry-over; split target unchanged.
+
+- 2026-06-28 — budget-ratchet re-base (seat-and-fire-cues): two
+  already-grandfathered files grew minimally to surface multi-crew seat/fire
+  cues. `src/systems/vehicle/FixedWingModel.ts` snapshot raised 1166→1191 LOC /
+  51→52 methods — the airborne-gate feedback signal adds one consume-on-read
+  getter (`consumeGroundedFireBlocked`) plus the grounded-trigger record branch
+  and a structural HUD-sink poll, so the silent ground fire no-op now flashes an
+  "Airborne to fire" hint. `src/ui/hud/HUDSystem.ts` snapshot raised 788→809 LOC
+  / 85→86 methods — one HUD delegation method (`flashFixedWingAirborneHint`,
+  mirror of the existing ammo delegation) plus seat-hint derivation wired into
+  the existing `setVehicleContext`; the seat-cue logic itself lives in
+  HudControlHints so only one method is added. Within-cycle growth, not a new
+  carry-over; both split targets unchanged.
 
 - 2026-06-15/16 — budget-ratchet stabilization re-base
   (dropped-frame-perf-harness): the dropped-frame harness/perf recovery branch

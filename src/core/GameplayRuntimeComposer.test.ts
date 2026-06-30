@@ -27,7 +27,7 @@ function createRefs() {
       setRenderer: vi.fn(),
       setShadowFollowTarget: vi.fn(),
     },
-    audioManager: {},
+    audioManager: { setSkyRuntime: vi.fn() },
     combatantSystem: {
       combatantAI: {
         setSandbagSystem: vi.fn(),

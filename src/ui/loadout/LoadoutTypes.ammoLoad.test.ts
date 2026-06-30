@@ -15,6 +15,7 @@ import {
   AmmoLoad,
   AMMO_LOAD_OPTIONS,
   clonePlayerLoadout,
+  getAmmoLoadHandlingFactor,
   getAmmoLoadLabel,
   getAmmoLoadReserveFactor,
   getAmmoLoadShortLabel,
@@ -63,6 +64,38 @@ describe('ammo load reserve factor', () => {
 
   it('treats an unknown load as the standard baseline factor', () => {
     expect(getAmmoLoadReserveFactor('mystery' as AmmoLoad)).toBe(1.0);
+  });
+});
+
+describe('ammo load handling factor (the tradeoff)', () => {
+  it('keeps STANDARD at no penalty and makes heavier loads strictly worse for handling', () => {
+    // Behavior, not exact tuning: STANDARD must be the neutral baseline, and the
+    // penalty must grow with the reserve a load grants so EXTENDED/HEAVY are a
+    // genuine tradeoff rather than strictly better than STANDARD.
+    const standard = getAmmoLoadHandlingFactor(AmmoLoad.STANDARD);
+    const extended = getAmmoLoadHandlingFactor(AmmoLoad.EXTENDED);
+    const heavy = getAmmoLoadHandlingFactor(AmmoLoad.HEAVY);
+
+    expect(standard).toBe(1.0);
+    expect(extended).toBeGreaterThan(standard);
+    expect(heavy).toBeGreaterThan(extended);
+  });
+
+  it('orders the handling penalty the same way as the reserve it grants', () => {
+    // The load that gives more reserve must also cost more handling, so there is
+    // no free lunch: more ammo => slower handling, monotonically.
+    const loads = [AmmoLoad.STANDARD, AmmoLoad.EXTENDED, AmmoLoad.HEAVY];
+    const byReserve = [...loads].sort(
+      (a, b) => getAmmoLoadReserveFactor(a) - getAmmoLoadReserveFactor(b)
+    );
+    const byHandling = [...loads].sort(
+      (a, b) => getAmmoLoadHandlingFactor(a) - getAmmoLoadHandlingFactor(b)
+    );
+    expect(byHandling).toEqual(byReserve);
+  });
+
+  it('treats an unknown load as the standard (no-penalty) baseline', () => {
+    expect(getAmmoLoadHandlingFactor('mystery' as AmmoLoad)).toBe(1.0);
   });
 });
 

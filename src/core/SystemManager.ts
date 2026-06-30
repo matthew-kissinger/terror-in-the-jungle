@@ -43,6 +43,7 @@ import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import { TaskingDirector } from '../systems/missions/TaskingDirector';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
@@ -342,6 +343,7 @@ export class SystemManager {
   get loadoutService(): LoadoutService { return this.registry.require('loadoutService'); }
   get warSimulator(): WarSimulator { return this.registry.require('warSimulator'); }
   get strategicFeedback(): StrategicFeedback { return this.registry.require('strategicFeedback'); }
+  get taskingDirector(): TaskingDirector { return this.registry.require('taskingDirector'); }
   get worldFeatureSystem(): WorldFeatureSystem { return this.registry.require('worldFeatureSystem'); }
   get navmeshSystem(): NavmeshSystem { return this.registry.require('navmeshSystem'); }
   get vehicleManager(): import('../systems/vehicle/VehicleManager').VehicleManager {

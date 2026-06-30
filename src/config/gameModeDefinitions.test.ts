@@ -6,6 +6,7 @@ import {
   getFactionOptionsForAlliance,
   getGameModeDefinition,
   getPlayableAlliances,
+  isFactionSelectable,
   resolveLaunchSelection
 } from './gameModeDefinitions';
 import { GameMode } from './gameModeTypes';
@@ -29,10 +30,10 @@ describe('getGameModeDefinition', () => {
     expect(definition.policies.mapIntel.tacticalRangeOverride).toBe(900);
   });
 
-  it('exposes playable alliances and faction options for the selected mode', () => {
+  it('exposes both alliances and faction options for the A Shau premiere mode', () => {
     const definition = getGameModeDefinition(GameMode.A_SHAU_VALLEY);
 
-    expect(getPlayableAlliances(definition)).toEqual([Alliance.BLUFOR]);
+    expect(getPlayableAlliances(definition)).toEqual([Alliance.BLUFOR, Alliance.OPFOR]);
     expect(getFactionOptionsForAlliance(definition, Alliance.BLUFOR)).toEqual([Faction.US, Faction.ARVN]);
     expect(getFactionOptionsForAlliance(definition, Alliance.OPFOR)).toEqual([Faction.NVA, Faction.VC]);
   });
@@ -44,6 +45,38 @@ describe('getGameModeDefinition', () => {
       alliance: Alliance.OPFOR,
       faction: Faction.NVA,
     })).toEqual({
+      alliance: Alliance.BLUFOR,
+      faction: Faction.US,
+    });
+  });
+});
+
+describe('faction-side picker gating', () => {
+  it('marks the A Shau premiere mode as faction-selectable', () => {
+    expect(isFactionSelectable(getGameModeDefinition(GameMode.A_SHAU_VALLEY))).toBe(true);
+  });
+
+  it('keeps the standard modes hidden from the side picker', () => {
+    expect(isFactionSelectable(getGameModeDefinition(GameMode.ZONE_CONTROL))).toBe(false);
+    expect(isFactionSelectable(getGameModeDefinition(GameMode.OPEN_FRONTIER))).toBe(false);
+    expect(isFactionSelectable(getGameModeDefinition(GameMode.TEAM_DEATHMATCH))).toBe(false);
+  });
+
+  it('routes an OPFOR choice to the OPFOR loadout pool on A Shau', () => {
+    const definition = getGameModeDefinition(GameMode.A_SHAU_VALLEY);
+
+    // The picker's chosen side reaches launch selection; the OPFOR faction pool
+    // (incl. the Phase-4 marksman/SKS) becomes the player's faction.
+    expect(resolveLaunchSelection(definition, { alliance: Alliance.OPFOR })).toEqual({
+      alliance: Alliance.OPFOR,
+      faction: Faction.NVA,
+    });
+  });
+
+  it('keeps the default BLUFOR side when no choice is supplied on A Shau', () => {
+    const definition = getGameModeDefinition(GameMode.A_SHAU_VALLEY);
+
+    expect(resolveLaunchSelection(definition)).toEqual({
       alliance: Alliance.BLUFOR,
       faction: Faction.US,
     });

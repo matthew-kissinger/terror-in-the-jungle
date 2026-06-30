@@ -45,6 +45,19 @@ function isVec3(v: unknown): v is [number, number, number] {
   return Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === 'number');
 }
 
+function checkOptionalFiniteRange(
+  id: string,
+  label: string,
+  value: unknown,
+  min: number,
+  max: number,
+): void {
+  if (value === undefined) return;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
+    fail(id, `${label} must be a finite number in [${min}, ${max}]`);
+  }
+}
+
 function checkRepresentation(id: string, r: Representation): void {
   if (!isStr(r.id)) fail(id, `representation of kind '${r.kind}' missing id`);
   switch (r.kind) {
@@ -62,6 +75,13 @@ function checkRepresentation(id: string, r: Representation): void {
     case 'octaImpostor':
       if (!isStr(r.baseColorPath) || !isStr(r.normalPath)) fail(id, `octaImpostor '${r.id}' maps missing`);
       if (typeof r.columns !== 'number' || typeof r.rows !== 'number') fail(id, `octaImpostor '${r.id}' grid missing`);
+      if (r.materialTuning) {
+        checkOptionalFiniteRange(id, `octaImpostor '${r.id}' materialTuning.fogStrength`, r.materialTuning.fogStrength, 0, 1.5);
+        checkOptionalFiniteRange(id, `octaImpostor '${r.id}' materialTuning.foliageExposureScale`, r.materialTuning.foliageExposureScale, 0, 2);
+        checkOptionalFiniteRange(id, `octaImpostor '${r.id}' materialTuning.foliageColorGamma`, r.materialTuning.foliageColorGamma, 0.6, 2.5);
+        checkOptionalFiniteRange(id, `octaImpostor '${r.id}' materialTuning.foliageSaturation`, r.materialTuning.foliageSaturation, 0, 1.25);
+        checkOptionalFiniteRange(id, `octaImpostor '${r.id}' materialTuning.azimuthBlendBand`, r.materialTuning.azimuthBlendBand, 0.05, 1);
+      }
       break;
     case 'groundCard':
       if (!isStr(r.baseColorPath)) fail(id, `groundCard '${r.id}' baseColorPath missing`);

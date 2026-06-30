@@ -1,0 +1,18 @@
+{
+  "slug": "zone-captured-sting",
+  "role": "zone-capture-complete confirmation sting (SOUND_CONFIGS['zoneCaptured'])",
+  "title": "Music Jingles - jingles_HIT03",
+  "author": "Kenney Vleugels (Kenney.nl)",
+  "provider": "kenney.nl",
+  "sourceUrl": "https://kenney.nl/media/pages/assets/music-jingles/f37e530b9e-1677590399/kenney_music-jingles.zip",
+  "infoUrl": "https://kenney.nl/assets/music-jingles",
+  "license": "CC0 1.0 Universal",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "status": "shipped-third-party",
+  "localPath": "public/assets/optimized/zoneCaptured.ogg",
+  "attributionRequired": false,
+  "attributionText": "\"Music Jingles\" (jingles_HIT03) by Kenney Vleugels (kenney.nl), CC0 1.0 Universal (public domain) — credit appreciated but not required.",
+  "format": "Vorbis .ogg, stereo, 44.1kHz, ~150 kbps, 0.75 s",
+  "fetchedOn": "2026-06-30",
+  "notes": "Closes the AudioManager.ts zone_captured event-bus subscription that already called play('zoneCaptured', ...) with no matching SOUND_CONFIGS entry (silent no-op since the subscription was added). Picked the 'Hit jingles' sub-pack over the pack's 8-Bit/Pizzicato/Sax/Steel-drum jingles as the most tonally neutral (a short abstract percussive sting, not tied to a specific cheerful instrument timbre) for a gritty jungle-combat game; HIT03 chosen for being the most substantial of the very-short HIT variants (0.75s vs 0.28-0.6s) so a territorial capture reads as a touch more significant than a plain UI blip, while still short enough not to step on combat audio. Fetched directly from kenney.nl (HTTP 200, no auth/credentials needed) — same no-auth-direct-download approach as the existing incompetech.com precedent in this directory. Not waveform/listen-verified by the agent (no audio playback available in this environment); flagged for an owner spot-check, trivially swappable (one file + one SOUND_CONFIGS path) if the tone doesn't land."
+}

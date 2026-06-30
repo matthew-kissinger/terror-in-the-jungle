@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -16,7 +15,8 @@ import {
 import { startServer, stopServer, type ServerHandle } from './preview-server';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
-type ProbePoseKind = 'ground' | 'elevated' | 'skyward' | 'finite-edge';
+type FixedProbePoseKind = 'ground' | 'elevated' | 'skyward' | 'finite-edge' | 'vegetation-focus';
+type ProbePoseKind = FixedProbePoseKind | `vegetation-focus-${string}`;
 
 interface RendererCapabilities {
   requestedMode?: string;
@@ -34,6 +34,7 @@ interface ImageMetrics {
   lumaStdDev: number;
   saturationMean: number;
   overexposedRatio: number;
+  paleLowSaturationRatio: number;
   greenDominanceRatio: number;
   alphaCoverage: number;
 }
@@ -44,6 +45,13 @@ interface MaterialProbe {
   type: string;
   objectName: string;
   category: string;
+  staticImpostor: {
+    source: string | null;
+    slug: string | null;
+    lightingProfile: string | null;
+    promotionDistanceMeters: number | null;
+    demotionDistanceMeters: number | null;
+  } | null;
   uniforms: Record<string, unknown>;
   textureMetrics: Record<string, unknown>;
 }
@@ -82,6 +90,8 @@ interface PoseMetrics {
     terrainLod: TerrainLodSummary | null;
     horizonRing: Record<string, unknown> | null;
     billboardDebug: Record<string, unknown> | null;
+    vegetationDebug: Record<string, unknown> | null;
+    vegetationFocus: Record<string, unknown> | null;
   };
   rendererInfo: {
     calls: number | null;
@@ -132,6 +142,11 @@ interface ProbeReport {
     headed: boolean;
     port: number;
     forceBuild: boolean;
+    vegetationImpostorFogStrength: number | null;
+    vegetationImpostorExposureScale: number | null;
+    vegetationImpostorColorGamma: number | null;
+    vegetationImpostorSaturation: number | null;
+    vegetationImpostorTransitionMeters: number | null;
   };
   files: {
     summary: string;
@@ -174,6 +189,20 @@ function parseNumberFlag(name: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseOptionalNumberFlag(name: string, min: number, max: number): number | null {
+  const eqArg = process.argv.find(arg => arg.startsWith(`--${name}=`));
+  const idx = process.argv.indexOf(`--${name}`);
+  const raw = eqArg
+    ? eqArg.split('=')[1]
+    : idx >= 0 && idx + 1 < process.argv.length
+      ? process.argv[idx + 1]
+      : null;
+  if (raw === null) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(max, Math.max(min, parsed));
+}
+
 function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
@@ -207,6 +236,7 @@ async function imageMetrics(path: string): Promise<ImageMetrics> {
   let lumaSqSum = 0;
   let saturationSum = 0;
   let overexposed = 0;
+  let paleLowSaturation = 0;
   let greenDominant = 0;
   let alphaCovered = 0;
   const pixels = Math.max(1, info.width * info.height);
@@ -222,6 +252,7 @@ async function imageMetrics(path: string): Promise<ImageMetrics> {
     lumaSqSum += luma * luma;
     saturationSum += max > 1e-6 ? (max - min) / max : 0;
     if (luma > 0.92) overexposed += 1;
+    if (luma > 0.45 && max > 1e-6 && (max - min) / max < 0.35) paleLowSaturation += 1;
     if (g > r * 1.08 && g > b * 1.08) greenDominant += 1;
     if (a > 0.05) alphaCovered += 1;
   }
@@ -234,6 +265,7 @@ async function imageMetrics(path: string): Promise<ImageMetrics> {
     lumaStdDev: Math.sqrt(variance),
     saturationMean: saturationSum / pixels,
     overexposedRatio: overexposed / pixels,
+    paleLowSaturationRatio: paleLowSaturation / pixels,
     greenDominanceRatio: greenDominant / pixels,
     alphaCoverage: alphaCovered / pixels,
   };
@@ -387,6 +419,24 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
       if (Object.prototype.hasOwnProperty.call(uniforms, 'npcExposure')) return 'npc_imposters';
       return 'unattributed';
     };
+    const staticImpostorFor = (object: any, material: any): MaterialProbe['staticImpostor'] => {
+      if (!material?.isStaticImpostorNodeMaterial && object?.userData?.isStaticImpostorBatch !== true) {
+        return null;
+      }
+      return {
+        source: typeof object?.userData?.staticImpostorSource === 'string' ? object.userData.staticImpostorSource : null,
+        slug: typeof object?.userData?.staticImpostorSlug === 'string' ? object.userData.staticImpostorSlug : null,
+        lightingProfile: typeof object?.userData?.staticImpostorLightingProfile === 'string'
+          ? object.userData.staticImpostorLightingProfile
+          : null,
+        promotionDistanceMeters: Number.isFinite(object?.userData?.staticImpostorPromotionDistanceMeters)
+          ? Number(object.userData.staticImpostorPromotionDistanceMeters)
+          : null,
+        demotionDistanceMeters: Number.isFinite(object?.userData?.staticImpostorDemotionDistanceMeters)
+          ? Number(object.userData.staticImpostorDemotionDistanceMeters)
+          : null,
+      };
+    };
     const seen = new Set<string>();
     const probes: MaterialProbe[] = [];
     scene.traverse((object: any) => {
@@ -394,16 +444,21 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
       for (const material of materialArray(object.material)) {
         if (!material) continue;
         const uniforms = material.uniforms ?? {};
-        const surface = Object.prototype.hasOwnProperty.call(uniforms, 'vegetationExposure')
+        const staticImpostor = staticImpostorFor(object, material);
+        const staticSource = staticImpostor?.source ?? null;
+        const staticLightingProfile = staticImpostor?.lightingProfile ?? null;
+        const surface = staticSource === 'vegetation' || staticLightingProfile === 'foliage-card'
+          ? 'vegetation'
+          : Object.prototype.hasOwnProperty.call(uniforms, 'vegetationExposure')
           ? 'vegetation'
           : Object.prototype.hasOwnProperty.call(uniforms, 'npcExposure')
             ? 'npc'
             : null;
         if (!surface) continue;
-        const key = `${surface}:${material.uuid ?? material.name ?? probes.length}`;
+        const key = `${surface}:${staticImpostor?.slug ?? material.uuid ?? material.name ?? probes.length}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const mapTexture = uniforms.map?.value ?? material.map ?? null;
+        const mapTexture = uniforms.map?.value ?? uniforms.baseColorMap?.value ?? material.map ?? null;
         const normalTexture = uniforms.normalMap?.value ?? material.normalMap ?? null;
         probes.push({
           surface,
@@ -411,6 +466,7 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
           type: String(material.type ?? '(unknown)'),
           objectName: String(object.name ?? '(unnamed)'),
           category: categoryFor(object, material),
+          staticImpostor,
           uniforms: serializeUniforms(uniforms),
           textureMetrics: {
             map: sampleTexture(mapTexture),
@@ -427,6 +483,13 @@ async function collectMaterialProbes(page: Page): Promise<MaterialProbe[]> {
 
 async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetrics> {
   return page.evaluate((poseKind: ProbePoseKind) => {
+    const vegetationFocusPrefix = 'vegetation-focus-';
+    const poseKindText = String(poseKind);
+    const isVegetationFocusPose = poseKindText === 'vegetation-focus'
+      || poseKindText.startsWith(vegetationFocusPrefix);
+    const requestedVegetationSlug = poseKindText.startsWith(vegetationFocusPrefix)
+      ? poseKindText.slice(vegetationFocusPrefix.length)
+      : null;
     const engine = (window as any).__engine;
     const rendererHost = engine?.renderer ?? (window as any).__renderer;
     const scene = rendererHost?.scene ?? rendererHost?.renderer?.scene;
@@ -435,6 +498,12 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
     const atmosphere = engine?.systemManager?.atmosphereSystem;
     const billboards = engine?.systemManager?.globalBillboardSystem;
     const threeRenderer = rendererHost?.threeRenderer ?? rendererHost?.renderer ?? rendererHost;
+    const streamingMetrics = typeof terrain?.getStreamingMetrics === 'function'
+      ? terrain.getStreamingMetrics()
+      : null;
+    const vegetationMetric = Array.isArray(streamingMetrics)
+      ? streamingMetrics.find((metric: any) => metric?.name === 'vegetation')
+      : null;
     if (!camera?.clone) throw new Error('camera_unavailable');
     const playableWorldSize = Number(terrain?.getPlayableWorldSize?.() ?? terrain?.getWorldSize?.() ?? NaN);
     const visualMargin = Number(terrain?.getVisualMargin?.() ?? NaN);
@@ -443,6 +512,74 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
     const terrainYAt = (x: number, z: number): number => {
       const y = Number(terrain?.getHeightAt?.(x, z) ?? 0);
       return Number.isFinite(y) ? y : 0;
+    };
+    const findVegetationFocus = (preferredSlug: string | null = null): Record<string, number | string> | null => {
+      const candidates: Array<Record<string, number | string>> = [];
+      scene?.traverse?.((object: any) => {
+        if (
+          object?.userData?.isStaticImpostorBatch !== true
+          || object.userData.staticImpostorSource !== 'vegetation'
+        ) {
+          return;
+        }
+        const positions = object.geometry?.getAttribute?.('instancePosition');
+        const scales = object.geometry?.getAttribute?.('instanceScale');
+        if (!positions?.getX || !positions?.getY || !positions?.getZ || !scales?.getX || !scales?.getY) {
+          return;
+        }
+        const count = Math.min(
+          Number(object.geometry?.instanceCount ?? positions.count ?? 0),
+          Number(positions.count ?? 0),
+        );
+        const slug = String(object.userData.staticImpostorSlug ?? object.name ?? 'vegetation');
+        const promotion = Number(object.userData.staticImpostorPromotionDistanceMeters ?? 140);
+        const demotion = Number(object.userData.staticImpostorDemotionDistanceMeters ?? promotion * 0.85);
+        for (let i = 0; i < count; i++) {
+          const scaleX = Number(scales.getX(i));
+          const scaleY = Number(scales.getY(i));
+          if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY) || Math.abs(scaleX) + Math.abs(scaleY) <= 0.01) {
+            continue;
+          }
+          const x = Number(positions.getX(i));
+          const y = Number(positions.getY(i));
+          const z = Number(positions.getZ(i));
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+            continue;
+          }
+          const terrainOk = typeof terrain?.hasTerrainAt === 'function' ? Boolean(terrain.hasTerrainAt(x, z)) : true;
+          if (!terrainOk) {
+            continue;
+          }
+          candidates.push({
+            slug,
+            x,
+            y,
+            z,
+            scaleX,
+            scaleY,
+            promotion,
+            demotion,
+            distanceFromOrigin: Math.hypot(x, z),
+          });
+        }
+      });
+      const targetRadius = Math.min(900, Math.max(320, halfWorld * 0.38));
+      const maxRadius = Math.max(targetRadius * 1.7, targetRadius + 220);
+      const slugCandidates = preferredSlug
+        ? candidates.filter(candidate => String(candidate.slug) === preferredSlug)
+        : candidates;
+      const reviewBand = slugCandidates.filter(candidate => Number(candidate.distanceFromOrigin) <= maxRadius);
+      const reviewCandidates = reviewBand.length > 0
+        ? reviewBand
+        : slugCandidates.length > 0
+          ? slugCandidates
+          : candidates;
+      reviewCandidates.sort((a, b) => {
+        const aDistance = Math.abs(Number(a.distanceFromOrigin) - targetRadius);
+        const bDistance = Math.abs(Number(b.distanceFromOrigin) - targetRadius);
+        return aDistance - bDistance || Number(b.scaleY) - Number(a.scaleY);
+      });
+      return reviewCandidates[0] ?? null;
     };
     let cameraX = 0;
     let cameraZ = -180;
@@ -474,6 +611,30 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
       targetZ = 0;
       cameraY = terrainYAt(cameraX, cameraZ) + 150;
       targetY = terrainYAt(halfWorld - 1, targetZ) + 30;
+    } else if (isVegetationFocusPose) {
+      const focus = findVegetationFocus(requestedVegetationSlug);
+      if (focus) {
+        targetX = Number(focus.x);
+        targetZ = Number(focus.z);
+        const promotion = Number(focus.promotion);
+        const scaleY = Number(focus.scaleY);
+        const focusDistance = Math.min(240, Math.max(90, promotion + 24));
+        const offsets = [
+          { x: focusDistance * 0.35, z: -focusDistance },
+          { x: -focusDistance * 0.35, z: -focusDistance },
+          { x: focusDistance, z: 0 },
+          { x: -focusDistance, z: 0 },
+        ];
+        const chosen = offsets.find(offset =>
+          typeof terrain?.hasTerrainAt === 'function'
+            ? terrain.hasTerrainAt(targetX + offset.x, targetZ + offset.z)
+            : true
+        ) ?? offsets[0];
+        cameraX = targetX + chosen.x;
+        cameraZ = targetZ + chosen.z;
+        cameraY = terrainYAt(cameraX, cameraZ) + Math.min(45, Math.max(8, scaleY * 0.65 + 6));
+        targetY = Number(focus.y) + Math.min(18, Math.max(2, scaleY * 0.42));
+      }
     }
     const override = camera.clone();
     override.near = 0.1;
@@ -618,6 +779,8 @@ async function setReviewPose(page: Page, kind: ProbePoseKind): Promise<PoseMetri
         terrainLod: summarizeTerrainLod(),
         horizonRing: terrain?.getHorizonRingDebugInfo?.() ?? null,
         billboardDebug: billboards?.getDebugInfo?.() ?? terrain?.getBillboardDebugInfo?.() ?? null,
+        vegetationDebug: vegetationMetric?.debug ?? null,
+        vegetationFocus: isVegetationFocusPose ? findVegetationFocus(requestedVegetationSlug) : null,
       },
       rendererInfo: {
         calls: Number(threeRenderer?.info?.render?.calls ?? null),
@@ -642,13 +805,16 @@ async function capturePose(page: Page, modeDir: string, kind: ProbePoseKind): Pr
   await page.waitForTimeout(120);
   await page.evaluate(PROJEKT_143_RENDER_SUBMISSION_ATTRIBUTION_RESET_SOURCE);
   await page.waitForTimeout(kind === 'finite-edge' ? 900 : 650);
-  const screenshotPath = join(modeDir, `${kind}.png`);
+  const screenshotPath = join(modeDir, `${safeFileStem(String(kind))}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: false });
-  const [renderSubmissions, sceneAttribution, metrics] = await Promise.all([
+  const [renderSubmissions, sceneAttributionRaw, metrics] = await Promise.all([
     page.evaluate(() => (window as any).__projekt143RenderSubmissionAttribution?.drain?.() ?? null),
     page.evaluate(PROJEKT_143_SCENE_ATTRIBUTION_EVALUATE_SOURCE),
     imageMetrics(screenshotPath),
   ]);
+  const sceneAttribution = Array.isArray(sceneAttributionRaw)
+    ? sceneAttributionRaw as Record<string, unknown>[]
+    : null;
   return {
     kind,
     screenshot: relative(process.cwd(), screenshotPath),
@@ -694,10 +860,51 @@ function topCategoriesForFrame(frame: Record<string, unknown> | null | undefined
     : [];
 }
 
-async function runModeProbe(page: Page, artifactDir: string, mode: string, renderer: string): Promise<ModeProbe> {
+function safeFileStem(value: string): string {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, '-');
+}
+
+function vegetationFocusPoseSlug(kind: ProbePoseKind): string | null {
+  const prefix = 'vegetation-focus-';
+  const text = String(kind);
+  return text.startsWith(prefix) ? text.slice(prefix.length) : null;
+}
+
+async function runModeProbe(
+  page: Page,
+  artifactDir: string,
+  mode: string,
+  renderer: string,
+  vegetationImpostorFogStrength: number | null,
+  vegetationImpostorExposureScale: number | null,
+  vegetationImpostorColorGamma: number | null,
+  vegetationImpostorSaturation: number | null,
+  vegetationImpostorTransitionMeters: number | null,
+): Promise<ModeProbe> {
   const modeDir = join(artifactDir, mode);
   mkdirSync(modeDir, { recursive: true });
-  const url = `http://${HOST}:${parseNumberFlag('port', DEFAULT_PORT)}/?perf=1&diag=1&renderer=${encodeURIComponent(renderer)}&logLevel=warn`;
+  const params = new URLSearchParams({
+    perf: '1',
+    diag: '1',
+    renderer,
+    logLevel: 'warn',
+  });
+  if (vegetationImpostorFogStrength !== null) {
+    params.set('vegImpostorFogStrength', String(vegetationImpostorFogStrength));
+  }
+  if (vegetationImpostorExposureScale !== null) {
+    params.set('vegImpostorExposureScale', String(vegetationImpostorExposureScale));
+  }
+  if (vegetationImpostorColorGamma !== null) {
+    params.set('vegImpostorColorGamma', String(vegetationImpostorColorGamma));
+  }
+  if (vegetationImpostorSaturation !== null) {
+    params.set('vegImpostorSaturation', String(vegetationImpostorSaturation));
+  }
+  if (vegetationImpostorTransitionMeters !== null) {
+    params.set('vegImpostorTransitionMeters', String(vegetationImpostorTransitionMeters));
+  }
+  const url = `http://${HOST}:${parseNumberFlag('port', DEFAULT_PORT)}/?${params.toString()}`;
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on('console', msg => {
@@ -715,12 +922,87 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
   const capabilities = await page.evaluate(() => (window as any).__rendererBackendCapabilities?.() ?? null) as RendererCapabilities | null;
   const materialProbes = await collectMaterialProbes(page);
   const poses: PoseProbe[] = [];
-  for (const kind of ['ground', 'elevated', 'skyward', 'finite-edge'] as const) {
+  const vegetationFocusSlugs = materialProbes
+    .filter(probe => probe.surface === 'vegetation' && probe.staticImpostor?.source === 'vegetation')
+    .map(probe => probe.staticImpostor?.slug)
+    .filter((slug): slug is string => typeof slug === 'string' && slug.length > 0)
+    .filter((slug, index, all) => all.indexOf(slug) === index)
+    .sort();
+  const poseKinds: ProbePoseKind[] = [
+    'ground',
+    'elevated',
+    'vegetation-focus',
+    ...vegetationFocusSlugs.map(slug => `vegetation-focus-${slug}` as const),
+    'skyward',
+    'finite-edge',
+  ];
+  for (const kind of poseKinds) {
     poses.push(await capturePose(page, modeDir, kind));
   }
 
   const vegetationProbeCount = materialProbes.filter(probe => probe.surface === 'vegetation').length;
   const npcProbeCount = materialProbes.filter(probe => probe.surface === 'npc').length;
+  const vegetationStaticProbeCount = materialProbes.filter(probe =>
+    probe.surface === 'vegetation' && probe.staticImpostor !== null
+  ).length;
+  const vegetationLodEvidence = poses.map(pose => {
+    const debug = pose.poseMetrics.world.vegetationDebug as any;
+    const heroImpostors = debug?.heroImpostors ?? null;
+    const groundCards = debug?.groundCards ?? null;
+    const archetypes = heroImpostors?.archetypes && typeof heroImpostors.archetypes === 'object'
+      ? Object.entries(heroImpostors.archetypes as Record<string, any>).map(([slug, value]) => ({
+          slug,
+          registeredInstances: Number(value?.registeredInstances ?? 0),
+          activeImpostors: Number(value?.activeImpostors ?? 0),
+          meshFallbacks: Number(value?.meshFallbacks ?? 0),
+          transitioningInstances: Number(value?.transitioningInstances ?? 0),
+          promotionDistanceMeters: Number(value?.promotionDistanceMeters ?? NaN),
+          demotionDistanceMeters: Number(value?.demotionDistanceMeters ?? NaN),
+          transitionFadeMeters: Number(value?.transitionFadeMeters ?? NaN),
+          nearestDistanceMeters: Number.isFinite(value?.nearestDistanceMeters) ? Number(value.nearestDistanceMeters) : null,
+          nearestMeshDistanceMeters: Number.isFinite(value?.nearestMeshDistanceMeters) ? Number(value.nearestMeshDistanceMeters) : null,
+          nearestImpostorDistanceMeters: Number.isFinite(value?.nearestImpostorDistanceMeters) ? Number(value.nearestImpostorDistanceMeters) : null,
+          nearestTransitionDistanceMeters: Number.isFinite(value?.nearestTransitionDistanceMeters) ? Number(value.nearestTransitionDistanceMeters) : null,
+        }))
+      : [];
+    return {
+      pose: pose.kind,
+      heroImpostors: heroImpostors
+        ? {
+            registeredInstances: Number(heroImpostors.registeredInstances ?? 0),
+            activeImpostors: Number(heroImpostors.activeImpostors ?? 0),
+            meshFallbacks: Number(heroImpostors.meshFallbacks ?? 0),
+            transitioningInstances: Number(heroImpostors.transitioningInstances ?? 0),
+            archetypes,
+          }
+        : null,
+      groundCards: groundCards
+        ? {
+            cardBatches: Number(groundCards.cardBatches ?? 0),
+            cardInstances: Number(groundCards.cardInstances ?? 0),
+            visibleBatches: Number(groundCards.visibleBatches ?? 0),
+            nearMeshes: Number(groundCards.nearMeshes ?? 0),
+          }
+        : null,
+    };
+  });
+  const hasHeroLodDistanceEvidence = vegetationLodEvidence.some(entry =>
+    (entry.heroImpostors?.archetypes ?? []).some(archetype =>
+      archetype.registeredInstances > 0
+      && Number.isFinite(archetype.promotionDistanceMeters)
+      && Number.isFinite(archetype.demotionDistanceMeters)
+      && Number.isFinite(archetype.transitionFadeMeters)
+      && archetype.nearestDistanceMeters !== null
+    )
+  );
+  const hasHeroSnapStateEvidence = vegetationLodEvidence.some(entry =>
+    (entry.heroImpostors?.activeImpostors ?? 0) > 0
+    || (entry.heroImpostors?.meshFallbacks ?? 0) > 0
+  );
+  const hasGroundCardDistanceEvidence = vegetationLodEvidence.some(entry =>
+    (entry.groundCards?.cardInstances ?? 0) > 0
+    || (entry.groundCards?.nearMeshes ?? 0) > 0
+  );
   const cdlodPoseEvidence = (['ground', 'elevated', 'skyward'] as const).map(kind => {
     const pose = poses.find(candidate => candidate.kind === kind);
     const terrainLod = pose?.poseMetrics.world.terrainLod ?? null;
@@ -740,6 +1022,14 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
     && Object.keys(entry.countsByLod).length > 0
   );
   const skyward = poses.find(pose => pose.kind === 'skyward');
+  const vegetationFocus = poses.find(pose => pose.kind === 'vegetation-focus');
+  const vegetationArchetypeFocuses = poses.filter(pose => vegetationFocusPoseSlug(pose.kind) !== null);
+  const capturedVegetationFocusSlugs = new Set(
+    vegetationArchetypeFocuses
+      .map(pose => vegetationFocusPoseSlug(pose.kind))
+      .filter((slug): slug is string => typeof slug === 'string' && slug.length > 0),
+  );
+  const missingVegetationFocusSlugs = vegetationFocusSlugs.filter(slug => !capturedVegetationFocusSlugs.has(slug));
   const finite = poses.find(pose => pose.kind === 'finite-edge');
   const skywardRenderSummary = summarizeRenderSubmissions(skyward?.renderSubmissions);
   const topSkywardCategories = topCategoriesForFrame(skywardRenderSummary.peakFrame);
@@ -754,6 +1044,59 @@ async function runModeProbe(page: Page, artifactDir: string, mode: string, rende
       message: vegetationProbeCount > 0
         ? `Captured ${vegetationProbeCount} vegetation material probe(s).`
         : 'No vegetation material probes were found in the live scene.',
+    },
+    {
+      id: 'vegetation-static-impostor-probes',
+      status: vegetationStaticProbeCount > 0 ? 'pass' : 'warn',
+      message: vegetationStaticProbeCount > 0
+        ? `Captured ${vegetationStaticProbeCount} vegetation static-impostor material probe(s).`
+        : 'No vegetation static-impostor batches were identified in the live scene.',
+      value: materialProbes
+        .filter(probe => probe.surface === 'vegetation' && probe.staticImpostor !== null)
+        .map(probe => ({
+          name: probe.name,
+          category: probe.category,
+          staticImpostor: probe.staticImpostor,
+          uniforms: {
+            fogStrength: probe.uniforms.fogStrength ?? null,
+            foliageExposure: probe.uniforms.foliageExposure ?? null,
+            fogDensity: probe.uniforms.fogDensity ?? null,
+          },
+          textureMetrics: probe.textureMetrics,
+        })),
+    },
+    {
+      id: 'vegetation-lod-transition-evidence',
+      status: hasHeroLodDistanceEvidence && hasHeroSnapStateEvidence && hasGroundCardDistanceEvidence ? 'pass' : 'warn',
+      message: hasHeroLodDistanceEvidence && hasHeroSnapStateEvidence && hasGroundCardDistanceEvidence
+        ? 'Captured vegetation hero impostor promotion/demotion distances, transition fade width, active snap/crossfade state, and ground-card distance LOD state.'
+        : 'Vegetation LOD transition evidence is incomplete for one or more live scene poses.',
+      value: vegetationLodEvidence,
+    },
+    {
+      id: 'vegetation-focus-screenshot',
+      status: vegetationFocus?.poseMetrics.world.vegetationFocus ? 'pass' : 'warn',
+      message: vegetationFocus?.poseMetrics.world.vegetationFocus
+        ? 'Captured a live-scene vegetation-focused screenshot from a current static-impostor batch.'
+        : 'Could not derive a live-scene vegetation-focused camera from active static-impostor batches.',
+      value: {
+        screenshot: vegetationFocus?.screenshot ?? null,
+        focus: vegetationFocus?.poseMetrics.world.vegetationFocus ?? null,
+        imageMetrics: vegetationFocus?.imageMetrics ?? null,
+      },
+    },
+    {
+      id: 'vegetation-archetype-focus-screenshots',
+      status: vegetationFocusSlugs.length > 0 && missingVegetationFocusSlugs.length === 0 ? 'pass' : 'warn',
+      message: vegetationFocusSlugs.length > 0 && missingVegetationFocusSlugs.length === 0
+        ? `Captured ${vegetationArchetypeFocuses.length} per-archetype vegetation focus screenshot(s).`
+        : `Per-archetype vegetation focus screenshots are incomplete; missing=${missingVegetationFocusSlugs.join(',') || 'unknown'}.`,
+      value: vegetationArchetypeFocuses.map(pose => ({
+        slug: vegetationFocusPoseSlug(pose.kind),
+        screenshot: pose.screenshot,
+        focus: pose.poseMetrics.world.vegetationFocus,
+        imageMetrics: pose.imageMetrics,
+      })),
     },
     {
       id: 'npc-material-probes',
@@ -853,6 +1196,39 @@ function terrainLodLine(pose: PoseProbe | undefined): string {
   return `tiles=${terrainLod.tileCount} saturated=${String(terrainLod.tileSelectionSaturated)} singleSubmitTri=${terrainLod.triangleEstimate} lods=${lods || 'none'} rings=${rings || 'none'}`;
 }
 
+function vegetationLodLine(pose: PoseProbe | undefined): string {
+  const debug = pose?.poseMetrics.world.vegetationDebug as any;
+  if (!debug) return 'missing';
+  const hero = debug.heroImpostors;
+  const heroArchetypes = hero?.archetypes && typeof hero.archetypes === 'object'
+    ? Object.entries(hero.archetypes as Record<string, any>)
+      .map(([slug, value]) => {
+        const active = Number(value?.activeImpostors ?? 0);
+        const mesh = Number(value?.meshFallbacks ?? 0);
+        const transitioning = Number(value?.transitioningInstances ?? 0);
+        const promotion = Number(value?.promotionDistanceMeters ?? NaN);
+        const demotion = Number(value?.demotionDistanceMeters ?? NaN);
+        const transitionFade = Number(value?.transitionFadeMeters ?? NaN);
+        const nearestMesh = Number.isFinite(value?.nearestMeshDistanceMeters)
+          ? Number(value.nearestMeshDistanceMeters).toFixed(1)
+          : 'none';
+        const nearestImpostor = Number.isFinite(value?.nearestImpostorDistanceMeters)
+          ? Number(value.nearestImpostorDistanceMeters).toFixed(1)
+          : 'none';
+        const nearestTransition = Number.isFinite(value?.nearestTransitionDistanceMeters)
+          ? Number(value.nearestTransitionDistanceMeters).toFixed(1)
+          : 'none';
+        return `${slug}:mesh=${mesh}/imp=${active}/blend=${transitioning}/prom=${promotion}/demote=${demotion}/fade=${transitionFade}/nearestMesh=${nearestMesh}/nearestImp=${nearestImpostor}/nearestBlend=${nearestTransition}`;
+      })
+      .join('; ')
+    : 'none';
+  const ground = debug.groundCards;
+  const groundLine = ground
+    ? `cards=${Number(ground.cardInstances ?? 0)} visible=${Number(ground.visibleBatches ?? 0)} nearMeshes=${Number(ground.nearMeshes ?? 0)}`
+    : 'cards=missing';
+  return `heroSource=${hero?.source ?? 'missing'} registered=${Number(hero?.registeredInstances ?? 0)} activeImp=${Number(hero?.activeImpostors ?? 0)} mesh=${Number(hero?.meshFallbacks ?? 0)} blend=${Number(hero?.transitioningInstances ?? 0)} archetypes=[${heroArchetypes}] ${groundLine}`;
+}
+
 function renderMarkdown(report: ProbeReport): string {
   const lines: string[] = [
     '# Scene Parity Probe',
@@ -860,6 +1236,7 @@ function renderMarkdown(report: ProbeReport): string {
     `Created: ${report.createdAt}`,
     `Status: ${report.status}`,
     `Renderer: ${report.options.renderer}`,
+    `Vegetation impostor candidate: fogStrength=${report.options.vegetationImpostorFogStrength ?? 'default'} exposureScale=${report.options.vegetationImpostorExposureScale ?? 'default'} colorGamma=${report.options.vegetationImpostorColorGamma ?? 'default'} saturation=${report.options.vegetationImpostorSaturation ?? 'default'} transitionMeters=${report.options.vegetationImpostorTransitionMeters ?? 'default'}`,
     `Git SHA: ${report.sourceGitSha}`,
     '',
     '## Decisions',
@@ -872,6 +1249,8 @@ function renderMarkdown(report: ProbeReport): string {
     const npcCount = mode.materialProbes.filter(probe => probe.surface === 'npc').length;
     const ground = mode.poses.find(pose => pose.kind === 'ground');
     const elevated = mode.poses.find(pose => pose.kind === 'elevated');
+    const vegetationFocus = mode.poses.find(pose => pose.kind === 'vegetation-focus');
+    const vegetationArchetypeFocuses = mode.poses.filter(pose => vegetationFocusPoseSlug(pose.kind) !== null);
     const skyward = mode.poses.find(pose => pose.kind === 'skyward');
     const finite = mode.poses.find(pose => pose.kind === 'finite-edge');
     const skywardRenderSummary = summarizeRenderSubmissions(skyward?.renderSubmissions);
@@ -884,6 +1263,12 @@ function renderMarkdown(report: ProbeReport): string {
       `- CDLOD ground: ${terrainLodLine(ground)}`,
       `- CDLOD elevated: ${terrainLodLine(elevated)}`,
       `- CDLOD skyward: ${terrainLodLine(skyward)}`,
+      `- Vegetation LOD ground: ${vegetationLodLine(ground)}`,
+      `- Vegetation LOD elevated: ${vegetationLodLine(elevated)}`,
+      `- Vegetation focus screenshot: ${vegetationFocus?.screenshot ?? 'missing'}; focus=${JSON.stringify(vegetationFocus?.poseMetrics.world.vegetationFocus ?? null)}; luma=${vegetationFocus?.imageMetrics.lumaMean.toFixed(3) ?? 'n/a'} saturation=${vegetationFocus?.imageMetrics.saturationMean.toFixed(3) ?? 'n/a'} pale=${vegetationFocus?.imageMetrics.paleLowSaturationRatio.toFixed(3) ?? 'n/a'} overexposed=${vegetationFocus?.imageMetrics.overexposedRatio.toFixed(3) ?? 'n/a'}`,
+      ...vegetationArchetypeFocuses.map(pose => (
+        `- Vegetation archetype focus (${vegetationFocusPoseSlug(pose.kind) ?? 'unknown'}): ${pose.screenshot}; focus=${JSON.stringify(pose.poseMetrics.world.vegetationFocus ?? null)}; luma=${pose.imageMetrics.lumaMean.toFixed(3)} saturation=${pose.imageMetrics.saturationMean.toFixed(3)} pale=${pose.imageMetrics.paleLowSaturationRatio.toFixed(3)} overexposed=${pose.imageMetrics.overexposedRatio.toFixed(3)}`
+      )),
       `- Skyward screenshot: ${skyward?.screenshot ?? 'missing'}; luma=${skyward?.imageMetrics.lumaMean.toFixed(3) ?? 'n/a'} saturation=${skyward?.imageMetrics.saturationMean.toFixed(3) ?? 'n/a'} overexposed=${skyward?.imageMetrics.overexposedRatio.toFixed(3) ?? 'n/a'}`,
       `- Skyward peak frame: frame=${String(skywardRenderSummary.peakFrame?.frameCount ?? 'missing')} triangles=${String(skywardRenderSummary.peakFrame?.triangles ?? 'missing')} draws=${String(skywardRenderSummary.peakFrame?.drawSubmissions ?? 'missing')}`,
       `- Skyward peak categories: ${topSkyward.map(entry => `${entry.category}:${entry.triangles} (${JSON.stringify(entry.passTypes ?? {})})`).join(', ') || 'missing'}`,
@@ -904,7 +1289,7 @@ function renderMarkdown(report: ProbeReport): string {
 
 async function main(): Promise<void> {
   if (hasFlag('help')) {
-    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed');
+    console.log('Usage: npx tsx scripts/scene-parity-probe.ts --modes open_frontier,zone_control --renderer webgpu-strict --headed [--veg-impostor-fog-strength 0.62] [--veg-impostor-exposure-scale 0.95] [--veg-impostor-color-gamma 1.75] [--veg-impostor-saturation 1] [--veg-impostor-transition-meters 28]');
     return;
   }
   const modes = normalizeModes(parseStringFlag('modes', 'open_frontier,zone_control'));
@@ -913,6 +1298,11 @@ async function main(): Promise<void> {
   const headed = hasFlag('headed');
   const port = parseNumberFlag('port', DEFAULT_PORT);
   const forceBuild = hasFlag('force-build');
+  const vegetationImpostorFogStrength = parseOptionalNumberFlag('veg-impostor-fog-strength', 0, 1.5);
+  const vegetationImpostorExposureScale = parseOptionalNumberFlag('veg-impostor-exposure-scale', 0, 2);
+  const vegetationImpostorColorGamma = parseOptionalNumberFlag('veg-impostor-color-gamma', 0.6, 2.5);
+  const vegetationImpostorSaturation = parseOptionalNumberFlag('veg-impostor-saturation', 0, 1.25);
+  const vegetationImpostorTransitionMeters = parseOptionalNumberFlag('veg-impostor-transition-meters', 0, 80);
   if (!forceBuild && !existsSync(join(process.cwd(), 'dist-perf', 'index.html'))) {
     throw new Error('dist-perf/index.html not found. Run `npm run build:perf` or pass --force-build.');
   }
@@ -949,7 +1339,17 @@ async function main(): Promise<void> {
     for (const mode of modes) {
       const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
       try {
-        modeReports.push(await runModeProbe(page, artifactDir, mode, renderer));
+        modeReports.push(await runModeProbe(
+          page,
+          artifactDir,
+          mode,
+          renderer,
+          vegetationImpostorFogStrength,
+          vegetationImpostorExposureScale,
+          vegetationImpostorColorGamma,
+          vegetationImpostorSaturation,
+          vegetationImpostorTransitionMeters,
+        ));
       } catch (error) {
         modeReports.push({
           mode,
@@ -984,7 +1384,18 @@ async function main(): Promise<void> {
         .filter(Boolean),
       source: 'scripts/scene-parity-probe.ts',
       status: aggregateStatus(modeReports),
-      options: { modes, renderer, headed, port, forceBuild },
+      options: {
+        modes,
+        renderer,
+        headed,
+        port,
+        forceBuild,
+        vegetationImpostorFogStrength,
+        vegetationImpostorExposureScale,
+        vegetationImpostorColorGamma,
+        vegetationImpostorSaturation,
+        vegetationImpostorTransitionMeters,
+      },
       files: {
         summary: relative(process.cwd(), summaryPath),
         markdown: relative(process.cwd(), markdownPath),

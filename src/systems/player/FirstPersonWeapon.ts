@@ -15,7 +15,7 @@ import { TicketSystem } from '../world/TicketSystem'
 import { InventoryManager } from './InventoryManager'
 import { PlayerStatsTracker } from './PlayerStatsTracker'
 import { WeaponRigManager } from './weapon/WeaponRigManager'
-import { WeaponAnimations } from './weapon/WeaponAnimations'
+import { WeaponAnimations, type WeaponAdsType } from './weapon/WeaponAnimations'
 import { WeaponFiring } from './weapon/WeaponFiring'
 import { WeaponReload } from './weapon/WeaponReload'
 import { WeaponModel } from './weapon/WeaponModel'
@@ -190,7 +190,9 @@ export class FirstPersonWeapon implements GameSystem {
     // Update animations (ADS, recoil, idle bob, sway, pump)
     this.beginWeaponPhase(telemetryEnabled, WEAPON_PHASE_ANIMATIONS)
     try {
-      this.animations.update(deltaTime, isMoving, lookVelocity)
+      // Pass the equipped weapon type so the ADS FOV-zoom resolves per-weapon
+      // (the marksman zooms deeper than iron-sight weapons).
+      this.animations.update(deltaTime, isMoving, lookVelocity, this.rigManager.getCurrentWeaponType())
     } finally {
       this.endWeaponPhase(telemetryEnabled, WEAPON_PHASE_ANIMATIONS)
     }
@@ -487,7 +489,7 @@ export class FirstPersonWeapon implements GameSystem {
    * The weapon currently equipped in-hand. Used to verify that the deployed
    * weapon matches the selected loadout primary at spawn.
    */
-  getEquippedWeaponType(): 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' {
+  getEquippedWeaponType(): WeaponAdsType {
     return this.rigManager.getCurrentWeaponType()
   }
 
@@ -504,6 +506,18 @@ export class FirstPersonWeapon implements GameSystem {
     this.switching.setReserveAmmoFactor(factor)
     // Reflect the new reserve on the HUD for the active weapon immediately.
     this.onAmmoChange(this.ammo.getAmmoState())
+  }
+
+  /**
+   * Apply the selectable ammo-load handling penalty (from the deploy loadout).
+   * The factor (1.0 = baseline / STANDARD, > 1.0 for EXTENDED/HEAVY) slows the
+   * weapon's ADS-transition so carrying more reserve ammo costs handling speed.
+   * This is the tradeoff that pairs with setReserveAmmoFactor; magazine size is
+   * unchanged. Concrete-class capability only -- intentionally NOT on the
+   * fenced IFirstPersonWeapon interface; LoadoutService calls it optionally.
+   */
+  setHandlingFactor(factor: number): void {
+    this.animations.setAdsTimeFactor(factor)
   }
 
   private startReload(): void {

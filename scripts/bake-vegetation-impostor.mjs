@@ -89,6 +89,7 @@ function makeBaseColorMaterial(s) {
   const m = new THREE.MeshBasicMaterial({
     color: s && s.color instanceof THREE.Color ? s.color : new THREE.Color(0xffffff),
     map: (s && s.map) || null,
+    vertexColors: Boolean(s && s.vertexColors),
     transparent: Boolean(s && s.transparent) || Number((s && s.opacity) ?? 1) < 1,
     opacity: Number((s && s.opacity) ?? 1),
     alphaTest: Number((s && s.alphaTest) ?? 0),
@@ -111,6 +112,50 @@ function applyBaseColorMaterials(root) {
 function makeAtlasCanvas(w, h) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d', { alpha: true }); ctx.clearRect(0, 0, w, h); return { canvas: c, ctx };
+}
+function alphaBleedCanvas(canvas, passes = 32) {
+  const ctx = canvas.getContext('2d', { alpha: true });
+  const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = image.data;
+  let colored = new Uint8Array(canvas.width * canvas.height);
+  for (let p = 0, i = 0; p < colored.length; p++, i += 4) colored[p] = data[i + 3] > 0 ? 1 : 0;
+  for (let pass = 0; pass < passes; pass++) {
+    let filled = 0;
+    const next = new Uint8ClampedArray(data);
+    const nextColored = new Uint8Array(colored);
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < canvas.width; x++) {
+        const p = y * canvas.width + x;
+        if (colored[p]) continue;
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let oy = -1; oy <= 1; oy++) {
+          const ny = y + oy;
+          if (ny < 0 || ny >= canvas.height) continue;
+          for (let ox = -1; ox <= 1; ox++) {
+            if (ox === 0 && oy === 0) continue;
+            const nx = x + ox;
+            if (nx < 0 || nx >= canvas.width) continue;
+            const np = ny * canvas.width + nx;
+            if (!colored[np]) continue;
+            const ni = np * 4;
+            r += data[ni]; g += data[ni + 1]; b += data[ni + 2]; count++;
+          }
+        }
+        if (count > 0) {
+          const i = p * 4;
+          next[i] = Math.round(r / count);
+          next[i + 1] = Math.round(g / count);
+          next[i + 2] = Math.round(b / count);
+          nextColored[p] = 1;
+          filled++;
+        }
+      }
+    }
+    if (filled === 0) break;
+    data.set(next);
+    colored = nextColored;
+  }
+  ctx.putImageData(image, 0, 0);
 }
 function elevationForRow(row, rows) {
   if (rows <= 1) return THREE.MathUtils.degToRad(35);
@@ -164,6 +209,8 @@ window.__bakeImpostor = async function (cfg) {
   const dMat = new THREE.MeshDepthMaterial({ depthPacking: THREE.BasicDepthPacking, side: THREE.DoubleSide });
   scene.overrideMaterial = dMat; drawAtlasPass({ ...shared, atlas: depthAtlas }); dMat.dispose();
   scene.overrideMaterial = null;
+  alphaBleedCanvas(baseAtlas.canvas);
+  alphaBleedCanvas(normalAtlas.canvas);
   renderer.dispose(); renderer.domElement.remove(); scene.remove(root);
   return {
     baseColorPng: baseAtlas.canvas.toDataURL('image/png'),
