@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
+import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { StructureModels } from '../../../config/generated/warAssetCatalog';
+import { getStaticImpostorArchetypes } from '../../../config/staticImpostorArchetypes';
 import {
   StaticImpostorSystem,
   type LoadedStaticImpostorAtlas,
@@ -62,6 +67,19 @@ function getFirstBatchOpacity(scene: THREE.Scene, slug = 'fuel-drum'): number {
   const attribute = mesh.geometry.getAttribute('instanceOpacity') as THREE.InstancedBufferAttribute | undefined;
   expect(attribute).toBeDefined();
   return Number(attribute!.array[0]);
+}
+
+/**
+ * Reads the rendered card's vertical scale for the promoted first instance —
+ * the observable card height the player would see at impostor distance. The
+ * batch copies the instance scale into the live `instanceScale` attribute once
+ * the impostor becomes visible, so this is the caller-visible card dimension.
+ */
+function getFirstBatchCardHeight(scene: THREE.Scene, slug: string): number {
+  const mesh = getBatchMesh(scene, slug);
+  const attribute = mesh.geometry.getAttribute('instanceScale') as THREE.InstancedBufferAttribute | undefined;
+  expect(attribute).toBeDefined();
+  return Number(attribute!.array[1]);
 }
 
 function makeVegetationArchetype(overrides: Partial<StaticImpostorArchetype> = {}): StaticImpostorArchetype {
@@ -458,5 +476,140 @@ describe('StaticImpostorSystem', () => {
 
     expect(registered).toBe(false);
     expect(provider.loadAtlas).not.toHaveBeenCalled();
+  });
+
+  it('clamps an inflated-AABB instance to authored bounds so no tall card (terrain "tower") renders', async () => {
+    const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => {});
+    const provider = makeProvider();
+    // Small authored tree: 4m tall. A real-world tower symptom is an order of
+    // magnitude bigger than this, so the clamp ceiling is ~6m (4 * 1.5).
+    const vegetationArchetype = makeVegetationArchetype({
+      promotionDistanceMeters: 100,
+      demotionDistanceMeters: 80,
+      bounds: { center: [0, 2, 0], size: [2, 4, 2], radius: 2.5 },
+    });
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      archetypes: { [vegetationArchetype.modelPath]: vegetationArchetype },
+      debugSource: 'vegetation',
+    });
+
+    // Mimic a mis-normalized GLB / stray off-origin child: the runtime AABB-Y
+    // balloons to ~200m even though the authored asset is 4m. Without the upper
+    // clamp this becomes a ~232m vertical card at scattered impostor locations.
+    const object = new THREE.Group();
+    object.position.set(180, 0, 0);
+    object.add(new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), new THREE.MeshStandardMaterial()));
+    const strayChild = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), new THREE.MeshBasicMaterial());
+    strayChild.position.set(0, 200, 0);
+    object.add(strayChild);
+    scene.add(object);
+
+    const registered = system.registerInstance({
+      id: 'inflated_tree',
+      modelPath: vegetationArchetype.modelPath,
+      object,
+    });
+    await flushPromises();
+    system.update(0.016);
+
+    expect(registered).toBe(true);
+    expect(object.visible).toBe(false); // promoted to impostor at 180m
+
+    // Card height is clamped to bounds.size[1] * 1.5 * planePaddingScale, NOT
+    // the inflated ~200m AABB. Assert it stays within an authored-scale bound.
+    const renderedHeight = getFirstBatchCardHeight(scene, vegetationArchetype.slug);
+    const ceiling = vegetationArchetype.bounds.size[1] * 1.5 * vegetationArchetype.planePaddingScale;
+    expect(renderedHeight).toBeCloseTo(ceiling, 3);
+    expect(renderedHeight).toBeLessThan(10); // emphatically not a ~200m tower
+
+    // The grossly inflated AABB is surfaced once so the bad asset is caught.
+    const inflationWarnings = warnSpy.mock.calls.filter(
+      ([, message]) => typeof message === 'string' && message.includes('far exceeds'),
+    );
+    expect(inflationWarnings).toHaveLength(1);
+    expect(inflationWarnings[0][1]).toContain(vegetationArchetype.modelPath);
+
+    warnSpy.mockRestore();
+  });
+
+  it('keeps a well-formed instance at its live height (clamp only bites inflated AABBs)', async () => {
+    const provider = makeProvider();
+    const vegetationArchetype = makeVegetationArchetype({
+      promotionDistanceMeters: 100,
+      demotionDistanceMeters: 80,
+      bounds: { center: [0, 2, 0], size: [2, 4, 2], radius: 2.5 },
+    });
+    const system = new StaticImpostorSystem(scene, camera, {
+      textureProvider: provider,
+      archetypes: { [vegetationArchetype.modelPath]: vegetationArchetype },
+      debugSource: 'vegetation',
+    });
+    const object = new THREE.Group();
+    object.position.set(180, 0, 0);
+    object.add(new THREE.Mesh(new THREE.BoxGeometry(2, 4, 2), new THREE.MeshStandardMaterial()));
+    scene.add(object);
+
+    system.registerInstance({ id: 'healthy_tree', modelPath: vegetationArchetype.modelPath, object });
+    await flushPromises();
+    system.update(0.016);
+
+    // A live 4m AABB is below the 6m ceiling, so the card keeps its real height.
+    const renderedHeight = getFirstBatchCardHeight(scene, vegetationArchetype.slug);
+    expect(renderedHeight).toBeCloseTo(4 * vegetationArchetype.planePaddingScale, 3);
+  });
+
+  // Best-effort audit: parse each registered archetype GLB and assert its
+  // runtime AABB-Y stays within the authored bounds the clamp trusts. If any
+  // archetype GLB is missing or unparseable in this env the audit skips
+  // gracefully (the synthetic clamp tests above are the required regression
+  // lock). On failure the assertion names the culprit archetype + modelPath so
+  // the offending asset can be re-normalized.
+  it('authored archetype GLBs stay within bounds.size[1] * 1.5 (best-effort)', () => {
+    const modelsRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../../public/models');
+    const archetypes = getStaticImpostorArchetypes();
+    const loader = new GLTFLoader();
+    const offenders: string[] = [];
+    let audited = 0;
+
+    for (const archetype of archetypes) {
+      const filePath = join(modelsRoot, archetype.modelPath);
+      if (!existsSync(filePath)) {
+        continue; // asset not present in this checkout — skip gracefully
+      }
+      let liveHeight: number | null = null;
+      try {
+        const buffer = readFileSync(filePath);
+        const arrayBuffer = buffer.buffer.slice(
+          buffer.byteOffset,
+          buffer.byteOffset + buffer.byteLength,
+        );
+        loader.parse(arrayBuffer, '', (gltf) => {
+          const size = new THREE.Vector3();
+          new THREE.Box3().setFromObject(gltf.scene).getSize(size);
+          liveHeight = size.y;
+        }, () => { /* parse error — treated as skip below */ });
+      } catch {
+        continue; // unparseable in this env — skip gracefully
+      }
+      if (liveHeight === null || !Number.isFinite(liveHeight)) {
+        continue;
+      }
+      audited++;
+      const ceiling = archetype.bounds.size[1] * 1.5;
+      if (liveHeight > ceiling) {
+        offenders.push(
+          `${archetype.slug} (${archetype.modelPath}): live AABB-Y ${liveHeight.toFixed(2)}m `
+            + `exceeds bounds.size[1] * 1.5 = ${ceiling.toFixed(2)}m`,
+        );
+      }
+    }
+
+    if (audited === 0) {
+      // GLB parsing not viable here (assets absent / env can't parse) — the
+      // synthetic clamp tests remain the regression lock.
+      return;
+    }
+    expect(offenders, `archetype GLBs exceed authored bounds:\n${offenders.join('\n')}`).toEqual([]);
   });
 });
