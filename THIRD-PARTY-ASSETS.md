@@ -119,6 +119,27 @@ with its origin.
 - **Action for owner:** confirm every audio file is originally authored, or
   list the exceptions here.
 
+### Ambient soundscape beds — FIRST-PARTY placeholders (CC BY-SA 4.0)
+
+Files: `public/assets/audio/ambient/{jungle-day,jungle-night,wildlife-bird,wildlife-call}.ogg`.
+Added in `cycle-2026-06-29-soundscape-loop-replacement` to back the layered
+day/night `SoundscapeDirector` (which replaced the old always-on `jungle1`/`jungle2`
+loop). Full provenance in
+[`docs/asset-provenance/audio-2026-06/`](docs/asset-provenance/audio-2026-06/).
+
+- These four beds/one-shots are **first-party placeholders synthesized from
+  scratch** (ffmpeg/libopus — see `generate-beds.sh`), original work under
+  **CC BY-SA 4.0**. They are **not** field recordings and **not** third-party —
+  they are listed here only to make their placeholder status unambiguous.
+- The campaign plan cited Freesound beds to source (day `#427400` CC-BY; night
+  `#175020` CC0); **Freesound downloads require account credentials the
+  autonomous run did not have**, so genuine beds were not fetched. No invented
+  attribution was recorded.
+- **Action for owner:** when production CC0/CC-BY field recordings are sourced,
+  replace these files (same paths) and record the real upstream attribution
+  (source URL + author + license) here. The `SoundscapeDirector` is
+  bed-agnostic — no code change needed.
+
 ## Note: "Pixel Forge" assets are FIRST-PARTY (not third-party)
 
 Models under `public/models/**/pixel-forge*/` and the imported aircraft GLBs are

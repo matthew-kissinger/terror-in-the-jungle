@@ -62,16 +62,9 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     maxDistance: 50,
     rolloffFactor: 2
   },
-  jungle1: {
-    path: 'assets/optimized/jungle1.ogg',
-    volume: 0.3,
-    loop: true
-  },
-  jungle2: {
-    path: 'assets/optimized/jungle2.ogg',
-    volume: 0.25,
-    loop: true
-  },
+  // The permanent jungle ambient loop was replaced by the layered day/night
+  // SoundscapeDirector (cycle-2026-06-29-soundscape-loop-replacement); its
+  // beds live in `src/config/soundscape.ts`, not here.
   playerReload: {
     path: 'assets/optimized/playerReload.ogg',
     volume: 0.6
