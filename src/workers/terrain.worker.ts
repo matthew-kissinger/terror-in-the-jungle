@@ -16,6 +16,7 @@ import { bakePreparedVisualGrid, generateNormalData } from './terrainPreparedVis
 import { DemBufferCache } from './demBufferCache';
 import { sampleDEMBilinearWithTaper } from '../systems/terrain/DEMSampling';
 import { getStampSpatialIndex } from '../systems/terrain/StampSpatialIndex';
+import { collarExtrapolatedHeight, playableHeightEnvelopeFor } from '../systems/terrain/collarExtrapolation';
 
 // ── Height provider reconstruction ──
 // We can't import the real classes because workers get a separate module graph.
@@ -85,9 +86,6 @@ interface VisualExtentConfig {
 type HeightProviderConfig = NoiseConfig | DEMConfig | StampedConfig | VisualExtentConfig;
 
 const SOURCE_DELTA_EPSILON_METERS = 0.01;
-const MIN_EDGE_SLOPE_SAMPLE_METERS = 8;
-const MAX_EDGE_SLOPE_SAMPLE_METERS = 64;
-const MAX_EDGE_EXTRAPOLATION_METERS = 320;
 
 // ── Perlin noise (must match NoiseHeightProvider exactly) ──
 
@@ -284,55 +282,13 @@ function sampleVisualExtentHeight(config: VisualExtentConfig, worldX: number, wo
     return edgeBaseHeight + sourceDelta;
   }
 
-  return edgeBaseHeight + estimateVisualEdgeSlopeDelta(config.base, worldX, worldZ, clampedX, clampedZ, halfPlayable, halfVisual);
-}
-
-function estimateVisualEdgeSlopeDelta(
-  baseConfig: HeightProviderConfig,
-  worldX: number,
-  worldZ: number,
-  clampedX: number,
-  clampedZ: number,
-  halfPlayable: number,
-  halfVisual: number,
-): number {
-  const outsideX = worldX - clampedX;
-  const outsideZ = worldZ - clampedZ;
-  const outsideDistance = Math.hypot(outsideX, outsideZ);
-  if (outsideDistance <= 0) return 0;
-
-  const sampleStep = clamp(halfPlayable / 128, MIN_EDGE_SLOPE_SAMPLE_METERS, MAX_EDGE_SLOPE_SAMPLE_METERS);
-  let delta = 0;
-  let weight = 0;
-
-  if (Math.abs(outsideX) > 0) {
-    const signX = Math.sign(outsideX);
-    const innerX = clamp(clampedX - signX * sampleStep, -halfPlayable, halfPlayable);
-    const inwardDistance = Math.abs(clampedX - innerX);
-    if (inwardDistance > 0) {
-      const edge = sampleProviderHeight(baseConfig, clampedX, clampedZ);
-      const inner = sampleProviderHeight(baseConfig, innerX, clampedZ);
-      delta += ((edge - inner) / inwardDistance) * Math.abs(outsideX);
-      weight++;
-    }
-  }
-
-  if (Math.abs(outsideZ) > 0) {
-    const signZ = Math.sign(outsideZ);
-    const innerZ = clamp(clampedZ - signZ * sampleStep, -halfPlayable, halfPlayable);
-    const inwardDistance = Math.abs(clampedZ - innerZ);
-    if (inwardDistance > 0) {
-      const edge = sampleProviderHeight(baseConfig, clampedX, clampedZ);
-      const inner = sampleProviderHeight(baseConfig, clampedX, innerZ);
-      delta += ((edge - inner) / inwardDistance) * Math.abs(outsideZ);
-      weight++;
-    }
-  }
-
-  if (weight === 0) return 0;
-  const averagedDelta = delta / weight;
-  const fade = 1 - clamp(outsideDistance / Math.max(1, halfVisual - halfPlayable), 0, 1) * 0.35;
-  return clamp(averagedDelta * fade, -MAX_EDGE_EXTRAPOLATION_METERS, MAX_EDGE_EXTRAPOLATION_METERS);
+  // No real source data beyond the edge: bounded, envelope-clamped collar
+  // extrapolation. Shared with the main thread + prepared bake so the three
+  // copies can never drift (collarExtrapolation.ts). The envelope is memoized
+  // on `config` so the per-texel bake loop computes it once.
+  const sampleBase = (x: number, z: number): number => sampleProviderHeight(config.base, x, z);
+  const envelope = playableHeightEnvelopeFor(config, sampleBase, halfPlayable);
+  return collarExtrapolatedHeight(sampleBase, worldX, worldZ, clampedX, clampedZ, halfPlayable, edgeBaseHeight, envelope);
 }
 
 function applyResolvedStamp(
