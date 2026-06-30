@@ -1,0 +1,18 @@
+{
+  "slug": "station-five-armies",
+  "role": "radio station track (driving martial score)",
+  "title": "Five Armies",
+  "author": "Kevin MacLeod",
+  "provider": "incompetech.com",
+  "sourceUrl": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Five%20Armies.mp3",
+  "infoUrl": "https://incompetech.com/music/royalty-free/index.html?keywords=Five+Armies",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "status": "shipped-third-party",
+  "localPath": "public/assets/audio/music/station-five-armies.ogg",
+  "attributionRequired": true,
+  "attributionText": "\"Five Armies\" by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License (https://creativecommons.org/licenses/by/4.0/).",
+  "format": "Opus .ogg, stereo, ~80 kbps, ~156 s",
+  "fetchedOn": "2026-06-29",
+  "notes": "Fetched directly from incompetech.com (HTTP 200) during cycle-2026-06-29-radio-stations-music and re-encoded MP3 320kbps -> Opus stereo 80kbps with ffmpeg/libopus (metadata stripped). incompetech music is published under 'Creative Commons: By Attribution 4.0 License' per the incompetech site. Lazy-loaded only when the player tunes to this station (music default-OFF)."
+}
