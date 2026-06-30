@@ -8,6 +8,8 @@ import { Logger } from '../../utils/Logger';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
+import { mountDeployOrbitalToggle, type DeployOrbitalHandle } from '../../ui/map/orbital/OrbitalDeployMount';
+import { resolveTopoBakedUrl } from '../../ui/map/orbital/OrbitalTopoBakedUrl';
 
 /**
  * Coordinates between the main game and the respawn map view.
@@ -18,13 +20,36 @@ export class RespawnMapController {
   private gameModeManager?: GameModeManager;
   private onZoneSelected?: (zoneId: string, zoneName: string) => void;
   private updateInterval?: number;
+  private zoneQuery?: IZoneQuery;
+  private spawnPoints: RespawnSpawnPoint[] = [];
+  private orbital3D: DeployOrbitalHandle | null = null;
 
   constructor() {
     this.openFrontierRespawnMap = new OpenFrontierRespawnMap();
+    this.openFrontierRespawnMap.setOrbitalToggleCallback(() => this.toggleOrbital3D());
   }
 
   setZoneManager(query: IZoneQuery): void {
+    this.zoneQuery = query;
     this.openFrontierRespawnMap.setZoneQuery(query);
+  }
+
+  /**
+   * Open/close the opt-in 3D orbital deploy map. The 2D deploy map stays the
+   * default; this is a toggle from the map's "3D" control. Lazily mounted.
+   */
+  private toggleOrbital3D(): void {
+    if (!this.orbital3D) {
+      const worldSize = this.gameModeManager?.getWorldSize() ?? 3200;
+      this.orbital3D = mountDeployOrbitalToggle({
+        zoneQuery: this.zoneQuery,
+        spawns: () => this.spawnPoints.map((s) => ({ id: s.id, name: s.name, position: { x: s.position.x, z: s.position.z } })),
+        worldSize,
+        bakedUrl: resolveTopoBakedUrl(this.currentGameMode),
+        onZoneSelected: (zoneId, zoneName) => this.onZoneSelected?.(zoneId, zoneName),
+      });
+    }
+    this.orbital3D.toggle();
   }
 
   setGameModeManager(manager: GameModeManager): void {
@@ -39,6 +64,7 @@ export class RespawnMapController {
   }
 
   setSpawnPoints(spawnPoints: RespawnSpawnPoint[]): void {
+    this.spawnPoints = spawnPoints;
     this.openFrontierRespawnMap.setSpawnPoints(spawnPoints);
   }
 
@@ -118,5 +144,7 @@ export class RespawnMapController {
 
   dispose(): void {
     this.stopMapUpdateInterval();
+    this.orbital3D?.dispose();
+    this.orbital3D = null;
   }
 }

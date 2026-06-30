@@ -11,6 +11,7 @@ import type { GameEngine } from '../GameEngine';
 import { markStartup } from '../StartupTelemetry';
 import { computeNavmeshBakeSignature } from '../../systems/navigation/NavmeshBakeSignature';
 import { yieldToRenderer } from './StartupYield';
+import { setOrbitalLiveTerrain } from '../../ui/map/orbital/OrbitalRendererRegistry';
 
 /**
  * Terrain + navigation wiring stage extracted from the ModeStartupPreparer
@@ -146,6 +147,9 @@ export async function applyCompiledTerrainFeatures(
   engine.systemManager.minimapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainRuntime(engine.systemManager.terrainSystem);
+  // Register the concrete terrain for the opt-in 3D orbital map (live baked
+  // heightmap, read-only). Non-fenced facade; default hold-M stays 2D.
+  setOrbitalLiveTerrain(engine.systemManager.terrainSystem);
 
   // Use async path - yields between vegetation cell batches to avoid blocking main thread
   await engine.systemManager.terrainSystem.setTerrainFeaturesAsync(

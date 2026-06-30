@@ -31,6 +31,23 @@ reference overlays (`*-rivers.json`, `*-firebases.json`).
   and record source + license + conversion per the pipeline's "Processing
   Contract".
 
+### Orbital topo map — baked coarse DEMs
+
+Files: `public/data/heightmaps/*-topo-*.f32` (+ `*.json` sidecars) — the coarse
+(96²) relief grids the 3D orbital topographic map CPU-displaces. Produced by
+`scripts/bake-topo-dem.ts`, which **downsamples** the existing committed
+`.f32` DEMs already in the repo (no fresh clip, no network):
+
+- `a-shau-topo-*.f32` derives from the **NASADEM**-based A Shau `z14` clip
+  (`public/data/vietnam/big-map/a-shau-z14-9x9.f32`). NASADEM is a
+  **public-domain / CC0** US-government product (no copyright, no relicensing).
+  The A Shau source DEM is git-ignored (large binary), so this baked topo may be
+  absent in CI checkouts; the live map covers A Shau via the runtime heightmap.
+- `open_frontier-*-topo-*.f32`, `zone_control-*-topo-*.f32`, `tdm-*-topo-*.f32`
+  derive from the **procedurally generated** seed DEMs (original project work).
+- These generated `.f32`/`.json` carry **no SPDX header** (generated data); their
+  provenance is recorded here and in `docs/asset-provenance/orbital-topo-2026-06/`.
+
 ## Fonts — third-party, SIL Open Font License 1.1
 
 Bundled via npm and shipped in the build:
