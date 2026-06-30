@@ -31,6 +31,7 @@ import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import type { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
 import type { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import type { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import type { NapalmFireSystem } from '../systems/effects/NapalmFireSystem';
 import type { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import type { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import type { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
@@ -83,6 +84,7 @@ export interface SystemKeyToType {
   playerSuppressionSystem: PlayerSuppressionSystem;
   flashbangScreenEffect: FlashbangScreenEffect;
   smokeCloudSystem: SmokeCloudSystem;
+  napalmFireSystem: NapalmFireSystem;
   zoneCaptureEffects: ZoneCaptureEffects;
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
@@ -173,6 +175,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'playerSuppressionSystem',
   'flashbangScreenEffect',
   'smokeCloudSystem',
+  'napalmFireSystem',
   'zoneCaptureEffects',
   'influenceMapSystem',
   'ammoSupplySystem',

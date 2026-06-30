@@ -48,6 +48,58 @@ export function createFlashTexture(): THREE.Texture {
   return texture;
 }
 
+/**
+ * Warm flame gradient for napalm fire billboards and the pooled explosion fire
+ * sub-effect (#8). White-hot core -> yellow -> orange -> deep red -> transparent
+ * so additive-blended sprites read as flame rather than a flat colored dot. The
+ * over-bright look is supplied by the material colour multiplier (the texture
+ * itself stays in 0-1 so it composites cleanly when post is off).
+ */
+export function createFireTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+
+  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, 'rgba(255, 255, 238, 1)');
+  gradient.addColorStop(0.18, 'rgba(255, 226, 138, 1)');
+  gradient.addColorStop(0.42, 'rgba(255, 140, 32, 0.92)');
+  gradient.addColorStop(0.72, 'rgba(196, 52, 0, 0.45)');
+  gradient.addColorStop(1, 'rgba(80, 12, 0, 0)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 128, 128);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Charred-ground decal for the napalm scorch quad. Dark, soft-edged radial so a
+ * normal-blended ground quad reads as burnt earth and fades cleanly at the rim.
+ */
+export function createScorchTexture(): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+
+  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, 'rgba(10, 8, 6, 0.92)');
+  gradient.addColorStop(0.5, 'rgba(22, 15, 10, 0.72)');
+  gradient.addColorStop(0.82, 'rgba(30, 21, 15, 0.32)');
+  gradient.addColorStop(1, 'rgba(32, 23, 16, 0)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 128, 128);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
 export function createDebrisTexture(): THREE.Texture {
   const canvas = document.createElement('canvas');
   canvas.width = 32;

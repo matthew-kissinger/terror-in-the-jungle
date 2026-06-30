@@ -6,6 +6,8 @@ import type { AirSupportMission } from './AirSupportTypes';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { Faction } from '../combat/types';
 import type { IAudioManager } from '../../types/SystemInterfaces';
+import { spawnNapalmFire } from '../effects/NapalmFireSystem';
+import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
 
 // Napalm parameters
 const APPROACH_DISTANCE = 500; // start/end distance from target
@@ -116,6 +118,12 @@ export function updateNapalm(
         const fz = mission.missionData[`fire_z${i}`];
         _firePos.set(fx, getTerrainHeight(fx, fz), fz);
         explosionSpawn?.(_firePos.clone());
+        // Light a persistent fire that burns for the full FIRE_DURATION at each
+        // zone (the missing visual), plus a smoke column over every other zone so
+        // the strike reads from range without swamping the shared smoke pool.
+        // No-ops in unit tests (the effect singletons are unwired there).
+        spawnNapalmFire(_firePos, FIRE_DURATION, FIRE_ZONE_RADIUS);
+        if (i % 2 === 0) spawnSmokeCloud(_firePos);
       }
     }
 

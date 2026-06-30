@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import { createSmokeTexture, createFlashTexture, createDebrisTexture } from './ExplosionTextures';
+import { createSmokeTexture, createFlashTexture, createDebrisTexture, createFireTexture } from './ExplosionTextures';
 import { ExplosionEffect, createExplosionEffect } from './ExplosionEffectFactory';
 import {
   updateFlash,
@@ -25,6 +25,7 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
   private smokeTexture: THREE.Texture;
   private flashTexture: THREE.Texture;
   private debrisTexture: THREE.Texture;
+  private fireTexture: THREE.Texture;
 
   constructor(scene: THREE.Scene, maxEffects = 16) {
     super(scene, maxEffects);
@@ -33,6 +34,7 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
     this.smokeTexture = createSmokeTexture();
     this.flashTexture = createFlashTexture();
     this.debrisTexture = createDebrisTexture();
+    this.fireTexture = createFireTexture();
 
     // Pre-allocate pool and add to scene once (toggle visible, never add/remove)
     for (let i = 0; i < maxEffects; i++) {
@@ -47,7 +49,7 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
   }
 
   protected createEffect(): ExplosionEffect {
-    return createExplosionEffect(this.smokeTexture, this.flashTexture, this.debrisTexture);
+    return createExplosionEffect(this.smokeTexture, this.flashTexture, this.debrisTexture, this.fireTexture);
   }
 
   protected isExpired(effect: ExplosionEffect, now: number): boolean {
@@ -140,5 +142,6 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
     this.smokeTexture.dispose();
     this.flashTexture.dispose();
     this.debrisTexture.dispose();
+    this.fireTexture.dispose();
   }
 }

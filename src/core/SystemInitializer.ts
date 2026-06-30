@@ -35,6 +35,7 @@ import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSyst
 import { getRenderDistanceMultiplier } from '../utils/DeviceDetector';
 import { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import { NapalmFireSystem, setNapalmFireSystem } from '../systems/effects/NapalmFireSystem';
 import { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
@@ -230,6 +231,11 @@ export class SystemInitializer {
     refs.playerSuppressionSystem = new PlayerSuppressionSystem();
     refs.flashbangScreenEffect = new FlashbangScreenEffect();
     refs.smokeCloudSystem = new SmokeCloudSystem(scene, camera);
+    // Persistent napalm fire VFX. Wire the module singleton at construction so
+    // NapalmMission's `spawnNapalmFire` resolves the moment the system exists
+    // (mirrors SmokeCloudSystem's setter); disposed/cleared in its own dispose().
+    refs.napalmFireSystem = new NapalmFireSystem(scene, camera);
+    setNapalmFireSystem(refs.napalmFireSystem);
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
 
@@ -279,6 +285,7 @@ export class SystemInitializer {
       refs.playerSuppressionSystem,
       refs.flashbangScreenEffect,
       refs.smokeCloudSystem,
+      refs.napalmFireSystem,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
       refs.warSimulator,

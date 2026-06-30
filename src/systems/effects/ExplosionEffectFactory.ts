@@ -49,7 +49,8 @@ export interface ExplosionEffect {
 export function createExplosionEffect(
   smokeTexture: THREE.Texture,
   flashTexture: THREE.Texture,
-  debrisTexture: THREE.Texture
+  debrisTexture: THREE.Texture,
+  fireTexture?: THREE.Texture
 ): ExplosionEffect {
   void smokeTexture;
   void debrisTexture;
@@ -103,7 +104,11 @@ export function createExplosionEffect(
   const fireMaterial = new THREE.PointsMaterial({
     // Over-bright orange so the fire core clears the post-stack bloom threshold.
     color: new THREE.Color(0xff6600).multiplyScalar(EXPLOSION_FIRE_BLOOM_GAIN),
-    size: 1.2,
+    // A soft flame texture (when supplied) turns each point from a hard square
+    // into a flame blob (#8); the modest size bump keeps it readable. Falls back
+    // to the legacy untextured dot when no texture is passed.
+    map: fireTexture,
+    size: fireTexture ? 2.4 : 1.2,
     transparent: true,
     opacity: 1,
     blending: THREE.AdditiveBlending,
