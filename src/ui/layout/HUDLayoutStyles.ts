@@ -169,6 +169,16 @@ export const HUD_LAYOUT_STYLES = `
     align-items: flex-start;
   }
 
+  /* Objectives slot stacks its children vertically (tasking-director card atop
+   * the objectives panel) and stays right-aligned. overflow:visible so the
+   * stacked card is never clipped by the slot's measured bounds. */
+  .hud-slot[data-region="objectives"] {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    overflow: visible;
+  }
+
   /* On mobile, minimap is in the left column — align flush top-left */
   [data-device="touch"] .hud-slot[data-region="minimap"] {
     justify-content: flex-start;
