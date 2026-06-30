@@ -1,0 +1,16 @@
+{
+  "slug": "small-inflatable-rubber-raiding",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/kiln-war-2026-06/small-inflatable-rubber-raiding.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.545Z",
+  "sourcePrompt": "A small inflatable rubber raiding raft for SEAL and recon teams, about four meters long. Fat rounded buoyancy tubes form the sides and meet at a blunt upturned bow, with a squared transom at the stern; the floor is flat with visible slats, rope grab lines loop along the outer tubes, and two wooden paddles lie across the thwarts.. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation a0330cd5-1c69-4edb-83b5-54304fedb6f3",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

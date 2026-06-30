@@ -1,0 +1,18 @@
+{
+  "slug": "defensive-perimeter-berm-section",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/defensive-perimeter-berm-section.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.964Z",
+  "sourcePrompt": "A defensive perimeter berm section about eight meters long. A bulldozed earth embankment rising to chest height, its forward face steep and its rear sloping into a shallow walkway, the crest topped with a course or two of sandbags forming a firing line. Raw shoved earth and tan sandbags, the camp's hard edge. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation cf5f7ffe-0410-4646-ac2b-6f995f664fc3",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4980 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

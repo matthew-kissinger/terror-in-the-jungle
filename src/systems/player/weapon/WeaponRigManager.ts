@@ -8,6 +8,8 @@ import type { IAmmoManager, IAudioManager, IHUDSystem } from '../../../types/Sys
 import { modelLoader } from '../../assets/ModelLoader'
 import { WeaponModels, warAssetCatalog } from '../../assets/modelPaths'
 import { Faction, isBlufor } from '../../combat/types'
+import { getWeaponArtMode, type WeaponArtMode } from '../../../config/weaponArtMode'
+import type { WeaponAdsType } from './WeaponAnimations'
 
 /**
  * Per-rig catalog slug, so magazine/muzzle node discovery reads the normalized
@@ -17,8 +19,136 @@ import { Faction, isBlufor } from '../../combat/types'
  * search would wrongly capture Mesh_Magwell), so the catalog is the single
  * source of truth for which nodes the reload animation may move. Weapons with
  * no catalog magazine/muzzle metadata fall back to the bbox max-Z marker.
+ *
+ * Both the legacy first-gen slugs and the Kiln gen-2 repaint slugs are listed;
+ * `WEAPON_RIG_ART` picks one slug set per `getWeaponArtMode()`. The catalog
+ * carries magazine/muzzle nodes for both, so the rig stays catalog-driven.
  */
-type WeaponRigSlug = 'm16a1' | 'ak47' | 'ithaca37' | 'm3-grease-gun' | 'm1911' | 'm60' | 'm79'
+type WeaponRigSlug =
+  | 'm16a1' | 'ak47' | 'ithaca37' | 'm3-grease-gun' | 'm1911' | 'm60' | 'm79'
+  | 'dragunov-svd' | 'sks'
+  | 'm16a1-2' | 'ak-47' | 'ithaca-37-pump-action' | 'm3a1-grease-gun'
+  | 'm1911a1-colt' | 'm60-pig-general-purpose' | 'm79-thumper-40mm-grenade'
+  | 'dragunov-svd-sniper-rifle' | 'sks-carbine'
+
+/** Runtime weapon-type identity (independent of the loadout enum). */
+type RuntimeWeaponType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' | 'marksman' | 'sks'
+
+/**
+ * Single source of truth for every selectable weapon's tuning: the runtime
+ * cores are built from this table and the deploy armory reads it via the static
+ * `WeaponRigManager.getWeaponSpec`, so spec values are never duplicated. Keys are
+ * the `RuntimeWeaponType` strings, which match the `LoadoutWeapon` enum values.
+ */
+const WEAPON_SPECS: Record<RuntimeWeaponType, WeaponSpec> = {
+  rifle: {
+    name: 'Rifle', rpm: 700, adsTime: 0.18,
+    baseSpreadDeg: 0.8, bloomPerShotDeg: 0.25,
+    recoilPerShotDeg: 0.65, recoilHorizontalDeg: 0.35,
+    damageNear: 34, damageFar: 24, falloffStart: 20, falloffEnd: 60,
+    headshotMultiplier: 1.7, penetrationPower: 1
+  },
+  shotgun: {
+    name: 'Shotgun', rpm: 75, adsTime: 0.22,
+    baseSpreadDeg: 2.5, bloomPerShotDeg: 1.0,
+    recoilPerShotDeg: 2.5, recoilHorizontalDeg: 0.8,
+    damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25,
+    headshotMultiplier: 1.5, penetrationPower: 0.5,
+    pelletCount: 10, pelletSpreadDeg: 8
+  },
+  smg: {
+    name: 'SMG', rpm: 900, adsTime: 0.15,
+    baseSpreadDeg: 1.2, bloomPerShotDeg: 0.15,
+    recoilPerShotDeg: 0.35, recoilHorizontalDeg: 0.25,
+    damageNear: 22, damageFar: 12, falloffStart: 15, falloffEnd: 40,
+    headshotMultiplier: 1.4, penetrationPower: 0.8
+  },
+  pistol: {
+    name: 'Pistol', rpm: 300, adsTime: 0.1,
+    baseSpreadDeg: 0.6, bloomPerShotDeg: 0.2,
+    recoilPerShotDeg: 0.5, recoilHorizontalDeg: 0.3,
+    damageNear: 25, damageFar: 15, falloffStart: 12, falloffEnd: 35,
+    headshotMultiplier: 1.6, penetrationPower: 0.7
+  },
+  lmg: {
+    name: 'LMG', rpm: 550, adsTime: 0.3,
+    baseSpreadDeg: 1.5, bloomPerShotDeg: 0.12,
+    recoilPerShotDeg: 0.8, recoilHorizontalDeg: 0.5,
+    damageNear: 38, damageFar: 28, falloffStart: 25, falloffEnd: 80,
+    headshotMultiplier: 1.5, penetrationPower: 1.2
+  },
+  launcher: {
+    name: 'Grenade Launcher', rpm: 30, adsTime: 0.25,
+    baseSpreadDeg: 0.5, bloomPerShotDeg: 0,
+    recoilPerShotDeg: 3.0, recoilHorizontalDeg: 0.5,
+    damageNear: 0, damageFar: 0, falloffStart: 0, falloffEnd: 0,
+    headshotMultiplier: 1.0, penetrationPower: 0
+  },
+  // Marksman (Dragunov SVD): precise slow-cadence DMR (low rpm, high
+  // range-carrying damage, tight resting spread). SKS: semi-auto OPFOR carbine
+  // tuned BETWEEN the AK rifle and the marksman DMR so it reads as distinct.
+  marksman: {
+    name: 'Marksman Rifle', rpm: 80, adsTime: 0.28,
+    baseSpreadDeg: 0.18, bloomPerShotDeg: 0.08,
+    recoilPerShotDeg: 1.4, recoilHorizontalDeg: 0.25,
+    damageNear: 75, damageFar: 55, falloffStart: 40, falloffEnd: 120,
+    headshotMultiplier: 2.2, penetrationPower: 1.5
+  },
+  sks: {
+    name: 'SKS Carbine', rpm: 200, adsTime: 0.2,
+    baseSpreadDeg: 0.45, bloomPerShotDeg: 0.15,
+    recoilPerShotDeg: 0.95, recoilHorizontalDeg: 0.3,
+    damageNear: 45, damageFar: 32, falloffStart: 30, falloffEnd: 90,
+    headshotMultiplier: 1.9, penetrationPower: 1.1
+  },
+}
+
+interface WeaponRigArtEntry {
+  model: string
+  slug: WeaponRigSlug
+}
+
+/**
+ * First-person rig model + catalog-slug pairs per art mode. The Kiln gen-2
+ * repaint GLBs (default) carry their own magazine/muzzle node metadata in the
+ * generated warAssetCatalog, so swapping art needs only the model path + slug;
+ * `prepareWeaponRig` reads the per-slug nodes. Flip to the legacy art with
+ * `?weaponArt=legacy` or `window.__weaponArt = 'legacy'`.
+ */
+const WEAPON_RIG_ART: Record<WeaponArtMode, {
+  m16: WeaponRigArtEntry
+  ak: WeaponRigArtEntry
+  shotgun: WeaponRigArtEntry
+  smg: WeaponRigArtEntry
+  pistol: WeaponRigArtEntry
+  m60: WeaponRigArtEntry
+  m79: WeaponRigArtEntry
+  marksman: WeaponRigArtEntry
+  sks: WeaponRigArtEntry
+}> = {
+  legacy: {
+    m16: { model: WeaponModels.M16A1, slug: 'm16a1' },
+    ak: { model: WeaponModels.AK47, slug: 'ak47' },
+    shotgun: { model: WeaponModels.ITHACA37, slug: 'ithaca37' },
+    smg: { model: WeaponModels.M3_GREASE_GUN, slug: 'm3-grease-gun' },
+    pistol: { model: WeaponModels.M1911, slug: 'm1911' },
+    m60: { model: WeaponModels.M60, slug: 'm60' },
+    m79: { model: WeaponModels.M79, slug: 'm79' },
+    marksman: { model: WeaponModels.DRAGUNOV_SVD, slug: 'dragunov-svd' },
+    sks: { model: WeaponModels.SKS, slug: 'sks' },
+  },
+  kiln: {
+    m16: { model: WeaponModels.M16A1_2, slug: 'm16a1-2' },
+    ak: { model: WeaponModels.AK_47, slug: 'ak-47' },
+    shotgun: { model: WeaponModels.ITHACA_37_PUMP_ACTION, slug: 'ithaca-37-pump-action' },
+    smg: { model: WeaponModels.M3A1_GREASE_GUN, slug: 'm3a1-grease-gun' },
+    pistol: { model: WeaponModels.M1911A1_COLT, slug: 'm1911a1-colt' },
+    m60: { model: WeaponModels.M60_PIG_GENERAL_PURPOSE, slug: 'm60-pig-general-purpose' },
+    m79: { model: WeaponModels.M79_THUMPER_40MM_GRENADE, slug: 'm79-thumper-40mm-grenade' },
+    marksman: { model: WeaponModels.DRAGUNOV_SVD_SNIPER_RIFLE, slug: 'dragunov-svd-sniper-rifle' },
+    sks: { model: WeaponModels.SKS_CARBINE, slug: 'sks-carbine' },
+  },
+}
 
 /**
  * Manages weapon model creation and switching between rifle/shotgun/SMG
@@ -32,12 +162,14 @@ export class WeaponRigManager {
   private pistolRig?: THREE.Group
   private m60Rig?: THREE.Group
   private m79Rig?: THREE.Group
+  private marksmanRig?: THREE.Group
+  private sksRig?: THREE.Group
   private weaponRig?: THREE.Group // Current active weapon rig root
   private muzzleRef?: THREE.Object3D
   private magazineRef?: THREE.Object3D
   private pumpGripRef?: THREE.Object3D
   private activeRifleFaction: Faction = Faction.US
-  private currentWeaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' = 'rifle'
+  private currentWeaponType: RuntimeWeaponType = 'rifle'
 
   // Weapon cores
   private rifleCore: GunplayCore
@@ -46,6 +178,8 @@ export class WeaponRigManager {
   private pistolCore: GunplayCore
   private lmgCore: GunplayCore
   private launcherCore: GunplayCore
+  private marksmanCore: GunplayCore
+  private sksCore: GunplayCore
   private gunCore: GunplayCore // Current active weapon core
 
   // Base position (relative to screen)
@@ -56,116 +190,93 @@ export class WeaponRigManager {
   private switchAnimationProgress = 0
   private readonly SWITCH_ANIMATION_TIME = 0.4 // 400ms total switch time
   private switchOffset = { y: 0, rotX: 0 }
-  private pendingWeaponSwitch?: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
+  private pendingWeaponSwitch?: RuntimeWeaponType
 
   constructor(weaponScene: THREE.Scene) {
     this.weaponScene = weaponScene
 
-    // Initialize weapon specs
-    const rifleSpec: WeaponSpec = {
-      name: 'Rifle', rpm: 700, adsTime: 0.18,
-      baseSpreadDeg: 0.8, bloomPerShotDeg: 0.25,
-      recoilPerShotDeg: 0.65, recoilHorizontalDeg: 0.35,
-      damageNear: 34, damageFar: 24, falloffStart: 20, falloffEnd: 60,
-      headshotMultiplier: 1.7, penetrationPower: 1
-    }
-
-    const shotgunSpec: WeaponSpec = {
-      name: 'Shotgun', rpm: 75, adsTime: 0.22,
-      baseSpreadDeg: 2.5, bloomPerShotDeg: 1.0,
-      recoilPerShotDeg: 2.5, recoilHorizontalDeg: 0.8,
-      damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25,
-      headshotMultiplier: 1.5, penetrationPower: 0.5,
-      pelletCount: 10, pelletSpreadDeg: 8
-    }
-
-    const smgSpec: WeaponSpec = {
-      name: 'SMG', rpm: 900, adsTime: 0.15,
-      baseSpreadDeg: 1.2, bloomPerShotDeg: 0.15,
-      recoilPerShotDeg: 0.35, recoilHorizontalDeg: 0.25,
-      damageNear: 22, damageFar: 12, falloffStart: 15, falloffEnd: 40,
-      headshotMultiplier: 1.4, penetrationPower: 0.8
-    }
-
-    const pistolSpec: WeaponSpec = {
-      name: 'Pistol', rpm: 300, adsTime: 0.1,
-      baseSpreadDeg: 0.6, bloomPerShotDeg: 0.2,
-      recoilPerShotDeg: 0.5, recoilHorizontalDeg: 0.3,
-      damageNear: 25, damageFar: 15, falloffStart: 12, falloffEnd: 35,
-      headshotMultiplier: 1.6, penetrationPower: 0.7
-    }
-
-    const lmgSpec: WeaponSpec = {
-      name: 'LMG', rpm: 550, adsTime: 0.3,
-      baseSpreadDeg: 1.5, bloomPerShotDeg: 0.12,
-      recoilPerShotDeg: 0.8, recoilHorizontalDeg: 0.5,
-      damageNear: 38, damageFar: 28, falloffStart: 25, falloffEnd: 80,
-      headshotMultiplier: 1.5, penetrationPower: 1.2
-    }
-
-    const launcherSpec: WeaponSpec = {
-      name: 'Grenade Launcher', rpm: 30, adsTime: 0.25,
-      baseSpreadDeg: 0.5, bloomPerShotDeg: 0,
-      recoilPerShotDeg: 3.0, recoilHorizontalDeg: 0.5,
-      damageNear: 0, damageFar: 0, falloffStart: 0, falloffEnd: 0,
-      headshotMultiplier: 1.0, penetrationPower: 0
-    }
-
-    // Initialize all weapon cores
-    this.rifleCore = new GunplayCore(rifleSpec)
-    this.shotgunCore = new GunplayCore(shotgunSpec)
-    this.smgCore = new GunplayCore(smgSpec)
-    this.pistolCore = new GunplayCore(pistolSpec)
-    this.lmgCore = new GunplayCore(lmgSpec)
-    this.launcherCore = new GunplayCore(launcherSpec)
+    // Build all weapon cores from the shared WEAPON_SPECS table (single source).
+    this.rifleCore = new GunplayCore(WEAPON_SPECS.rifle)
+    this.shotgunCore = new GunplayCore(WEAPON_SPECS.shotgun)
+    this.smgCore = new GunplayCore(WEAPON_SPECS.smg)
+    this.pistolCore = new GunplayCore(WEAPON_SPECS.pistol)
+    this.lmgCore = new GunplayCore(WEAPON_SPECS.lmg)
+    this.launcherCore = new GunplayCore(WEAPON_SPECS.launcher)
+    this.marksmanCore = new GunplayCore(WEAPON_SPECS.marksman)
+    this.sksCore = new GunplayCore(WEAPON_SPECS.sks)
     this.gunCore = this.rifleCore // Start with rifle
   }
 
+  /**
+   * Read-only access to a weapon's tuning spec by runtime type id (which matches
+   * the `LoadoutWeapon` enum value). Returns the shared table entry so callers
+   * (e.g. the deploy armory stats readout) never duplicate spec values. Static
+   * because the deploy UI has no weapon scene to construct a full rig manager.
+   */
+  static getWeaponSpec(weaponType: RuntimeWeaponType): WeaponSpec {
+    return WEAPON_SPECS[weaponType]
+  }
+
   async init(): Promise<void> {
+    // Pick the gen-2 Kiln art (default) or legacy art for every rig slot.
+    const art = WEAPON_RIG_ART[getWeaponArtMode()]
+
     // Load GLB weapon models in parallel
-    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene, m60Scene, m79Scene] = await Promise.all([
-      modelLoader.loadModel(WeaponModels.M16A1),
-      modelLoader.loadModel(WeaponModels.AK47),
-      modelLoader.loadModel(WeaponModels.ITHACA37),
-      modelLoader.loadModel(WeaponModels.M3_GREASE_GUN),
-      modelLoader.loadModel(WeaponModels.M1911),
-      modelLoader.loadModel(WeaponModels.M60),
-      modelLoader.loadModel(WeaponModels.M79),
+    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene, m60Scene, m79Scene, marksmanScene, sksScene] = await Promise.all([
+      modelLoader.loadModel(art.m16.model),
+      modelLoader.loadModel(art.ak.model),
+      modelLoader.loadModel(art.shotgun.model),
+      modelLoader.loadModel(art.smg.model),
+      modelLoader.loadModel(art.pistol.model),
+      modelLoader.loadModel(art.m60.model),
+      modelLoader.loadModel(art.m79.model),
+      modelLoader.loadModel(art.marksman.model),
+      modelLoader.loadModel(art.sks.model),
     ])
 
-    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false, 'm16a1')
+    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false, art.m16.slug)
     this.m16RifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.weaponScene.add(this.m16RifleRig)
 
-    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false, 'ak47')
+    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false, art.ak.slug)
     this.akRifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.akRifleRig.visible = false
     this.weaponScene.add(this.akRifleRig)
 
-    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true, 'ithaca37')
+    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true, art.shotgun.slug)
     this.shotgunRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.shotgunRig.visible = false
     this.weaponScene.add(this.shotgunRig)
 
-    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false, 'm3-grease-gun')
+    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false, art.smg.slug)
     this.smgRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.smgRig.visible = false
     this.weaponScene.add(this.smgRig)
 
-    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false, 'm1911')
+    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false, art.pistol.slug)
     this.pistolRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.pistolRig.visible = false
     this.weaponScene.add(this.pistolRig)
 
-    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false, 'm60')
+    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false, art.m60.slug)
     this.m60Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.m60Rig.visible = false
     this.weaponScene.add(this.m60Rig)
 
-    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false, 'm79')
+    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false, art.m79.slug)
     this.m79Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.m79Rig.visible = false
     this.weaponScene.add(this.m79Rig)
+
+    this.marksmanRig = this.prepareWeaponRig(marksmanScene, 1.5, false, art.marksman.slug)
+    this.marksmanRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.marksmanRig.visible = false
+    this.weaponScene.add(this.marksmanRig)
+
+    this.sksRig = this.prepareWeaponRig(sksScene, 1.5, false, art.sks.slug)
+    this.sksRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.sksRig.visible = false
+    this.weaponScene.add(this.sksRig)
 
     // Start with the BLUFOR rifle active
     this.currentWeaponType = 'rifle'
@@ -346,7 +457,15 @@ export class WeaponRigManager {
     return this.launcherCore
   }
 
-  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
+  getMarksmanCore(): GunplayCore {
+    return this.marksmanCore
+  }
+
+  getSksCore(): GunplayCore {
+    return this.sksCore
+  }
+
+  startWeaponSwitch(weaponType: RuntimeWeaponType, _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
     // A switch already in flight to a DIFFERENT target must be superseded, not
     // dropped. Dropping it desynced the equipped weapon from the selected
     // loadout at spawn: the deploy-apply path issues several switch requests in
@@ -426,7 +545,7 @@ export class WeaponRigManager {
     }
   }
 
-  private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
+  private performWeaponSwitch(weaponType: RuntimeWeaponType, hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
     // The LOGICAL equipped weapon is authoritative regardless of whether the
     // rendered GLB rigs have loaded yet. Track it before the rig-null guard so
     // the equipped weapon always matches the requested one (the visible model
@@ -434,7 +553,7 @@ export class WeaponRigManager {
     this.currentWeaponType = weaponType
 
     // Actually switch the visible weapon models
-    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig || !this.m60Rig || !this.m79Rig) return
+    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig || !this.m60Rig || !this.m79Rig || !this.marksmanRig || !this.sksRig) return
 
     this.setRifleRigVisibility(false)
     this.shotgunRig.visible = false
@@ -442,6 +561,8 @@ export class WeaponRigManager {
     this.pistolRig.visible = false
     this.m60Rig.visible = false
     this.m79Rig.visible = false
+    this.marksmanRig.visible = false
+    this.sksRig.visible = false
 
     switch (weaponType) {
       case 'rifle':
@@ -495,12 +616,28 @@ export class WeaponRigManager {
         this.magazineRef = undefined // M79 is break-action, no detachable magazine
         this.pumpGripRef = undefined
         break
+      case 'marksman':
+        this.marksmanRig.visible = true
+        this.weaponRig = this.marksmanRig
+        this.gunCore = this.marksmanCore
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
+        this.pumpGripRef = undefined
+        break
+      case 'sks':
+        this.sksRig.visible = true
+        this.weaponRig = this.sksRig
+        this.gunCore = this.sksCore
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
+        this.pumpGripRef = undefined
+        break
     }
 
     // Notify HUD about weapon switch
     if (hudSystem && hudSystem.showWeaponSwitch) {
-      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL', lmg: 'LMG', launcher: 'LAUNCHER' }
-      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT', lmg: 'MG', launcher: 'GL' }
+      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL', lmg: 'LMG', launcher: 'LAUNCHER', marksman: 'MARKSMAN', sks: 'SKS' }
+      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT', lmg: 'MG', launcher: 'GL', marksman: 'DMR', sks: 'SKS' }
       const ammoState = ammoManager?.getState() || { currentMagazine: 0, reserveAmmo: 0 }
       hudSystem.showWeaponSwitch(
         weaponNames[weaponType],
@@ -523,8 +660,12 @@ export class WeaponRigManager {
     return this.isSwitchingWeapon
   }
 
-  /** The logical weapon currently equipped (independent of switch animation). */
-  getCurrentWeaponType(): 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' {
+  /**
+   * The logical weapon currently equipped (independent of switch animation).
+   * The return type is the shared `WeaponAdsType`, the key WeaponModel uses to
+   * resolve this weapon's per-weapon ADS sight-line offset.
+   */
+  getCurrentWeaponType(): WeaponAdsType {
     return this.currentWeaponType
   }
 
@@ -565,6 +706,8 @@ export class WeaponRigManager {
       this.pistolRig,
       this.m60Rig,
       this.m79Rig,
+      this.marksmanRig,
+      this.sksRig,
     ]
     for (const rig of rigs) {
       if (rig) {

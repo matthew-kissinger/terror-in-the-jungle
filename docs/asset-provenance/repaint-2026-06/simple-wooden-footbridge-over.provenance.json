@@ -1,0 +1,16 @@
+{
+  "slug": "simple-wooden-footbridge-over",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/simple-wooden-footbridge-over.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.914Z",
+  "sourcePrompt": "A simple wooden footbridge over a stream, about five meters long and one plank-width wide. A slightly sagging deck of mismatched planks rests on two or three timber pile bents, with a single rough handrail down each side on slender posts, one rail leaning. Sun-grayed weathered timber, rustic and creaky-looking. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 4ea1f3e5-6c96-40bc-bc51-8378668a988d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

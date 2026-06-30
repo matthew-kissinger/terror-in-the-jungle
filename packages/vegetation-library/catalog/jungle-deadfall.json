@@ -1,0 +1,31 @@
+{
+  "id": "jungle-deadfall",
+  "commonName": "Jungle deadfall (dead trunk / log)",
+  "tags": ["deadfall", "log", "trunk", "cover", "collision"],
+  "status": "sourceStaged",
+  "provenance": {
+    "source": "Poly Haven",
+    "author": null,
+    "url": "https://polyhaven.com/a/dead_tree_trunk",
+    "license": "CC0-1.0",
+    "attributionRequired": false,
+    "notes": "dead_tree_trunk + dead_tree_trunk_02 (1k gltf) staged under source/polyhaven-dead-tree-trunk*. Needs decimation + a collision footprint before 'ready'; it is a near-range cover prop, not background canopy."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [],
+  "lod": {
+    "label": "mesh-near-only",
+    "rationale": "A deadfall log is gameplay cover the player gets close to; it carries a collision footprint and is culled past ~60m rather than impostor-ed. No mid/far band — once it is too far to vault, it simply stops drawing.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 60, "representationId": null, "plannedKind": "mesh", "notes": "Decimate trunk to <2k tris, add a capsule/box collision footprint." }
+    ]
+  },
+  "ecology": {
+    "tier": "midLevel",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.08,
+    "slopeRangeDeg": [0, 25],
+    "cluster": { "min": 1, "max": 2, "radiusMeters": 6 }
+  }
+}

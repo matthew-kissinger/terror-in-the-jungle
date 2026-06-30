@@ -31,6 +31,23 @@ reference overlays (`*-rivers.json`, `*-firebases.json`).
   and record source + license + conversion per the pipeline's "Processing
   Contract".
 
+### Orbital topo map — baked coarse DEMs
+
+Files: `public/data/heightmaps/*-topo-*.f32` (+ `*.json` sidecars) — the coarse
+(96²) relief grids the 3D orbital topographic map CPU-displaces. Produced by
+`scripts/bake-topo-dem.ts`, which **downsamples** the existing committed
+`.f32` DEMs already in the repo (no fresh clip, no network):
+
+- `a-shau-topo-*.f32` derives from the **NASADEM**-based A Shau `z14` clip
+  (`public/data/vietnam/big-map/a-shau-z14-9x9.f32`). NASADEM is a
+  **public-domain / CC0** US-government product (no copyright, no relicensing).
+  The A Shau source DEM is git-ignored (large binary), so this baked topo may be
+  absent in CI checkouts; the live map covers A Shau via the runtime heightmap.
+- `open_frontier-*-topo-*.f32`, `zone_control-*-topo-*.f32`, `tdm-*-topo-*.f32`
+  derive from the **procedurally generated** seed DEMs (original project work).
+- These generated `.f32`/`.json` carry **no SPDX header** (generated data); their
+  provenance is recorded here and in `docs/asset-provenance/orbital-topo-2026-06/`.
+
 ## Fonts — third-party, SIL Open Font License 1.1
 
 Bundled via npm and shipped in the build:
@@ -42,6 +59,62 @@ Bundled via npm and shipped in the build:
 These are third-party typefaces distributed under the **SIL Open Font License
 1.1** (see each package's bundled license under `node_modules/`). They are not
 relicensed; CC BY-SA 4.0 does not apply to them.
+
+## Vegetation — third-party 3D models + textures
+
+Staged under `public/assets/vegetation/` (normalized binaries) and
+`public/assets/vegetation/source/` (raw source, git-ignored). Full provenance
+per asset in [`docs/asset-provenance/vegetation-2026-06/`](docs/asset-provenance/vegetation-2026-06/)
+and the engine-agnostic descriptors in
+[`packages/vegetation-library/catalog/`](packages/vegetation-library/catalog/).
+
+**Shipped (in the runtime bundle):**
+
+- **Jungle Tree** — author **kobaltsecond**, Sketchfab, **CC BY 4.0**.
+  https://sketchfab.com/3d-models/jungle-tree-46f83ec5f6c04abf9d509c1070f67d1e
+  Normalized (pivot + webp textures) to `public/assets/vegetation/jungle-tree/`.
+  **Attribution required** — keep this credit while shipped.
+
+- **Bamboo Grove** — author **verify** (from the "free bamboo set"), Sketchfab, **CC BY 4.0**.
+  https://sketchfab.com/search?q=bamboo&type=models
+  Representative 3-culm clump extracted + re-clustered + uniform-scaled to a realistic
+  ~14m height, normalized (pivot + webp textures) to `public/assets/vegetation/bamboo-grove/`
+  (also re-baked as the `bamboo-thicket` ground-card variant for dense high-density placement).
+  **Attribution required** — keep this credit while shipped (author handle to be confirmed).
+
+- **Rice Paddy Plant** — author **verify**, Sketchfab, **CC BY 4.0**.
+  https://sketchfab.com/search?q=rice+plant&type=models
+  Vertex-colored (no textures); pivot-only normalization to `public/assets/vegetation/rice-paddy/`.
+  **Attribution required** — keep this credit while shipped (author handle to be confirmed).
+
+- **Tropical Plants Pack M02P** — author **mozzarellaARC**, Sketchfab, **CC BY 4.0**.
+  https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0
+  Split into four per-species assets (cleanest representative variant each), world-transform
+  baked, pivot + webp normalized to `public/assets/vegetation/fan-palm/`, `.../banana-plant/`,
+  `.../understory-fern/`, `.../taro-elephant-ear/`.
+  **Attribution required** — keep this credit while shipped.
+
+- **Coconut Palm** — author **Poly by Google**, via poly.pizza, **CC BY 4.0**.
+  https://poly.pizza/m/bXUTyfiwqBb
+  Centered to a ground pivot + webp-compressed (2.38MB -> 329KB) via @gltf-transform to
+  `public/assets/vegetation/coconut-palm/`; a front-view alpha card is baked for the far LOD.
+  **Attribution required** — keep this credit while shipped.
+
+- **EZ-Tree hardwoods (teak-a, teak-b, rubber-a, rubber-b)** — generator by
+  **Daniel Greenheck (dgreenheck)**, **MIT**.
+  https://github.com/dgreenheck/ez-tree
+  Generated headless with `@dgreenheck/ez-tree@1.1.0`; each normalized (ground-center
+  pivot, scaled to 19-22m, LOD0 <=10k tris) with EZ-Tree's own MIT bark + leaf textures
+  bound (leaf alphaClip). Written to `public/assets/vegetation/{teak-a,teak-b,rubber-a,rubber-b}/`.
+  MIT does **not** require attribution; credited here as a courtesy.
+
+**Staged, not yet shipped (credit becomes required if/when shipped):**
+
+- **ambientCG** Grass004 / LeafSet013 / LeafSet017 / Foliage001 — **CC0** (no attribution required).
+- **Poly Haven** fern_02 / dead_tree_trunk / dead_tree_trunk_02 — **CC0** (no attribution required).
+
+First-party vegetation (Kiln Studio procedural banyans) is original work under
+CC BY-SA 4.0 and is **not** listed here.
 
 ## npm runtime + build dependencies — third-party, own licenses
 
@@ -62,6 +135,56 @@ with its origin.
 
 - **Action for owner:** confirm every audio file is originally authored, or
   list the exceptions here.
+
+### Ambient soundscape beds — FIRST-PARTY placeholders (CC BY-SA 4.0)
+
+Files: `public/assets/audio/ambient/{jungle-day,jungle-night,wildlife-bird,wildlife-call}.ogg`.
+Added in `cycle-2026-06-29-soundscape-loop-replacement` to back the layered
+day/night `SoundscapeDirector` (which replaced the old always-on `jungle1`/`jungle2`
+loop). Full provenance in
+[`docs/asset-provenance/audio-2026-06/`](docs/asset-provenance/audio-2026-06/).
+
+- These four beds/one-shots are **first-party placeholders synthesized from
+  scratch** (ffmpeg/libopus — see `generate-beds.sh`), original work under
+  **CC BY-SA 4.0**. They are **not** field recordings and **not** third-party —
+  they are listed here only to make their placeholder status unambiguous.
+- The campaign plan cited Freesound beds to source (day `#427400` CC-BY; night
+  `#175020` CC0); **Freesound downloads require account credentials the
+  autonomous run did not have**, so genuine beds were not fetched. No invented
+  attribution was recorded.
+- **Action for owner:** when production CC0/CC-BY field recordings are sourced,
+  replace these files (same paths) and record the real upstream attribution
+  (source URL + author + license) here. The `SoundscapeDirector` is
+  bed-agnostic — no code change needed.
+
+### Radio station music — THIRD-PARTY CC BY 4.0 (Kevin MacLeod, incompetech.com)
+
+Files: `public/assets/audio/music/{station-volatile-reaction,station-five-armies,station-ossuary-air}.ogg`.
+Added in `cycle-2026-06-29-radio-stations-music` to back the headless
+`RadioStationSystem` (the selectable radio stations that replaced the removed
+single music loop). Music is **default-OFF** and lazy-loaded only when the
+player tunes a station. Full per-track provenance in
+[`docs/asset-provenance/audio-2026-06/`](docs/asset-provenance/audio-2026-06/).
+
+These are **genuine third-party CC BY 4.0 tracks** by **Kevin MacLeod**
+(incompetech.com), fetched directly (no credentials) and re-encoded to Opus
+stereo ~80 kbps. **Attribution is REQUIRED** and must remain wherever the game
+credits assets:
+
+- "Volatile Reaction" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+- "Five Armies" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+- "Ossuary 6 - Air" by Kevin MacLeod (incompetech.com) — Licensed under
+  Creative Commons: By Attribution 4.0 License — https://creativecommons.org/licenses/by/4.0/
+
+Sourcing note: the campaign brief cited Bartmann CC0 drones / AFN CC-BY surf for
+the ambient station, but those sources are account/credential-bound and could not
+be fetched license-clean in the autonomous run. The ambient station ships
+"Ossuary 6 - Air" (CC BY 4.0) instead — same license posture, fully attributed,
+no invented provenance. The station catalog (`src/config/radioStations.ts`) is
+swap-friendly: replacing a track with a different license-clean clip needs no
+code change beyond that file plus an entry here.
 
 ## Note: "Pixel Forge" assets are FIRST-PARTY (not third-party)
 

@@ -1,0 +1,58 @@
+{
+  "id": "banyan-large",
+  "commonName": "Banyan (large hero)",
+  "species": "Ficus benghalensis",
+  "tags": ["tree", "canopy", "hero", "strangler-fig", "aerial-roots"],
+  "status": "ready",
+  "provenance": {
+    "source": "Kiln Studio",
+    "author": "Terror in the Jungle (first-party, procedural gen)",
+    "url": null,
+    "license": "CC-BY-SA-4.0",
+    "attributionRequired": true,
+    "sourceTris": 13304,
+    "notes": "Kiln procedural lineage c6520de6 -> af132063 -> 0b7b51c2 (spreading surface-root pass). PATINA bark+leaf textures applied + webp-compressed."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [
+    {
+      "id": "bark",
+      "blend": "opaque",
+      "maps": { "baseColor": "textures/bark_basecolor.webp", "normal": "textures/bark_normal.webp" },
+      "factors": { "roughness": 0.92, "metalness": 0 }
+    },
+    {
+      "id": "leaf",
+      "blend": "opaque",
+      "maps": { "baseColor": "textures/leaf_basecolor.webp", "normal": "textures/leaf_normal.webp" },
+      "factors": { "roughness": 0.85, "metalness": 0 }
+    }
+  ],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-large",
+      "role": "hero",
+      "path": "banyan/banyan-large-textured.glb",
+      "tris": 13304,
+      "materialBuckets": ["bark", "leaf"],
+      "bounds": { "center": [0.26, 2.43, 0], "size": [17.55, 11.06, 19.32], "radius": 14.17 },
+      "budget": { "trisPerInstance": 13304, "drawCallsPerBatch": 2, "textureMb": 0.39 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+octa-far",
+    "rationale": "Special-area hero placed sparsely, so the close mesh detail is worth its 13k tris; beyond ~150m it collapses to an octahedral impostor to keep draw cost flat. Impostor not yet baked (planned).",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 150, "representationId": "mesh-large", "budget": { "trisPerInstance": 13304, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 150, "maxDistanceMeters": null, "representationId": null, "plannedKind": "octaImpostor", "notes": "Bake via Path B static-impostor baker (8 cols x 3 rows) from the large mesh." }
+    ]
+  },
+  "ecology": {
+    "tier": "canopy",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.05,
+    "slopeRangeDeg": [0, 18],
+    "cluster": { "min": 1, "max": 1, "radiusMeters": 0 }
+  }
+}

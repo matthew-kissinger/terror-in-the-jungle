@@ -36,6 +36,20 @@ export class PlayerVehicleController {
       this.deps.fixedWingModel?.exitAircraft();
       return;
     }
+
+    // Ground / tracked-vehicle exit branch. PlayerState only flags the flight
+    // categories, so a seated tank, jeep, watercraft, or emplacement reaches
+    // here on a non-flight `E`. `requestVehicleExit` is the canonical session
+    // dismount (it runs the active adapter's `getExitPlan`, so the tank ejects
+    // to the side of the hull); it returns `false` when the player is on foot,
+    // so the enter-aircraft fallback below still fires in that case.
+    //
+    // This is the fix for the unreachable tank exit: `F` is consumed by the
+    // driver<->gunner seat-swap whenever a second seat exists, so before this
+    // branch the only way out of a tank was `Escape` (which also opens the
+    // pause menu). `E` now mirrors the aircraft exit key for every category.
+    if (this.deps.requestVehicleExit?.()) return;
+
     // Try entering: fixed-wing first (higher priority at airfields), then helicopter
     if (this.deps.fixedWingModel?.tryEnterAircraft()) return;
     this.deps.helicopterModel?.tryEnterHelicopter();

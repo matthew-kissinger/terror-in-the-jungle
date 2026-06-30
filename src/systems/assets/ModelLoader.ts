@@ -43,6 +43,23 @@ export class ModelLoader {
     return instance;
   }
 
+  /**
+   * Load a GLB by an already-resolved served URL (e.g. '/assets/vegetation/.../tree.glb')
+   * rather than a `public/models/`-relative path. Shares the same cache, clone, and
+   * dispose machinery as loadModel(); the URL doubles as the cache key, so it never
+   * collides with models/-relative keys (which carry no leading slash).
+   *
+   * Used by binaries that live outside public/models/ — currently the vegetation
+   * library heroes served from public/assets/vegetation/.
+   */
+  async loadModelFromUrl(servedUrl: string): Promise<THREE.Group> {
+    const model = await this.loadModelRawResolved(servedUrl, servedUrl);
+    const instance = model.scene.clone();
+    instance.userData[SHARED_MODEL_INSTANCE_KEY] = true;
+    instance.userData.modelPath = servedUrl;
+    return instance;
+  }
+
   async loadAnimatedModel(relativePath: string): Promise<AnimatedModelInstance> {
     const model = await this.loadModelRaw(relativePath);
     const instance = cloneSkeleton(model.scene) as THREE.Group;
@@ -59,14 +76,22 @@ export class ModelLoader {
    * calls for the same path return the same object.
    */
   private async loadModelRaw(relativePath: string): Promise<LoadedModel> {
-    const cached = this.cache.get(relativePath);
+    return this.loadModelRawResolved(relativePath, getModelPath(relativePath));
+  }
+
+  /**
+   * Shared load core for both the models/-relative path (loadModel) and the
+   * served-URL path (loadModelFromUrl). `cacheKey` keys the cache + in-flight map;
+   * `url` is the resolved fetch URL.
+   */
+  private async loadModelRawResolved(cacheKey: string, url: string): Promise<LoadedModel> {
+    const cached = this.cache.get(cacheKey);
     if (cached) return cached;
 
     // Deduplicate concurrent loads of the same path
-    const inflight = this.pending.get(relativePath);
+    const inflight = this.pending.get(cacheKey);
     if (inflight) return inflight;
 
-    const url = getModelPath(relativePath);
     const promise = new Promise<LoadedModel>((resolve, reject) => {
       this.loader.load(
         url,
@@ -86,22 +111,22 @@ export class ModelLoader {
             scene: gltf.scene,
             animations: gltf.animations,
           };
-          this.cache.set(relativePath, model);
-          this.pending.delete(relativePath);
+          this.cache.set(cacheKey, model);
+          this.pending.delete(cacheKey);
 
-          Logger.info('assets', `Loaded model: ${relativePath}`);
+          Logger.info('assets', `Loaded model: ${cacheKey}`);
           resolve(model);
         },
         undefined,
         (error) => {
-          this.pending.delete(relativePath);
-          Logger.warn('assets', `Failed to load model: ${relativePath}`, error);
+          this.pending.delete(cacheKey);
+          Logger.warn('assets', `Failed to load model: ${cacheKey}`, error);
           reject(error);
         }
       );
     });
 
-    this.pending.set(relativePath, promise);
+    this.pending.set(cacheKey, promise);
     return promise;
   }
 

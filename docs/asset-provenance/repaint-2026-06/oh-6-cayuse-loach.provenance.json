@@ -1,0 +1,29 @@
+{
+  "slug": "oh-6-cayuse-loach",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/oh-6-cayuse-loach.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.505Z",
+  "sourcePrompt": "An OH-6 Cayuse \"Loach\" light observation helicopter, tiny at about seven meters, perched on slender skids. An egg-shaped cabin with a big rounded glass front takes up barely a third of the length; a thin tail boom runs back to a small tail rotor beside an upswept V-tail. A four-bladed main rotor rides close above the rounded. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation ed5b9774-169d-4ffa-bc59-14503ec82715",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 6
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 2
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

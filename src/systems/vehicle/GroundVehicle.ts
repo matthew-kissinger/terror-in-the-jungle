@@ -31,12 +31,16 @@ export const M151_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   mass: 1120,
   wheelbase: 2.06,
   trackWidth: 1.42,
-  engineTorque: 420,
+  // 2026-06-28 owner playtest: the jeep felt too slow/floaty. Stronger pull-away
+  // torque + much lighter velocity damping (0.88 -> 0.95) raise the steady-state
+  // cruise without turning into ice — damping still bleeds speed off-throttle, so
+  // it stops feeling like it coasts forever.
+  engineTorque: 520,
   gearRatio: 5.2,
   maxSteer: 0.58,
   maxClimbSlope: 0.76,
   rollingCoef: 85,
-  velocityDamping: 0.88,
+  velocityDamping: 0.95,
   angularDamping: 0.76,
   lateralGripDamping: 0.08,
   slopeDriveFloor: 0.65,
@@ -99,27 +103,33 @@ interface GroundVehicleRuntimeProfile {
   maxHp: number;
 }
 
+// Legacy + Kiln (kiln-war-2026-06) art paths share one runtime profile per
+// vehicle, so the placement promotes whichever path the ?vehicleArt flag
+// resolves to (kiln in browser, legacy in node/SSR + when opted out).
+const M35_TRUCK_PROFILE: GroundVehicleRuntimeProfile = {
+  seats: M35_TRUCK_SEATS,
+  physicsConfig: M35_PHYSICS_CONFIG,
+  maxHp: 420,
+};
+const M113_APC_PROFILE: GroundVehicleRuntimeProfile = {
+  seats: APC_SEATS,
+  physicsConfig: APC_PHYSICS_CONFIG,
+  maxHp: 650,
+};
+
 const GROUND_VEHICLE_RUNTIME_PROFILES: Record<string, GroundVehicleRuntimeProfile> = {
   [GroundVehicleModels.M151_JEEP]: {
     seats: DEFAULT_M151_SEATS,
     physicsConfig: M151_PHYSICS_CONFIG,
     maxHp: M151_MAX_HP,
   },
-  [GroundVehicleModels.M35_TRUCK]: {
-    seats: M35_TRUCK_SEATS,
-    physicsConfig: M35_PHYSICS_CONFIG,
-    maxHp: 420,
-  },
-  [GroundVehicleModels.ZIL_157]: {
-    seats: M35_TRUCK_SEATS,
-    physicsConfig: M35_PHYSICS_CONFIG,
-    maxHp: 420,
-  },
-  [GroundVehicleModels.M113_APC]: {
-    seats: APC_SEATS,
-    physicsConfig: APC_PHYSICS_CONFIG,
-    maxHp: 650,
-  },
+  [GroundVehicleModels.M35_TRUCK]: M35_TRUCK_PROFILE,
+  [GroundVehicleModels.M35_DEUCE_A_HALF]: M35_TRUCK_PROFILE,
+  // ZIL-157 reuses the wheeled-truck profile.
+  [GroundVehicleModels.ZIL_157]: M35_TRUCK_PROFILE,
+  [GroundVehicleModels.ZIL_157_SIX_WHEEL]: M35_TRUCK_PROFILE,
+  [GroundVehicleModels.M113_APC]: M113_APC_PROFILE,
+  [GroundVehicleModels.M113_ARMORED_PERSONNEL_CARRIER]: M113_APC_PROFILE,
 };
 
 export function isM151ModelPath(modelPath: string): boolean {

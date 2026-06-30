@@ -1,0 +1,16 @@
+{
+  "slug": "m16a1-2",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m16a1-2.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.678Z",
+  "sourcePrompt": "An M16A1, the standard US infantry rifle of the Vietnam War, about a meter long and lying level. A slim straight-line rifle: a triangular front sight tower above the muzzle, a fixed carry handle housing the rear sight, ribbed cylindrical handguards around a thin barrel, a magazine curving slightly forward below the receiver, a pistol grip, and a solid. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation 6c78b400-eb78-46fc-8327-a431103926f6",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

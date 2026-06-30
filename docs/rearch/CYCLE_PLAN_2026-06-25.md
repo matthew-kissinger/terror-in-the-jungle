@@ -10,9 +10,9 @@ LEGEND
 
 RECOMMENDED DISPATCH ORDER
   1. C1 r185-upgrade-land        -> ship now, unblocks measurement on a current engine
-  2. C2 asset-pack-regen         -> START IN PARALLEL (owner generates while C1 lands)
+  2. C2 war-asset-import-refine  -> GEN DONE; refine loop + import. Cut over FIRST.
   3. C3 dead-asset-purge         -> parallel with C2 (independent cleanup)
-  4. C4 vegetation-foundation    -> after/over C2; R&D spike can start immediately
+  4. C4 vegetation-foundation    -> BUILD parallel w/ C2; cut over SECOND (see DAG)
   5. C5 render-batching-levers   -> AFTER assets are final (measure on real art)
   S.  STANDING TRACKS            -> dropped-frame finish, playtest backlog, hygiene
 
@@ -48,23 +48,27 @@ LESSON  Local `npm install` is lenient on peer deps; CI `npm ci` is strict. A
 
 
 ================================================================================
- CYCLE 2 — cycle-2026-06-25-asset-pack-regen        SIZE: L   dep: none (parallel C1)
+ CYCLE 2 — cycle-2026-06-25-war-asset-import-refine   SIZE: L   dep: none (parallel C1)
+            *** GENERATION PHASE DONE 2026-06-25 — now import & refine ***
 ================================================================================
-OBJECTIVE  Regenerate the 108-asset war catalog in Kiln under ONE locked palette,
-           lift instanceability grades, import through the acceptance standard,
-           re-measure perf against final art.
+OBJECTIVE  Take the 99 Kiln-generated palette-snapped war assets through a
+           refine/re-roll loop, import through the acceptance standard, cut the
+           consumers over, re-baseline perf on final art.
+BRIEF      docs/rearch/WAR_ASSET_IMPORT_REFINE_CYCLE_2026-06-25.md (full plan,
+           phases, consumer cutover, sequencing vs vegetation in §6).
+STATE      99 generated (0 errors), grades 15A/11B/73C, MIGRATED to prod mkvision
+           (private gallery). Refine loop LIVE via kiln-studio/scripts/
+           rerun-failed-refines.ts (re-runs transient-failed refines as admin).
 INPUT      99 reusable sourcePrompts in docs/asset-provenance/repaint-2026-06/.
            Recipe + palette: docs/rearch/ASSET_REGEN_AND_R185_SCAFFOLD_2026-06-25.md
 
-  OWNER TRACK (Kiln Studio — kilnstudio.tools / local dev)
-  [!] T1  Define + lock "Vietnam War" palette (9 slots) via POST /api/palettes (O)
-  [!] T2  Batch-generate via flat /api/generate loop w/ paletteId (no 40-cap)  (O)
-            Wave A: 10 REJECTs (sandbag-wall 48k, helipad 41k, bunkers, wire...)
-            Wave B: worst material count (aid-station 19, generator-shed 17,
-                    warehouse/shophouse 14-15, tea-house/rice-mill 13)
-            Wave C: remaining structures + buildings
-            Wave D: weapons (watch 1500-tri budget) + ground/aircraft (joints!)
-            Wave E: boats (dormant) + animals (Kiln weakest — consider sourcing)
+  OWNER + REFINE TRACK (Kiln Studio — done generating; now reviewing)
+  [x] T1  "Vietnam War" palette locked; 99 assets generated (0 errors)         (O)
+  [x] T2  Migrated to prod mkvision gallery (private) for review               (E)
+  [~] T2b Refine loop: rerun failed refines (transient 503s) + owner re-rolls  (O/E)
+            tool: kiln-studio/scripts/rerun-failed-refines.ts --since <date> --apply
+            owner deliverable: docs/REROLL_REQUESTS.md (over-budget weapons,
+            bad wildlife, any hero C-grade worth lifting)
 
   ENGINEERING TRACK
   [ ] T3  Verify/harden assets:import-war-catalog for the new batch            (E)
@@ -105,6 +109,14 @@ OBJECTIVE  Replace the single-palm flora with a Vietnam jungle set that looks
            right AND instances cheaply (trees + efficient ground cover).
 SPEC       src/config/VietnamVegetationSpecies.ts (banyan hero, teak, rubber rows,
            bamboo, banana, palms, elephant grass, fern, mangrove, rice, vines).
+PLAN       *** STRATEGY A CHOSEN (2026-06-25, $0, cohesion-first) ***
+           docs/rearch/STRATEGY_A_VEGETATION_IMPLEMENTATION_2026-06-25.md (master plan,
+             6 phases, species->source->engine-path map, files touched)
+           docs/rearch/strategy-a-source-manifest.md (download + attribution checklist)
+           docs/rearch/vegetation-asset-report.html (166-candidate interactive matrix)
+           Spine: M02P pack (CC-BY) + EZ-Tree (MIT) + ambientCG CC0 cards + hybrid heroes.
+           Re-bake 6 accepted species from M02P = biggest cohesion win. Banyan = only
+           hard asset (no free game-ready true banyan; decimate CC0 + author roots).
 
   SOURCING (CC0 = repo-safe)
   [ ] T1  Acquire Quaternius Ultimate Stylized Nature + ambientCG leaf atlases  (O)
@@ -166,16 +178,29 @@ NOTE  Each T is independently shippable; dispatch as sub-briefs, not one mega-PR
 ================================================================================
  DEPENDENCY GRAPH (text)
 ================================================================================
-  C1 r185 ---------------------------+--> C5 render levers
-                                     |
-  C2 asset-regen ----(final art)-----+
-        |                            |
-        +--> C4 vegetation (integration)
+  C1 r185 ---------------------------------------+--> C5 render levers
+                                                 |
+  C2 war-asset (import/refine) --(final art)-----+
+        |                                        |
+        +--> C4 vegetation (integration) --------+ (authoritative perf here)
   C3 dead-purge  (independent, anytime)
-  C4 veg spike (anytime) --> C4 integration (after C2 import)
   S1 dropped-frame (independent; rebase first) ; S2 owner (independent)
 
+  C2 (WAR-ASSET) vs C4 (VEGETATION) — SEQUENCING DECISION (2026-06-25):
+    SOFT-SEQUENCE: parallel build, sequenced cutover, ONE final perf.
+    - BUILD in parallel now (different files, both owner-gated):
+        C2 = refine/re-roll loop (Kiln) ; C4 = source M02P + EZ-Tree + bake atlases.
+    - CUTOVER war-assets FIRST (most mature: gen done, only import+cutover left)
+        -> intermediate perf baseline.
+    - CUTOVER vegetation SECOND, on top of finalized war art.
+    - ONE authoritative combat120 + A Shau perf capture AFTER veg (the last art).
+    SHARED SURFACES to coordinate (additive, low-conflict):
+        scripts/import-war-catalog.ts (war GLBs + EZ-Tree tree GLBs)
+        src/config/staticImpostorArchetypes.ts (war vehicles/props + veg hero trees)
+        the perf baseline (don't double-capture; veg capture is the truth)
+    Detail: WAR_ASSET_IMPORT_REFINE_CYCLE_2026-06-25.md §6.
+
   Critical path to "stable + upgraded + measured on real art":
-     C1  ->  C2  ->  (C4 integration | C5)
-  Parallelizable now: C2-owner, C3, C4-sourcing, C4-spike, S1-rebase, S3.
+     C1  ->  C2 build|cutover  ->  C4 build(||)|cutover  ->  perf  ->  C5
+  Parallelizable now: C2-refine, C4-sourcing, C4-spike, C3, S1-rebase, S3.
 ================================================================================

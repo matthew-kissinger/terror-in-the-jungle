@@ -5349,6 +5349,11 @@ async function runCapture(): Promise<void> {
   const disableTerrainFarCanopyTint = parseBooleanFlag('disable-terrain-far-canopy-tint', false);
   const disableTerrainLowSunOcclusion = parseBooleanFlag('disable-terrain-low-sun-occlusion', false);
   const disableWildlife = parseBooleanFlag('disable-wildlife', false);
+  // A/B the GLB canopy hero scatter. In-game default is ON, so this forces a value:
+  //   --veg-heroes off  -> ?vegHeroes=0 (disable, for measuring the hero delta)
+  //   --veg-heroes on   -> ?vegHeroes=1 (force on)
+  //   (absent)          -> no param, game default (ON)
+  const vegHeroesArg = parseStringFlag('veg-heroes', '');
   const vegetationDensityScaleArg = parseNumberFlag('vegetation-density-scale', Number.NaN);
   const vegetationDensityScale = Number.isFinite(vegetationDensityScaleArg)
     ? Math.max(0, Math.min(1, vegetationDensityScaleArg))
@@ -5488,7 +5493,12 @@ async function runCapture(): Promise<void> {
   const vegetationDensityScaleQuery = vegetationDensityScale !== null
     ? `&perfVegetationDensityScale=${vegetationDensityScale}`
     : '';
-  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainFullShadowPassQuery}${terrainForceInstanceUploadQuery}${terrainHeightAwareFrustumQuery}${disableTerrainHeightAwareFrustumQuery}${terrainFullSkirtsQuery}${terrainSparseSkirtsQuery}${disableTerrainSkirtsQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}${vegetationDensityScaleQuery}`;
+  const vegHeroesQuery = /^(0|off|false)$/i.test(vegHeroesArg)
+    ? '&vegHeroes=0'
+    : /^(1|on|true)$/i.test(vegHeroesArg)
+      ? '&vegHeroes=1'
+      : '';
+  const perfRuntimeQuery = `${matchDurationQuery}${disableVictoryQuery}${disableNpcCloseModelsQuery}${disableTerrainShadowsQuery}${boundedTerrainShadowPassQuery}${terrainFullShadowPassQuery}${terrainForceInstanceUploadQuery}${terrainHeightAwareFrustumQuery}${disableTerrainHeightAwareFrustumQuery}${terrainFullSkirtsQuery}${terrainSparseSkirtsQuery}${disableTerrainSkirtsQuery}${disableTerrainFarCanopyTintQuery}${disableTerrainLowSunOcclusionQuery}${disableWildlifeQuery}${vegetationDensityScaleQuery}${vegHeroesQuery}`;
   const query = sandboxMode
     ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`
     : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${rendererQuery}${seedQuery}${gpuTimingQuery}${perfRuntimeQuery}`;

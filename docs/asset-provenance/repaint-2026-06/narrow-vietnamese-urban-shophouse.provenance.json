@@ -1,0 +1,16 @@
+{
+  "slug": "narrow-vietnamese-urban-shophouse",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/narrow-vietnamese-urban-shophouse.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.226Z",
+  "sourcePrompt": "A narrow Vietnamese urban shophouse of Saigon or Da Nang, French-colonial in flavor: about four meters wide but two tall stories, made for a tight street. An open shopfront at street level under a horizontal signboard, tall shuttered windows and a small railed balcony above, stucco walls with simple cornice lines, and a shallow clay-tile. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation b0d19366-796d-4ff8-a68f-a596948cbf61",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

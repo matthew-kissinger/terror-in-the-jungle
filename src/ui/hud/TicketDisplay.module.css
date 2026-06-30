@@ -12,14 +12,26 @@
 .container {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: var(--space-3);
   padding: var(--space-1) var(--space-4);
+  /* Pin the height so toggling the bleed arrow / TDM header or a digit-count
+   * change never reflows the widget (stable-dimensions per UI guidance). */
+  min-height: 3.75rem;
+  box-sizing: border-box;
   user-select: none;
   pointer-events: none;
   background: rgba(43, 38, 32, 0.78);
   backdrop-filter: blur(4px);
   border-radius: var(--r);
   border: 1px solid rgba(231, 217, 186, 0.4);
+}
+
+/* Reserve a stable 3-row column (label + count + bleed) on both factions so the
+ * bleed arrow appearing/clearing never changes the widget height. */
+.faction {
+  min-height: 3rem;
+  justify-content: center;
 }
 
 .faction {

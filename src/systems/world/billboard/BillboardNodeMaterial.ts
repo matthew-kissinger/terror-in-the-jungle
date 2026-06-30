@@ -89,9 +89,9 @@ export const RIG_HEMI_UP_SKY_WEIGHT = 0.95;
 
 const DEFAULT_BILLBOARD_FOG_DENSITY = 0.00055;
 const BILLBOARD_ALPHA_TEST = 0.25;
-const HUMID_JUNGLE_VEGETATION_TINT = { r: 0.72, g: 0.82, b: 0.58 } as const;
-const HUMID_JUNGLE_VEGETATION_SATURATION = 0.58;
-const HUMID_JUNGLE_VEGETATION_EXPOSURE = 0.82;
+export const HUMID_JUNGLE_VEGETATION_TINT = { r: 0.72, g: 0.82, b: 0.58 } as const;
+export const HUMID_JUNGLE_VEGETATION_SATURATION = 0.58;
+export const HUMID_JUNGLE_VEGETATION_EXPOSURE = 0.82;
 const HUMID_JUNGLE_MAX_VEGETATION_LIGHT = 0.78;
 
 const clampValue = (value: number, min: number, max: number): number => (

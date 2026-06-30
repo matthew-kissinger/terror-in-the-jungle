@@ -1,0 +1,16 @@
+{
+  "slug": "field-latrine",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/field-latrine.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.950Z",
+  "sourcePrompt": "A field latrine, a narrow standalone privy about two and a half meters tall. An upright shed of rough vertical planks under a single-slope corrugated-tin roof, a plank door on strap hinges with a gap at top and bottom, and a thin vent pipe rising up one back corner. Sun-grayed wood and rusty tin, humble and necessary. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation d605f22b-38bf-40b5-8d50-1344ab151742",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

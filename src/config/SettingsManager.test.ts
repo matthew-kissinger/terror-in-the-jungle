@@ -24,6 +24,10 @@ describe('SettingsManager', () => {
     const sm = SettingsManager.getInstance();
     expect(sm.get('masterVolume')).toBe(70);
     expect(sm.get('mouseSensitivity')).toBe(5);
+    expect(sm.get('ambientVolume')).toBe(100);
+    expect(sm.get('musicVolume')).toBe(50);
+    // Radio music ships OFF (no cellular auto-download on touch).
+    expect(sm.get('musicEnabled')).toBe(false);
     expect(sm.get('controllerPreset')).toBe('default');
     expect(sm.get('controllerDpadMode')).toBe('weapons');
     expect(sm.get('showFPS')).toBe(false);
@@ -96,11 +100,25 @@ describe('SettingsManager', () => {
     expect(sm.getMasterVolumeNormalized()).toBe(1);
   });
 
+  it('should normalize ambient and music volume to 0-1 range', () => {
+    const sm = SettingsManager.getInstance();
+    expect(sm.getAmbientVolumeNormalized()).toBe(1);
+    expect(sm.getMusicVolumeNormalized()).toBeCloseTo(0.5);
+
+    sm.set('ambientVolume', 0);
+    sm.set('musicVolume', 100);
+    expect(sm.getAmbientVolumeNormalized()).toBe(0);
+    expect(sm.getMusicVolumeNormalized()).toBe(1);
+  });
+
   it('should return all settings via getAll', () => {
     const sm = SettingsManager.getInstance();
     const all = sm.getAll();
     expect(all).toEqual({
       masterVolume: 70,
+      ambientVolume: 100,
+      musicVolume: 50,
+      musicEnabled: false,
       mouseSensitivity: 5,
       touchSensitivity: 3,
       controllerPreset: 'default',

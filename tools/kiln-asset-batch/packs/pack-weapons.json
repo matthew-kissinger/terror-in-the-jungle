@@ -1,0 +1,84 @@
+{
+  "plan": {
+    "name": "Vietnam Weapons",
+    "prompt": "Vietnam-war infantry small arms and heavy weapons, low-poly game-ready, one shared palette.",
+    "paletteId": "vietnam-war",
+    "items": [
+      {
+        "prompt": "An AK-47, the iconic rifle of the NVA and Viet Cong, just under a meter long and lying level. A rugged rifle with a deep banana magazine curving down from the middle, a warm reddish-brown wood handguard, pistol grip and buttstock, a gas tube riding above the barrel, a front sight post, and a slanted muzzle cut. Blued steel and weathered wood, purposeful. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M57 \"clicker\", the handheld firing device for a Claymore mine, small enough to disappear in a fist at about ten centimeters. An olive-drab plastic squeeze-grip detonator shaped like a stubby stapler, with a folding wire safety bail over the lever and a thin firing-wire pigtail with a small connector trailing from one end. Olive-drab plastic, small. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A Dragunov SVD sniper rifle, the NVA designated-marksman weapon, about one point two meters long and noticeably slender. A long thin barrel with a slotted flash hider, a skeletonized wooden thumbhole stock with an open cut-out, a short curved magazine, and a long telescopic scope riding above the receiver on a side mount. Reddish wood and blued steel. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An Ithaca 37 pump-action 12-gauge shotgun, the close-quarters \"Tunnel Rat\" weapon, about a meter long. A compact shotgun with a tubular magazine running under the barrel, a grooved wooden pump slide wrapped around that tube, a plain walnut buttstock, a small bead front sight, and a clean receiver with the ejection port underneath. Walnut wood and blued. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A USMC KA-BAR fighting knife, about thirty centimeters end to end. A classic combat knife: a long clip-point blade with a shallow fuller groove, a small oval steel crossguard, a stacked leather-washer handle with fine ring ridges, and a flat steel pommel cap. Dark parkerized blade, warm brown leather grip, simple and timeless. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M14 battle rifle, early-war US issue, about one point one meters long and traditional in profile. A full-length rifle with a one-piece walnut stock and handguard running most of its length, a long barrel ending in a slotted flash suppressor, a twenty-round box magazine below the receiver, and iron sights front and rear. Walnut wood and parkerized steel. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M16A1, the standard US infantry rifle of the Vietnam War, about a meter long and lying level. A slim straight-line rifle: a triangular front sight tower above the muzzle, a fixed carry handle housing the rear sight, ribbed cylindrical handguards around a thin barrel, a magazine curving slightly forward below the receiver, a pistol grip, and a solid. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M1911A1 Colt .45 pistol, the US officer sidearm, about twenty-five centimeters long. A compact semi-automatic handgun with a slab-sided slide over a short barrel, a hammer at the rear, a curved grip with checkered walnut panels raked back from the trigger guard, and a flat single-stack magazine base at the heel. Blued and parkerized steel, classic. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M2 Browning .50 caliber \"Ma Deuce\" heavy machine gun mounted low on its ground tripod. A massive boxy receiver feeding a thick barrel inside a perforated jacket, more than one and a half meters of gun, with big spade grips and a butterfly trigger at the rear, sitting on a splayed three-legged tripod whose front legs reach forward. Gunmetal gray, brutally. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M3A1 \"Grease Gun\" .45 submachine gun issued to US armored crews, about three quarters of a meter with its wire stock extended. A crude stamped-steel cylindrical body like a mechanic's grease gun, a stubby barrel, a long straight box magazine hanging from the underside, a simple pistol grip, and a thin collapsible wire shoulder stock of two parallel rods.. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M60 \"The Pig\" general-purpose machine gun, about one point one meters long and heavy in profile. A long machine gun with a perforated barrel shroud, a folding bipod spread at the front, a flat top-mounted feed cover, a carry handle, a pistol grip and a fixed shoulder stock; a short belt of linked brass ammunition drapes from the open feed tray. Black. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An M79 \"Thumper\" 40mm grenade launcher, a stubby single-shot weapon about seventy centimeters long, like an oversized sawn-off shotgun. A short fat smoothbore barrel, hinged open-and-shut at a wide break-action breech, a wooden fore-end under the barrel, a wooden shoulder stock, and a tall flip-up leaf sight near the breech. Walnut wood and dark blued. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An RPD light machine gun, an NVA belt-fed squad automatic, just over a meter long. A wood-stocked machine gun with a long plain barrel, a folding bipod at the muzzle, a wooden buttstock, pistol grip and fore-grip, and its signature round sheet-metal drum hanging centered beneath the receiver carrying the belt. Wood furniture and blued steel, low-slung. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An RPG-7, the NVA and VC shoulder-fired anti-armor launcher, about a meter of tube with a pointed rocket adding another third. A straight launch tube flaring into a wide blast cone at the rear, a bulbous wooden heat shield wrapping the middle, a pistol grip and trigger underneath, iron sights on top, and a teardrop-shaped rocket grenade seated. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An SKS carbine, early-war NVA and VC issue, just over a meter long. A trim wood-stocked rifle with a fixed shallow magazine ahead of the trigger guard, a long barrel with a hooded front sight, and a folding spike bayonet stowed flat under the muzzle end. Warm honey-toned wood over blued steel, simple, slender and classic. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      }
+    ]
+  }
+}

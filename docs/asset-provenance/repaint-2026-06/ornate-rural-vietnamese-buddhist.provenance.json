@@ -1,0 +1,16 @@
+{
+  "slug": "ornate-rural-vietnamese-buddhist",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/ornate-rural-vietnamese-buddhist.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.133Z",
+  "sourcePrompt": "An ornate rural Vietnamese Buddhist temple hall, about twelve meters wide and grander than a village pagoda. A broad timber hall under a sweeping two-tier roof whose ridges curl up into carved dragon finials, deep eaves over a colonnade of red-and-gold columns, full-width entrance steps rising to triple doorways, and carved lintels. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation d042fd7d-a245-4ab6-a46d-705119b6ba00",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

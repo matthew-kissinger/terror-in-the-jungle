@@ -1,15 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { applyM151JeepGlbVisual, applyM48TankGlbVisual } from './VehicleGlbVisuals';
+import { applyM151JeepGlbVisual, applyM48TankGlbVisual, applyT54TankGlbVisual, vehicleArtMode } from './VehicleGlbVisuals';
 import type { TurretRigSource, VehicleModelLoader } from './VehicleGlbVisuals';
 import { buildM151JeepMesh } from './M151JeepSpawn';
 import { buildM48ChassisMesh } from './M48TankSpawn';
+import { buildT54ChassisMesh } from './T54TankSpawn';
 
 function loaderResolving(glb: THREE.Group): VehicleModelLoader {
   return { loadModel: () => Promise.resolve(glb) };
+}
+
+/** Loader that records every requested model path so art-mode routing is provable. */
+function capturingLoader(glb: THREE.Group): { loader: VehicleModelLoader; requested: string[] } {
+  const requested: string[] = [];
+  return {
+    loader: {
+      loadModel: (path: string) => {
+        requested.push(path);
+        return Promise.resolve(glb);
+      },
+    },
+    requested,
+  };
 }
 
 const failingLoader: VehicleModelLoader = {
@@ -96,6 +111,29 @@ function fakeTurretRig(): { rig: TurretRigSource; yawNode: THREE.Object3D; pitch
   return { rig, yawNode, pitchNode };
 }
 
+/** Sibling of `fakeTurretRig` with the T-54 procedural mesh-name set. */
+function fakeT54TurretRig(): { rig: TurretRigSource; yawNode: THREE.Object3D; pitchNode: THREE.Object3D } {
+  const yawNode = new THREE.Object3D();
+  yawNode.position.set(0, 1.7, 0);
+  const pitchNode = new THREE.Object3D();
+  pitchNode.position.set(0, 0.45, -0.3);
+  yawNode.add(pitchNode);
+  for (const name of ['t54_turret', 't54_turret_ring', 't54_cupola']) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    m.name = name;
+    yawNode.add(m);
+  }
+  for (const name of ['t54_mantlet', 't54_barrel', 't54_muzzle_brake']) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    m.name = name;
+    pitchNode.add(m);
+  }
+  const rig: TurretRigSource = {
+    getTurret: () => ({ getYawNode: () => yawNode, getPitchNode: () => pitchNode }),
+  };
+  return { rig, yawNode, pitchNode };
+}
+
 /** Forward direction of the barrel (gun pivot -> muzzle) in chassis frame. */
 function barrelForward(chassisRoot: THREE.Object3D, gun: THREE.Object3D, muzzle: THREE.Object3D): THREE.Vector3 {
   chassisRoot.updateWorldMatrix(false, true);
@@ -114,7 +152,64 @@ function collectMeshes(root: THREE.Object3D): THREE.Mesh[] {
   return meshes;
 }
 
+describe('vehicleArtMode kill-switch', () => {
+  type WindowHost = { window?: unknown };
+  const host = globalThis as unknown as WindowHost;
+  const original = host.window;
+
+  afterEach(() => {
+    if (original === undefined) delete host.window;
+    else host.window = original;
+  });
+
+  it('defaults to the Kiln art in a browser', () => {
+    host.window = { location: { search: '' } };
+    expect(vehicleArtMode()).toBe('kiln');
+  });
+
+  it('honours ?vehicleArt=legacy', () => {
+    host.window = { location: { search: '?vehicleArt=legacy' } };
+    expect(vehicleArtMode()).toBe('legacy');
+  });
+
+  it('honours an explicit window.__vehicleArt override', () => {
+    host.window = { location: { search: '' }, __vehicleArt: 'legacy' };
+    expect(vehicleArtMode()).toBe('legacy');
+  });
+
+  it('resolves to legacy with no window (headless / node)', () => {
+    delete host.window;
+    expect(vehicleArtMode()).toBe('legacy');
+  });
+});
+
 describe('applyM151JeepGlbVisual', () => {
+  it('loads the Kiln MUTT GLB scaled up under kiln art', async () => {
+    const root = buildM151JeepMesh();
+    const glb = new THREE.Group();
+    glb.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 3), new THREE.MeshStandardMaterial()));
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM151JeepGlbVisual(root, loader, 'kiln');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('m151-mutt');
+    expect(glb.scale.x).toBeCloseTo(1.32);
+  });
+
+  it('loads the legacy jeep GLB at the tuned legacy scale under legacy art', async () => {
+    const root = buildM151JeepMesh();
+    const glb = new THREE.Group();
+    glb.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 3), new THREE.MeshStandardMaterial()));
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM151JeepGlbVisual(root, loader, 'legacy');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('m151-jeep');
+    expect(glb.scale.x).toBeCloseTo(1.15);
+  });
+
   it('replaces the procedural meshes with the GLB and enables shadows', async () => {
     const root = buildM151JeepMesh();
     const glb = new THREE.Group();
@@ -171,6 +266,32 @@ describe('applyM151JeepGlbVisual', () => {
 });
 
 describe('applyM48TankGlbVisual', () => {
+  it('loads the Kiln Patton main-battle GLB under kiln art', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig } = fakeTurretRig();
+    const { glb } = fakeM48Glb();
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM48TankGlbVisual(root, rig, loader, 'kiln');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('m48-patton-main-battle');
+  });
+
+  it('loads the legacy Patton GLB under legacy art', async () => {
+    const root = buildM48ChassisMesh();
+    const { rig } = fakeTurretRig();
+    const { glb } = fakeM48Glb();
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyM48TankGlbVisual(root, rig, loader, 'legacy');
+
+    expect(ok).toBe(true);
+    // Legacy path is the bare m48-patton.glb, not the kiln main-battle variant.
+    expect(requested[0]).toContain('m48-patton.glb');
+    expect(requested[0]).not.toContain('main-battle');
+  });
+
   it('splits the GLB across chassis root + turret rig nodes', async () => {
     const root = buildM48ChassisMesh();
     const { rig, yawNode, pitchNode } = fakeTurretRig();
@@ -300,6 +421,91 @@ describe('applyM48TankGlbVisual', () => {
     const before = root.children.length;
 
     const ok = await applyM48TankGlbVisual(root, rig, failingLoader);
+
+    expect(ok).toBe(false);
+    expect(root.children).toHaveLength(before);
+  });
+});
+
+describe('applyT54TankGlbVisual', () => {
+  it('loads the Kiln T-54 main-battle GLB under kiln art', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const { glb } = fakeM48Glb(); // generic Joint_Turret / Joint_MainGun articulated GLB
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyT54TankGlbVisual(root, rig, loader, 'kiln');
+
+    expect(ok).toBe(true);
+    expect(requested[0]).toContain('t-54-main-battle');
+  });
+
+  it('loads the legacy jointless T-54 GLB under legacy art', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const { glb } = fakeM48Glb();
+    const { loader, requested } = capturingLoader(glb);
+
+    const ok = await applyT54TankGlbVisual(root, rig, loader, 'legacy');
+
+    expect(ok).toBe(true);
+    // Legacy path is the bare t54-tank.glb, not the kiln main-battle variant.
+    expect(requested[0]).toContain('t54-tank.glb');
+    expect(requested[0]).not.toContain('main-battle');
+  });
+
+  it('splits the GLB across chassis root + turret rig nodes and strips the t54 procedural parts', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeT54TurretRig();
+    const { glb, turret, gun } = fakeM48Glb();
+
+    const ok = await applyT54TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    expect(root.children).toContain(glb);
+    expect(root.children.filter((c) => (c as THREE.Mesh).isMesh)).toHaveLength(0);
+    expect(turret.parent).toBe(yawNode);
+    expect(gun.parent).toBe(pitchNode);
+    expect(yawNode.getObjectByName('t54_turret')).toBeUndefined();
+    expect(pitchNode.getObjectByName('t54_barrel')).toBeUndefined();
+    // T-54-specific draw-call userData keys (proves the spec parameterization).
+    expect(glb.userData.t54HullDrawCallOptimization).toMatchObject({ sourceMeshCount: 2, mergedMeshCount: 1 });
+    expect(turret.userData.t54TurretDrawCallOptimization).toMatchObject({ sourceMeshCount: 2, mergedMeshCount: 1 });
+    expect(gun.userData.t54GunDrawCallOptimization).toMatchObject({ sourceMeshCount: 2, mergedMeshCount: 1 });
+  });
+
+  it('keeps the barrel pointing down-bore after re-seating past the axis wrapper', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const { glb, gun, muzzle } = fakeM48Glb();
+
+    const ok = await applyT54TankGlbVisual(root, rig, loaderResolving(glb));
+
+    expect(ok).toBe(true);
+    const forward = barrelForward(root, gun, muzzle);
+    expect(forward.dot(new THREE.Vector3(0, 0, -1))).toBeGreaterThan(0.99);
+  });
+
+  it('keeps every procedural mesh when the GLB lacks the turret joints (legacy jointless art)', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig, yawNode, pitchNode } = fakeT54TurretRig();
+    const before = root.children.length;
+    const bareGlb = new THREE.Group(); // no Joint_Turret / Joint_MainGun, as t54-tank.glb
+
+    const ok = await applyT54TankGlbVisual(root, rig, loaderResolving(bareGlb));
+
+    expect(ok).toBe(false);
+    expect(root.children).toHaveLength(before);
+    expect(yawNode.getObjectByName('t54_turret')).toBeDefined();
+    expect(pitchNode.getObjectByName('t54_barrel')).toBeDefined();
+  });
+
+  it('keeps the procedural mesh when the load fails', async () => {
+    const root = buildT54ChassisMesh();
+    const { rig } = fakeT54TurretRig();
+    const before = root.children.length;
+
+    const ok = await applyT54TankGlbVisual(root, rig, failingLoader);
 
     expect(ok).toBe(false);
     expect(root.children).toHaveLength(before);

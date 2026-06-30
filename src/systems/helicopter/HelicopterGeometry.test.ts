@@ -137,15 +137,20 @@ describe('HelicopterGeometry rotor exclusion', () => {
   });
 });
 
-describe('repaint helicopter rotor-joint contract', () => {
+describe('flyable helicopter rotor-joint contract', () => {
   // The static-GLB cutover spins rotors off the importer-grafted pivots, so each
   // flyable rotorcraft must declare a main + tail rotor joint with a spin axis
   // the animation system understands. Without this the airframe silently falls
   // back to synthetic blades (a visible regression), so guard the catalog data.
+  //
+  // The default-shipped art (kiln-war-2026-06): the Kiln UH-1H transport, AH-1G
+  // Cobra, and UH-1C gunship (the UH-1C Kiln GLB is scale-corrected at the
+  // importer via CATALOG_SCALE_FIX). These are exactly the GLBs
+  // `createHelicopterGeometry` loads under the default `__aircraftArt`.
   const slugFor = (path: string) => (path.split('/').pop() ?? path).replace(/\.glb$/i, '');
   const SPINNABLE_AXES = new Set(['x', 'y', 'z']);
 
-  for (const path of [AircraftModels.UH1_HUEY, AircraftModels.UH1C_GUNSHIP, AircraftModels.AH1_COBRA]) {
+  for (const path of [AircraftModels.UH_1H_HUEY_TRANSPORT, AircraftModels.UH_1C_HUEY_GUNSHIP, AircraftModels.AH_1G_COBRA_ATTACK]) {
     const slug = slugFor(path);
 
     it(`${slug} declares a spinnable main + tail rotor joint`, () => {

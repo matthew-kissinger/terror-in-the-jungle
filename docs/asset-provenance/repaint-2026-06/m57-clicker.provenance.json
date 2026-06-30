@@ -1,0 +1,16 @@
+{
+  "slug": "m57-clicker",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/m57-clicker.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.642Z",
+  "sourcePrompt": "An M57 \"clicker\", the handheld firing device for a Claymore mine, small enough to disappear in a fist at about ten centimeters. An olive-drab plastic squeeze-grip detonator shaped like a stubby stapler, with a folding wire safety bail over the lever and a thin firing-wire pigtail with a small connector trailing from one end. Olive-drab plastic, small. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation bcde10e2-d4cd-482c-97e9-8ac031196568",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

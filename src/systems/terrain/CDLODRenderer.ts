@@ -15,6 +15,25 @@ import { TERRAIN_SHADOW_BOUND_FALLBACK_RADIUS_METERS } from './TerrainShadowBoun
 
 type TerrainSkirtMode = 'full' | 'sparse-edge' | 'none';
 
+/**
+ * Hard cap on CDLOD instance-buffer capacity, dictated by WebGPU's 65536-byte
+ * uniform-binding limit (`maxUniformBufferBindingSize`).
+ *
+ * three.js r185's WebGPU instancing (`three.webgpu.js` `instancedMesh()` ->
+ * `createInstanceMatrixNode`) decides between a uniform buffer and an instanced
+ * attribute using the mesh's *live* draw count, but then sizes the uniform from
+ * the *full* allocated `instanceMatrix.array` (capacity x 64 bytes). With a large
+ * capacity and a small live count it wrongly picks the uniform path and uploads
+ * the whole array, so the binding must satisfy `capacity * 64 <= 65536`, i.e.
+ * `capacity <= 1024`. Above that, the bind group is invalid and the terrain (plus
+ * its four edge skirts) silently fails to render under WebGPU while flooding the
+ * console with `bindGroup_object` validation errors. WebGL has no such limit.
+ *
+ * Observed peak selected-tile count is ~89 (open_frontier), so 1024 keeps >10x
+ * headroom while staying within the uniform binding limit on both backends.
+ */
+const WEBGPU_SAFE_MAX_INSTANCES = 1024;
+
 interface TerrainEdgeSkirtSpec {
   bit: TerrainEdgeSkirtBit;
   name: string;
@@ -131,9 +150,12 @@ export class CDLODRenderer {
   constructor(
     material: THREE.Material,
     tileResolution: number,
-    maxInstances = 2048,
+    maxInstances = WEBGPU_SAFE_MAX_INSTANCES,
   ) {
-    this.maxInstances = maxInstances;
+    // Clamp to the WebGPU-safe ceiling even if a caller over-requests: a larger
+    // instance buffer would invalidate the bind group under WebGPU (see
+    // WEBGPU_SAFE_MAX_INSTANCES) and make the terrain disappear.
+    this.maxInstances = Math.min(maxInstances, WEBGPU_SAFE_MAX_INSTANCES);
 
     // Shared base geometry: a flat XZ plane with 1x1 dimensions. Production
     // keeps seam-cover skirts adaptive and edge-only, driven by the quadtree's
@@ -282,13 +304,15 @@ export class CDLODRenderer {
     const tileSize = Math.fround(tile.size);
     const lodLevel = Math.fround(tile.lodLevel);
 
-    // Keep matrix and tileParams0 coherent. The vertex node combines both:
-    // matrix supplies rendered XZ placement while tileParams0 supplies the
-    // world-space heightmap sample. Sparse uploads can leave one buffer newer
-    // than the other on renderer backends, which manifests as terrain bands
-    // or inverted/see-through CDLOD tiles.
-    this._matrix.makeScale(tileSize, 1, tileSize);
-    this._matrix.setPosition(tileX, 0, tileZ);
+    // Identity instance matrix. The terrain position node derives every tile's
+    // world XZ placement from the tileParams0 attribute (tileCenterX/Z + tileSize),
+    // NOT from the InstancedMesh matrix: three.js r185's WebGPU backend routes a
+    // small-live-count InstancedMesh matrix through a per-object UNIFORM buffer that
+    // is not applied for this mesh, collapsing all tiles to the world origin so the
+    // terrain renders invisible (it worked on r184, which used the instanced-
+    // attribute path). tileParams0 is an instanced ATTRIBUTE, which both backends
+    // apply correctly, so placement and the heightmap sample stay coherent there.
+    this._matrix.identity();
     this.mesh.setMatrixAt(index, this._matrix);
 
     const morphFactor = Math.fround(tile.morphFactor);
@@ -343,8 +367,10 @@ export class CDLODRenderer {
     const morphFactor = Math.fround(tile.morphFactor);
     const edgeMorphMask = Math.fround(Number(tile.edgeMorphMask ?? 0));
 
-    this._matrix.makeScale(tileSize, 1, tileSize);
-    this._matrix.setPosition(tileX, 0, tileZ);
+    // Identity instance matrix — tile placement is driven entirely by the
+    // tileParams0 attribute in the terrain position node. See writeTileInstance
+    // for why the instance matrix is not used (r185 WebGPU instance-matrix bug).
+    this._matrix.identity();
     mesh.setMatrixAt(index, this._matrix);
 
     this.writeTileParams(

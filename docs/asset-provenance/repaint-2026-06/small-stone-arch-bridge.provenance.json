@@ -1,0 +1,16 @@
+{
+  "slug": "small-stone-arch-bridge",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/small-stone-arch-bridge.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.131Z",
+  "sourcePrompt": "A small stone arch bridge over a canal, about eight meters end to end. A single low masonry arch of fitted gray stone blocks springs between squat abutments, carrying a gently humped walking deck, with low solid stone parapet walls along both edges that step down at the ends. Moss-darkened weathered stone, old, heavy and permanent. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 7d78dbd2-2e49-49f7-847b-a8c16fae2056",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

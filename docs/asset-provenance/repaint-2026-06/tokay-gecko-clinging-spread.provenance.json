@@ -1,0 +1,16 @@
+{
+  "slug": "tokay-gecko-clinging-spread",
+  "class": "animals",
+  "action": "new",
+  "tijTarget": "animals/kiln-war-2026-06/tokay-gecko-clinging-spread.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.763Z",
+  "sourcePrompt": "A tokay gecko clinging spread-eagled to a surface, about twenty-five centimeters long. A chunky gecko with broad toe-padded feet splayed wide, a thick body and tapered tail, a wide blunt head with big lidless gold-ringed eyes, the skin pebbled with fine bumps. Blue-gray ground color dotted boldly with bright orange spots, vivid and alert. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation abe766ce-c5c5-439d-8ad2-73ced8978599",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

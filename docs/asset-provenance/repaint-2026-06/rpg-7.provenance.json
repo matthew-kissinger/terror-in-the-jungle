@@ -1,0 +1,18 @@
+{
+  "slug": "rpg-7",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/rpg-7.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.730Z",
+  "sourcePrompt": "An RPG-7, the NVA and VC shoulder-fired anti-armor launcher, about a meter of tube with a pointed rocket adding another third. A straight launch tube flaring into a wide blast cone at the rear, a bulbous wooden heat shield wrapping the middle, a pistol grip and trigger underneath, iron sights on top, and a teardrop-shaped rocket grenade seated. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation c9197a56-615f-4f23-bf78-ae96ef354d7f",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "1980 tris over 1,500 weapon budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

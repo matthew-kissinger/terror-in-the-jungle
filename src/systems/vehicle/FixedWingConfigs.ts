@@ -11,6 +11,7 @@
 
 import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
 import type { WarAssetEntry } from '../assets/modelPaths';
+import { isAircraftArtLegacy } from '../../config/aircraftArt';
 
 export interface FixedWingPhysicsConfig {
   mass: number; // kg
@@ -121,12 +122,26 @@ export interface FixedWingDisplayInfo {
   modelYawOffset?: number;
 }
 
-/** Config key -> war-asset catalog slug (the catalog owns measured dims + joints). */
-const FIXED_WING_CATALOG_SLUG: Record<string, string> = {
-  A1_SKYRAIDER: 'a1-skyraider',
-  AC47_SPOOKY: 'ac47-spooky',
-  F4_PHANTOM: 'f4-phantom',
-};
+/**
+ * Config key -> war-asset catalog slug (the catalog owns measured dims + joints).
+ *
+ * Flag-selected at module-init by the Kiln-art kill-switch: the default Kiln
+ * slugs resolve the new kiln-war-2026-06 GLBs' dims + grafted prop joints;
+ * `?aircraftArt=legacy` restores the prior cycle-2026-06-11 repaint slugs so the
+ * catalog entry matches whichever GLB the airfield/visual layer actually loads
+ * (keeping prop-hub joint names in sync with the loaded mesh).
+ */
+const FIXED_WING_CATALOG_SLUG: Record<string, string> = isAircraftArtLegacy()
+  ? {
+      A1_SKYRAIDER: 'a1-skyraider',
+      AC47_SPOOKY: 'ac47-spooky',
+      F4_PHANTOM: 'f4-phantom',
+    }
+  : {
+      A1_SKYRAIDER: 'a-1-skyraider-spad',
+      AC47_SPOOKY: 'ac-47-spooky-gunship',
+      F4_PHANTOM: 'f-4-phantom-ii',
+    };
 
 /** Resolve the war-asset catalog entry for a fixed-wing config key. */
 export function getFixedWingCatalogEntry(key: string): WarAssetEntry | null {
@@ -159,8 +174,9 @@ const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     propellerNodes: A1_PROPS.nodes,
     propellerSpinAxis: A1_PROPS.axis,
     autoLevelDefault: true,
-    // Camera distances kept in step with the re-banded FixedWingCameraFit table.
-    cameraDistance: 32,
+    // Camera distances kept in step with the re-banded FixedWingCameraFit table
+    // (Kiln spans: A-1 13.42 m, F-4 14.12 m, AC-47 28.4 m).
+    cameraDistance: 30,
     cameraHeight: 8,
     fovWidenEnabled: false,
     seats: 1,
@@ -171,7 +187,7 @@ const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     propellerNodes: AC47_PROPS.nodes,
     propellerSpinAxis: AC47_PROPS.axis,
     autoLevelDefault: true,
-    cameraDistance: 48,
+    cameraDistance: 50,
     cameraHeight: 13,
     fovWidenEnabled: false,
     seats: 2,
@@ -182,7 +198,7 @@ const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     propellerNodes: [],
     propellerSpinAxis: 'z',
     autoLevelDefault: true,
-    cameraDistance: 40,
+    cameraDistance: 36,
     cameraHeight: 9,
     fovWidenEnabled: true,
     seats: 1,
@@ -242,10 +258,12 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 8.0,
       rollingResistance: 0.017,
       brakeDeceleration: 12,
-      // Re-banded after the AC-47 prop-graft fix: the misplaced propeller
-      // assemblies no longer define the ground contact. Parked clearance seats
-      // the actual landing gear/tailwheel against the runway.
-      gearClearance: 0.07,
+      // Re-banded to the Kiln AC-47 catalog dims (kiln-war-2026-06): the GLB
+      // bottoms out 0.24 m below model origin (minY -0.24), so parked clearance
+      // seats the landing gear/tailwheel against the runway. The
+      // `?aircraftArt=legacy` escape hatch reuses this Kiln-tuned value on the
+      // legacy GLB (best-effort; a small parked-height drift is cosmetic).
+      gearClearance: 0.24,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 11,
       groundEffectStrength: 0.22,
@@ -306,10 +324,11 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 8.8,
       rollingResistance: 0.015,
       brakeDeceleration: 18,
-      // Re-banded to the repaint F-4 catalog dims (cycle-2026-06-11): the
-      // longer 18.82 m airframe seats its gear 0.1 m below model origin
-      // (minY -0.1). The old 0.5 was tuned to the 14.2 m undersized model.
-      gearClearance: 0.1,
+      // Re-banded to the Kiln F-4 catalog dims (kiln-war-2026-06): the GLB seats
+      // its lowest mesh at model origin (minY 0), so no origin lift is needed.
+      // The `?aircraftArt=legacy` escape hatch reuses this on the legacy GLB
+      // (best-effort; a small parked-height drift is cosmetic).
+      gearClearance: 0.0,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 10,
       groundEffectStrength: 0.14,
@@ -317,6 +336,10 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
     role: 'fighter',
     pilotProfile: 'fast_jet',
     operation: {
+      // Rechecked for the Kiln F-4 (length 14.12 m vs the legacy 18.82 m):
+      // ground roll is physics-driven (Vr 68 m/s, T/W from 155 kN @ 18 t →
+      // ~270 m to rotate), not airframe-length-driven, so the shorter Kiln model
+      // does not shorten the requirement. 420 m holds with margin.
       minimumRunwayLength: 420,
       preferredSpawnMode: 'parked',
       playerFlow: 'runway',
@@ -379,11 +402,13 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 7.4,
       rollingResistance: 0.014,
       brakeDeceleration: 14,
-      // Re-banded to the repaint A-1 catalog dims (cycle-2026-06-11): the GLB
-      // bottoms out 0.24 m below model origin (minY -0.24), so the parked
-      // origin sits 0.24 m over the ground to seat the gear. The prop tips
-      // clear: the 12.51 m-long airframe's hub is well above this offset.
-      gearClearance: 0.24,
+      // Re-banded to the Kiln A-1 catalog dims after the re-roll (f8c3518c):
+      // the GLB bottoms out 0.06 m below model origin (catalog minY -0.06), so
+      // the parked origin sits 0.06 m over the ground to seat the gear with its
+      // lowest mesh point exactly on the runway. The `?aircraftArt=legacy`
+      // escape hatch reuses this on the legacy GLB (best-effort; a small parked-
+      // height drift is cosmetic).
+      gearClearance: 0.06,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 14,
       groundEffectStrength: 0.35,
@@ -414,10 +439,16 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
   },
 };
 
+// Both the legacy and Kiln (kiln-war-2026-06) GLB paths map to the same flight
+// config key, so the airfield/visual layer resolves a config whichever art the
+// `__aircraftArt` kill-switch selects for a parking spot.
 const FIXED_WING_MODEL_TO_KEY: Record<string, string> = {
   [AircraftModels.A1_SKYRAIDER]: 'A1_SKYRAIDER',
+  [AircraftModels.A_1_SKYRAIDER_SPAD]: 'A1_SKYRAIDER',
   [AircraftModels.F4_PHANTOM]: 'F4_PHANTOM',
+  [AircraftModels.F_4_PHANTOM_II]: 'F4_PHANTOM',
   [AircraftModels.AC47_SPOOKY]: 'AC47_SPOOKY',
+  [AircraftModels.AC_47_SPOOKY_GUNSHIP]: 'AC47_SPOOKY',
 };
 
 /**

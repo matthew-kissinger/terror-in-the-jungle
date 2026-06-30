@@ -248,11 +248,13 @@ describe('repaint building wiring into settlement pools', () => {
 });
 
 describe('parked-vehicle and wildlife scenery wiring', () => {
-  it('parks a static T-54 at the NVA trail base (non-drivable scenery, not an M151)', () => {
+  it('no longer parks a static T-54 at the NVA trail base (it is now a drivable scenario Tank)', () => {
+    // The T-54 was promoted to a live, drivable NVA Tank IVehicle spawned
+    // through the scenario path (T54TankSpawn). The static armor-dressing prop
+    // is removed so exactly one T-54 stands in the world.
     const placements = placementsFor('nva_trail_base_small');
     const t54 = placements.find((p) => p.modelPath === GroundVehicleModels.T54_TANK);
-    expect(t54).toBeDefined();
-    expect(isM151ModelPath(t54!.modelPath)).toBe(false);
+    expect(t54).toBeUndefined();
   });
 
   it('parks a static ZIL-157 supply truck at the NVA tunnel camp', () => {

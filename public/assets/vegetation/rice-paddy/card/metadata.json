@@ -1,0 +1,30 @@
+{
+  "generator": "scripts/bake-veg-card.mjs",
+  "generatedAt": "2026-06-26T09:32:14.658Z",
+  "id": "rice-paddy",
+  "modelUrl": "/assets/vegetation/rice-paddy/rice-paddy.glb",
+  "projection": "single-front-card",
+  "crossQuadCapable": true,
+  "elevationDeg": 12,
+  "worldSize": [
+    1.7743801016566854,
+    2.440885413185299
+  ],
+  "tileSize": [
+    372,
+    512
+  ],
+  "bounds": {
+    "center": [
+      0,
+      1.2204427065926495,
+      5.551115123125783e-17
+    ],
+    "size": [
+      1.3930916014857075,
+      2.440885413185299,
+      1.0989633911214587
+    ],
+    "radius": 1.5088361694909058
+  }
+}

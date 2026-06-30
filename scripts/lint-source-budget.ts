@@ -90,7 +90,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // is the per-airframe config plumbing and the +3 method-regex matches are the
   // getWeaponName getter plus two multi-line call-expression false positives.
   // Within-cycle ratchet re-base; R4 split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files; +3 LOC from dropped-frame stabilization branch wiring', loc: 1166, methods: 51 },
+  // Snapshot raised 1166 → 1191 / 51 → 52 (seat-and-fire-cues, 2026-06-28): the
+  // airborne-gate feedback signal adds one consume-on-read getter
+  // (`consumeGroundedFireBlocked`) + the grounded-trigger record branch and the
+  // structural HUD-sink poll in the update loop, so the silent ground no-op
+  // surfaces an "Airborne to fire" hint. In-cycle ratchet re-base; R4 split
+  // target unchanged. See docs/CARRY_OVERS.md.
+  'src/systems/vehicle/FixedWingModel.ts': { round: 'P3R4', reason: 'split into 4 files; +3 LOC from dropped-frame stabilization branch wiring; +25 LOC/+1 method airborne-gate feedback signal (seat-and-fire-cues, 2026-06-28)', loc: 1191, methods: 52 },
   'src/systems/vehicle/airframe/Airframe.ts': { round: 'P3R4', reason: '0 tests → add tests + slim split', loc: 985, methods: 22 },
   'src/systems/combat/CombatantLODManager.ts': { round: 'P3R1', reason: 'ai-timing-gate; +5 LOC: sole body-despawn owner now reaps terminal DEAD stragglers (combat-death-body-persistence); +102 LOC dropped-frame materialization telemetry', loc: 1035, methods: 32 },
   'src/systems/world/WorldFeatureSystem.ts': { round: 'P3R4', reason: 'split into 3 files; +204 LOC dropped-frame world-static attribution and optimization hooks', loc: 1064, methods: 34 },
@@ -109,14 +115,35 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // single-owner stepping gate in one cycle window. Orchestrator note in
   // docs/CARRY_OVERS.md (Parked). Factor into a composition split when it
   // next grows.
-  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); +35 LOC dropped-frame startup/materialization wiring; split queued when it next grows', loc: 783, methods: 50 },
+  // Snapshot raised 783 → 790 LOC (helipad-spawn-truth, 2026-06-28): +6 LOC to
+  // wire the boardable-helicopter presence provider (HelicopterModel) into the
+  // player respawn manager so helipad spawn labels match reality. This is the
+  // prod composition point for player/vehicle wiring — exactly where this wire
+  // belongs. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by the
+  // task brief); split target unchanged.
+  'src/core/StartupPlayerRuntimeComposer.ts': { round: 'P3R5', reason: 'prod composition point for seated-weapon/NPC-gunner/HUD-host wiring; +9 LOC: tank gunner-panel host (tank-sight-prod-wiring, same cycle window); +35 LOC dropped-frame startup/materialization wiring; +6 LOC boardable-helicopter presence wire (helipad-spawn-truth, 2026-06-28); split queued when it next grows', loc: 790, methods: 50 },
   // Snapshot raised 757 → 761 / 83 → 84 (fixedwing-gunsight, 2026-06-10): the
   // fixed-wing reflector-gunsight task adds one HUD delegation method
   // (`updateFixedWingAmmo`) so the nose-gun ammo count reaches FixedWingHUD —
   // the mirror of the existing `setHelicopterWeaponStatus` delegation. Growth
   // is intentional and minimal; the R3 split target is unchanged. In-cycle
   // ratchet re-base, not a new carry-over (see docs/CARRY_OVERS.md).
-  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring', loc: 774, methods: 85 },
+  // Snapshot raised 788 → 809 / 85 → 86 (seat-and-fire-cues, 2026-06-28): the
+  // seat/fire-cue task adds one HUD delegation method
+  // (`flashFixedWingAirborneHint`, mirror of the existing ammo delegation) and
+  // grows `setVehicleContext` to derive the seat hint + plane seat-fire cue from
+  // the context the HUD already receives (derivation logic lives in
+  // HudControlHints so only one method is added). In-cycle ratchet re-base; the
+  // R3 split target is unchanged. See docs/CARRY_OVERS.md.
+  // Snapshot raised 809 → 858 / 86 → 88 (situation-readout-hud, 2026-06-28): the
+  // situation-readout task mounts the readout on the shared control-hint surface
+  // and drives it on the existing 2Hz objective tick. Two methods are added —
+  // `updateSituationReadout` (reads zone/ticket/player state into a snapshot) and
+  // `setPlayerAlliance` (faction-relative ticket/objective split) — plus the
+  // mount/dispose wiring. The read rule itself lives in HudSituationReadout, so
+  // HUDSystem only forwards existing read paths. In-cycle ratchet re-base; the
+  // R3 split target is unchanged. See docs/CARRY_OVERS.md.
+  'src/ui/hud/HUDSystem.ts': { round: 'P3R3', reason: 'split into 4 files; +13 LOC/+1 method dropped-frame HUD timing/debug wiring; +14 LOC control-hints mount/dispose + per-actor context wiring (control-hints-hud); +21 LOC/+1 method seat/fire cue wiring (seat-and-fire-cues, 2026-06-28); +49 LOC/+2 methods situation-readout mount/update wiring (situation-readout-hud, 2026-06-28); +20 LOC/+1 method task-card mount/dispose + reward-dispatcher wiring + getTaskCard accessor (tasking-director-mvp, 2026-06-28). The card owns its own DOM/logic in HudTaskCard; HUDSystem only mounts it + forwards rewards to the existing score-popup surface. In-cycle ratchet re-base; R3 split target unchanged.', loc: 878, methods: 89 },
   'src/systems/combat/CombatantSystem.ts': { round: 'P3R2', reason: '0 direct tests → split + tests; +10 LOC: wire rifle-death squad bookkeeping hooks (combat-death-body-persistence); +28 LOC dropped-frame combat telemetry wiring', loc: 790, methods: 43 },
   // Admitted 2026-06-15/16 (dropped-frame-perf-harness): the main loop grew
   // with frame/presentation epoch recording and render-context attribution.
@@ -139,7 +166,12 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // depending on HelicopterWeaponSystem directly (it only holds the fenced
   // IHelicopterModel). Within-cycle ratchet re-base; R4 split target unchanged.
   // See docs/CARRY_OVERS.md.
-  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +14 LOC for player door-gun seat pass-throughs (door-gun-seat, 2026-06-09)', loc: 721, methods: 51 },
+  // Snapshot raised 721 → 732 LOC / 51 → 52 methods (helipad-spawn-truth,
+  // 2026-06-28): +1 read-only method `hasBoardableHelicopterForHelipad` so the
+  // spawn selector can label a helipad honestly (promise a helicopter only when
+  // one is actually boardable). No spawning rework. In-cycle ratchet re-base, no
+  // CARRY_OVERS row (sanctioned by the task brief).
+  'src/systems/helicopter/HelicopterModel.ts': { round: 'P3R4', reason: 'split during AVIATSIYA-3 helicopter parity work; +14 LOC for player door-gun seat pass-throughs (door-gun-seat, 2026-06-09); +1 read-only presence method (helipad-spawn-truth, 2026-06-28)', loc: 732, methods: 52 },
   // Snapshot raised 781 → 810 (ci-gate-consolidation, 2026-06-09): the sibling
   // Phase-1 task `real-mouse-input` (040337e7) added 29 LOC of real
   // held-mouse-button state to PlayerInput AFTER the budget-ratchet snapshot
@@ -151,25 +183,66 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // `onHelicopterDoorGunToggle` callback decl. Within-cycle ratchet re-base; R3
   // split target unchanged. See docs/CARRY_OVERS.md.
   'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
-  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md', loc: 752, methods: 58 },
-  'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy', loc: 764, methods: 0 },
-  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles', loc: 1182, methods: 0 },
+  // Snapshot raised 752 → 757 LOC / 58 → 59 methods (helipad-spawn-truth,
+  // 2026-06-28): +1 setter `setBoardableHelicopterPresence` that forwards the
+  // boardable-helicopter presence provider to the spawn selector so helipad
+  // spawn labels match reality. In-cycle ratchet re-base, no CARRY_OVERS row
+  // (sanctioned by the task brief).
+  // Snapshot raised 757 → 800 LOC / 59 → 60 methods (crew-vehicle-selectable,
+  // 2026-06-28): selecting a crewable vehicle in the CREW-A-VEHICLE deploy panel
+  // now adopts the vehicle anchor as a real selected spawn (enables Deploy, lands
+  // the player at the vehicle) instead of being a logging no-op — adds the
+  // buildVehicleSpawnPoint helper + the selection/hint wiring. In-cycle ratchet
+  // re-base, no CARRY_OVERS row (sanctioned by the task brief).
+  'src/systems/player/PlayerRespawnManager.ts': { round: 'P3R3', reason: 'use beginRejoiningSquad helper, see docs/CARRY_OVERS.md; +1 presence-provider setter (helipad-spawn-truth, 2026-06-28); +43 LOC/+1 method crew-a-vehicle selectable spawn (crew-vehicle-selectable, 2026-06-28)', loc: 800, methods: 60 },
+  // Admitted 2026-06-28 (sks-rifle-wiring, cycle-2026-06-28-arsenal-expansion):
+  // the runtime-weapon-type plumbing established by marksman-rifle-class left
+  // this file at 699 LOC (1 under the base limit). Adding the SKS as its own
+  // semi-auto OPFOR weapon type (spec + core + rig field + art entries + load +
+  // rig prep + switch case + visibility + getter + HUD labels) crosses 700.
+  // The growth is per-weapon plumbing, not god-module drift; the natural split
+  // target is to extract the per-weapon spec/core registry out of the manager.
+  // In-cycle ratchet admission, no CARRY_OVERS row (sanctioned by the brief).
+  // Snapshot raised 735 → 740 (weapon-stats-panel, 2026-06-28): the per-weapon
+  // spec literals moved out of the constructor into a module-level WEAPON_SPECS
+  // table (single source of truth) plus a small static `getWeaponSpec` accessor
+  // the deploy armory reads, so spec values are never duplicated into the UI.
+  // Net +5 LOC. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by the
+  // brief). This is the registry-extraction the split target above called for.
+  'src/systems/player/weapon/WeaponRigManager.ts': { round: 'P3R3', reason: 'extract the per-weapon spec/core/rig registry out of the manager; +36 LOC for the SKS semi-auto runtime weapon type (sks-rifle-wiring, 2026-06-28); +5 LOC module-level WEAPON_SPECS table + static getWeaponSpec accessor (weapon-stats-panel, 2026-06-28)', loc: 740, methods: 30 },
+  'src/systems/terrain/TerrainFeatureCompiler.ts': { round: 'P3R5', reason: 'split into placement / compile policy; +3 LOC route-corridor-exclusion: merge route veg-exclusion corridors into vegetationExclusionZones', loc: 767, methods: 0 },
+  'src/systems/terrain/TerrainMaterial.ts': { round: 'P3R5', reason: 'split shader uniforms / atlas / impostor sampling; +35 LOC cycle-2026-06-09-lighting-rig-spike (rig-prototype): flag-gated unified-rig terrain lighting branch (applyTerrainRigLighting + night-fill emissive gate); +27 LOC dropped-frame terrain visual isolation toggles; +10 LOC task/veg-glb-hero-scatter r185 WebGPU terrain-render restore', loc: 1192, methods: 0 },
   // Snapshot raised 898 → 904 / 69 → 75 (ashau-load-freeze, 2026-06-10): six
   // markStartup statements bracketing propagateTerrainSourceChanges phases —
   // the instrumentation that attributed the 47s A Shau load freeze to the
   // stamped-provider gameplay-grid bake. The methods delta is those statement
   // lines tripping the first-class-method heuristic, not new methods.
   // Within-cycle ratchet re-base; split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale); +6 LOC: propagate-phase startup marks (ashau-load-freeze, 2026-06-10); +71 LOC dropped-frame vegetation/shadow isolation and terrain lighting controls', loc: 975, methods: 80 },
-  'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 861, methods: 24 },
+  'src/systems/terrain/TerrainSystem.ts': { round: 'P3R5', reason: 'split into TerrainCore + TerrainStreamingFacade; +22 LOC cycle-2026-06-09 gameplay-heightmap-resolution (DEM-faithful CPU query grid in syncCpuHeightsToGpu + rationale); +6 LOC: propagate-phase startup marks (ashau-load-freeze, 2026-06-10); +71 LOC dropped-frame vegetation/shadow isolation and terrain lighting controls; +10 LOC / +1 method cycle-2026-06-29-cinematic-foundations getBakedHeightmap() facade (non-fenced 1024 baked-grid accessor for orbital topo map)', loc: 985, methods: 81 },
+  'src/ui/hud/CommandModeOverlay.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3; +6 LOC radio-command-menu (FIRE SUPPORT + SQUAD section headers + per-order effect text; fire-support rows extracted to CommandRadioFireSupportPanel.ts to keep growth minimal)', loc: 867, methods: 24 },
   'src/ui/map/FullMapSystem.ts': { round: 'P3R3', reason: 'split alongside HUDSystem in R3', loc: 882, methods: 42 },
   'src/config/AShauValleyConfig.ts': { round: 'P3R4', reason: '0 tests → split into terrain config + biome config + spawn data; +5 LOC: prebaked navmesh asset wiring (navmesh-coverage-ashau)', loc: 761, methods: 0 },
   // Pre-existing budget debt surfaced by validate:fast (CI runs `lint` but not
   // `lint:budget`): grew during the 2026-06-03 deploy-loadout cycle (UX-3
   // faction-availability chips + the selectable-ammo 4th loadout slot).
   // Not relicense-related; queued for a presentation/loadout-panel split.
-  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade', loc: 1038, methods: 68 },
-  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff', loc: 355, methods: 62 },
+  // Snapshot raised 1038 → 1118 LOC / 68 → 75 methods (weapon-stats-panel,
+  // 2026-06-28): the armory now surfaces a compact weapon-stats readout
+  // (rpm / damage near→far / falloff / recoil / ADS) for the focused weapon,
+  // built from the shared WeaponRigManager spec table and updated on cycle /
+  // chip select. In-cycle ratchet re-base, no CARRY_OVERS row (sanctioned by
+  // the brief). The loadout/presentation split target above is unchanged.
+  // Snapshot raised 1118 → 1121 LOC (deploy-map-navigation, 2026-06-28): +3 LOC
+  // to make the map container a positioning context for the map's self-mounted
+  // navigation controls overlay (zoom / recenter / spawn-cycle). In-cycle
+  // ratchet re-base sanctioned by the task brief; no CARRY_OVERS row.
+  // Snapshot raised 1120 → 1142 LOC / 75 → 76 methods (crew-vehicle-selectable,
+  // 2026-06-28): the CREW-A-VEHICLE selection surfaces a "Press F to board" hint
+  // in the selected-spawn panel — one new hint element + the setBoardVehicleHint
+  // method (also cleared on resetSelectedSpawn). In-cycle ratchet re-base, no
+  // CARRY_OVERS row (sanctioned by the task brief).
+  'src/ui/screens/DeployScreen.ts': { round: 'P4-deploy-loadout', reason: 'split the loadout panel out of the screen facade; +80 LOC/+7 methods weapon-stats readout (weapon-stats-panel, 2026-06-28); +3 LOC map-controls positioning context (deploy-map-navigation, 2026-06-28); armory declutter removed the redundant per-slot PREV/NEXT cycle buttons, net -1 LOC (armory-layout-reflow, 2026-06-28); +22 LOC/+1 method F-board hint (crew-vehicle-selectable, 2026-06-28)', loc: 1142, methods: 76 },
+  'src/core/SystemManager.ts': { round: 'P2-P3', reason: 'decompose system wiring + lifecycle into helpers; +1 method dropped-frame diagnostics handoff; +1 taskingDirector registry getter (tasking-director-mvp, 2026-06-28). In-cycle ratchet re-base for the new opt-in system registration; decompose target unchanged.', loc: 355, methods: 63 },
   // Added 2026-05-12 at the exp/konveyer-webgpu-migration → master merge gate.
   // HosekWilkieSkyBackend grew through the KONVEYER campaign and is tracked as
   // split-debt in docs/CARRY_OVERS.md (konveyer-large-file-splits). The

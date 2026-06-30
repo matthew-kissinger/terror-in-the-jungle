@@ -169,6 +169,16 @@ function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingComm
 }
 
 /**
+ * Optional airborne-hint sink on the concrete HUD. Accessed structurally (the
+ * same way the adapter reaches `updateFixedWingAmmo`) so the model does not
+ * have to widen the fenced `IHUDSystem` for a UI-only nicety — a HUD that lacks
+ * the method simply shows no hint.
+ */
+interface FixedWingAirborneHintSink {
+  flashFixedWingAirborneHint?(): void;
+}
+
+/**
  * Orchestrates all fixed-wing aircraft instances.
  * Parallel to HelicopterModel; each airframe carries its own gun from the
  * armament table (A-1 wing cannons, F-4 nose rotary, AC-47 broadside; no door
@@ -210,6 +220,13 @@ export class FixedWingModel implements GameSystem {
   // Forward armament: per-aircraft weapon state + a small shared tracer pool.
   private weapons = new Map<string, FixedWingWeaponState>();
   private tracerPool?: TracerPool;
+
+  // Airborne-gate feedback: set when the player holds the trigger while the
+  // aircraft is still grounded (the gun silently no-ops there). The HUD reads
+  // and clears this each frame to surface a transient "Airborne to fire" hint
+  // instead of nothing. Internal signal only — not a fired round, not a gate
+  // change.
+  private groundedFireBlocked = false;
 
   // Controls from player input
   private currentPilotIntent: FixedWingPilotIntent = createIdleFixedWingPilotIntent();
@@ -389,6 +406,13 @@ export class FixedWingModel implements GameSystem {
           currentFlightState !== 'grounded',
           deltaTime,
         );
+        // Surface the airborne-gate feedback: if the player held the trigger
+        // while grounded this frame, flash a transient HUD hint so the silent
+        // no-op reads as "not yet" instead of a broken gun.
+        if (this.consumeGroundedFireBlocked()) {
+          (this.hudSystem as FixedWingAirborneHintSink | undefined)
+            ?.flashFixedWingAirborneHint?.();
+        }
       }
 
       const shouldRender = shouldRenderAirVehicle({
@@ -811,6 +835,19 @@ export class FixedWingModel implements GameSystem {
   }
 
   /**
+   * Reads and clears the airborne-gate feedback flag: returns `true` once for
+   * each frame in which the player pulled the trigger while grounded (the gun
+   * fired nothing). The HUD polls this to flash a transient "Airborne to fire"
+   * hint so the silence is explained rather than mysterious. Consume-on-read so
+   * the hint naturally fades when the player stops trying or lifts off.
+   */
+  consumeGroundedFireBlocked(): boolean {
+    const blocked = this.groundedFireBlocked;
+    this.groundedFireBlocked = false;
+    return blocked;
+  }
+
+  /**
    * Advance the airframe's gun for one frame. Fires as many rounds as the
    * fire-rate budget allows while the trigger is held, routing each shot
    * through the shared combatant fire path so friend-or-foe filtering and
@@ -831,6 +868,13 @@ export class FixedWingModel implements GameSystem {
 
     if (weapon.cooldownRemaining > 0) {
       weapon.cooldownRemaining -= deltaTime;
+    }
+
+    // Holding the trigger on the ground produces no rounds (the gate below).
+    // Record it so the HUD can explain the silence with an "Airborne to fire"
+    // hint instead of leaving the player guessing whether the gun is broken.
+    if (weapon.isFiring && !isAirborne && weapon.ammo > 0) {
+      this.groundedFireBlocked = true;
     }
 
     if (!weapon.isFiring || !isAirborne || weapon.ammo <= 0) {

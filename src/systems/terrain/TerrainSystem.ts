@@ -169,7 +169,7 @@ export class TerrainSystem implements GameSystem {
     const losAccelerator = new LOSAccelerator();
     this.raycastRuntime = new TerrainRaycastRuntime(losAccelerator);
     this.terrainQueries = new TerrainQueries(losAccelerator);
-    this.vegetationRuntime = new TerrainVegetationRuntime(globalBillboardSystem, this.config.vegetationCellSize);
+    this.vegetationRuntime = new TerrainVegetationRuntime(globalBillboardSystem, this.config.vegetationCellSize, scene, camera);
     this.vegetationRuntime.setWorldBounds(worldSize, this.config.visualMargin);
     this.workerPool = new TerrainWorkerPool();
     this.streamingScheduler = new TerrainStreamingScheduler();
@@ -247,6 +247,7 @@ export class TerrainSystem implements GameSystem {
         pendingUnits: result.pendingUnits,
       };
     });
+    this.vegetationRuntime.update(deltaTime); // hero impostor LOD swap: every frame, off the streaming budget
 
     // Stagger collision rebuild: skip on frames where vegetation did work
     // to avoid compounding expensive terrain operations in the same frame.
@@ -419,6 +420,17 @@ export class TerrainSystem implements GameSystem {
 
   getNormalAt(x: number, z: number, target?: THREE.Vector3): THREE.Vector3 {
     return this.terrainQueries.getNormalAt(x, z, target);
+  }
+
+  /**
+   * Baked GPU-coherent heightmap as a CPU-readable 1024²-capped grid (NOT the
+   * 2304² source DEM); null until the surface has baked. Concrete-class facade
+   * over the private surface runtime — deliberately NOT on the fenced
+   * ITerrainRuntime — for the orbital topo map to read relief without coupling
+   * to GPU heightmap internals.
+   */
+  getBakedHeightmap(): { data: Float32Array; gridSize: number; worldSize: number } | null {
+    return this.isInitialized ? this.surfaceRuntime.getBakedHeightmap() : null;
   }
 
   // ──── Collision objects ────

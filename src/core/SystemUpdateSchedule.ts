@@ -121,6 +121,7 @@ export const SYSTEM_UPDATE_SCHEDULE: readonly SystemUpdatePhaseDefinition[] = [
     systems: [
       { key: 'warSimulator', mode: 'cadenced-update' },
       { key: 'strategicFeedback', mode: 'state-sync' },
+      { key: 'taskingDirector', mode: 'cadenced-update' },
     ],
   },
   {

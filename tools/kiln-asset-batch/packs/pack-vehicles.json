@@ -1,0 +1,149 @@
+{
+  "plan": {
+    "name": "Vietnam Vehicles",
+    "prompt": "Vietnam-war aircraft, ground vehicles, and boats, low-poly game-ready, +X forward, named pivots for rotors/turrets/wheels.",
+    "paletteId": "vietnam-war",
+    "items": [
+      {
+        "prompt": "An A-1 Skyraider \"Spad\", a burly single-engine attack aircraft about twelve meters long, sitting tail-low on taildragger gear. A big radial engine cowl with a four-bladed propeller fills the nose, a framed bubble canopy sits over mid-fuselage, and straight broad wings carry rows of underwing hardpoints loaded with bombs. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An A-37 Dragonfly light attack jet, small at under nine meters, parked level on tricycle gear. A compact straight-winged jet with a wide side-by-side two-seat canopy, engine intakes buried in the wing roots, tip tanks capping each wingtip like fat cigars, and bombs and rocket pods crowding the underwing pylons. Short, stubby. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An AC-47 \"Spooky\" gunship, a Douglas C-47 transport turned side-firing gunship, about twenty meters long with a wingspan wider still, sitting tail-down on taildragger gear. A rounded nose and stepped cockpit lead a fat cigar fuselage; two radial engines with propellers hang on broad low wings; a tall rounded tail fin rises aft.. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An AH-1G Cobra attack helicopter, about thirteen meters long but barely a meter wide across the fuselage - a flying blade parked on skinny skids. A tandem cockpit steps up from the gunner in front to the pilot behind under a long glass canopy, a rounded chin turret with a minigun hangs under the nose, and short stub wings. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A B-52D Stratofortress strategic bomber, immense - nearly fifty meters of slender fuselage under a wingspan wider still. Long thin wings droop visibly under the weight of eight jet engines slung in four twin pods, small outrigger wheels sit near the wingtips, and the main gear rides in fuselage bogies. A stepped cockpit caps. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A C-130 Hercules tactical transport, about thirty meters long, squatting low on stubby gear housed in fuselage sponsons. A fat round-nosed fuselage rides under a high straight wing carrying four turboprops with broad propellers; the rear fuselage sweeps up over a full-width cargo ramp, and a tall slab tail fin rises above it.. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A CH-47 Chinook heavy-lift helicopter, about sixteen meters of fat straight fuselage with no tail rotor at all - its silhouette is the two tall rotor pylons, one at the nose and a taller one at the tail, carrying huge overlapping three-bladed rotors. Long sponsons run low along each side housing fuel and the four-wheel landing. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An F-4 Phantom II fighter-bomber, about nineteen meters long, parked on tricycle gear with its nose high. A long pointed radome leads to a tandem two-seat canopy; broad low-set wings sweep back with their outer tips angled sharply upward, while the tailplanes angle just as sharply down - the Phantom's unmistakable cranked. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An HH-3E \"Jolly Green Giant\" rescue helicopter, about twenty-two meters with rotors, resting on wheels tucked into side sponsons. A deep boat-bottomed hull swells under a five-bladed main rotor; a long thin refueling probe spears forward from the nose, stubby sponson floats flank the lower hull, and the rear fuselage rises into. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An LCM-8 \"Mike Boat\" mechanized landing craft, about twenty-two meters of rectangular steel box. A tall flat bow ramp leans back against the front, ribbed and hinged at the deck line; high slab side walls run straight aft framing an open cargo well big enough for a vehicle; at the stern a small blocky pilothouse rises with a rail. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An M113 armored personnel carrier, about five meters long, flat and boxy on its tracks. A slab-sided aluminum hull with a steeply sloped bow plate, a flat roof carrying a small commander's cupola with a .50 caliber machine gun, a tall flat rear panel hiding the drop ramp, and tracks running over five evenly spaced road wheels per. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An M151 MUTT, the US quarter-ton utility jeep, about three and a half meters long with all four tires on the ground. A small open-topped jeep: a flat windshield folded upright above a flat grille with two round headlights, an open two-seat body with simple bucket seats and a flat hood, big square wheel arches over knobby tires. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An M35 \"Deuce and a Half\" six-wheel cargo truck, about six and a half meters long, sitting high on its axles. A round-fendered hooded cab with a flat split windshield leads; behind it a long cargo bed rides on the frame under arched bows carrying a canvas tarp roof. One axle under the cab, two close-set at the rear with big. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An M42 Duster self-propelled anti-aircraft gun, about five and a half meters long on tracks. A light-tank hull carries a wide open-topped turret amidships mounting twin 40mm Bofors autocannons side by side, their long barrels angled skyward past vertical seats and ammunition racks visible in the open tub. Five road wheels per. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An M48 Patton main battle tank, about seven meters of hull with the gun reaching past nine, planted on wide tracks. A rounded cast hull rises to a domed turret set just forward of center, carrying a long 90mm gun ending in a T-shaped muzzle brake, with a boxy searchlight above the gun and a small machine-gun cupola on the turret. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A MiG-17 \"Fresco\", the NVA's nimble Soviet jet fighter, about eleven meters long, parked nose-high on tricycle gear. The whole nose is a round open air intake; a bubble canopy sits close behind it over a slim barrel fuselage that tapers straight to a single exhaust. Mid-set wings sweep back hard wearing low fences across their. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An OH-6 Cayuse \"Loach\" light observation helicopter, tiny at about seven meters, perched on slender skids. An egg-shaped cabin with a big rounded glass front takes up barely a third of the length; a thin tail boom runs back to a small tail rotor beside an upswept V-tail. A four-bladed main rotor rides close above the rounded. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An M50 Ontos, the tiny US Marine tank destroyer, under four meters long but impossible to mistake: six long recoilless rifles mounted in two stacked banks of three on either side of a small turret atop a stubby tracked hull. The tubes overhang the vehicle in both directions, dwarfing it. Short tracks with four road wheels per. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "An OV-10 Bronco forward-air-control aircraft, about thirteen meters long with its strangest feature in plan view: two slim booms run back from the wing-mounted turboprop engines to a single high tailplane bridging them, framing open air behind the short central pod. That pod carries a huge greenhouse canopy up front and sponson. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A PBR river patrol boat of the Brown Water Navy, about nine and a half meters of low fiberglass hull with no propellers - water-jet nozzles tuck under the flat stern. A circular gun tub sunk into the foredeck mounts twin .50 caliber machine guns; amidships an open conning station with a low windshield and a small radar mast. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A PT-76 amphibious light tank of the NVA, about seven meters long and strikingly low - a steel boat on tracks. A flat wide hull with a boat-nosed bow and a folded trim vane lying flat on it, a small rounded pancake turret with a 76mm gun mounted well forward, and six large evenly spaced road wheels per side with no return. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A small inflatable rubber raiding raft for SEAL and recon teams, about four meters long. Fat rounded buoyancy tubes form the sides and meet at a blunt upturned bow, with a squared transom at the stern; the floor is flat with visible slats, rope grab lines loop along the outer tubes, and two wooden paddles lie across the thwarts.. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A Vietnamese sampan, the flat-bottomed wooden river boat of the Mekong, about five meters long and barely a meter wide. A long narrow open hull of lapped planks, the bow and stern both rising gently from a low waist, two or three plank thwart benches across the middle, a small section of cargo decking, and a single long steering. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A PCF \"Swift Boat\" coastal patrol craft, about fifteen meters of welded aluminum, all straight lines. A boxy hull with a vertical bow leads to a two-level deckhouse amidships: an enclosed pilothouse with rectangular windows below, and an open gun tub on its roof mounting twin .50 caliber machine guns. The long aft deck. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A T-54 main battle tank, the NVA's Soviet-pattern armor, about six and a half meters of hull with the 100mm gun stretching it past nine. A low sloped hull under a smooth half-egg dome turret, the long gun wearing a bore evacuator near the muzzle; five big road wheels per side with a distinct gap between the first and second. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A UH-1H \"Huey\" transport helicopter, the workhorse of the US Army in Vietnam, about thirteen meters nose to tail and parked on its skids. A rounded greenhouse cockpit with chin windows flows into a broad slab-sided cabin with wide open side doorways; from there a slim tail boom, longer than the cabin itself, tapers back to. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A UH-1C Huey gunship, the armed Vietnam Huey, parked on its skids - the same thirteen-meter rounded-cockpit fuselage and long tapering tail boom as the transport, but bristling. Short stub pylons jut from the cabin sides carrying cylindrical rocket pods, flexible machine guns hang at the open doors, and the two-bladed main rotor. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      },
+      {
+        "prompt": "A ZIL-157 six-wheel cargo truck, the NVA supply hauler of the Ho Chi Minh Trail, about six and a half meters long. A rounded 1950s Soviet cab with bulbous fenders, a split flat windshield and a wide louvered grille; behind it a long wooden-sided cargo bed under canvas-topped bows. Three axles on big single tires - one forward. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+        "category": "prop",
+        "role": "vehicle"
+      }
+    ]
+  }
+}

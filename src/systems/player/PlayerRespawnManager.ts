@@ -33,7 +33,7 @@ import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
 import { isPerfHarnessEnabled } from '../../core/PerfDiagnostics';
 import { InputContextManager } from '../input/InputContextManager';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
-import { SpawnPointSelector } from './SpawnPointSelector';
+import { SpawnPointSelector, type BoardableHelicopterPresence } from './SpawnPointSelector';
 import { MissionBriefing } from '../../ui/loading/MissionBriefing';
 import type { MissionBriefingInfo } from '../../ui/loading/MissionBriefing';
 import { DeployFlowController } from './DeployFlowController';
@@ -250,6 +250,11 @@ export class PlayerRespawnManager implements GameSystem {
     this.spawnPointSelector.setHelipadSystem(helipadSystem);
   }
 
+  /** Wire boardable-helicopter presence so helipad spawn labels stay honest. */
+  setBoardableHelicopterPresence(presence: BoardableHelicopterPresence): void {
+    this.spawnPointSelector.setBoardableHelicopterPresence(presence);
+  }
+
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
     this.spawnPointSelector.setTerrainSystem(terrainSystem);
@@ -403,17 +408,56 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   /**
-   * Informational selection of a crewable-vehicle deploy option. The player is
-   * NOT teleported into the vehicle here (crewing/gunnery is owned by the
-   * vehicle systems); this surfaces where the vehicle is and how to crew it.
+   * Select a crewable-vehicle deploy option as the spawn target. This adopts the
+   * vehicle's world position as the selected spawn (so the Deploy button enables
+   * and deploy lands the player at the vehicle), highlights the vehicle on the
+   * deploy map, and surfaces an "F to board" hint. The player arrives ON FOOT at
+   * the vehicle position — crewing/gunnery itself is owned by the vehicle systems
+   * and is triggered by the player pressing F once they are there.
    */
   private selectVehicleDeployOption(vehicleId: string, vehicleName: string): void {
+    if (this.deploySession && !this.deploySession.allowSpawnSelection) {
+      return;
+    }
     const option = this.availableVehicleOptions.find(entry => entry.id === vehicleId);
     if (!option) return;
+
+    // Adopt the vehicle anchor as a selectable spawn so the shared deploy/respawn
+    // path (confirmRespawn -> respawn) lands the player at the vehicle. Dedup by
+    // id so re-selecting the same vehicle does not stack synthetic spawns.
+    const spawnPoint = this.buildVehicleSpawnPoint(option);
+    this.availableSpawnPoints = [
+      ...this.availableSpawnPoints.filter(sp => sp.id !== spawnPoint.id),
+      spawnPoint,
+    ];
+
+    this.selectedSpawnPoint = vehicleId;
+    this.mapController.setSelectedSpawnPoint?.(vehicleId);
+    this.respawnUI.updateSelectedSpawn(vehicleName);
+    this.respawnUI.setBoardVehicleHint(option.controlsHint);
+    this.respawnUI.updateVehicleDeployOptions(this.availableVehicleOptions, vehicleId);
+    this.updateTimerDisplay();
+
     Logger.info(
       'player',
-      ` Vehicle deploy option focused: ${vehicleName} at ${Math.round(option.position.x)}, ${Math.round(option.position.z)} (${option.controlsHint})`
+      ` Vehicle deploy option selected: ${vehicleName} at ${Math.round(option.position.x)}, ${Math.round(option.position.z)} (${option.controlsHint})`
     );
+  }
+
+  /**
+   * Map a crewable-vehicle deploy option to a selectable on-foot spawn point at
+   * the vehicle anchor. Reuses the existing insertion-kind plumbing; the deploy
+   * flow snaps Y to terrain at confirm time.
+   */
+  private buildVehicleSpawnPoint(option: VehicleDeployOption): RespawnSpawnPoint {
+    return {
+      id: option.id,
+      name: option.name,
+      position: new THREE.Vector3(option.position.x, 0, option.position.z),
+      safe: true,
+      kind: 'insertion',
+      selectionClass: 'direct_insertion',
+    };
   }
 
   private respawn(position: THREE.Vector3): void {
@@ -513,6 +557,10 @@ export class PlayerRespawnManager implements GameSystem {
     this.mapController.setSelectedSpawnPoint?.(zoneId);
     this.respawnUI.updateSelectedSpawn(zoneName);
     this.respawnUI.updateSpawnOptions(this.availableSpawnPoints, zoneId);
+    // Picking an on-foot spawn clears any prior crew-a-vehicle selection so the
+    // F-board hint and the highlighted vehicle option don't linger.
+    this.respawnUI.setBoardVehicleHint(undefined);
+    this.respawnUI.updateVehicleDeployOptions(this.availableVehicleOptions, undefined);
     this.updateTimerDisplay();
   }
 

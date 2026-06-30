@@ -138,7 +138,11 @@ const _scratchDir = new THREE.Vector3();
  * Input mapping:
  *   Driver:  W/S throttle, A/D turn, Space brake.
  *   Gunner:  Mouse XY -> turret yaw/pitch slew (turret clamps), LMB/Space fire.
- *   F (session controller) -> enter / exit.
+ *   F  -> driver<->gunner seat-swap (`swapSeat`), the M48 has two crew seats.
+ *   E  -> board (on foot) / exit (seated). Distinct from F so the swap never
+ *         shadows the dismount: with two seats, F always swaps, so exit must
+ *         live on its own key (the bug that stranded the player in the tank
+ *         unless they hit Escape).
  *
  * The cannon launcher is injected post-construction via `setCannonSystem`
  * because the boarding factory builds the adapter from the Tank alone; the
@@ -391,6 +395,13 @@ export class TankPlayerAdapter implements PlayerVehicleAdapter {
    * occupies the seat they are entering on the underlying `IVehicle`, then
    * switches the control target + HUD context. Returns the new crew seat,
    * or the current seat unchanged when the player is not mounted (no-op).
+   *
+   * Bound to `F`. This is deliberately a SEAT-SWAP only, never an exit: the
+   * F-key router (`PlayerInput.consumeVehicleBoardOrSeatSwap`) tries the swap
+   * before the board/exit fallback, so on a two-seat tank F always swaps and
+   * the dismount lives on `E` (the ground/tracked exit branch in
+   * `PlayerVehicleController.handleEnterExitVehicle`). Keeping the two on
+   * separate keys is the fix for the unreachable tank exit.
    *
    * The chassis coasts to a stop when the player leaves the driver hatch
    * (no hand on the throttle), mirroring the unattended-chassis behaviour

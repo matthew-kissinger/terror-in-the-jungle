@@ -1,0 +1,13 @@
+{
+  "slug": "polyhaven-fern-02",
+  "provider": "Poly Haven",
+  "sourceUrl": "https://polyhaven.com/a/fern_02",
+  "license": "CC0",
+  "sourceTriangles": 6232,
+  "status": "downloaded",
+  "localPath": "public/assets/vegetation/source/polyhaven-fern-02/",
+  "attributionRequired": false,
+  "notes": "Tier 3 #13 — Fern 02, spans all bands (GLB + Alpha). fern alt / impostor-card source. CC0 (no attribution required) but record provenance anyway.",
+  "author": "Poly Haven",
+  "downloadedRes": "2k gltf"
+}

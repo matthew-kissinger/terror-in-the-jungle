@@ -16,24 +16,26 @@ import {
 } from './PixelForgeNpcRuntime';
 import { Combatant, CombatantState, Faction } from './types';
 
-// Mesh node names present in the shipped repaint NPC weapon GLBs, verified by
-// parsing each GLB JSON chunk. The NPC hold derivation (CombatantRenderer
-// findNamed) takes the FIRST matching name in each list; if none match it falls
-// through to a hardcoded default offset and the gun floats. These fixtures let
-// us assert every configured anchor list resolves against the real model.
+// Mesh node names present in the shipped Kiln gen-2 NPC weapon GLBs (the default
+// art), verified by parsing each GLB JSON chunk
+// (public/models/weapons/kiln-war-2026-06/{m16a1-2,ak-47}.glb). The NPC hold
+// derivation (CombatantRenderer findNamed) takes the FIRST matching name in each
+// list; if none match it falls through to a hardcoded default offset and the gun
+// floats. These fixtures let us assert every configured anchor list resolves
+// against the real model.
 const NPC_WEAPON_GLB_NODES: Record<'m16a1' | 'ak47', ReadonlySet<string>> = {
   m16a1: new Set([
     'Mesh_UpperReceiver', 'Mesh_LowerReceiver', 'Mesh_Magwell', 'Mesh_PistolGrip',
-    'Mesh_PistolGripBase', 'Mesh_HandguardBody', 'Mesh_DeltaRing', 'Mesh_HandguardCap',
-    'Mesh_Barrel', 'Mesh_FrontSightPost', 'Mesh_FlashHiderBase', 'Mesh_FlashHiderBirdcage',
-    'Mesh_FlashHiderBore', 'Mesh_MagSeg1', 'Mesh_MagFloor', 'Mesh_TriggerGuardBottom',
+    'Mesh_Handguard', 'Mesh_DeltaRing', 'Mesh_Barrel', 'Mesh_GasBlock',
+    'Mesh_FrontSightFrame', 'Mesh_FrontSightPost', 'Mesh_FlashHider', 'Mesh_MuzzleHole',
+    'Mesh_MagSeg1', 'Mesh_MagSeg2', 'Mesh_MagSeg3', 'Mesh_TriggerGuard',
     'Mesh_Stock', 'Mesh_Buttplate',
   ]),
   ak47: new Set([
-    'Mesh_ReceiverMain', 'Mesh_PistolGrip', 'Mesh_GripPlate', 'Mesh_GuardBottom',
-    'Mesh_LowerHandguard', 'Mesh_UpperHandguard', 'Mesh_Barrel', 'Mesh_MuzzleBrake',
-    'Mesh_FrontSightPost', 'Mesh_MagSeg1', 'Mesh_MagFloor', 'Mesh_StockMain',
-    'Mesh_StockMount', 'Mesh_Buttplate',
+    'Mesh_Receiver', 'Mesh_PistolGrip', 'Mesh_TriggerGuardBottom', 'Mesh_LowerHandguard',
+    'Mesh_UpperHandguard', 'Mesh_Barrel', 'Mesh_MuzzleBrake', 'Mesh_MuzzleSlant',
+    'Mesh_FrontSightBase', 'Mesh_FrontSightPost', 'Mesh_MagSeg1', 'Mesh_MagBase',
+    'Mesh_StockWrist', 'Mesh_StockBody', 'Mesh_Buttplate',
   ]),
 };
 
@@ -80,10 +82,11 @@ describe('PixelForgeNpcRuntime', () => {
       PIXEL_FORGE_NPC_RUNTIME_FACTIONS.map((config) => [config.runtimeFaction, config.weapon.modelPath]),
     );
 
-    expect(weaponByFaction.get(Faction.US)).toBe('weapons/m16a1.glb');
-    expect(weaponByFaction.get(Faction.ARVN)).toBe('weapons/m16a1.glb');
-    expect(weaponByFaction.get(Faction.NVA)).toBe('weapons/ak47.glb');
-    expect(weaponByFaction.get(Faction.VC)).toBe('weapons/ak47.glb');
+    // Default art is Kiln gen-2 (no window in the node test env -> 'kiln').
+    expect(weaponByFaction.get(Faction.US)).toBe('weapons/kiln-war-2026-06/m16a1-2.glb');
+    expect(weaponByFaction.get(Faction.ARVN)).toBe('weapons/kiln-war-2026-06/m16a1-2.glb');
+    expect(weaponByFaction.get(Faction.NVA)).toBe('weapons/kiln-war-2026-06/ak-47.glb');
+    expect(weaponByFaction.get(Faction.VC)).toBe('weapons/kiln-war-2026-06/ak-47.glb');
     for (const config of PIXEL_FORGE_NPC_RUNTIME_FACTIONS) {
       expect(config.modelPath.endsWith('.glb')).toBe(true);
       expect(config.rightHandSocket).toBe('RightHand');

@@ -1,0 +1,29 @@
+{
+  "slug": "lcm-8-mike-boat",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/kiln-war-2026-06/lcm-8-mike-boat.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.453Z",
+  "sourcePrompt": "An LCM-8 \"Mike Boat\" mechanized landing craft, about twenty-two meters of rectangular steel box. A tall flat bow ramp leans back against the front, ribbed and hinged at the deck line; high slab side walls run straight aft framing an open cargo well big enough for a vehicle; at the stern a small blocky pilothouse rises with a rail. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation a22ae64b-3bba-4bfd-a9c5-5690dcbf7b0d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_PropellerL",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 5
+    },
+    {
+      "name": "Joint_PropellerR",
+      "type": "mainBlades",
+      "spinAxis": "x",
+      "meshCount": 5
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

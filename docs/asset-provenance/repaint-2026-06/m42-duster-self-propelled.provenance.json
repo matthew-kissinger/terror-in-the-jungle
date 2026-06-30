@@ -1,0 +1,21 @@
+{
+  "slug": "m42-duster-self-propelled",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/m42-duster-self-propelled.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.483Z",
+  "sourcePrompt": "An M42 Duster self-propelled anti-aircraft gun, about five and a half meters long on tracks. A light-tank hull carries a wide open-topped turret amidships mounting twin 40mm Bofors autocannons side by side, their long barrels angled skyward past vertical seats and ammunition racks visible in the open tub. Five road wheels per. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation c54705fa-53e5-4b72-9d41-fd47c5ebb0c0",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [
+    {
+      "name": "Joint_Turret",
+      "meshCount": 45
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

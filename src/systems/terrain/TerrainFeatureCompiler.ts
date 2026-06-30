@@ -71,6 +71,9 @@ export function compileTerrainFeatures(
   compiled.stamps.push(...terrainFlow.stamps);
   compiled.surfacePatches.push(...terrainFlow.surfacePatches);
   compiled.flowPaths.push(...terrainFlow.flowPaths);
+  // Route centerline corridors join the POI exclusion zones in the SAME
+  // vegetationExclusionZones stream, so both scatterers skip the trail.
+  compiled.vegetationExclusionZones.push(...terrainFlow.vegetationExclusionZones);
 
   compiled.stamps.sort((a, b) => a.priority - b.priority);
   compiled.surfacePatches.sort((a, b) => a.priority - b.priority);

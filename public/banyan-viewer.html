@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Banyan Review</title>
+<style>
+  html,body{margin:0;height:100%;background:#17191c;color:#cfd3d6;font:14px system-ui,sans-serif;overflow:hidden}
+  #ui{position:fixed;top:10px;left:10px;z-index:10;background:#0c0e10cc;padding:10px 12px;border-radius:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button{background:#23272b;color:#cfd3d6;border:1px solid #353a3f;padding:6px 10px;border-radius:6px;cursor:pointer}
+  button.on{background:#2f6b3a;border-color:#3f8a4d;color:#fff}
+  #info{position:fixed;bottom:10px;left:10px;z-index:10;background:#0c0e10cc;padding:8px 12px;border-radius:8px;font-size:12px}
+  canvas{display:block}
+</style>
+</head>
+<body>
+<div id="ui">
+  <strong>Banyan:</strong>
+  <button id="b-standard" class="on">Standard</button>
+  <button id="b-large">Large (special-area)</button>
+  <span style="width:1px;height:20px;background:#353a3f"></span>
+  <strong>Texture:</strong>
+  <button id="t-on" class="on">Textured (PATINA)</button>
+  <button id="t-off">Untextured</button>
+  <span style="width:1px;height:20px;background:#353a3f"></span>
+  <button id="wire">Wireframe</button>
+</div>
+<div id="info">drag = orbit · scroll = zoom · right-drag = pan</div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.185.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.185.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x20242a);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 2000);
+camera.position.set(14, 9, 18);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 4, 0); controls.update();
+
+scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x4a3f33, 1.1));
+const sun = new THREE.DirectionalLight(0xfff2e0, 2.2);
+sun.position.set(12, 20, 8); scene.add(sun);
+const grid = new THREE.GridHelper(40, 40, 0x3a3f45, 0x2a2e33); scene.add(grid);
+
+const loader = new GLTFLoader();
+let current = null, wire = false;
+const qp = new URLSearchParams(location.search);
+const state = { tree: qp.get('tree') || 'standard', tex: 'textured' };
+function url() { return `/assets/vegetation/banyan/banyan-${state.tree}-${state.tex === 'textured' ? 'textured' : 'untextured'}.glb?t=${Date.now()}`; }
+
+function load() {
+  loader.load(url(), (gltf) => {
+    if (current) scene.remove(current);
+    current = gltf.scene;
+    // center + frame
+    const box = new THREE.Box3().setFromObject(current);
+    const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
+    current.position.sub(new THREE.Vector3(c.x, box.min.y, c.z));
+    controls.target.set(0, s.y * 0.45, 0);
+    current.traverse(o => { if (o.isMesh) { o.material.wireframe = wire; o.frustumCulled = false; } });
+    scene.add(current);
+    document.getElementById('info').textContent = `${url().split('/').pop()} — size ${s.x.toFixed(1)}×${s.y.toFixed(1)}×${s.z.toFixed(1)}m`;
+  }, undefined, (e) => { document.getElementById('info').textContent = 'load error: ' + e; });
+}
+
+function pick(id, group, val, key) {
+  document.querySelectorAll(group).forEach(b => b.classList.remove('on'));
+  document.getElementById(id).classList.add('on'); state[key] = val; load();
+}
+document.getElementById('b-standard').onclick = () => pick('b-standard', '#b-standard,#b-large', 'standard', 'tree');
+document.getElementById('b-large').onclick = () => pick('b-large', '#b-standard,#b-large', 'large', 'tree');
+document.getElementById('t-on').onclick = () => pick('t-on', '#t-on,#t-off', 'textured', 'tex');
+document.getElementById('t-off').onclick = () => pick('t-off', '#t-on,#t-off', 'untextured', 'tex');
+document.getElementById('wire').onclick = (e) => { wire = !wire; e.target.classList.toggle('on', wire); if (current) current.traverse(o => { if (o.isMesh) o.material.wireframe = wire; }); };
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+load();
+</script>
+</body>
+</html>

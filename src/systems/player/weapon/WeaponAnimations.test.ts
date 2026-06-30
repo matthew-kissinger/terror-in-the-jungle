@@ -136,6 +136,46 @@ describe('WeaponAnimations', () => {
       expect(animations.getADSProgress()).toBeCloseTo(0)
     })
 
+    it('a heavier handling penalty makes the ADS transition slower (the ammo-load tradeoff)', () => {
+      // Baseline (no penalty set): measure how far ADS progresses after a fixed
+      // slice of time. STANDARD load leaves handling untouched, so this is the
+      // "today" behavior we must preserve.
+      const baseline = new WeaponAnimations(camera)
+      baseline.setADS(true)
+      baseline.update(0.05, false, new THREE.Vector3())
+      const baselineProgress = baseline.getADSProgress()
+
+      // Explicitly setting the no-penalty factor (1.0) must be identical to the
+      // baseline — STANDARD does not change ADS feel.
+      const standard = new WeaponAnimations(camera)
+      standard.setAdsTimeFactor(1.0)
+      standard.setADS(true)
+      standard.update(0.05, false, new THREE.Vector3())
+      expect(standard.getADSProgress()).toBeCloseTo(baselineProgress, 6)
+
+      // A heavier load slows the transition: after the SAME elapsed time the gun
+      // has aimed in LESS, so reaching the sights takes longer.
+      const heavy = new WeaponAnimations(camera)
+      heavy.setAdsTimeFactor(1.3)
+      heavy.setADS(true)
+      heavy.update(0.05, false, new THREE.Vector3())
+      expect(heavy.getADSProgress()).toBeLessThan(baselineProgress)
+    })
+
+    it('clamps the handling factor so it can never speed ADS up below baseline', () => {
+      // A sub-1.0 (or invalid) factor must never make aiming faster than STANDARD.
+      const baseline = new WeaponAnimations(camera)
+      baseline.setADS(true)
+      baseline.update(0.05, false, new THREE.Vector3())
+
+      const fast = new WeaponAnimations(camera)
+      fast.setAdsTimeFactor(0.1)
+      fast.setADS(true)
+      fast.update(0.05, false, new THREE.Vector3())
+
+      expect(fast.getADSProgress()).toBeCloseTo(baseline.getADSProgress(), 6)
+    })
+
     it('FOV changes when ADS is active (zooms in)', () => {
       const initialFov = camera.fov
       animations.setADS(true)
@@ -534,7 +574,36 @@ describe('WeaponAnimations', () => {
 
     it('getADSPosition() returns correct values', () => {
       const pos = animations.getADSPosition()
-      expect(pos).toEqual({ x: 0.0, y: -0.18, z: -0.55 })
+      // y lowered from -0.18 -> -0.44 so the sight line drops onto the center
+      // crosshair (screenshot-validated; previously the gun sat above it).
+      expect(pos).toEqual({ x: 0.0, y: -0.44, z: -0.55 })
+    })
+  })
+
+  // Per-weapon ADS offset (sight-line clearance for bulky guns)
+  describe('Per-weapon ADS offset', () => {
+    it('the bulky M60 (lmg) resolves a distinct ADS offset from the rifle default', () => {
+      const rifle = animations.getADSPosition('rifle')
+      const lmg = animations.getADSPosition('lmg')
+      expect(lmg).not.toEqual(rifle)
+    })
+
+    it('drops and pulls back the M60 (lmg) so its body clears the sight line', () => {
+      const rifle = animations.getADSPosition('rifle')
+      const lmg = animations.getADSPosition('lmg')
+      // Lower in the frame (more negative y) and a touch further back (more
+      // negative z) than the rifle, so the receiver no longer crosses the sight.
+      expect(lmg.y).toBeLessThan(rifle.y)
+      expect(lmg.z).toBeLessThan(rifle.z)
+    })
+
+    it('the rifle (M16) keeps the global default ADS offset', () => {
+      expect(animations.getADSPosition('rifle')).toEqual(animations.getADSPosition())
+    })
+
+    it('a weapon without an override falls back to the global default', () => {
+      // The pistol has no per-weapon override, so it resolves the default pose.
+      expect(animations.getADSPosition('pistol')).toEqual(animations.getADSPosition())
     })
   })
 

@@ -1,0 +1,16 @@
+{
+  "slug": "vietnamese-sampan",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/kiln-war-2026-06/vietnamese-sampan.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.553Z",
+  "sourcePrompt": "A Vietnamese sampan, the flat-bottomed wooden river boat of the Mekong, about five meters long and barely a meter wide. A long narrow open hull of lapped planks, the bow and stern both rising gently from a low waist, two or three plank thwart benches across the middle, a small section of cargo decking, and a single long steering. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 6fc27217-f89f-42e1-9625-70d8cf5ce20a",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

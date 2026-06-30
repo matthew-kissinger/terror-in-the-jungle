@@ -1,0 +1,26 @@
+{
+  "name": "Vietnam War",
+  "slots": [
+    { "name": "od-green", "color": "#4a5236", "roughness": 0.85, "use": "US olive-drab gear, fatigues, vehicle hulls, ammo cans" },
+    { "name": "od-green-dark", "color": "#353a26", "roughness": 0.85, "use": "shadowed webbing, recessed gear, dark canvas" },
+    { "name": "nva-tan", "color": "#8a7d5a", "roughness": 0.9, "use": "NVA/VC tan uniforms, slings, light canvas" },
+    { "name": "gunmetal", "color": "#3a3f47", "metalness": 0.9, "roughness": 0.42, "use": "weapon receivers, barrels, fittings" },
+    { "name": "steel", "color": "#6a6f78", "metalness": 0.85, "roughness": 0.5, "use": "bright metal, blades, bolts, hardware" },
+    { "name": "brass", "color": "#9a7b3c", "metalness": 0.8, "roughness": 0.45, "use": "shell casings, fittings, ornament" },
+    { "name": "rust", "color": "#8a4a2c", "metalness": 0.2, "roughness": 0.85, "use": "oxidized metal, fuel drums, corrugated tin" },
+    { "name": "wood", "color": "#6e4c2f", "roughness": 0.8, "use": "rifle stocks, crates, stilt timber, furniture" },
+    { "name": "wood-dark", "color": "#44321f", "roughness": 0.85, "use": "aged timber, hooch posts, bamboo shadow" },
+    { "name": "sandbag", "color": "#9b8a5e", "roughness": 1.0, "use": "sandbags, earthworks, dirt berms, gravel" },
+    { "name": "mud", "color": "#5c4a32", "roughness": 1.0, "use": "wet earth, trench walls, rice paddy" },
+    { "name": "canvas", "color": "#b8a878", "roughness": 0.95, "use": "tents, tarps, packs, sandbag cloth" },
+    { "name": "foliage", "color": "#3f5d2a", "roughness": 0.9, "use": "leaves, thatch, camo netting, palm" },
+    { "name": "black-rubber", "color": "#1c1d1f", "roughness": 0.6, "use": "tires, hoses, charred surfaces, optics housing" },
+    { "name": "concrete", "color": "#9a958c", "roughness": 0.95, "use": "bunkers, French masonry, runway, pillbox" },
+    { "name": "brick", "color": "#7a4a3a", "roughness": 0.9, "use": "colonial brick, chimneys, foundations" },
+    { "name": "terracotta", "color": "#9c5a3c", "roughness": 0.85, "use": "pagoda/temple roof tile, clay pots" },
+    { "name": "stucco", "color": "#cfc9bc", "roughness": 0.9, "use": "village walls, temple plaster, whitewash" },
+    { "name": "hide", "color": "#8a6a4a", "roughness": 0.9, "use": "animal fur, hide, leather, scales" },
+    { "name": "red-marking", "color": "#7a2a22", "roughness": 0.8, "use": "stars, flags, painted markings, stencils" },
+    { "name": "glass", "color": "#aacbe0", "kind": "glass", "opacity": 0.35, "roughness": 0.1, "use": "canopies, optics, windows, headlights" }
+  ]
+}

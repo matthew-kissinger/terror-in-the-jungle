@@ -1,0 +1,25 @@
+{
+  "slug": "m48-patton-main-battle",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/m48-patton-main-battle.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.490Z",
+  "sourcePrompt": "An M48 Patton main battle tank, about seven meters of hull with the gun reaching past nine, planted on wide tracks. A rounded cast hull rises to a domed turret set just forward of center, carrying a long 90mm gun ending in a T-shaped muzzle brake, with a boxy searchlight above the gun and a small machine-gun cupola on the turret. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation a1c1ce9f-271e-4973-abeb-6a0233e3afe0",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [
+    {
+      "name": "Joint_Turret",
+      "meshCount": 30
+    },
+    {
+      "name": "Joint_MainGun",
+      "meshCount": 10
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

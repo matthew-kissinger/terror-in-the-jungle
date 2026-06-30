@@ -1,0 +1,16 @@
+{
+  "slug": "pbr-river-patrol-boat",
+  "class": "boats",
+  "action": "new",
+  "tijTarget": "vehicles/watercraft/kiln-war-2026-06/pbr-river-patrol-boat.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.529Z",
+  "sourcePrompt": "A PBR river patrol boat of the Brown Water Navy, about nine and a half meters of low fiberglass hull with no propellers - water-jet nozzles tuck under the flat stern. A circular gun tub sunk into the foredeck mounts twin .50 caliber machine guns; amidships an open conning station with a low windshield and a small radar mast. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 48ae6297-51c8-44cf-ad13-3fe95e61619d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

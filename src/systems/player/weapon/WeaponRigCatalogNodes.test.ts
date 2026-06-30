@@ -46,62 +46,67 @@ interface GlbNode {
   quat?: [number, number, number, number]
 }
 
+// Keyed by the Kiln gen-2 paths (the default art the rig now loads). Node names
+// + magazine transforms mirror the shipped kiln-war-2026-06 GLBs.
 const GLB_NODES: Record<string, GlbNode[]> = {
-  'weapons/m16a1.glb': [
+  'weapons/kiln-war-2026-06/m16a1-2.glb': [
     { name: 'Mesh_UpperReceiver' }, { name: 'Mesh_LowerReceiver' }, { name: 'Mesh_Magwell' },
-    { name: 'Mesh_PistolGrip' }, { name: 'Mesh_HandguardBody' }, { name: 'Mesh_DeltaRing' },
-    { name: 'Mesh_Barrel' },
-    { name: 'Mesh_FlashHiderBase' }, { name: 'Mesh_FlashHiderBirdcage' }, { name: 'Mesh_FlashHiderBore' },
+    { name: 'Mesh_PistolGrip' }, { name: 'Mesh_Handguard' }, { name: 'Mesh_DeltaRing' },
+    { name: 'Mesh_Barrel' }, { name: 'Mesh_FrontSightPost' },
+    { name: 'Mesh_FlashHider' }, { name: 'Mesh_MuzzleHole' },
     // The well-seated mag sits forward + low of the body origin with a slight
-    // forward cant. Decals are CHILDREN of the MagSeg they letter, ~9mm out.
+    // forward cant. Kiln m16a1-2 has three mag segments (no decals).
     { name: 'Mesh_MagSeg1', pos: [0.043, 0.147, 0], quat: [0.06, 0, 0, 0.998] },
     { name: 'Mesh_MagSeg2', pos: [0.04, 0.09, 0], quat: [0.06, 0, 0, 0.998] },
-    { name: 'Mesh_MagSeg2DecalL', parent: 'Mesh_MagSeg2', pos: [0, 0, 0.009] },
-    { name: 'Mesh_MagSeg2DecalR', parent: 'Mesh_MagSeg2', pos: [0, 0, -0.009] },
     { name: 'Mesh_MagSeg3', pos: [0.037, 0.033, 0], quat: [0.06, 0, 0, 0.998] },
-    { name: 'Mesh_MagSeg3DecalL', parent: 'Mesh_MagSeg3', pos: [0, 0, 0.009] },
-    { name: 'Mesh_MagSeg3DecalR', parent: 'Mesh_MagSeg3', pos: [0, 0, -0.009] },
-    { name: 'Mesh_MagFloor', pos: [0.034, -0.01, 0], quat: [0.06, 0, 0, 0.998] },
     { name: 'Mesh_Stock' }, { name: 'Mesh_Buttplate' },
   ],
-  'weapons/ak47.glb': [
-    { name: 'Mesh_ReceiverMain' }, { name: 'Mesh_PistolGrip' },
+  'weapons/kiln-war-2026-06/ak-47.glb': [
+    { name: 'Mesh_Receiver' }, { name: 'Mesh_PistolGrip' },
     { name: 'Mesh_LowerHandguard' }, { name: 'Mesh_UpperHandguard' },
-    { name: 'Mesh_Barrel' }, { name: 'Mesh_MuzzleBrake' }, { name: 'Mesh_FrontSightPost' },
+    { name: 'Mesh_Barrel' }, { name: 'Mesh_MuzzleBrake' }, { name: 'Mesh_MuzzleSlant' },
+    { name: 'Mesh_FrontSightPost' },
     { name: 'Mesh_MagSeg1', pos: [0.05, 0.13, 0], quat: [0.12, 0, 0, 0.993] },
     { name: 'Mesh_MagSeg2', pos: [0.045, 0.07, 0], quat: [0.12, 0, 0, 0.993] },
     { name: 'Mesh_MagSeg3', pos: [0.04, 0.01, 0], quat: [0.12, 0, 0, 0.993] },
-    { name: 'Mesh_MagFloor', pos: [0.036, -0.04, 0], quat: [0.12, 0, 0, 0.993] },
-    { name: 'Mesh_StockMain' }, { name: 'Mesh_Buttplate' },
+    { name: 'Mesh_MagBase', pos: [0.036, -0.04, 0], quat: [0.12, 0, 0, 0.993] },
+    { name: 'Mesh_MagRib1L', parent: 'Mesh_MagSeg2', pos: [0, 0, 0.008] },
+    { name: 'Mesh_MagRib1R', parent: 'Mesh_MagSeg2', pos: [0, 0, -0.008] },
+    { name: 'Mesh_StockBody' }, { name: 'Mesh_Buttplate' },
   ],
-  'weapons/ithaca37.glb': [
-    { name: 'Mesh_ReceiverBody' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_BeadSight' }, { name: 'Mesh_MagTube' },
+  'weapons/kiln-war-2026-06/ithaca-37-pump-action.glb': [
+    { name: 'Mesh_Receiver' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_FrontSight' },
+    { name: 'Mesh_MagTube' }, { name: 'Mesh_MagCap' }, { name: 'Mesh_ForendBase' }, { name: 'Mesh_Buttplate' },
   ],
-  'weapons/m3-grease-gun.glb': [
-    { name: 'Mesh_Receiver' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_MuzzleBore' },
-    { name: 'Mesh_Magazine' }, { name: 'Mesh_MagWell' },
+  'weapons/kiln-war-2026-06/m3a1-grease-gun.glb': [
+    { name: 'Mesh_Receiver' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_MuzzleTip' },
+    { name: 'Mesh_PistolGrip' }, { name: 'Mesh_BarrelCollar' },
+    { name: 'Mesh_Magazine', pos: [0.02, 0.1, 0] }, { name: 'Mesh_MagRibL', parent: 'Mesh_Magazine', pos: [0, 0, 0.006] },
+    { name: 'Mesh_MagRibR', parent: 'Mesh_Magazine', pos: [0, 0, -0.006] }, { name: 'Mesh_ButtCross' },
   ],
-  'weapons/m1911.glb': [
-    { name: 'Mesh_SlideBase' }, { name: 'Mesh_BarrelTip' }, { name: 'Mesh_Bushing' },
-    { name: 'Mesh_MagBase' }, { name: 'Mesh_Barrel' },
+  'weapons/kiln-war-2026-06/m1911a1-colt.glb': [
+    { name: 'Mesh_SlideBase' }, { name: 'Mesh_Bore' }, { name: 'Mesh_Bushing' },
+    { name: 'Mesh_GripFrame' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_MagBase', pos: [0, -0.06, 0] },
   ],
-  'weapons/m60.glb': [
-    { name: 'Mesh_Receiver' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_FlashHiderBase' }, { name: 'Mesh_FlashHiderFlare' },
+  'weapons/kiln-war-2026-06/m60-pig-general-purpose.glb': [
+    { name: 'Mesh_Receiver' }, { name: 'Mesh_Barrel' }, { name: 'Mesh_FlashHider' },
+    { name: 'Mesh_PistolGrip' }, { name: 'Mesh_Handguard' }, { name: 'Mesh_Buttplate' },
   ],
-  'weapons/m79.glb': [
-    { name: 'Mesh_HollowBarrel' }, { name: 'Mesh_ShellRim' }, { name: 'Mesh_Receiver' }, { name: 'Mesh_Barrel' },
+  'weapons/kiln-war-2026-06/m79-thumper-40mm-grenade.glb': [
+    { name: 'Mesh_Mesh_Barrel' }, { name: 'Mesh_ReceiverBlock' }, { name: 'Mesh_StockGrip' },
+    { name: 'Mesh_ForeEndWood' }, { name: 'Mesh_Buttplate' },
   ],
 }
 
 // The body-node name inside the axis wrapper, per weapon (mirrors the GLB).
 const BODY_NODE: Record<string, string> = {
-  'weapons/m16a1.glb': 'M16A1',
-  'weapons/ak47.glb': 'AK47',
-  'weapons/ithaca37.glb': 'Ithaca37',
-  'weapons/m3-grease-gun.glb': 'M3GreaseGun',
-  'weapons/m1911.glb': 'M1911',
-  'weapons/m60.glb': 'M60',
-  'weapons/m79.glb': 'M79',
+  'weapons/kiln-war-2026-06/m16a1-2.glb': 'M16A1',
+  'weapons/kiln-war-2026-06/ak-47.glb': 'AK47',
+  'weapons/kiln-war-2026-06/ithaca-37-pump-action.glb': 'Ithaca37_Shotgun',
+  'weapons/kiln-war-2026-06/m3a1-grease-gun.glb': 'M3A1_GreaseGun',
+  'weapons/kiln-war-2026-06/m1911a1-colt.glb': 'Colt1911',
+  'weapons/kiln-war-2026-06/m60-pig-general-purpose.glb': 'M60MachineGun',
+  'weapons/kiln-war-2026-06/m79-thumper-40mm-grenade.glb': 'M79_Thumper',
 }
 
 // The importer's axis-normalize quaternion (−90° about Y), verified by direct
@@ -176,10 +181,10 @@ describe('WeaponRigManager catalog-driven node discovery', () => {
     await manager.init()
   })
 
-  it('groups exactly the catalog magazine nodes for the m16a1 (and excludes the magwell)', () => {
+  it('groups exactly the catalog magazine nodes for the m16a1-2 (and excludes the magwell)', () => {
     const rig = (manager as unknown as { m16RifleRig: THREE.Group }).m16RifleRig
     const grouped = collectMagazineLeafNames(rig).sort()
-    const expected = [...(warAssetCatalog.m16a1.magazineNodes ?? [])].sort()
+    const expected = [...(warAssetCatalog['m16a1-2'].magazineNodes ?? [])].sort()
 
     expect(grouped).toEqual(expected)
     // The receiver magazine well is part of the gun body, not the detachable
@@ -187,10 +192,10 @@ describe('WeaponRigManager catalog-driven node discovery', () => {
     expect(grouped).not.toContain('Mesh_Magwell')
   })
 
-  it('groups exactly the catalog magazine nodes for the ak47', () => {
+  it('groups exactly the catalog magazine nodes for the ak-47', () => {
     const rig = (manager as unknown as { akRifleRig: THREE.Group }).akRifleRig
     const grouped = collectMagazineLeafNames(rig).sort()
-    const expected = [...(warAssetCatalog.ak47.magazineNodes ?? [])].sort()
+    const expected = [...(warAssetCatalog['ak-47'].magazineNodes ?? [])].sort()
 
     expect(grouped).toEqual(expected)
   })
@@ -219,7 +224,7 @@ describe('WeaponRigManager catalog-driven node discovery', () => {
     // The marker is parented to one of the flash-hider meshes named in the
     // catalog (first match wins), not floated free in rig space.
     const parentName = muzzle?.parent?.name ?? ''
-    expect(warAssetCatalog.m16a1.muzzleNodes).toContain(parentName)
+    expect(warAssetCatalog['m16a1-2'].muzzleNodes).toContain(parentName)
   })
 })
 
@@ -287,19 +292,19 @@ describe('WeaponRigManager magazine grouping preserves world pose (weapon-mag-tr
     await manager.init()
   })
 
-  it('keeps every m16a1 magazine mesh (and nested decals) at its pre-grouping world pose', () => {
+  it('keeps every m16a1-2 magazine mesh at its pre-grouping world pose', () => {
     const rig = (manager as unknown as { m16RifleRig: THREE.Group }).m16RifleRig
-    const reference = buildReferenceRig('weapons/m16a1.glb')
-    // Includes the decal children, which must ride with their MagSeg parent and
-    // therefore stay put even though they are catalog entries.
-    const magNodes = warAssetCatalog.m16a1.magazineNodes ?? []
+    const reference = buildReferenceRig('weapons/kiln-war-2026-06/m16a1-2.glb')
+    const magNodes = warAssetCatalog['m16a1-2'].magazineNodes ?? []
     assertWorldPosePreserved(rig, reference, magNodes)
   })
 
-  it('keeps every ak47 magazine mesh at its pre-grouping world pose', () => {
+  it('keeps every ak-47 magazine mesh (and nested ribs) at its pre-grouping world pose', () => {
     const rig = (manager as unknown as { akRifleRig: THREE.Group }).akRifleRig
-    const reference = buildReferenceRig('weapons/ak47.glb')
-    const magNodes = warAssetCatalog.ak47.magazineNodes ?? []
+    const reference = buildReferenceRig('weapons/kiln-war-2026-06/ak-47.glb')
+    // Includes the rib children, which must ride with their MagSeg parent and
+    // therefore stay put even though they are catalog entries.
+    const magNodes = warAssetCatalog['ak-47'].magazineNodes ?? []
     assertWorldPosePreserved(rig, reference, magNodes)
   })
 

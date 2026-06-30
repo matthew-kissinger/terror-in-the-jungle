@@ -1,0 +1,53 @@
+{
+  "id": "banana-plant",
+  "commonName": "Banana plant",
+  "species": "Musa-like",
+  "tags": ["banana", "broadleaf", "midLevel", "understory", "jungle"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "mozzarellaARC",
+    "url": "https://sketchfab.com/3d-models/tropical-plants-pack-m02p",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 1144,
+    "notes": "Extracted from Tropical Plants Pack M02P (SM_MZRa_Banana_B092 variant). Subtree pruned, world transform baked, normalized to ground-center pivot. 3 textures webp-compressed. Credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-banana",
+      "role": "instanced",
+      "path": "banana-plant/banana-plant.glb",
+      "tris": 1144,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 1.39, 0], "size": [2.92, 2.77, 2.61], "radius": 2.4 },
+      "budget": { "trisPerInstance": 1144, "drawCallsPerBatch": 2, "textureMb": 3.1 }
+    },
+    {
+      "kind": "groundCard",
+      "id": "card-banana",
+      "baseColorPath": "banana-plant/card/atlas.base-color.png",
+      "normalPath": "banana-plant/card/atlas.normal.png",
+      "worldSize": [3.916, 2.774],
+      "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1, "textureMb": 0.3 }
+    }
+  ],
+  "lod": {
+    "label": "mesh-near+card-far",
+    "rationale": "Big banana fronds read as real 3D broadleaf up close (cheap mesh), but past ~30m the cluster flattens to an alpha card. Far band is a baked ground card; no impostor needed for a 2.8m understory plant.",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 30, "representationId": "mesh-banana", "budget": { "trisPerInstance": 1144, "drawCallsPerBatch": 2 } },
+      { "minDistanceMeters": 30, "maxDistanceMeters": 70, "representationId": "card-banana", "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced two-sided cross + hard-culled at 70m." }
+    ]
+  },
+  "ecology": {
+    "tier": "midLevel",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge"],
+    "density": 0.3,
+    "slopeRangeDeg": [0, 25],
+    "cluster": { "min": 1, "max": 4, "radiusMeters": 4 }
+  }
+}

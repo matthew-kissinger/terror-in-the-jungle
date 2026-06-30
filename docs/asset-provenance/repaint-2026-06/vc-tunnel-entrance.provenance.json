@@ -1,0 +1,16 @@
+{
+  "slug": "vc-tunnel-entrance",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/vc-tunnel-entrance.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.000Z",
+  "sourcePrompt": "A VC tunnel entrance, a concealed spider hole barely sixty centimeters square. A woven stick-and-earth trapdoor lies tipped aside revealing a tight dark vertical shaft cut into the ground, its rim packed smooth, with scuffed dirt and scattered leaves around the opening. Dark earth and camouflage litter, claustrophobic and secret. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 994ef0dd-322a-4b9a-ab5b-adf7be7c3c3d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

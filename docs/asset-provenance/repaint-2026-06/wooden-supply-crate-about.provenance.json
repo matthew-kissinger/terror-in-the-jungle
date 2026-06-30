@@ -1,0 +1,16 @@
+{
+  "slug": "wooden-supply-crate-about",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/wooden-supply-crate-about.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.992Z",
+  "sourcePrompt": "A wooden supply crate about a meter long. A plain rectangular shipping box of rough sawn planks with batten strips reinforcing the corners and edges, faint stenciled markings across one side, and small gaps between slats. Pale weathered raw wood, plain, square and stackable. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 49309259-d095-42b7-94d9-807d804eeab5",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

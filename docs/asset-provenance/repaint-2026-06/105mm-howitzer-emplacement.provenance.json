@@ -1,0 +1,18 @@
+{
+  "slug": "105mm-howitzer-emplacement",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/105mm-howitzer-emplacement.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.871Z",
+  "sourcePrompt": "A 105mm howitzer emplacement, a circular sandbagged gun pit about eight meters across. The howitzer centers it - a long barrel angled up over the parapet, a shield plate, two splayed trail legs and two rubber tires - while ammunition crates and a powder canister stack against the inside of the chest-high sandbag ring. Sandbags and olive-drab. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 91778826-a21f-4bc1-b77d-549aecbb55af",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "4806 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

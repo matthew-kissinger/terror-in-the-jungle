@@ -6,6 +6,8 @@ import { modelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { GroundVehicleModels } from '../assets/modelPaths';
 import { Logger } from '../../utils/Logger';
+import { vehicleArtMode } from '../../config/vehicleArt';
+import type { VehicleArtMode } from '../../config/vehicleArt';
 
 /**
  * Async GLB visual upgrade for the drivable ground vehicles.
@@ -17,9 +19,13 @@ import { Logger } from '../../utils/Logger';
  * failure the procedural placeholder simply stays — the same fallback the
  * original briefs allowed, now pointed the right way around.
  *
- * Both GLBs come through the war-asset import pipeline
- * (cycle-2026-06-11-war-asset-repaint), which wraps the source +X-forward art
- * in a `TIJ_AxisNormalize` node (a +90° Y rotation) so the loaded scene
+ * Which GLB pair loads is chosen by the `vehicleArtMode()` kill-switch: the new
+ * Kiln war-asset heroes (M151 MUTT + M48 Patton main-battle) by default, or the
+ * legacy GLBs via `?vehicleArt=legacy` / `window.__vehicleArt = 'legacy'`.
+ *
+ * Both GLB pairs come through the war-asset import pipeline, which wraps the
+ * source +X-forward art in a `TIJ_AxisNormalize` node (a +90° Y rotation) so the
+ * loaded scene
  * presents -Z-forward with the ground plane at y=0 — matching the
  * GroundVehiclePhysics / TrackedVehiclePhysics chassis conventions. Because
  * the whole GLB keeps that wrapper, the m151 swap needs no yaw or grounding
@@ -54,14 +60,69 @@ export interface TurretRigSource {
 }
 
 /** Procedural turret parts mounted on the rig by `mountM48TurretMeshes`. */
-const PROCEDURAL_TURRET_MESHES = ['m48_turret', 'm48_turret_ring', 'm48_cupola'] as const;
-const PROCEDURAL_GUN_MESHES = ['m48_mantlet', 'm48_barrel', 'm48_muzzle_brake'] as const;
-const M151_RUNTIME_VISUAL_SCALE = 1.15;
+const PROCEDURAL_M48_TURRET_MESHES = ['m48_turret', 'm48_turret_ring', 'm48_cupola'] as const;
+const PROCEDURAL_M48_GUN_MESHES = ['m48_mantlet', 'm48_barrel', 'm48_muzzle_brake'] as const;
+/** Procedural turret parts mounted on the rig by `mountT54TurretMeshes`. */
+const PROCEDURAL_T54_TURRET_MESHES = ['t54_turret', 't54_turret_ring', 't54_cupola'] as const;
+const PROCEDURAL_T54_GUN_MESHES = ['t54_mantlet', 't54_barrel', 't54_muzzle_brake'] as const;
+
+/**
+ * Drivable ground-vehicle hero art kill-switch.
+ *
+ * Defaults to the Kiln war-asset art (cycle kiln-war-2026-06): the M151 MUTT and
+ * the M48 Patton main-battle GLBs (both importer-normalized neg-z-forward,
+ * ground-at-origin, exposing the same `Joint_Turret` / `Joint_MainGun` rig
+ * joints the M48 re-seat path already targets). Opt back to the legacy GLBs at
+ * runtime with `?vehicleArt=legacy` or `window.__vehicleArt = 'legacy'` (read at
+ * swap time). No window (SSR / node tests) resolves to legacy so headless
+ * fixtures stay deterministic; production callers pass nothing and pick up the
+ * browser flag.
+ */
+// vehicleArtMode + VehicleArtMode are the single source of truth in
+// src/config/vehicleArt.ts (shared with WorldFeaturePrefabs' placement art
+// resolution); imported above for the hero-GLB swap below and re-exported here
+// for existing callers + tests.
+export { vehicleArtMode };
+export type { VehicleArtMode };
+
+/** Drivable-hero GLB paths per art mode (kiln = new Kiln war-asset art). */
+const M151_MODEL_BY_ART: Record<VehicleArtMode, string> = {
+  kiln: GroundVehicleModels.M151_MUTT,
+  legacy: GroundVehicleModels.M151_JEEP,
+};
+const M48_MODEL_BY_ART: Record<VehicleArtMode, string> = {
+  kiln: GroundVehicleModels.M48_PATTON_MAIN_BATTLE,
+  legacy: GroundVehicleModels.M48_PATTON,
+};
+/**
+ * NVA T-54 main-battle GLB paths per art mode. The Kiln `t-54-main-battle.glb`
+ * carries the same `Joint_Turret` / `Joint_MainGun` rig the M48 re-seat path
+ * targets; the legacy `t54-tank.glb` has NO joints, so `?vehicleArt=legacy`
+ * keeps the procedural turret (the re-seat bails on the missing joints).
+ */
+const T54_MODEL_BY_ART: Record<VehicleArtMode, string> = {
+  kiln: GroundVehicleModels.T_54_MAIN_BATTLE,
+  legacy: GroundVehicleModels.T54_TANK,
+};
+
+/**
+ * Runtime uniform scale applied to the loaded M151 GLB so its wheels sit on the
+ * chassis footprint the procedural placeholder + physics define. The Kiln MUTT
+ * measures 3.0m long vs the legacy jeep's ~3.5m, so it needs a ~+15% bump to
+ * present at the same on-ground size; the legacy jeep keeps its tuned 1.15.
+ */
+const M151_SCALE_BY_ART: Record<VehicleArtMode, number> = {
+  kiln: 1.32,
+  legacy: 1.15,
+};
 const GROUND_VEHICLE_PERF_CATEGORY = 'ground_vehicles';
 const M151_BODY_OPTIMIZED_RESOURCE_KEY = 'm151BodyOptimizedGeneratedResource';
 const M48_HULL_OPTIMIZED_RESOURCE_KEY = 'm48HullOptimizedGeneratedResource';
 const M48_TURRET_OPTIMIZED_RESOURCE_KEY = 'm48TurretOptimizedGeneratedResource';
 const M48_GUN_OPTIMIZED_RESOURCE_KEY = 'm48GunOptimizedGeneratedResource';
+const T54_HULL_OPTIMIZED_RESOURCE_KEY = 't54HullOptimizedGeneratedResource';
+const T54_TURRET_OPTIMIZED_RESOURCE_KEY = 't54TurretOptimizedGeneratedResource';
+const T54_GUN_OPTIMIZED_RESOURCE_KEY = 't54GunOptimizedGeneratedResource';
 
 function enableShadows(root: THREE.Object3D): void {
   root.traverse((obj) => {
@@ -81,77 +142,51 @@ function markGroundVehiclePerfCategory(root: THREE.Object3D): void {
   });
 }
 
-function optimizeM48StaticHullDrawCalls(glb: THREE.Group): void {
-  try {
-    const result = optimizeStaticModelDrawCalls(glb, {
-      batchNamePrefix: 'm48_hull',
-      strategy: 'merge',
-      minBucketSize: 2,
-    });
-    glb.userData.m48HullDrawCallOptimization = result;
-    glb.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
-        child.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
-        child.userData[M48_HULL_OPTIMIZED_RESOURCE_KEY] = true;
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-  } catch (error) {
-    Logger.warn('vehicle', 'Failed to optimize M48 static hull draw calls', error);
-  }
+/**
+ * Draw-call-optimizer batch metadata for one rigid tank subtree (static hull,
+ * turret joint, or gun joint). Parameterizes the merge so the M48 + T-54 share
+ * one optimizer while keeping their own per-asset userData keys + batch
+ * prefixes (the values the draw-call proof tests assert on).
+ */
+interface TankSubtreeDrawCallSpec {
+  /** userData key on the optimized root holding the optimizer result summary. */
+  resultKey: string;
+  /** userData flag stamped on each generated merged mesh. */
+  resourceKey: string;
+  /** Batch-name prefix for the generated merged meshes. */
+  batchNamePrefix: string;
+  /** Warning logged when the optimizer throws (kept asset-specific for triage). */
+  warning: string;
+  /** Meshes for which this returns true stay un-merged (e.g. named muzzle anchors). */
+  excludeMesh?: (mesh: THREE.Mesh) => boolean;
 }
 
-function optimizeM48ArticulatedJointDrawCalls(
-  root: THREE.Object3D,
-  options: {
-    resultKey: string;
-    resourceKey: string;
-    batchNamePrefix: string;
-    warning: string;
-    excludeMesh?: (mesh: THREE.Mesh) => boolean;
-  },
-): void {
+/**
+ * Merge a rigid tank subtree's compatible meshes into batched draw calls. Used
+ * for the static hull (a `THREE.Group`) and for the re-seated turret / gun
+ * joints (`THREE.Object3D`). Failures are swallowed with a warning — the
+ * un-optimized meshes simply render as-is.
+ */
+function optimizeTankSubtreeDrawCalls(root: THREE.Object3D, spec: TankSubtreeDrawCallSpec): void {
   try {
     const result = optimizeStaticModelDrawCalls(root, {
-      batchNamePrefix: options.batchNamePrefix,
+      batchNamePrefix: spec.batchNamePrefix,
       strategy: 'merge',
       minBucketSize: 2,
-      excludeMesh: options.excludeMesh,
+      excludeMesh: spec.excludeMesh,
     });
-    root.userData[options.resultKey] = result;
+    root.userData[spec.resultKey] = result;
     root.traverse((child) => {
       if (child instanceof THREE.Mesh && child.userData.generatedOptimizedMesh === true) {
         child.userData.perfCategory = GROUND_VEHICLE_PERF_CATEGORY;
-        child.userData[options.resourceKey] = true;
+        child.userData[spec.resourceKey] = true;
         child.castShadow = true;
         child.receiveShadow = true;
       }
     });
   } catch (error) {
-    Logger.warn('vehicle', options.warning, error);
+    Logger.warn('vehicle', spec.warning, error);
   }
-}
-
-function optimizeM48TurretDrawCalls(turretJoint: THREE.Object3D): void {
-  optimizeM48ArticulatedJointDrawCalls(turretJoint, {
-    resultKey: 'm48TurretDrawCallOptimization',
-    resourceKey: M48_TURRET_OPTIMIZED_RESOURCE_KEY,
-    batchNamePrefix: 'm48_turret',
-    warning: 'Failed to optimize M48 turret draw calls',
-  });
-}
-
-function optimizeM48GunDrawCalls(gunJoint: THREE.Object3D): void {
-  optimizeM48ArticulatedJointDrawCalls(gunJoint, {
-    resultKey: 'm48GunDrawCallOptimization',
-    resourceKey: M48_GUN_OPTIMIZED_RESOURCE_KEY,
-    batchNamePrefix: 'm48_gun',
-    warning: 'Failed to optimize M48 gun draw calls',
-    // Keep named muzzle meshes addressable for barrel/muzzle proof and future
-    // weapon-effect anchors; merge the rest of the rigid pitch subtree.
-    excludeMesh: (mesh) => mesh.name.toLowerCase().includes('muzzle'),
-  });
 }
 
 function optimizeM151StaticBodyDrawCalls(glb: THREE.Group): void {
@@ -190,15 +225,16 @@ function removeProceduralMeshes(chassisRoot: THREE.Group): void {
 export async function applyM151JeepGlbVisual(
   chassisRoot: THREE.Group,
   loader: VehicleModelLoader = modelLoader,
+  artMode: VehicleArtMode = vehicleArtMode(),
 ): Promise<boolean> {
   let glb: THREE.Group;
   try {
-    glb = await loader.loadModel(GroundVehicleModels.M151_JEEP);
+    glb = await loader.loadModel(M151_MODEL_BY_ART[artMode]);
   } catch {
     return false; // keep the procedural placeholder
   }
   glb.name = 'm151_glb_visual';
-  glb.scale.setScalar(M151_RUNTIME_VISUAL_SCALE);
+  glb.scale.setScalar(M151_SCALE_BY_ART[artMode]);
   enableShadows(glb);
   markGroundVehiclePerfCategory(glb);
   optimizeM151StaticBodyDrawCalls(glb);
@@ -208,14 +244,38 @@ export async function applyM151JeepGlbVisual(
 }
 
 /**
- * Swap the drivable M48's procedural meshes for `m48-patton.glb`, re-seating
+ * Per-asset spec for the articulated-tank GLB swap. The only things that
+ * differ between the M48 Patton and the NVA T-54 are the GLB paths, the
+ * loaded-scene name, the procedural mesh-name sets to strip off the rig, and
+ * the draw-call batch metadata — everything else (the joint re-seat, the
+ * axis-wrapper-preserving `attach`, the hull swap) is identical.
+ */
+interface ArticulatedTankGlbSpec {
+  /** GLB paths per art mode (kiln hero / legacy fallback). */
+  modelByArt: Record<VehicleArtMode, string>;
+  /** Name assigned to the loaded GLB root. */
+  glbName: string;
+  /** Procedural turret meshes the spawn mounted on the yaw node (stripped on swap). */
+  proceduralTurretMeshes: readonly string[];
+  /** Procedural gun meshes the spawn mounted on the pitch node (stripped on swap). */
+  proceduralGunMeshes: readonly string[];
+  /** Draw-call batch metadata for the static hull subtree. */
+  hull: TankSubtreeDrawCallSpec;
+  /** Draw-call batch metadata for the re-seated turret joint. */
+  turret: TankSubtreeDrawCallSpec;
+  /** Draw-call batch metadata for the re-seated gun joint. */
+  gun: TankSubtreeDrawCallSpec;
+}
+
+/**
+ * Swap a drivable tank's procedural meshes for its GLB hero art, re-seating
  * the articulated parts on the Tank's turret rig:
  *
- *  - `Joint_Turret` (turret bulk + cupola + searchlight + hatches) mounts on
- *    the rig yaw node so crew aim traverses the GLB turret around the
- *    turret-ring pivot the cannon math already uses.
- *  - `Joint_MainGun` (mantlet + barrel + muzzle brake) mounts on the rig
- *    pitch node so the rendered barrel elevates around the rig trunnion.
+ *  - `Joint_Turret` (turret bulk + cupola + hatches) mounts on the rig yaw
+ *    node so crew aim traverses the GLB turret around the turret-ring pivot
+ *    the cannon math already uses.
+ *  - `Joint_MainGun` (mantlet + barrel + muzzle) mounts on the rig pitch node
+ *    so the rendered barrel elevates around the rig trunnion.
  *  - The remaining GLB content (hull + tracks + wheels) replaces the
  *    procedural hull boxes on the chassis root.
  *
@@ -226,16 +286,18 @@ export async function applyM151JeepGlbVisual(
  * world matrix is refreshed before the joints move.
  *
  * Resolves true on success; false keeps every procedural mesh in place
- * (load failure or unexpected asset shape).
+ * (load failure or unexpected asset shape — e.g. the legacy jointless GLB).
  */
-export async function applyM48TankGlbVisual(
+async function applyArticulatedTankGlbVisual(
   chassisRoot: THREE.Group,
   tank: TurretRigSource,
-  loader: VehicleModelLoader = modelLoader,
+  spec: ArticulatedTankGlbSpec,
+  loader: VehicleModelLoader,
+  artMode: VehicleArtMode,
 ): Promise<boolean> {
   let glb: THREE.Group;
   try {
-    glb = await loader.loadModel(GroundVehicleModels.M48_PATTON);
+    glb = await loader.loadModel(spec.modelByArt[artMode]);
   } catch {
     return false; // keep the procedural placeholder
   }
@@ -255,10 +317,10 @@ export async function applyM48TankGlbVisual(
   // Procedural hull/tracks come off the chassis root; procedural turret + gun
   // parts come off the rig nodes.
   removeProceduralMeshes(chassisRoot);
-  for (const name of PROCEDURAL_TURRET_MESHES) yawNode.getObjectByName(name)?.removeFromParent();
-  for (const name of PROCEDURAL_GUN_MESHES) pitchNode.getObjectByName(name)?.removeFromParent();
+  for (const name of spec.proceduralTurretMeshes) yawNode.getObjectByName(name)?.removeFromParent();
+  for (const name of spec.proceduralGunMeshes) pitchNode.getObjectByName(name)?.removeFromParent();
 
-  glb.name = 'm48_glb_visual';
+  glb.name = spec.glbName;
   chassisRoot.add(glb);
   chassisRoot.updateWorldMatrix(false, true);
 
@@ -270,8 +332,83 @@ export async function applyM48TankGlbVisual(
   pitchNode.attach(gunJoint);
   markGroundVehiclePerfCategory(turretJoint);
   markGroundVehiclePerfCategory(gunJoint);
-  optimizeM48StaticHullDrawCalls(glb);
-  optimizeM48TurretDrawCalls(turretJoint);
-  optimizeM48GunDrawCalls(gunJoint);
+  optimizeTankSubtreeDrawCalls(glb, spec.hull);
+  optimizeTankSubtreeDrawCalls(turretJoint, spec.turret);
+  optimizeTankSubtreeDrawCalls(gunJoint, spec.gun);
   return true;
+}
+
+/** Keep named muzzle meshes addressable for barrel/muzzle proof + weapon-effect anchors. */
+const excludeMuzzleMesh = (mesh: THREE.Mesh): boolean => mesh.name.toLowerCase().includes('muzzle');
+
+const M48_GLB_SPEC: ArticulatedTankGlbSpec = {
+  modelByArt: M48_MODEL_BY_ART,
+  glbName: 'm48_glb_visual',
+  proceduralTurretMeshes: PROCEDURAL_M48_TURRET_MESHES,
+  proceduralGunMeshes: PROCEDURAL_M48_GUN_MESHES,
+  hull: {
+    resultKey: 'm48HullDrawCallOptimization',
+    resourceKey: M48_HULL_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 'm48_hull',
+    warning: 'Failed to optimize M48 static hull draw calls',
+  },
+  turret: {
+    resultKey: 'm48TurretDrawCallOptimization',
+    resourceKey: M48_TURRET_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 'm48_turret',
+    warning: 'Failed to optimize M48 turret draw calls',
+  },
+  gun: {
+    resultKey: 'm48GunDrawCallOptimization',
+    resourceKey: M48_GUN_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 'm48_gun',
+    warning: 'Failed to optimize M48 gun draw calls',
+    excludeMesh: excludeMuzzleMesh,
+  },
+};
+
+const T54_GLB_SPEC: ArticulatedTankGlbSpec = {
+  modelByArt: T54_MODEL_BY_ART,
+  glbName: 't54_glb_visual',
+  proceduralTurretMeshes: PROCEDURAL_T54_TURRET_MESHES,
+  proceduralGunMeshes: PROCEDURAL_T54_GUN_MESHES,
+  hull: {
+    resultKey: 't54HullDrawCallOptimization',
+    resourceKey: T54_HULL_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 't54_hull',
+    warning: 'Failed to optimize T-54 static hull draw calls',
+  },
+  turret: {
+    resultKey: 't54TurretDrawCallOptimization',
+    resourceKey: T54_TURRET_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 't54_turret',
+    warning: 'Failed to optimize T-54 turret draw calls',
+  },
+  gun: {
+    resultKey: 't54GunDrawCallOptimization',
+    resourceKey: T54_GUN_OPTIMIZED_RESOURCE_KEY,
+    batchNamePrefix: 't54_gun',
+    warning: 'Failed to optimize T-54 gun draw calls',
+    excludeMesh: excludeMuzzleMesh,
+  },
+};
+
+/** Swap the drivable M48's procedural meshes for the Kiln `m48-patton` GLB. */
+export function applyM48TankGlbVisual(
+  chassisRoot: THREE.Group,
+  tank: TurretRigSource,
+  loader: VehicleModelLoader = modelLoader,
+  artMode: VehicleArtMode = vehicleArtMode(),
+): Promise<boolean> {
+  return applyArticulatedTankGlbVisual(chassisRoot, tank, M48_GLB_SPEC, loader, artMode);
+}
+
+/** Swap the drivable NVA T-54's procedural meshes for the Kiln `t-54-main-battle` GLB. */
+export function applyT54TankGlbVisual(
+  chassisRoot: THREE.Group,
+  tank: TurretRigSource,
+  loader: VehicleModelLoader = modelLoader,
+  artMode: VehicleArtMode = vehicleArtMode(),
+): Promise<boolean> {
+  return applyArticulatedTankGlbVisual(chassisRoot, tank, T54_GLB_SPEC, loader, artMode);
 }

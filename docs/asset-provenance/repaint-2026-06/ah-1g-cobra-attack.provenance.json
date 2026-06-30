@@ -1,0 +1,33 @@
+{
+  "slug": "ah-1g-cobra-attack",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/ah-1g-cobra-attack.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.408Z",
+  "sourcePrompt": "An AH-1G Cobra attack helicopter, about thirteen meters long but barely a meter wide across the fuselage - a flying blade parked on skinny skids. A tandem cockpit steps up from the gunner in front to the pilot behind under a long glass canopy, a rounded chin turret with a minigun hangs under the nose, and short stub wings. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 1a5f1d33-3092-415a-a802-2ecf5016ec98",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 7
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 5
+    },
+    {
+      "name": "Joint_Turret",
+      "meshCount": 3
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,69 @@
+{
+  "plan": {
+    "name": "Vietnam Wildlife and Props",
+    "prompt": "Southeast-Asian jungle wildlife and field props, low-poly game-ready.",
+    "paletteId": "vietnam-war",
+    "items": [
+      {
+        "prompt": "A Burmese python at rest, a thick-bodied constrictor some four meters long gathered into a low mound of overlapping coils about a meter across. The body is as thick as a man's leg at the middle, the head resting on the top coil with a flicked forked tongue. Tan and gold scales patterned with big dark-brown blotches edged in black. Heavy, settled and still. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A flying-fox fruit bat roosting upside-down from a bare branch, about forty centimeters head to folded tail, hanging by two hooked feet. The leathery dark wings wrap the body like a closed cloak, with the small clawed thumbs peeking at the fold, while the fox-like head hangs lowest - a furry muzzle, round dark eyes and pointed ears. Russet-brown fur against. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A white-handed gibbon sitting upright, about ninety centimeters tall, its folded arms still reaching past its feet - arms half again the length of its body. A slender tailless ape with a small round head, a pale ring framing a dark face, pale hands and feet against shaggy dark chocolate fur, knees drawn up. Lithe, long-limbed and gentle-looking. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A king cobra reared to strike, the front third of a three-meter body raised vertically about a meter off the ground. The neck spreads into a broad flattened hood below a level, forward-fixed head, while the remaining body pools behind in two settled coils. Dark olive-brown scales with faint pale chevron bands, the belly paler. Poised, taut and dangerous. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A long-tailed macaque sitting on its haunches, about half a meter tall seated, with a tail longer than its body curling behind. A small monkey leaning slightly forward, hands resting in front, with a round expressive pinkish face under a cap of swept fur and close-set watchful eyes. Short tan-brown fur shading paler at the chest, compact and inquisitive. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A Chinese pond heron standing hunched at the water's edge, about half a meter tall. A compact heron with its neck drawn in so the streaked brown head sits low on the shoulders, a straight pointed bill angled slightly down, folded white wings under a buff-streaked breast, and sturdy yellow legs. Brown streaks over white, quiet and watchful. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "An Indochinese tiger caught mid-stalk, about two and a half meters nose to tail-tip. A big cat pressed low and forward, shoulders rolling above a dipped spine, head level and fixed ahead, the long tail trailing in a shallow curve, all four paws planted wide and silent. A broad white-cheeked face, and the classic coat: burnt orange banded with black stripes. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A tokay gecko clinging spread-eagled to a surface, about twenty-five centimeters long. A chunky gecko with broad toe-padded feet splayed wide, a thick body and tapered tail, a wide blunt head with big lidless gold-ringed eyes, the skin pebbled with fine bumps. Blue-gray ground color dotted boldly with bright orange spots, vivid and alert. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A domestic water buffalo standing placidly, about one point eight meters at the shoulder and built like a barrel. A massive bovine with a low-hung head carrying broad crescent horns that sweep back and out, a deep heavy body on stout legs, a short tufted tail, and a thick neck with loose folds. Dark slate-gray hide with a dusty sheen, immense and calm. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A water monitor lizard standing in a high-walk pause, about a meter and a half from snout to tail-tip - half of it muscular tail. A big amphibious lizard on four splayed bent legs with long claws, a long neck carrying a tapered snout with a flicking tongue, and a deep keeled tail trailing in a curve. Dark gray-brown skin flecked with yellow speckle rows. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A wild boar standing alert, about a meter and a half long and low-slung. A stocky forest pig with its weight piled into a humped muscular shoulder that tapers to lean hindquarters, a long wedge snout with short upturned tusks, upright ears, a bristled ridge along the spine, and short sturdy legs. Coarse dark brown bristle all over, compact and tough. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      },
+      {
+        "prompt": "A coopered wooden barrel standing upright, about ninety centimeters tall. Vertical oak staves swell to a proud belly at the middle and taper to flat round ends, bound by four dark iron hoops - two near the ends, two flanking the bulge - with a small bung hole in one stave. Weathered brown oak and rust-spotted iron, sturdy and timeless. Low-poly, game-ready, clean hard edges.",
+        "category": "prop",
+        "role": "prop"
+      }
+    ]
+  }
+}

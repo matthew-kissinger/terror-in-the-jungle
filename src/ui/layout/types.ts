@@ -19,6 +19,7 @@ export type HUDRegion =
   | 'compass'
   | 'minimap'
   | 'objectives'
+  | 'control-hints'  // desktop right rail: contextual control legend + situation readout
   | 'stats'
   | 'kill-feed'
   | 'ammo'

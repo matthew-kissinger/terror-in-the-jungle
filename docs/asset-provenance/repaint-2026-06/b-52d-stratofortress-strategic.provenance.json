@@ -1,0 +1,16 @@
+{
+  "slug": "b-52d-stratofortress-strategic",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/b-52d-stratofortress-strategic.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.415Z",
+  "sourcePrompt": "A B-52D Stratofortress strategic bomber, immense - nearly fifty meters of slender fuselage under a wingspan wider still. Long thin wings droop visibly under the weight of eight jet engines slung in four twin pods, small outrigger wheels sit near the wingtips, and the main gear rides in fuselage bogies. A stepped cockpit caps. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation af16befd-1b61-44f4-927a-2c4df01e5703",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "coopered-wooden-barrel-standing",
+  "class": "props",
+  "action": "new",
+  "tijTarget": "props/kiln-war-2026-06/coopered-wooden-barrel-standing.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.795Z",
+  "sourcePrompt": "A coopered wooden barrel standing upright, about ninety centimeters tall. Vertical oak staves swell to a proud belly at the middle and taper to flat round ends, bound by four dark iron hoops - two near the ends, two flanking the bulge - with a small bung hole in one stave. Weathered brown oak and rust-spotted iron, sturdy and timeless. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation ca55b123-b0e3-4c53-866c-60c3cd1524ff",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

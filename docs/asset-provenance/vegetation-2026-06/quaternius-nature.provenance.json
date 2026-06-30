@@ -1,0 +1,11 @@
+{
+  "slug": "quaternius-nature",
+  "provider": "Quaternius",
+  "sourceUrl": "https://quaternius.com",
+  "license": "CC0",
+  "sourceTriangles": null,
+  "status": "pending-download",
+  "localPath": "public/assets/vegetation/source/quaternius-nature/",
+  "attributionRequired": false,
+  "notes": "Tier 3 #12 — Ultimate Stylized Nature pack. Fallback / Strategy-B backbone if the M02P style clashes. CC0 (no attribution required) but record provenance anyway."
+}

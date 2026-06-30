@@ -270,6 +270,10 @@ export class SystemUpdater {
         refs.warSimulator.setPlayerPosition(pos.x, pos.y, pos.z);
         refs.warSimulator.update(warSimDelta);
         refs.strategicFeedback.setPlayerPosition(pos.x, pos.z);
+        if (refs.taskingDirector) {
+          refs.taskingDirector.setPlayerPosition(pos.x, pos.z);
+          refs.taskingDirector.update(warSimDelta);
+        }
       }
       performanceTelemetry.endSystem('WarSim');
     });

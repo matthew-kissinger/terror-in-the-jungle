@@ -1,0 +1,29 @@
+{
+  "slug": "hh-3e-jolly-green",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/hh-3e-jolly-green.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.445Z",
+  "sourcePrompt": "An HH-3E \"Jolly Green Giant\" rescue helicopter, about twenty-two meters with rotors, resting on wheels tucked into side sponsons. A deep boat-bottomed hull swells under a five-bladed main rotor; a long thin refueling probe spears forward from the nose, stubby sponson floats flank the lower hull, and the rear fuselage rises into. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation a0f617ff-f235-4930-8cb1-0f5a9630298a",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_MainRotor",
+      "type": "mainBlades",
+      "spinAxis": "y",
+      "meshCount": 11
+    },
+    {
+      "name": "Joint_TailRotor",
+      "type": "tailBlades",
+      "spinAxis": "z",
+      "meshCount": 6
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -7,6 +7,7 @@ import { GameMode } from '../config/gameModeTypes';
 import { Logger } from '../utils/Logger';
 import type { M2HBScenarioMode } from '../systems/combat/weapons/M2HBEmplacementSpawn';
 import type { M48ScenarioMode } from '../systems/vehicle/M48TankSpawn';
+import type { T54ScenarioMode } from '../systems/vehicle/T54TankSpawn';
 import type { M151ScenarioMode } from '../systems/vehicle/M151JeepSpawn';
 import { resolveGroundPlacement } from '../systems/terrain/TerrainPlacementAuthority';
 import { Tank } from '../systems/vehicle/Tank';
@@ -32,6 +33,7 @@ type OperationalRuntimeRefs = Pick<
   | 'npcVehicleController'
   | 'playerController'
   | 'strategicFeedback'
+  | 'taskingDirector'
   | 'terrainSystem'
   | 'ticketSystem'
   | 'vehicleManager'
@@ -52,6 +54,7 @@ interface OperationalRuntimeGroups {
     | 'influenceMapSystem'
     | 'minimapSystem'
     | 'strategicFeedback'
+    | 'taskingDirector'
     | 'ticketSystem'
     | 'warSimulator'
     | 'zoneManager'
@@ -104,6 +107,7 @@ export function createOperationalRuntimeGroups(
       influenceMapSystem: refs.influenceMapSystem,
       minimapSystem: refs.minimapSystem,
       strategicFeedback: refs.strategicFeedback,
+      taskingDirector: refs.taskingDirector,
       ticketSystem: refs.ticketSystem,
       warSimulator: refs.warSimulator,
       zoneManager: refs.zoneManager,
@@ -164,6 +168,16 @@ function wireStrategyRuntime(runtime: OperationalRuntimeGroups['strategyRuntime'
   runtime.strategicFeedback.setWarSimulator(runtime.warSimulator);
   runtime.strategicFeedback.setHUDSystem(runtime.hudSystem);
   runtime.strategicFeedback.setAudioManager(runtime.audioManager);
+
+  // Tasking director (tasking-director-mvp): a read-only consumer of the same
+  // war/zone/ticket state, surfacing one opt-in mission at a time on the HUD
+  // task card. It subscribes to WarSimulator events for clear/complete and
+  // mutates nothing. zoneManager is the IZoneQuery handle (ZoneManager
+  // implements it, same as HUDZoneDisplay consumes).
+  runtime.taskingDirector.setWarSimulator(runtime.warSimulator);
+  runtime.taskingDirector.setZoneQuery(runtime.zoneManager);
+  runtime.taskingDirector.setTicketSystem(runtime.ticketSystem);
+  runtime.taskingDirector.setTaskCard(runtime.hudSystem.getTaskCard());
 
   runtime.gameModeManager.setWarSimulator(runtime.warSimulator);
   runtime.minimapSystem.setWarSimulator(runtime.warSimulator);
@@ -276,6 +290,7 @@ function wireVehicleRuntime(
   wireM2HBEmplacementRuntime(runtime, options);
   wireM151JeepRuntime(runtime, options);
   wireM48TankRuntime(runtime, options);
+  wireT54TankRuntime(runtime, options);
 }
 
 // Maps GameMode -> the scenario-spawn key understood by
@@ -422,6 +437,59 @@ function wireM48TankRuntime(
 }
 
 function bindSpawnedM48TankRuntime(
+  ids: readonly string[],
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+): void {
+  for (const id of ids) {
+    const vehicle = runtime.vehicleManager.getVehicle(id);
+    if (!(vehicle instanceof Tank)) continue;
+    vehicle.setTerrain(runtime.terrainSystem ?? null);
+  }
+}
+
+// Maps GameMode -> the T-54 scenario-spawn key. Same shape + same scenarios
+// as the M48 wiring above; the NVA T-54 rides alongside the US M48 on Open
+// Frontier + A Shau, spawned at the OPFOR anchors.
+const T54_MODES_BY_GAMEMODE: Partial<Record<GameMode, T54ScenarioMode>> = {
+  [GameMode.OPEN_FRONTIER]: 'open_frontier',
+  [GameMode.A_SHAU_VALLEY]: 'a_shau_valley',
+};
+
+function wireT54TankRuntime(
+  runtime: OperationalRuntimeGroups['vehicleRuntime'],
+  options: OperationalRuntimeOptions
+): void {
+  const scene = options.scene;
+  if (!scene) return;
+
+  const spawnedModes = new Set<T54ScenarioMode>();
+  runtime.gameModeManager.onModeChanged((mode) => {
+    const scenarioKey = T54_MODES_BY_GAMEMODE[mode];
+    if (!scenarioKey) return;
+    if (spawnedModes.has(scenarioKey)) return;
+    spawnedModes.add(scenarioKey);
+    // Defer one frame so the per-mode terrain provider is hot before
+    // resolvePosition runs `getHeightAt` — mirrors the M48 wiring's
+    // setTimeout(0) deferral above.
+    setTimeout(() => {
+      try {
+        const ids = runtime.vehicleManager.spawnScenarioT54Tanks({
+          scene,
+          modes: [scenarioKey],
+          resolvePosition: (_m, base) => resolveGroundPlacement(base, runtime.terrainSystem).position,
+        });
+        bindSpawnedT54TankRuntime(ids, runtime);
+        Logger.info('vehicle', `T-54 tank scenario spawn (${scenarioKey}): ${ids.join(', ')}`);
+      } catch (error) {
+        // Roll back the reservation so a manual re-trigger can retry.
+        spawnedModes.delete(scenarioKey);
+        Logger.warn('vehicle', `T-54 tank scenario spawn failed for ${scenarioKey}`, error);
+      }
+    }, 0);
+  });
+}
+
+function bindSpawnedT54TankRuntime(
   ids: readonly string[],
   runtime: OperationalRuntimeGroups['vehicleRuntime'],
 ): void {

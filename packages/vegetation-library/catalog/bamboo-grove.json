@@ -1,0 +1,63 @@
+{
+  "id": "bamboo-grove",
+  "commonName": "Bamboo grove (single-culm scatter unit)",
+  "species": "Bambusa-like",
+  "tags": ["bamboo", "midlevel", "clump", "culm", "alpha-leaves", "concealment"],
+  "status": "ready",
+  "provenance": {
+    "source": "Sketchfab",
+    "author": "verify",
+    "url": "https://sketchfab.com/search?q=bamboo&type=models",
+    "license": "CC-BY-4.0",
+    "attributionRequired": true,
+    "sourceTris": 37834,
+    "notes": "Single bamboo culm extracted from the 'free_bamboo_set' display set (30 culms, 37834 tris), using bambooBlock.009 from the previously staged 3-culm bamboo-grove source. Source culms were authored oversized (~42m); a uniform 0.34 scale brings the culm to a realistic ~14.3m height (unit:meter normalization; geometry untouched). Ground-center pivot; pruned derivative GLB is 333KB. Runtime groves are formed by scattering this unit, not by baking a multi-culm cluster into one impostor. Author handle pending verification on the staged set; credit in THIRD-PARTY-ASSETS.md."
+  },
+  "normalization": { "upAxis": "Y", "forwardAxis": "-Z", "unit": "meter", "pivot": "ground-center" },
+  "materialBuckets": [],
+  "representations": [
+    {
+      "kind": "mesh",
+      "id": "mesh-grove",
+      "role": "instanced",
+      "path": "bamboo-culm/bamboo-culm.glb",
+      "tris": 3054,
+      "materialBuckets": [],
+      "bounds": { "center": [0, 7.151, 0], "size": [5.129, 14.301, 5.357], "radius": 8.055 },
+      "budget": { "trisPerInstance": 3054, "drawCallsPerBatch": 3, "textureMb": 0.34 }
+    },
+    {
+      "kind": "octaImpostor",
+      "id": "octa-grove",
+      "baseColorPath": "bamboo-culm/impostor/atlas.base-color.png",
+      "normalPath": "bamboo-culm/impostor/atlas.normal.png",
+      "depthPath": "bamboo-culm/impostor/atlas.depth.png",
+      "columns": 8,
+      "rows": 3,
+      "bounds": { "center": [0, 7.151, 0], "size": [5.129, 14.301, 5.357], "radius": 8.055 },
+      "materialTuning": {
+        "foliageExposureScale": 1.55,
+        "foliageColorGamma": 1.05,
+        "foliageSaturation": 0.82,
+        "fogStrength": 0.85,
+        "azimuthBlendBand": 0.6
+      },
+      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.2 }
+    }
+  ],
+  "lod": {
+    "label": "single-culm-mesh-near+octa-far",
+    "rationale": "Runtime groves are built from one bamboo culm repeated by scatter placement, not one baked three-culm cluster. The real single-culm mesh stays near the player; beyond ~70m it collapses to an 8x3 camera-facing impostor baked from that same single culm. This avoids the rejected clump impostor (three plants fighting one projection) and the rejected crossed card (three plants duplicating into six at diagonal angles).",
+    "bands": [
+      { "minDistanceMeters": 0, "maxDistanceMeters": 70, "representationId": "mesh-grove", "budget": { "trisPerInstance": 3054, "drawCallsPerBatch": 3 } },
+      { "minDistanceMeters": 70, "maxDistanceMeters": null, "representationId": "octa-grove", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 1.2 }, "notes": "8x3 upper-hemisphere static impostor baked from bamboo-culm/bamboo-culm.glb via scripts/bake-vegetation-impostor.mjs. Per-asset material tuning lowers foliage gamma and lifts exposure so the pale culm and muted leaves stay close to the source mesh across daylight, low-sun, and humid-fog review stages." }
+    ]
+  },
+  "ecology": {
+    "tier": "midLevel",
+    "preferredBiomes": ["denseJungle", "riverbank", "trailEdge", "clearingEdge"],
+    "density": 0.08,
+    "slopeRangeDeg": [0, 18],
+    "cluster": { "min": 1, "max": 4, "radiusMeters": 8 }
+  }
+}

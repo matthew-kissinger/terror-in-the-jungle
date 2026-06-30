@@ -1,0 +1,16 @@
+{
+  "slug": "traditional-vietnamese-village-hut",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/traditional-vietnamese-village-hut.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.258Z",
+  "sourcePrompt": "A traditional Vietnamese village hut of the Mekong Delta, a single small room about four meters wide, raised a hand's height off the ground on short wooden posts. Woven bamboo-mat walls under a steep thatched palm-leaf roof whose eaves overhang deeply, a single doorway with a woven door leaf, and one small window opening. Weathered bamboo. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade B; generation be0f8a4c-7e8e-493a-9b69-c55208bf3c7b",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

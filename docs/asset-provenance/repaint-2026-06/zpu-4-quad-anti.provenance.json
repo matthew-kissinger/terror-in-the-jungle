@@ -1,0 +1,23 @@
+{
+  "slug": "zpu-4-quad-anti",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/zpu-4-quad-anti.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.016Z",
+  "sourcePrompt": "A ZPU-4 quad anti-aircraft gun, an NVA towed mount about four and a half meters long. Four heavy machine-gun barrels with conical flash hiders sit clustered in a two-by-two block, elevated together skyward from a rotating central mount with a gunner's seat and two small shield plates, all riding a four-wheeled towing carriage with a hitch. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 981b92fd-c9f9-407a-a187-e40272e1103d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [
+    {
+      "name": "Joint_Turret",
+      "meshCount": 36
+    }
+  ],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "2536 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

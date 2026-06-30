@@ -1,0 +1,16 @@
+{
+  "slug": "f-4-phantom-ii",
+  "class": "aircraft",
+  "action": "new",
+  "tijTarget": "vehicles/aircraft/kiln-war-2026-06/f-4-phantom-ii.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.438Z",
+  "sourcePrompt": "An F-4 Phantom II fighter-bomber, about nineteen meters long, parked on tricycle gear with its nose high. A long pointed radome leads to a tandem two-seat canopy; broad low-set wings sweep back with their outer tips angled sharply upward, while the tailplanes angle just as sharply down - the Phantom's unmistakable cranked. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 45294c5b-f363-468b-bc64-241520deeb6d",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "ithaca-37-pump-action",
+  "class": "weapons",
+  "action": "new",
+  "tijTarget": "weapons/kiln-war-2026-06/ithaca-37-pump-action.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.656Z",
+  "sourcePrompt": "An Ithaca 37 pump-action 12-gauge shotgun, the close-quarters \"Tunnel Rat\" weapon, about a meter long. A compact shotgun with a tubular magazine running under the barrel, a grooved wooden pump slide wrapped around that tube, a plain walnut buttstock, a small bead front sight, and a clean receiver with the ejection port underneath. Walnut wood and blued. Low-poly, game-ready, clean hard edges.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 6170e606-5c08-4c83-9715-e9ef3bf88a5e",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

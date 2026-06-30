@@ -1,0 +1,25 @@
+{
+  "slug": "pt-76-amphibious-light",
+  "class": "ground",
+  "action": "new",
+  "tijTarget": "vehicles/ground/kiln-war-2026-06/pt-76-amphibious-light.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.538Z",
+  "sourcePrompt": "A PT-76 amphibious light tank of the NVA, about seven meters long and strikingly low - a steel boat on tracks. A flat wide hull with a boat-nosed bow and a folded trim vane lying flat on it, a small rounded pancake turret with a 76mm gun mounted well forward, and six large evenly spaced road wheels per side with no return. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 4ddadfce-bc6b-41fc-b293-7111ea15e9f3",
+  "appliedNormalization": "+X forward -> -Z forward (ground vehicle)",
+  "graftedJoints": [
+    {
+      "name": "Joint_Turret",
+      "meshCount": 15
+    },
+    {
+      "name": "Joint_MainGun",
+      "meshCount": 5
+    }
+  ],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

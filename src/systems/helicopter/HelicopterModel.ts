@@ -336,6 +336,17 @@ export class HelicopterModel implements GameSystem {
     return true;
   }
 
+  /**
+   * Read-only: is a boardable (alive, present) helicopter provisioned at this
+   * helipad right now? Helipads spawn `heli_<helipadId>`; a destroyed heli is
+   * hidden but kept in the map, so exclude it. Lets the spawn selector label a
+   * helipad honestly (helipad-spawn-truth) without reworking spawning.
+   */
+  hasBoardableHelicopterForHelipad(helipadId: string): boolean {
+    const id = `heli_${helipadId}`;
+    return this.helicopters.has(id) && !this.healthSystem.isDestroyed(id);
+  }
+
   getAllHelicopters(): Array<{ id: string; position: THREE.Vector3; model: string }> {
     const result: Array<{ id: string; position: THREE.Vector3; model: string }> = [];
     this.helicopters.forEach((helicopter, id) => {

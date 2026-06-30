@@ -1,0 +1,18 @@
+{
+  "slug": "french-colonial-rubber-plantation",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/french-colonial-rubber-plantation.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:08.210Z",
+  "sourcePrompt": "A French-colonial rubber-plantation mansion, grander than a villa - two tall stories about sixteen meters wide. A wide columned veranda wraps the entire ground floor with a matching balustraded gallery above, a raised central entrance porch with double doors crowns a fan of steps, tall louvered shutters line both floors, and a red-tile hipped. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 404f542c-46c1-43bc-91ff-7c1b487e66d0",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "11900 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

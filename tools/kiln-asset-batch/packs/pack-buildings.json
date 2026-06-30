@@ -1,0 +1,109 @@
+{
+  "plan": {
+    "name": "Vietnam Buildings",
+    "prompt": "Vietnamese village and French-colonial buildings, low-poly game-ready, one shared palette.",
+    "paletteId": "vietnam-war",
+    "items": [
+      {
+        "prompt": "A small stone arch bridge over a canal, about eight meters end to end. A single low masonry arch of fitted gray stone blocks springs between squat abutments, carrying a gently humped walking deck, with low solid stone parapet walls along both edges that step down at the ends. Moss-darkened weathered stone, old, heavy and permanent. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "An ornate rural Vietnamese Buddhist temple hall, about twelve meters wide and grander than a village pagoda. A broad timber hall under a sweeping two-tier roof whose ridges curl up into carved dragon finials, deep eaves over a colonnade of red-and-gold columns, full-width entrance steps rising to triple doorways, and carved lintels. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "An NVA earthen bunker, a buried timber-and-earth strongpoint about five meters across that barely rises a meter above grade. A low rounded mound of packed earth over a log roof, a wide dark horizontal firing slit facing front between timber lintels, and a small log-framed crawl entrance at the rear flanked by a few sandbags. Raw earth, rough. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A small Vietnamese Catholic mission church, French-built, about eight meters wide with its bell tower reaching twice the height of the nave. A white stucco church with a steep gabled roof, a narrow square tower centered on the front face carrying an arched open belfry under a small spire with a cross, tall arched windows down the sides. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A plain utilitarian concrete town building, a two-story Vietnamese government office or small hotel about ten meters wide. A flat-roofed rectangular block with its concrete frame showing as a grid around rows of plain rectangular windows, a recessed ground-floor entrance behind a couple of square columns, and a low parapet hiding the roof.. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A Vietnamese rural farmhouse, a single-story family home about eight meters wide - a step up from a hut. Plastered timber-framed walls in a warm earth tone, a clay-tile roof with gentle pitch, a covered veranda across the front on wooden posts sheltering the central doorway, and shuttered windows either side. Earthy plaster, dark timber. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A French-colonial villa of 1930s Vietnam, an elegant two-story house roughly twelve meters wide. Whitewashed walls with tall louvered shutters on every window, a columned veranda wrapping the ground floor with a balustraded balcony above, arched openings at the entrance, and a red clay-tile hipped roof with wide eaves. Whitewash, dark green. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "An open-air Vietnamese street market stall, about three meters wide and head-high. A simple wooden stand: four rough poles holding up a single slanted awning of faded tarp, a plank counter across the front loaded with produce and goods, and woven baskets and a stacked crate or two at its feet. No walls, all structure. Weathered wood. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A small Vietnamese Buddhist pagoda in the Mahayana style, about six meters square under roughly eight meters of stacked roof. Two tiers of green glazed-tile roofs with dramatically upturned eave corners and ornamental ridge finials, red-lacquered columns framing an open raised entrance up a short flight of steps, and white stucco side walls. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A Vietnamese rice granary raised on stilts, a small square store about three meters on a side, lifted a full meter off the ground on four stout flared posts that keep rodents and floodwater out. Woven bamboo walls bulge slightly between corner posts, a steep thatched roof caps it, and a short ladder leans up to one small square door. Bamboo. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A small Vietnamese rice mill, a working shed about eight meters long with one long side open. A timber frame under a rusted corrugated-tin roof with a small roof vent, the open side revealing a chunky milling machine with a hopper and belt wheel inside, and plump grain sacks stacked on a low loading platform out front. Weathered gray wood. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A French-colonial rubber-plantation mansion, grander than a villa - two tall stories about sixteen meters wide. A wide columned veranda wraps the entire ground floor with a matching balustraded gallery above, a raised central entrance porch with double doors crowns a fan of steps, tall louvered shutters line both floors, and a red-tile hipped. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A modest Vietnamese rural schoolhouse, a single-story rectangular building about ten meters long. Plain timber-plank walls under a low-pitched corrugated-tin roof, a row of three large shuttered window openings down the long classroom side, and a small covered entrance porch at one end with a step up. Weathered wood, rusty tin, orderly. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A narrow Vietnamese urban shophouse of Saigon or Da Nang, French-colonial in flavor: about four meters wide but two tall stories, made for a tight street. An open shopfront at street level under a horizontal signboard, tall shuttered windows and a small railed balcony above, stucco walls with simple cornice lines, and a shallow clay-tile. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A battle-damaged Vietnamese shophouse - the same narrow two-story colonial building, shelled. A ragged hole has collapsed one upper corner, exposing floor edges and interior wall; shutters hang skewed, the balcony rail is bent, scorch marks streak up the stucco above the openings, and rubble piles against the shopfront. The far half still. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A Mekong Delta stilt house standing about two meters above flood-prone ground on tall slender hardwood posts. A timber house with woven-mat walls and a thatched roof perched on the open stilt frame, a railed front porch along one side, and a steep ladder-stair climbing from the ground to the porch door; the shaded under-space stays open. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A traditional Vietnamese tea house, a small quan tra about five meters wide with its whole front open to the street. A raised wooden floor a step up from the ground, a tiled roof with gently upturned corners over carved eave brackets, round paper lanterns hanging along the open front, and low wooden tables and stools visible in the warm. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A traditional Vietnamese village hut of the Mekong Delta, a single small room about four meters wide, raised a hand's height off the ground on short wooden posts. Woven bamboo-mat walls under a steep thatched palm-leaf roof whose eaves overhang deeply, a single doorway with a woven door leaf, and one small window opening. Weathered bamboo. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A battle-damaged Vietnamese village hut - the same small bamboo-and-thatch home on short posts, wrecked by shelling. Half the thatched roof has collapsed inward leaving charred rafters open to the sky, one bamboo wall is blown out into splintered staves, and broken thatch and bamboo debris lie around the breach. The standing half remains. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      },
+      {
+        "prompt": "A rural warehouse or supply depot, a long low building about fifteen meters by eight. Cinder-block walls to waist height with corrugated-metal sheeting above, a corrugated gable roof with shallow pitch, a pair of large sliding cargo doors on the long face hung from an exterior rail, and a few small high windows. Rust-streaked silver steel. Low-poly, blocky, modular; simple readable silhouette.",
+        "category": "architecture",
+        "role": "building"
+      }
+    ]
+  }
+}

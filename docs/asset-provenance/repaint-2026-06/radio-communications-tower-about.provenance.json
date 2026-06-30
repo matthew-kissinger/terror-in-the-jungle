@@ -1,0 +1,18 @@
+{
+  "slug": "radio-communications-tower-about",
+  "class": "structures",
+  "action": "new",
+  "tijTarget": "structures/kiln-war-2026-06/radio-communications-tower-about.glb",
+  "provider": "google",
+  "model": "gemini-3.5-flash",
+  "sourceTimestamp": "2026-06-25T14:02:07.900Z",
+  "sourcePrompt": "A radio communications tower about twelve meters tall. A slender three-legged lattice mast of cross-braced steel angle sections rises from a small concrete pad, steadied by three guy wires to ground anchors, topped with two whip antennas and one small dish. Galvanized gray lattice, spindly and tall. Low-poly, blocky, modular; simple readable silhouette.",
+  "handEdit": "Kiln war-export-plan 2026-06-25; grade A; generation 838d36be-9a63-44e0-90f0-aa88384974e1",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "EXCEPTION",
+  "budgetReasons": [
+    "3496 tris over 2,500 structure budget"
+  ],
+  "sourceBatch": "pixel-forge war-assets/_repaint-2026-06"
+}

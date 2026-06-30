@@ -7,6 +7,7 @@ import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { repairKnownAircraftRotorGeometry } from '../assets/AircraftRotorGeometryRepair';
 import { AircraftModels, warAssetCatalog } from '../assets/modelPaths';
 import type { WarAssetEntry, WarAssetJoint } from '../assets/modelPaths';
+import { pickAircraftArt } from '../../config/aircraftArt';
 import { Logger } from '../../utils/Logger';
 
 /**
@@ -23,10 +24,15 @@ type RotorSpinAxis = 'x' | 'y' | 'z';
 
 const HELICOPTER_PERF_CATEGORY = 'helicopters';
 
+// Logical aircraft key -> GLB. The Kiln-art cutover (kiln-war-2026-06) repoints
+// the transport Huey + Cobra + UH-1C gunship to the new Kiln GLBs by default;
+// `?aircraftArt=legacy` restores the prior cycle-2026-06-11 repaint GLBs. The
+// UH-1C Kiln GLB was scale-defective (~6.28 m long); it is corrected to true
+// scale (~13.85 m) at the importer via CATALOG_SCALE_FIX, so it now ships Kiln art.
 const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
-  UH1_HUEY:      { modelPath: AircraftModels.UH1_HUEY,      displayName: 'UH-1 Huey',      faction: 'US' },
-  UH1C_GUNSHIP:  { modelPath: AircraftModels.UH1C_GUNSHIP,  displayName: 'UH-1C Gunship',  faction: 'US' },
-  AH1_COBRA:     { modelPath: AircraftModels.AH1_COBRA,      displayName: 'AH-1 Cobra',     faction: 'US' },
+  UH1_HUEY:      { modelPath: pickAircraftArt(AircraftModels.UH_1H_HUEY_TRANSPORT, AircraftModels.UH1_HUEY), displayName: 'UH-1 Huey',      faction: 'US' },
+  UH1C_GUNSHIP:  { modelPath: pickAircraftArt(AircraftModels.UH_1C_HUEY_GUNSHIP, AircraftModels.UH1C_GUNSHIP),  displayName: 'UH-1C Gunship',  faction: 'US' },
+  AH1_COBRA:     { modelPath: pickAircraftArt(AircraftModels.AH_1G_COBRA_ATTACK, AircraftModels.AH1_COBRA),  displayName: 'AH-1 Cobra',     faction: 'US' },
   AC47_SPOOKY:   { modelPath: AircraftModels.AC47_SPOOKY,    displayName: 'AC-47 Spooky',   faction: 'US' },
   F4_PHANTOM:    { modelPath: AircraftModels.F4_PHANTOM,      displayName: 'F-4 Phantom',    faction: 'US' },
   A1_SKYRAIDER:  { modelPath: AircraftModels.A1_SKYRAIDER,    displayName: 'A-1 Skyraider',  faction: 'US' },
@@ -77,7 +83,12 @@ export async function createHelicopterGeometry(
   helicopterGroup.add(scene);
 
   wireRotorJoints(scene, helicopterGroup, modelPath);
-  repairKnownAircraftRotorGeometry(scene, aircraftKey);
+  // Key the known-bad-rotor repair off the RESOLVED model path, not the logical
+  // aircraft key. The repair targets the legacy cycle-2026-06-11 UH-1H repaint's
+  // detached blade chunks; the Kiln UH-1H is a different, clean GLB, so passing
+  // the path makes the repair no-op for it (it would otherwise graft a second
+  // synthetic rotor bar on top of the Kiln blades).
+  repairKnownAircraftRotorGeometry(scene, modelPath);
   optimizeRotorJointDrawCalls(scene, aircraftKey);
   optimizeAircraftScene(scene, aircraftKey);
 
