@@ -16,8 +16,9 @@ import {
   radioAssetToSupportType,
 } from '../airsupport/AirSupportRadioCatalog';
 import type { AirSupportManager } from '../airsupport/AirSupportManager';
+import { StrikeDesignationController } from '../airsupport/StrikeDesignationController';
 import { CommandModeOverlay } from '../../ui/hud/CommandModeOverlay';
-import { AirSupportRadioMenu, type AirSupportRadioSelection } from '../../ui/hud/AirSupportRadioMenu';
+import { AirSupportRadioMenu } from '../../ui/hud/AirSupportRadioMenu';
 import { RadioDialPresenter } from '../../ui/hud/radio/RadioDialPresenter';
 import { RADIO_SLOT_OPEN_EVENT } from '../../ui/hud/radio/RadioHotbarSlot';
 import type { RadioIntent } from '../../ui/hud/radio/RadioDialModel';
@@ -70,8 +71,11 @@ export class CommandInputManager implements GameSystem {
   private readonly radioOrigin = new THREE.Vector3();
   private readonly radioDir = new THREE.Vector3();
   private readonly radioTarget = new THREE.Vector3();
-  private readonly radioApproach = new THREE.Vector3();
   private radioTargetValid = false;
+  private radioTargetHasGround = false;
+  // DESIGNATE -> CONFIRM call-in step (extracted; this manager only forwards).
+  private readonly strikeDesignation = new StrikeDesignationController();
+  private scene?: THREE.Scene;
   private radioCooldownAccumulator = 0;
   private unsubscribeCommandState?: () => void;
   private unsubscribeInputMode?: () => void;
@@ -87,12 +91,15 @@ export class CommandInputManager implements GameSystem {
       onSquadSelected: (squadId) => this.handleSquadSelection(squadId),
       onCloseRequested: () => this.closeOverlay(),
       onRadioRequested: () => this.openRadioMenu(),
-      onFireSupportSelected: (assetId) => this.handleFireSupportSelection(assetId),
+      onFireSupportSelected: (assetId) => this.beginStrikeDesignation(assetId, this.selectedMarking),
       onMarkingSelected: (marking) => this.setSelectedMarking(marking)
     });
     this.airSupportRadioMenu.setCallbacks({
       onCloseRequested: () => this.closeRadioMenu(),
-      onAssetSelected: (selection) => this.handleRadioSelection(selection)
+      onAssetSelected: (selection) => {
+        this.selectedMarking = selection.targetMarking;
+        this.beginStrikeDesignation(selection.assetId, selection.targetMarking);
+      }
     });
 
     this.radioDial = new RadioDialPresenter();
@@ -104,6 +111,21 @@ export class CommandInputManager implements GameSystem {
     // listen for it so a slot tap opens the dial exactly like the KeyT path.
     this.radioSlotOpenHandler = () => this.toggleRadioDial();
     document.addEventListener(RADIO_SLOT_OPEN_EVENT, this.radioSlotOpenHandler);
+
+    // Designate re-uses this manager's camera->ground pick + a friendly count.
+    this.strikeDesignation.setPickProvider(
+      (out) => ({ ok: this.resolveCameraGroundPick(out), hasGround: this.radioTargetHasGround }),
+      () => this.radioOrigin,
+    );
+    this.strikeDesignation.setFriendlyCountProvider((center, radius) => {
+      const cs = this.combatantSystem;
+      if (!cs) return 0;
+      let count = 0;
+      for (const id of cs.querySpatialRadius(center, radius)) {
+        if (cs.getCombatantById(id)?.faction === Faction.US) count++;
+      }
+      return count;
+    });
 
     this.unsubscribeCommandState = this.playerSquadController.onCommandStateChange((state) => {
       this.latestSquadState = state;
@@ -130,6 +152,12 @@ export class CommandInputManager implements GameSystem {
         this.radioCooldownAccumulator = 0;
         this.feedRadioCooldowns();
       }
+    }
+
+    // DESIGNATE owns the frame while placing a strike (re-aimable view-ray track).
+    if (this.strikeDesignation.isActive()) {
+      this.strikeDesignation.update(deltaTime);
+      return;
     }
 
     if (!this.overlayVisible || !this.playerController) return;
@@ -185,10 +213,12 @@ export class CommandInputManager implements GameSystem {
     this.commandModeOverlay.unmount();
     this.airSupportRadioMenu.unmount();
     this.radioDial.unmount();
+    this.strikeDesignation.unmount();
     this.layout = undefined;
     this.commandModeOverlay.dispose();
     this.airSupportRadioMenu.dispose();
     this.radioDial.dispose();
+    this.strikeDesignation.dispose();
   }
 
   mountTo(layout: HUDLayout): void {
@@ -203,6 +233,8 @@ export class CommandInputManager implements GameSystem {
     // Both dial presentations live at body level alongside the legacy menus;
     // only the input-mode-appropriate one is shown when the dial opens.
     this.radioDial.mount(document.body);
+    // DESIGNATE banner/reticle sits at body level too.
+    this.strikeDesignation.mount(document.body);
   }
 
   /** Route STATIONS selections to the headless RadioStationSystem (P3d wiring). */
@@ -245,10 +277,23 @@ export class CommandInputManager implements GameSystem {
 
   setAirSupportManager(airSupportManager: AirSupportManager): void {
     this.airSupportManager = airSupportManager;
+    this.strikeDesignation.setAirSupportManager(airSupportManager);
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
+    this.strikeDesignation.setTerrainHeightProvider((x, z) => terrainSystem.getHeightAt(x, z) ?? 0);
+  }
+
+  /** Scene handle so the designate step can build its world target marker. */
+  setScene(scene: THREE.Scene): void {
+    this.scene = scene;
+    this.strikeDesignation.setScene(scene);
+  }
+
+  /** LMB / pad-A: confirm an armed strike. Returns true if it consumed the input. */
+  handleStrikeConfirm(): boolean {
+    return this.strikeDesignation.confirm();
   }
 
   onVisibilityChange(listener: (visible: boolean) => void): () => void {
@@ -287,6 +332,9 @@ export class CommandInputManager implements GameSystem {
   }
 
   handleCancel(): boolean {
+    if (this.strikeDesignation.cancel()) {
+      return true;
+    }
     if (this.dialVisible) {
       this.closeRadioDial();
       return true;
@@ -317,6 +365,9 @@ export class CommandInputManager implements GameSystem {
   }
 
   handleGamepadCancel(): boolean {
+    if (this.strikeDesignation.cancel()) {
+      return true;
+    }
     if (this.dialVisible) {
       this.closeRadioDial();
       return true;
@@ -410,7 +461,7 @@ export class CommandInputManager implements GameSystem {
       }
     } else if (intent.kind === 'fire-support') {
       this.selectedMarking = intent.marking;
-      this.handleFireSupportSelection(intent.assetId);
+      this.beginStrikeDesignation(intent.assetId, intent.marking);
     } else if (intent.kind === 'marking') {
       this.setSelectedMarking(intent.marking);
     } else if (intent.kind === 'station') {
@@ -546,71 +597,29 @@ export class CommandInputManager implements GameSystem {
     }
   }
 
-  private handleRadioSelection(selection: AirSupportRadioSelection): void {
-    const asset = getAirSupportRadioAsset(selection.assetId);
-    const supportType = radioAssetToSupportType[selection.assetId];
-
-    // Unwired (no air-support manager or no resolved target): keep the shell's
-    // prior status-echo behaviour so the radio still reads as a UI surface.
-    if (!this.airSupportManager || !supportType || !this.radioTargetValid) {
-      const marking = selection.targetMarking.replace(/_/g, ' ').toUpperCase();
-      this.airSupportRadioMenu.setState({
-        selectedAssetId: selection.assetId,
-        selectedMarking: selection.targetMarking,
-        statusText: `${marking} target mark selected`,
-      });
-      return;
-    }
-
-    // Run the sortie in along the player's line of sight.
-    this.radioApproach.set(
-      this.radioTarget.x - this.radioOrigin.x,
-      0,
-      this.radioTarget.z - this.radioOrigin.z,
-    );
-    if (this.radioApproach.lengthSq() < 1) {
-      this.radioApproach.set(0, 0, 1);
-    }
-    this.radioApproach.normalize();
-
-    const accepted = this.airSupportManager.requestSupport({
-      type: supportType,
-      targetPosition: this.radioTarget.clone(),
-      approachDirection: this.radioApproach.clone(),
-      requesterFaction: Faction.US,
-    });
-
-    if (accepted) {
-      this.airSupportRadioMenu.setState({
-        selectedAssetId: selection.assetId,
-        selectedMarking: selection.targetMarking,
-        statusText: `${asset.label} inbound - ${asset.aircraft}`,
-      });
-      this.feedRadioCooldowns();
-      // Close whichever fire-support surface launched the call-in.
-      if (this.radioVisible) {
-        this.closeRadioMenu();
-      } else if (this.overlayVisible) {
-        this.closeOverlay();
-      }
-    } else {
-      const remaining = Math.ceil(this.airSupportManager.getCooldownRemaining(supportType));
-      this.airSupportRadioMenu.setState({
-        selectedAssetId: selection.assetId,
-        selectedMarking: selection.targetMarking,
-        statusText: `${asset.label} unavailable (${remaining}s)`,
-      });
-      this.feedRadioCooldowns();
-    }
-  }
-
   /**
-   * Fire-support call-in from the unified radio overlay. Re-uses the exact
-   * `AirSupportManager.requestSupport` path the detailed radio menu drives — it
-   * does NOT reimplement the sortie. The selection carries the active mark mode.
+   * Enter the DESIGNATE step (dial/overlay/menu all route here): close the open
+   * surface (relock the pointer to aim) and hand off to the designation
+   * controller; the strike fires on confirm, not on select. A cooling-down or
+   * unwired asset leaves a status echo and does not enter designate.
    */
-  private handleFireSupportSelection(assetId: AirSupportRadioAssetId): void {
-    this.handleRadioSelection({ assetId, targetMarking: this.selectedMarking });
+  private beginStrikeDesignation(assetId: AirSupportRadioAssetId, marking: AirSupportTargetMarking): void {
+    if (this.dialVisible) this.closeRadioDial();
+    else if (this.radioVisible) this.closeRadioMenu();
+    else if (this.overlayVisible) this.closeOverlay();
+
+    const outcome = this.strikeDesignation.begin(assetId, marking);
+    if (outcome !== 'designating') {
+      const asset = getAirSupportRadioAsset(assetId);
+      const supportType = radioAssetToSupportType[assetId];
+      const remaining = supportType
+        ? Math.ceil(this.airSupportManager?.getCooldownRemaining(supportType) ?? 0)
+        : 0;
+      const status = outcome === 'rejected'
+        ? `${asset.label} unavailable (${remaining}s)`
+        : `${asset.label} selected`;
+      this.airSupportRadioMenu.setState({ selectedAssetId: assetId, statusText: status });
+    }
   }
 
   /**
@@ -651,14 +660,17 @@ export class CommandInputManager implements GameSystem {
       const groundY = sampleHeight(x, z);
       if (y <= groundY) {
         out.set(x, groundY, z);
+        this.radioTargetHasGround = true;
         return true;
       }
     }
 
+    // Looking above the horizon: fall back to a fixed point ahead, flagged off-ground.
     const horiz = Math.hypot(this.radioDir.x, this.radioDir.z) || 1;
     const fx = this.radioOrigin.x + (this.radioDir.x / horiz) * 200;
     const fz = this.radioOrigin.z + (this.radioDir.z / horiz) * 200;
     out.set(fx, sampleHeight(fx, fz), fz);
+    this.radioTargetHasGround = false;
     return true;
   }
 

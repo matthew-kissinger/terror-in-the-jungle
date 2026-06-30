@@ -228,7 +228,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('dispatches a radio call-in to the air support manager with the player faction', () => {
+  it('arms a designate step on asset select, then dispatches the call-in on confirm', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -255,13 +255,22 @@ describe('CommandInputManager', () => {
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'ac47_orbit');
 
+    // Selecting an asset no longer fires immediately: it closes the dial and
+    // enters DESIGNATE (re-aimable). The strike only goes out on confirm.
+    expect(requestSupport).not.toHaveBeenCalled();
+    expect(visibleDialog()).toBeNull();
+
+    manager.update(0.1); // track the view ray onto the ground
+
+    // LMB confirms the painted target.
+    expect(manager.handleStrikeConfirm()).toBe(true);
+
     expect(requestSupport).toHaveBeenCalledTimes(1);
     const request = requestSupport.mock.calls[0][0];
     expect(request.type).toBe('spooky'); // ac47_orbit fulfils via the spooky sortie
     expect(request.requesterFaction).toBe(Faction.US); // called strikes spare friendlies
+    expect(request.marking).toBe('smoke'); // active mark threaded into the request
     expect(request.targetPosition).toBeInstanceOf(THREE.Vector3);
-    // Dial closes after a successful call-in.
-    expect(visibleDialog()).toBeNull();
 
     manager.dispose();
     layout.dispose();

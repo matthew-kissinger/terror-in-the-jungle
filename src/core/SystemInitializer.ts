@@ -207,6 +207,8 @@ export class SystemInitializer {
     refs.commandInputManager = new CommandInputManager(refs.playerSquadController);
     // Air-support radio call-in: the command UI dispatches sorties through the
     // existing AirSupportManager and needs terrain to resolve the marked point.
+    // The scene handle lets the DESIGNATE step build its world target marker.
+    refs.commandInputManager.setScene(scene);
     refs.commandInputManager.setAirSupportManager(refs.airSupportManager);
     if (refs.terrainSystem) {
       refs.commandInputManager.setTerrainSystem(refs.terrainSystem);

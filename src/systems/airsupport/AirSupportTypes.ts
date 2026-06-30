@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import type { Faction } from '../combat/types';
+import type { AirSupportTargetMarking } from './AirSupportRadioCatalog';
 import { pickAircraftArt } from '../../config/aircraftArt';
 
 export type AirSupportType = 'spooky' | 'napalm' | 'rocket_run' | 'recon' | 'arclight';
@@ -16,6 +17,12 @@ export interface AirSupportRequest {
    * combatants are never hit. Defaults to the player faction (US) when omitted.
    */
   requesterFaction?: Faction;
+  /**
+   * How the player marked the target (smoke / willie-pete / position-only).
+   * Additive + optional: drives the on-target mark spawned at call-in. Omitted
+   * requests behave exactly as before (no mark).
+   */
+  marking?: AirSupportTargetMarking;
 }
 
 export interface AirSupportMission {

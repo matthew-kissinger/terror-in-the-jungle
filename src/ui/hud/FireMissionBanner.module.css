@@ -1,0 +1,151 @@
+/**
+ * FireMissionBanner — DESIGNATE / CONFIRM / INBOUND air-support call-in HUD.
+ * Parchment-ink field aesthetic, matching the radio pill + command overlay.
+ * Non-interactive (pointer-events: none); the player aims/confirms with the
+ * mouse/controller, not by clicking this overlay.
+ */
+
+.root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 70;
+  font-family: var(--font-primary, var(--type-stamp));
+  color: rgba(231, 217, 186, 0.95);
+}
+
+.root[data-state="hidden"] {
+  display: none;
+}
+
+/* Top status strip ------------------------------------------------------- */
+.strip {
+  position: absolute;
+  top: max(14%, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  border: 1px solid rgba(231, 217, 186, 0.42);
+  border-radius: var(--radius-pill, 50px);
+  background: rgba(28, 25, 20, 0.82);
+  box-shadow: 0 2px 10px rgba(20, 18, 15, 0.5);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.asset { color: rgba(231, 217, 186, 0.98); }
+
+.sep,
+.lead {
+  color: rgba(168, 116, 42, 0.95);
+}
+
+.root[data-state="confirm"] .strip {
+  border-color: rgba(224, 165, 44, 0.7);
+  background: rgba(46, 38, 22, 0.9);
+}
+
+.grid {
+  font-variant-numeric: tabular-nums;
+  color: rgba(231, 217, 186, 0.9);
+}
+
+.status {
+  font-variant-numeric: tabular-nums;
+}
+
+.status[data-kind="valid"] { color: #7fcf6a; }
+.status[data-kind="invalid"] { color: rgba(154, 160, 166, 0.85); }
+.status[data-kind="danger"] { color: #ef6a5c; }
+
+.danger {
+  color: #ef6a5c;
+  animation: fmb-flash 1s steps(2, jump-none) infinite;
+}
+
+/* Center designate reticle ---------------------------------------------- */
+.reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  transform: translate(-50%, -50%);
+  display: none;
+}
+
+.root[data-state="designate"] .reticle,
+.root[data-state="confirm"] .reticle {
+  display: block;
+}
+
+.reticleRing,
+.reticleDot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.reticleRing {
+  width: 100%;
+  height: 100%;
+  border: 2px solid currentColor;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.55);
+}
+
+.reticleDot {
+  width: 4px;
+  height: 4px;
+  background: currentColor;
+}
+
+.reticle[data-kind="valid"] { color: #7fcf6a; }
+.reticle[data-kind="invalid"] { color: rgba(190, 194, 198, 0.85); }
+.reticle[data-kind="danger"] { color: #ef6a5c; }
+
+.reticle[data-kind="valid"] .reticleRing {
+  animation: fmb-lock 0.6s ease-out infinite alternate;
+}
+
+/* Bottom action hint ---------------------------------------------------- */
+.hint {
+  position: absolute;
+  bottom: max(20%, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: rgba(20, 18, 15, 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: rgba(231, 217, 186, 0.82);
+  white-space: nowrap;
+}
+
+.hint:empty { display: none; }
+
+@keyframes fmb-lock {
+  from { transform: translate(-50%, -50%) scale(1.15); opacity: 0.65; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes fmb-flash {
+  from { opacity: 1; }
+  to { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reticle[data-kind="valid"] .reticleRing,
+  .danger {
+    animation: none;
+  }
+}

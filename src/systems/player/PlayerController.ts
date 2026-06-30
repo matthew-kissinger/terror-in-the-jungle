@@ -348,6 +348,7 @@ export class PlayerController implements GameSystem {
 
   /** Start firing - routes to weapon system based on current weapon mode */
   private actionFireStart(): void {
+    if (this.commandInputManager?.handleStrikeConfirm()) return; // LMB confirms a strike mark, not fire
     if (this.shouldSuppressInfantryActions()) return;
     this.combatController.beginFire(this.playerState, this.currentWeaponMode, this.camera);
   }
