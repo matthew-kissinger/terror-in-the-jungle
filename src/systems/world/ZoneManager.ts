@@ -222,6 +222,8 @@ export class ZoneManager implements GameSystem, IZoneQuery {
             zoneId: zone.id,
             zoneName: zone.name,
             faction: zone.owner,
+            position: zone.position.clone(),
+            radius: zone.radius,
           });
         }
       }

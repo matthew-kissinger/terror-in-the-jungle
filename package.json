@@ -65,6 +65,7 @@
       "scripts/real-device-validation.ts",
       "scripts/bake-vegetation-impostor.mjs",
       "scripts/bake-veg-card.mjs",
+      "scripts/bake-topo-dem.ts",
       "scripts/stage-kiln-war-export.mjs",
       "tools/kiln-asset-batch/build-packs.mjs",
       "tools/weapon/capture-ads-align.mjs",

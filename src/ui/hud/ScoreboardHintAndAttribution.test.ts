@@ -5,13 +5,14 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 /**
- * Behavior tests for two playtest HUD truths (cycle-2026-06-28):
+ * Behavior tests for HUD attribution placement + scoreboard affordance:
  *   1. The AGPL attribution notice must NOT sit in the bottom-left corner,
  *      where it overlapped the health pill. It is now bottom-center, still
  *      readable and still pointer-events:none.
- *   2. The scoreboard is hold-Tab, not a toggle, so it read as broken. A tiny
- *      "Hold Tab: scoreboard" discoverability hint now renders and steps aside
- *      while the board is open.
+ *   2. The scoreboard's "Hold Tab" affordance was consolidated into the
+ *      right-rail control-hints legend (HudControlHints, "TAB · Scoreboard").
+ *      ScoreboardPanel no longer mounts a separate floating discoverability
+ *      hint, so it can never collide with the control-hints panel.
  *
  * These assert observable DOM geometry / presence, not the score-tracking
  * internals (PlayerStatsTracker is correct and tested elsewhere).
@@ -58,7 +59,7 @@ describe('attribution notice placement', () => {
   });
 });
 
-describe('scoreboard discoverability hint', () => {
+describe('scoreboard affordance (consolidated, no floating hint)', () => {
   function makePanel(): ScoreboardPanel {
     const statsTracker = {
       getStats: () => ({ kills: 0, assists: 0, deaths: 0, zonesCaptured: 0 }),
@@ -70,42 +71,24 @@ describe('scoreboard discoverability hint', () => {
     return new ScoreboardPanel(statsTracker, combatantSystem);
   }
 
-  it('renders a "Hold Tab" hint when the panel mounts on a keyboard device', () => {
+  it('does NOT mount a standalone discoverability hint (it lives in the control-hints legend now)', () => {
     const panel = makePanel();
     panel.mount(document.body);
-
-    const hint = document.getElementById('scoreboard-discoverability-hint');
-    expect(hint).not.toBeNull();
-    expect(hint!.textContent?.toLowerCase()).toContain('tab');
-    expect(hint!.textContent?.toLowerCase()).toContain('scoreboard');
-    // Passive nudge: it must never intercept gameplay input.
-    expect(hint!.style.pointerEvents).toBe('none');
-    // Visible while the board is closed.
-    expect(hint!.style.display).not.toBe('none');
-
-    panel.dispose();
-  });
-
-  it('hides the hint while the scoreboard is open and restores it when closed', () => {
-    const panel = makePanel();
-    panel.mount(document.body);
-    const hint = document.getElementById('scoreboard-discoverability-hint')!;
-
-    panel.toggle(true);
-    expect(hint.style.display).toBe('none');
-
-    panel.toggle(false);
-    expect(hint.style.display).not.toBe('none');
-
-    panel.dispose();
-  });
-
-  it('removes the hint from the DOM when the panel is disposed', () => {
-    const panel = makePanel();
-    panel.mount(document.body);
-    expect(document.getElementById('scoreboard-discoverability-hint')).not.toBeNull();
-
-    panel.dispose();
+    // The old floating "Hold Tab: scoreboard" overlay is gone — the affordance
+    // is consolidated into the right-rail control-hints legend so it can never
+    // collide with that panel.
     expect(document.getElementById('scoreboard-discoverability-hint')).toBeNull();
+    panel.dispose();
+  });
+
+  it('toggles cleanly without a floating hint', () => {
+    const panel = makePanel();
+    panel.mount(document.body);
+    expect(() => {
+      panel.toggle(true);
+      panel.toggle(false);
+    }).not.toThrow();
+    expect(document.getElementById('scoreboard-discoverability-hint')).toBeNull();
+    panel.dispose();
   });
 });

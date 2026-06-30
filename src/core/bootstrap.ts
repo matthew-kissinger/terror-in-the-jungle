@@ -17,6 +17,8 @@ import { Logger } from '../utils/Logger';
 import { preloadIcons } from '../ui/icons/IconRegistry';
 import { isFlightTestMode } from '../dev/flightTestMode';
 import { BoundedRingBuffer } from './BoundedRingBuffer';
+import { setOrbitalSharedRenderer } from '../ui/map/orbital/OrbitalRendererRegistry';
+import type { SharedRenderer } from '../ui/map/orbital/OrbitalTopoRenderer';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -249,6 +251,10 @@ export async function bootstrapGame(): Promise<void> {
     markStartup('bootstrap.engine-initialize.end');
     engine.start();
     markStartup('bootstrap.engine-started');
+
+    // Register the shared renderer for the 3D orbital topo map (render-on-demand;
+    // no second WebGPU device). The concrete THREE renderer satisfies SharedRenderer.
+    setOrbitalSharedRenderer(engine.renderer.renderer as unknown as SharedRenderer);
 
     // Warm browser cache for critical HUD icons
     preloadIcons([

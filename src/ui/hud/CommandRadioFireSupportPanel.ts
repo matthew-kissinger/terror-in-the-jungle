@@ -2,17 +2,37 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import {
-  AIR_SUPPORT_RADIO_ASSETS,
-  AIR_SUPPORT_TARGET_MARKINGS,
   getCooldownRemaining,
   type AirSupportRadioAssetId,
   type AirSupportRadioCooldowns,
   type AirSupportTargetMarking
 } from '../../systems/airsupport/AirSupportRadioCatalog';
+import {
+  buildRadioCategories,
+  formatRadioCooldown,
+  type RadioCategory,
+  type RadioOption,
+} from './radio/RadioDialModel';
 
 interface FireSupportRowRefs {
   button: HTMLButtonElement;
   status: HTMLSpanElement;
+}
+
+// Pull the fire-support + markings rows from the ONE shared radio model so this
+// panel and the revived dial render the same catalog (no duplicated lists).
+function fireSupportOptions(): Extract<RadioOption, { kind: 'fire-support' }>[] {
+  const category = buildRadioCategories().find((c): c is RadioCategory => c.id === 'fire-support');
+  return (category?.options ?? []).filter(
+    (o): o is Extract<RadioOption, { kind: 'fire-support' }> => o.kind === 'fire-support',
+  );
+}
+
+function markingOptions(): Extract<RadioOption, { kind: 'marking' }>[] {
+  const category = buildRadioCategories().find((c): c is RadioCategory => c.id === 'markings');
+  return (category?.options ?? []).filter(
+    (o): o is Extract<RadioOption, { kind: 'marking' }> => o.kind === 'marking',
+  );
 }
 
 /**
@@ -21,6 +41,9 @@ interface FireSupportRowRefs {
  * Pure presentation — selecting an asset fires `onAssetSelected`; the owner
  * (`CommandInputManager`) drives the real `AirSupportManager.requestSupport`
  * path. Extracted from `CommandModeOverlay` to keep that file within budget.
+ *
+ * It consumes the shared `RadioDialModel` for its catalog + cooldown resolution
+ * so this legacy panel and the revived dial never drift apart.
  */
 export class CommandRadioFireSupportPanel {
   static readonly STYLE_ID = 'command-radio-fire-support-styles';
@@ -29,6 +52,8 @@ export class CommandRadioFireSupportPanel {
   private readonly readyValue: HTMLSpanElement;
   private readonly markingButtons = new Map<AirSupportTargetMarking, HTMLButtonElement>();
   private readonly rows = new Map<AirSupportRadioAssetId, FireSupportRowRefs>();
+  private readonly assetOptions = fireSupportOptions();
+  private readonly markings = markingOptions();
   private cooldowns: AirSupportRadioCooldowns = {};
   private selectedMarking: AirSupportTargetMarking = 'smoke';
   private onAssetSelected?: (assetId: AirSupportRadioAssetId) => void;
@@ -59,24 +84,24 @@ export class CommandRadioFireSupportPanel {
 
     const markingRow = document.createElement('div');
     markingRow.className = 'command-radio-fire__marks';
-    for (const marking of AIR_SUPPORT_TARGET_MARKINGS) {
+    for (const marking of this.markings) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'command-radio-fire__mark';
-      button.dataset.radioMarking = marking.id;
-      button.textContent = marking.shortLabel;
-      button.title = marking.label;
-      button.addEventListener('click', () => this.onMarkingSelected?.(marking.id));
-      this.markingButtons.set(marking.id, button);
+      button.dataset.radioMarking = marking.marking;
+      button.textContent = marking.label;
+      button.title = marking.detail;
+      button.addEventListener('click', () => this.onMarkingSelected?.(marking.marking));
+      this.markingButtons.set(marking.marking, button);
       markingRow.appendChild(button);
     }
     this.element.appendChild(markingRow);
 
     const list = document.createElement('div');
     list.className = 'command-radio-fire__list';
-    for (const asset of AIR_SUPPORT_RADIO_ASSETS) {
-      const refs = this.createRow(asset.id, asset.label, `${asset.aircraft} / ${asset.payload}`);
-      this.rows.set(asset.id, refs);
+    for (const asset of this.assetOptions) {
+      const refs = this.createRow(asset.assetId, asset.label, asset.detail);
+      this.rows.set(asset.assetId, refs);
       list.appendChild(refs.button);
     }
     this.element.appendChild(list);
@@ -147,22 +172,22 @@ export class CommandRadioFireSupportPanel {
 
   private render(): void {
     let ready = 0;
-    for (const asset of AIR_SUPPORT_RADIO_ASSETS) {
-      const refs = this.rows.get(asset.id);
+    for (const asset of this.assetOptions) {
+      const refs = this.rows.get(asset.assetId);
       if (!refs) continue;
-      const remaining = getCooldownRemaining(this.cooldowns, asset.id);
+      const remaining = getCooldownRemaining(this.cooldowns, asset.assetId);
       const coolingDown = remaining > 0;
       if (!coolingDown) ready += 1;
       refs.button.disabled = coolingDown;
-      refs.status.textContent = coolingDown ? formatCooldown(remaining) : 'READY';
+      refs.status.textContent = coolingDown ? formatRadioCooldown(remaining) : 'READY';
       refs.button.classList.toggle('command-radio-fire__row--cooling', coolingDown);
     }
-    this.readyValue.textContent = `${ready}/${AIR_SUPPORT_RADIO_ASSETS.length} ready`;
+    this.readyValue.textContent = `${ready}/${this.assetOptions.length} ready`;
 
-    for (const marking of AIR_SUPPORT_TARGET_MARKINGS) {
-      this.markingButtons.get(marking.id)?.setAttribute(
+    for (const marking of this.markings) {
+      this.markingButtons.get(marking.marking)?.setAttribute(
         'aria-pressed',
-        marking.id === this.selectedMarking ? 'true' : 'false'
+        marking.marking === this.selectedMarking ? 'true' : 'false'
       );
     }
   }
@@ -303,9 +328,4 @@ export class CommandRadioFireSupportPanel {
     `;
     document.head.appendChild(style);
   }
-}
-
-function formatCooldown(seconds: number): string {
-  const safeSeconds = Math.ceil(Math.max(0, seconds));
-  return safeSeconds >= 60 ? `${Math.ceil(safeSeconds / 60)}M` : `${safeSeconds}S`;
 }

@@ -137,4 +137,22 @@ describe('HudTaskCard', () => {
     card.dispose();
     expect(cardEl(host)).toBeNull();
   });
+
+  it('mounts atop existing slot content as a sibling, not nested inside it', () => {
+    // The host stands in for a grid slot that already holds the objectives panel.
+    // The card must land as the slot's first child (above the panel), never as a
+    // descendant of the panel — that nesting was the bug it overlapped.
+    const objectivesPanel = document.createElement('div');
+    objectivesPanel.className = 'objectives-panel';
+    host.appendChild(objectivesPanel);
+
+    const card = new HudTaskCard();
+    card.mount(host);
+
+    const el = cardEl(host);
+    expect(el).not.toBeNull();
+    expect(el?.parentElement).toBe(host);
+    expect(objectivesPanel.contains(el)).toBe(false);
+    expect(host.firstElementChild).toBe(el);
+  });
 });

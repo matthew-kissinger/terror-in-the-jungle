@@ -12,6 +12,9 @@ vi.mock('../../config/SettingsManager', () => ({
     getInstance: () => ({
       getAll: () => ({
         masterVolume: 70,
+        ambientVolume: 100,
+        musicVolume: 50,
+        musicEnabled: false,
         mouseSensitivity: 5,
         touchSensitivity: 5,
         graphicsQuality: 'medium',
@@ -85,6 +88,15 @@ describe('SettingsModal', () => {
     expect(volumeInput).not.toBeNull();
     const volumeLabel = modal.element.querySelector('label[for="setting-masterVolume"]');
     expect(volumeLabel).not.toBeNull();
+  });
+
+  it('exposes ambient/music volume sliders and a radio music toggle', () => {
+    expect(modal.element.querySelector('#setting-ambientVolume')).not.toBeNull();
+    expect(modal.element.querySelector('#setting-musicVolume')).not.toBeNull();
+    const musicToggle = modal.element.querySelector('[data-setting="musicEnabled"]') as HTMLInputElement | null;
+    expect(musicToggle).not.toBeNull();
+    // Radio music ships OFF: the toggle is unchecked by default.
+    expect(musicToggle?.checked).toBe(false);
   });
 
   it('shows graphics quality hint text', () => {
