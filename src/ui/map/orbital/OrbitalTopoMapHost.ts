@@ -131,12 +131,14 @@ export function createLiveOrbitalMap(opts: {
   zoneQuery: IZoneQuery;
   spawns?: () => readonly SpawnPointLike[];
   onZoneSelected?: (zoneId: string, zoneName: string) => void;
+  ownsCanvas?: boolean;
 }): OrbitalTopoMap {
   const options: OrbitalTopoMapOptions = {
     renderer: opts.renderer,
     dataSource: liveDataSource(opts.terrain),
     markerProvider: () => buildMarkerInputs(opts.zoneQuery.getAllZones(), opts.spawns ? opts.spawns() : []),
     onZoneSelected: opts.onZoneSelected,
+    ownsCanvas: opts.ownsCanvas,
   };
   return new OrbitalTopoMap(options);
 }
@@ -148,12 +150,14 @@ export function createBakedOrbitalMap(opts: {
   worldSize: number;
   markers: () => readonly TopoMarkerInput[];
   onZoneSelected?: (zoneId: string, zoneName: string) => void;
+  ownsCanvas?: boolean;
 }): OrbitalTopoMap {
   const options: OrbitalTopoMapOptions = {
     renderer: opts.renderer,
     dataSource: bakedDataSource(opts.url, opts.worldSize),
     markerProvider: opts.markers,
     onZoneSelected: opts.onZoneSelected,
+    ownsCanvas: opts.ownsCanvas,
   };
   return new OrbitalTopoMap(options);
 }

@@ -164,8 +164,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.attachToDOM(this.hudLayout);
     this.scoreboard.mount(this.hudLayout.getRoot());
     this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
-    // Context-sensitive control legend on the right edge; suppressed on touch.
-    this.controlHints.mount(this.hudLayout.getRoot(), isTouchDevice());
+    // Context-sensitive control legend in its dedicated right-rail grid slot; suppressed on touch.
+    this.controlHints.mount(this.hudLayout.getSlot('control-hints'), isTouchDevice());
     // Situation readout (war posture + nearest contested objective + a direction
     // nudge) shares the control-hint panel surface — mounted into the legend
     // root so the two read as one right-edge panel and never collide with the

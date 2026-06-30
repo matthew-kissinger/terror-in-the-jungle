@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { colors, fontStack, zIndex } from '../design/tokens';
+import { colors, fontStack } from '../design/tokens';
 import type { ActorMode, VehicleUIContext } from '../layout/types';
 
 /**
@@ -78,15 +78,11 @@ interface ContextLegend {
  */
 const CONTEXT_BINDS: Record<ControlHintContext, ContextLegend> = {
   foot: {
+    // Trimmed to this game's non-obvious verbs — standard FPS binds (WASD /
+    // sprint / jump / fire / reload / weapon-swap / grenade) are intentionally
+    // omitted per UI guidance against explaining obvious controls.
     title: 'ON FOOT',
     hints: [
-      { keys: 'WASD', action: 'Move' },
-      { keys: 'Shift', action: 'Sprint' },
-      { keys: 'Space', action: 'Jump' },
-      { keys: 'LMB / RMB', action: 'Fire / ADS' },
-      { keys: 'R', action: 'Reload' },
-      { keys: '1-6', action: 'Weapons' },
-      { keys: 'G', action: 'Grenade' },
       { keys: 'F', action: 'Board vehicle' },
       { keys: 'T', action: 'Air support radio' },
       { keys: 'Z', action: 'Squad commands' },
@@ -487,11 +483,8 @@ export class HudControlHints {
     style.id = STYLE_ID;
     style.textContent = `
       .hud-control-hints {
-        position: fixed;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: ${zIndex.hudStatus};
+        /* Flows inside the dedicated 'control-hints' grid slot (HUDLayout);
+         * no longer a position:fixed viewport overlay. */
         pointer-events: none;
         font-family: ${fontStack.hud};
         font-size: 11px;

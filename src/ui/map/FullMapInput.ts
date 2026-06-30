@@ -13,11 +13,13 @@ interface FullMapInputCallbacks {
   onHide: () => void;
   onRender: () => void;
   /**
-   * Optional opt-in 3D orbital map toggle (Shift+M). When wired, holding Shift
-   * while pressing M opens the rich 3D relief map instead of the fast 2D map;
-   * plain M still opens the 2D map (owner decision: hold-M default stays 2D).
+   * 3D orbital relief map toggle. When wired, plain M opens the rich 3D relief
+   * map (toggle: press M again to close); Shift+M opens the fast 2D tactical
+   * peek (hold to view, release to hide). Owner decision 2026-06-30: 3D is the
+   * default in-combat map. Returns the resulting open state so the input
+   * handler can gate gameplay input context and answer Escape correctly.
    */
-  onToggleOrbital3D?: () => void;
+  onToggleOrbital3D?: () => boolean;
 }
 
 /** Touch gesture state machine */
@@ -32,6 +34,9 @@ export class FullMapInput {
   private defaultZoomLevel = 1;
   private callbacks: FullMapInputCallbacks;
   private isVisible = false;
+  /** Tracks the 3D relief toggle's own open state (plain M) — separate from
+   * `isVisible`, which is the 2D tactical peek's hold-to-view flag. */
+  private orbital3DVisible = false;
   private mapCanvas?: HTMLCanvasElement;
   private readonly contextManager = InputContextManager.getInstance();
 
@@ -99,9 +104,13 @@ export class FullMapInput {
 
   private handleKeyDown(e: KeyboardEvent): void {
     if (e.key === 'm' || e.key === 'M') {
-      // Shift+M opens the opt-in 3D orbital map (toggle); plain M opens 2D.
-      if (e.shiftKey && this.callbacks.onToggleOrbital3D) {
-        if (!e.repeat) this.callbacks.onToggleOrbital3D();
+      // Default M opens the 3D orbital relief map (toggle); Shift+M opens the
+      // fast 2D tactical peek. Owner decision 2026-06-30: 3D is the default.
+      if (!e.shiftKey && this.callbacks.onToggleOrbital3D) {
+        if (!e.repeat) {
+          this.orbital3DVisible = this.callbacks.onToggleOrbital3D();
+          this.contextManager.setContext(this.orbital3DVisible ? 'map' : 'gameplay');
+        }
         return;
       }
       if (!e.repeat) {
@@ -109,19 +118,32 @@ export class FullMapInput {
         this.contextManager.setContext('map');
         this.callbacks.onShow();
       }
-    } else if (e.key === 'Escape' && this.isVisible) {
+    } else if (e.key === 'Escape' && (this.isVisible || this.orbital3DVisible)) {
+      this.closeAnyOpenMap();
+    }
+  }
+
+  private handleKeyUp(e: KeyboardEvent): void {
+    // The 3D relief (plain M) is a toggle, not a hold — only the 2D tactical
+    // peek (Shift+M) hides on key release. Gating on `isVisible` keeps a plain
+    // M release from spuriously tearing down HUD/touch-modal state while the
+    // 3D relief is still open (it never set isVisible in the first place).
+    if ((e.key === 'm' || e.key === 'M') && this.isVisible) {
       this.isVisible = false;
       this.contextManager.setContext('gameplay');
       this.callbacks.onHide();
     }
   }
 
-  private handleKeyUp(e: KeyboardEvent): void {
-    if (e.key === 'm' || e.key === 'M') {
+  private closeAnyOpenMap(): void {
+    if (this.orbital3DVisible && this.callbacks.onToggleOrbital3D) {
+      this.orbital3DVisible = this.callbacks.onToggleOrbital3D();
+    }
+    if (this.isVisible) {
       this.isVisible = false;
-      this.contextManager.setContext('gameplay');
       this.callbacks.onHide();
     }
+    this.contextManager.setContext('gameplay');
   }
 
   private handleWheel(e: WheelEvent): void {

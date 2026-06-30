@@ -147,8 +147,8 @@ export async function applyCompiledTerrainFeatures(
   engine.systemManager.minimapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainRuntime(engine.systemManager.terrainSystem);
-  // Register the concrete terrain for the opt-in 3D orbital map (live baked
-  // heightmap, read-only). Non-fenced facade; default hold-M stays 2D.
+  // Register the concrete terrain for the 3D orbital map (live baked
+  // heightmap, read-only). Non-fenced facade; plain M opens 3D, Shift+M = 2D.
   setOrbitalLiveTerrain(engine.systemManager.terrainSystem);
 
   // Use async path - yields between vegetation cell batches to avoid blocking main thread

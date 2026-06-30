@@ -43,6 +43,14 @@ export interface OrbitalTopoMapOptions {
   onZoneSelected?: (zoneId: string, zoneName: string) => void;
   /** Live ownership refresh cadence (ms) while open. */
   refreshIntervalMs?: number;
+  /**
+   * True when the renderer is a DEDICATED canvas this map fully owns (the
+   * embedded deploy viewport) rather than the shared full-screen game canvas.
+   * In that case the relief renders the whole canvas (canvas-local origin)
+   * instead of a viewport-relative scissored sub-rect. Picking is unaffected —
+   * it always uses the interaction container's viewport rect.
+   */
+  ownsCanvas?: boolean;
 }
 
 export class OrbitalTopoMap {
@@ -138,7 +146,7 @@ export class OrbitalTopoMap {
       // canvas every frame, so our scissored region must be re-drawn on top.
       // The render-on-demand guarantee (zero cost when closed) holds because
       // the pump only runs while the panel is open.
-      this.topoRenderer?.renderTo(this.viewportRect(), true);
+      this.topoRenderer?.renderTo(this.renderRect(), true);
       this.rafId = requestAnimationFrame(pump);
     };
     this.rafId = requestAnimationFrame(pump);
@@ -156,6 +164,22 @@ export class OrbitalTopoMap {
     return { left: r.left, top: r.top, width: r.width, height: r.height };
   }
 
+  /**
+   * The rect the relief renders INTO. Shared-renderer mounts render a
+   * viewport-relative scissored sub-rect of the full-screen game canvas. A
+   * dedicated-canvas mount (the embedded deploy viewport) owns its whole
+   * canvas, so it renders the full canvas at a canvas-local origin — passing a
+   * viewport-relative rect there would mis-place the scissor for any canvas not
+   * pinned to the viewport top-left.
+   */
+  private renderRect(): { left: number; top: number; width: number; height: number } {
+    if (this.options.ownsCanvas) {
+      const c = this.options.renderer.domElement;
+      return { left: 0, top: 0, width: c.clientWidth, height: c.clientHeight };
+    }
+    return this.viewportRect();
+  }
+
   private handleClick = (e: MouseEvent): void => {
     if (!this.topoRenderer || !this.options.onZoneSelected) return;
     const hit = this.topoRenderer.pickMarker(e.clientX, e.clientY, this.viewportRect());
@@ -168,6 +192,16 @@ export class OrbitalTopoMap {
 
   isOpen(): boolean {
     return this.open;
+  }
+
+  /**
+   * Whether the relief actually loaded (height grid decoded + renderer built).
+   * Callers that take over the screen for the 3D view (e.g. the deploy mount)
+   * gate on this so a missing baked DEM falls back to the 2D map instead of a
+   * black takeover.
+   */
+  isLoaded(): boolean {
+    return this.topoRenderer !== null;
   }
 
   dispose(): void {
