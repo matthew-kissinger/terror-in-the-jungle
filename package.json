@@ -213,7 +213,7 @@
     "playtest:mobile:flow": "npx tsx scripts/mobile-playtest.ts --flow-only"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260422.1",
+    "@cloudflare/workers-types": "^4.20260626.1",
     "@gltf-transform/core": "^4.4.0",
     "@gltf-transform/extensions": "^4.4.0",
     "@types/node": "^25.6.0",
