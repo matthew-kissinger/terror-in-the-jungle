@@ -157,7 +157,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('opens the unified radio menu on T and shows live fire-support cooldowns', () => {
+  it('opens the radio dial on T and greys a cooling-down fire-support asset', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -172,24 +172,35 @@ describe('CommandInputManager', () => {
       })
     } as any);
 
-    manager.setRadioCooldowns({ ac47_orbit: 75 });
-    // T opens the one menu that lists fire support AND squad orders together.
+    const requestSupport = vi.fn(() => true);
+    // The air-support manager is the cooldown authority: the spooky sortie (which
+    // the AC-47 orbit fulfils) is cooling down; every other sortie is ready.
+    manager.setAirSupportManager({
+      requestSupport,
+      getCooldownRemaining: vi.fn((type: string) => (type === 'spooky' ? 75 : 0)),
+    } as any);
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+    manager.setPlayerController(lookDownController());
+    // T opens the revived dial: one surface for fire support AND squad orders.
     manager.toggleRadioMenu();
 
-    const overlay = document.body.querySelector<HTMLElement>('.command-mode-overlay');
-    expect(overlay?.dataset.visible).toBe('true');
-    expect(document.body.textContent).toContain(`${RADIO_ASSET_COUNT - 1}/${RADIO_ASSET_COUNT} ready`);
-    expect(document.body.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]')?.disabled).toBe(true);
+    const dial = visibleDialog();
+    expect(dial?.dataset.visible).toBe('true');
+    drillCategory(dial!, 'fire-support');
+    // The cooling-down asset's sector cannot launch a sortie.
+    clickSector(dial!, 'ac47_orbit');
+    expect(requestSupport).not.toHaveBeenCalled();
+    expect(RADIO_ASSET_COUNT).toBe(7);
 
     expect(manager.handleCancel()).toBe(true);
-    expect(overlay?.dataset.visible).toBe('false');
+    expect(visibleDialog()).toBeNull();
     expect(relockPointer).toHaveBeenCalledTimes(1);
 
     manager.dispose();
     layout.dispose();
   });
 
-  it('records radio selections as UI shell state only', () => {
+  it('keeps marking selections sticky on the dial without issuing a squad command', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -204,10 +215,12 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.toggleRadioMenu();
-    document.body.querySelector<HTMLButtonElement>('[data-radio-marking="position_only"]')?.click();
-    document.body.querySelector<HTMLButtonElement>('[data-radio-asset="f4_bombs"]')?.click();
+    const dial = visibleDialog()!;
+    drillCategory(dial, 'markings');
+    clickSector(dial, 'position_only');
 
-    expect(document.body.textContent).toContain('POSITION ONLY target mark selected');
+    // Marking is a sticky toggle — the dial stays open and no squad order fires.
+    expect(visibleDialog()).not.toBeNull();
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
 
@@ -235,24 +248,20 @@ describe('CommandInputManager', () => {
       getCooldownRemaining: vi.fn(() => 0),
     } as any);
     manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
-    manager.setPlayerController({
-      getCamera: () => ({
-        getWorldPosition: (v: THREE.Vector3) => v.set(0, 10, 0),
-        getWorldDirection: (v: THREE.Vector3) => v.set(0, -0.5, 1).normalize(),
-      }),
-      getPosition: (v: THREE.Vector3) => v.set(0, 0, 0),
-    } as any);
+    manager.setPlayerController(lookDownController());
 
     manager.toggleRadioMenu();
-    document.body.querySelector<HTMLButtonElement>('[data-radio-asset="ac47_orbit"]')?.click();
+    const dial = visibleDialog()!;
+    drillCategory(dial, 'fire-support');
+    clickSector(dial, 'ac47_orbit');
 
     expect(requestSupport).toHaveBeenCalledTimes(1);
     const request = requestSupport.mock.calls[0][0];
     expect(request.type).toBe('spooky'); // ac47_orbit fulfils via the spooky sortie
     expect(request.requesterFaction).toBe(Faction.US); // called strikes spare friendlies
     expect(request.targetPosition).toBeInstanceOf(THREE.Vector3);
-    // Radio closes after a successful call-in.
-    expect(document.body.querySelector<HTMLElement>('[role="dialog"]')?.dataset.visible).toBe('false');
+    // Dial closes after a successful call-in.
+    expect(visibleDialog()).toBeNull();
 
     manager.dispose();
     layout.dispose();
@@ -634,6 +643,37 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 });
+
+/** The currently-shown radio dial surface (desktop wheel) is a visible dialog. */
+function visibleDialog(): HTMLElement | null {
+  const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>('[role="dialog"]'));
+  return dialogs.find((d) => d.dataset.visible === 'true') ?? null;
+}
+
+/** Drill into a category sector on the wheel (the click bubbles to the group). */
+function drillCategory(dial: HTMLElement, categoryId: string): void {
+  dial.querySelector<HTMLElement>(`[data-radio-category="${categoryId}"]`)?.dispatchEvent(
+    new MouseEvent('click', { bubbles: true })
+  );
+}
+
+/** Click an option sector on the wheel. */
+function clickSector(dial: HTMLElement, optionId: string): void {
+  dial.querySelector<HTMLElement>(`[data-radio-option="${optionId}"]`)?.dispatchEvent(
+    new MouseEvent('click', { bubbles: true })
+  );
+}
+
+/** Camera looking forward + down so the ground pick resolves a call-in target. */
+function lookDownController() {
+  return {
+    getCamera: () => ({
+      getWorldPosition: (v: THREE.Vector3) => v.set(0, 12, 0),
+      getWorldDirection: (v: THREE.Vector3) => v.set(0, -0.5, 1).normalize(),
+    }),
+    getPosition: (v: THREE.Vector3) => v.set(0, 0, 0),
+  } as any;
+}
 
 function createSquadControllerStub() {
   const listeners = new Set<(state: {
