@@ -50,7 +50,7 @@
       "@gltf-transform/extensions"
     ],
     "ignoreFiles": [
-      ".claude/skills/**/templates/**",
+      ".claude/skills/**",
       "public/mockups/**"
     ],
     "ignore": [
