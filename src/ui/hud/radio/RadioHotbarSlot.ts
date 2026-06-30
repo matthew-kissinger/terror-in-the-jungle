@@ -48,6 +48,7 @@ export class RadioHotbarSlot {
     this.button.innerHTML = `
       <span class="${styles.icon}">${RADIO_GLYPH}</span>
       <span class="${styles.label}">RADIO</span>
+      <span class="${styles.key}" aria-hidden="true">T</span>
     `;
     this.button.addEventListener('click', () => this.activate());
 

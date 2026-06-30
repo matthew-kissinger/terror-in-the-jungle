@@ -9,7 +9,7 @@ import type { IAudioManager } from '../../types/SystemInterfaces';
 import type { TracerPool } from '../effects/TracerPool';
 
 // Orbit parameters
-const ORBIT_RADIUS = 200;
+const ORBIT_RADIUS = 170; // tighter circle than before (was 200) for a snappier pylon turn
 const BANK_ANGLE = 0.44; // ~25 degrees left bank
 
 // Weapon parameters
@@ -26,10 +26,23 @@ const _targetPos = new THREE.Vector3();
 
 export function initSpooky(mission: AirSupportMission): void {
   // Start at a random angle on the orbit
-  mission.missionData.orbitAngle = Math.random() * Math.PI * 2;
+  const angle = Math.random() * Math.PI * 2;
+  mission.missionData.orbitAngle = angle;
   mission.missionData.nextBurstAt = BURST_INTERVAL_MIN;
   mission.missionData.burstRoundsRemaining = 0;
   mission.missionData.burstFireAccum = 0;
+
+  // Seat the aircraft on its orbit immediately so it never flashes at the world
+  // origin for the frame between spawn and the first update tick. The y is a
+  // close AGL estimate (target ground height + orbit altitude); the first
+  // updateSpooky refines it from the live terrain sample.
+  const { aircraft, targetPosition } = mission;
+  aircraft.position.set(
+    targetPosition.x + ORBIT_RADIUS * Math.cos(angle),
+    targetPosition.y + 300,
+    targetPosition.z + ORBIT_RADIUS * Math.sin(angle),
+  );
+  aircraft.rotation.set(0, angle + Math.PI / 2, -BANK_ANGLE);
 }
 
 export function updateSpooky(
@@ -46,7 +59,7 @@ export function updateSpooky(
 
   // Flight positioning: skip if physics controller is handling it
   if (!physicsControlled) {
-    const speed = 40; // m/s orbital speed
+    const speed = 58; // m/s orbital speed (faster, tighter loop — ~18s period at r=170)
 
     // Advance orbit angle
     const angularSpeed = speed / ORBIT_RADIUS;

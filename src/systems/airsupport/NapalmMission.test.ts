@@ -135,6 +135,30 @@ describe('NapalmMission', () => {
     expect(explosionSpawn.mock.calls.length).toBeGreaterThan(1);
   });
 
+  it('staggers the fire-zone bursts across frames instead of seeding all six at once', () => {
+    // Regression: all 6 zones used to spawn in the drop frame, risking eviction
+    // of the small shared explosion pool. They must now release over time.
+    const explosionSpawn = vi.fn();
+    const mission = createAirSupportMission('napalm', { x: 200, z: -150 });
+    initNapalm(mission);
+    const dt = 0.1;
+    let dropFrameSpawns = -1;
+    for (let i = 0; i < 600; i++) {
+      mission.elapsed += dt;
+      const before = explosionSpawn.mock.calls.length;
+      updateNapalm(mission, dt, combatantSystem, makeAudio(), explosionSpawn, flatTerrainHeight());
+      if (mission.missionData.dropped === 1 && dropFrameSpawns < 0) {
+        dropFrameSpawns = explosionSpawn.mock.calls.length - before;
+      }
+      if (mission.state === 'outbound') break;
+    }
+    // No single frame seeds all six zones...
+    expect(dropFrameSpawns).toBeGreaterThanOrEqual(0);
+    expect(dropFrameSpawns).toBeLessThan(6);
+    // ...but every zone is eventually seeded.
+    expect(explosionSpawn.mock.calls.length).toBeGreaterThanOrEqual(6);
+  });
+
   it('plays an explosion sound on drop', () => {
     const audio = makeAudio();
     flyPass({ combatantSystem, audio });

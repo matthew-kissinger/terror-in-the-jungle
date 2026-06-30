@@ -15,6 +15,7 @@ const FIRE_ZONE_MAX_DAMAGE = 200;
 const FIRE_TICK_INTERVAL = 0.5; // damage tick interval
 const FIRE_DURATION = 12; // seconds of persistent fire
 const FIRE_ZONE_COUNT = 6; // number of fire points along impact line
+const NAPALM_BURST_STAGGER = 0.08; // seconds between successive fire-zone bursts (avoids one-frame pool eviction)
 
 // Scratch vectors
 const _firePos = new THREE.Vector3();
@@ -77,13 +78,11 @@ export function updateNapalm(
       mission.missionData[`fire_z${i}`] = fz;
     }
 
-    // Initial explosion effects at each fire point
-    for (let i = 0; i < FIRE_ZONE_COUNT; i++) {
-      const fx = mission.missionData[`fire_x${i}`];
-      const fz = mission.missionData[`fire_z${i}`];
-      _firePos.set(fx, getTerrainHeight(fx, fz), fz);
-      explosionSpawn?.(_firePos.clone());
-    }
+    // Stage the per-zone bursts; they are released one at a time in the update
+    // loop (below) rather than all in one frame, so the shared explosion pool is
+    // never asked for all 6 slots at once. (Plan #6.)
+    mission.missionData.burstsSpawned = 0;
+    mission.missionData.burstAccum = NAPALM_BURST_STAGGER;
 
     // Initial damage burst
     if (combatantSystem) {
@@ -97,11 +96,29 @@ export function updateNapalm(
       );
     }
 
-    audioManager?.play('grenadeExplosion', targetPosition, 1.0);
+    audioManager?.play('napalmExplosion', targetPosition, 1.0);
   }
 
   // Persistent fire damage ticks
   if (mission.missionData.dropped === 1) {
+    // Release the staggered fire-zone explosion bursts over the first frames
+    // after the drop (one per NAPALM_BURST_STAGGER), instead of all at once.
+    if (mission.missionData.burstsSpawned < FIRE_ZONE_COUNT) {
+      mission.missionData.burstAccum += dt;
+      while (
+        mission.missionData.burstAccum >= NAPALM_BURST_STAGGER &&
+        mission.missionData.burstsSpawned < FIRE_ZONE_COUNT
+      ) {
+        mission.missionData.burstAccum -= NAPALM_BURST_STAGGER;
+        const i = mission.missionData.burstsSpawned as number;
+        mission.missionData.burstsSpawned = i + 1;
+        const fx = mission.missionData[`fire_x${i}`];
+        const fz = mission.missionData[`fire_z${i}`];
+        _firePos.set(fx, getTerrainHeight(fx, fz), fz);
+        explosionSpawn?.(_firePos.clone());
+      }
+    }
+
     mission.missionData.fireElapsed += dt;
     mission.missionData.fireDamageAccum += dt;
 

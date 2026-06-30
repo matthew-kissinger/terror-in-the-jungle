@@ -23,9 +23,6 @@ import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { IAudioManager, IHUDSystem, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { AircraftModels } from '../assets/modelPaths';
-import { NPCFlightController, buildAirSupportMission } from './NPCFlightController';
-import { FIXED_WING_CONFIGS, B52_ARCLIGHT_PHYSICS } from '../vehicle/FixedWingConfigs';
-import { createRuntimeTerrainProbe } from '../vehicle/airframe/terrainProbe';
 
 interface AirSupportManagerDependencies {
   combatantSystem: CombatantSystem;
@@ -58,7 +55,6 @@ export class AirSupportManager implements GameSystem {
   private activeMissions: AirSupportMission[] = [];
   private pendingRequests: Array<{ request: AirSupportRequest; requestedAt: number }> = [];
   private cooldowns: Map<AirSupportType, number> = new Map();
-  private flightControllers: Map<string, NPCFlightController> = new Map();
   private gameElapsed = 0;
 
   constructor(scene: THREE.Scene) {
@@ -208,7 +204,6 @@ export class AirSupportManager implements GameSystem {
     }
     this.activeMissions.length = 0;
     this.pendingRequests.length = 0;
-    this.flightControllers.clear();
     this.tracerPool.dispose();
   }
 
@@ -249,6 +244,23 @@ export class AirSupportManager implements GameSystem {
     // ground).
     aircraft.scale.setScalar(request.type === 'arclight' ? 1.0 : 2.0);
     aircraft.matrixAutoUpdate = true;
+    // Air-support aircraft are a handful of transient hero objects that bank and
+    // orbit. Three.js per-mesh frustum culling tests each child's local bounding
+    // sphere, which on a rotating multi-mesh GLB hierarchy goes stale and blinks
+    // meshes in/out at the frustum edge. Disable culling on the whole aircraft and
+    // opt its materials out of scene fog so a weather fog spike fades but never
+    // hard-hides the silhouette. (Plan #1.)
+    aircraft.traverse((child) => {
+      child.frustumCulled = false;
+      if (child instanceof THREE.Mesh) {
+        const mat = child.material;
+        if (Array.isArray(mat)) {
+          mat.forEach((m) => { (m as THREE.Material & { fog?: boolean }).fog = false; });
+        } else if (mat) {
+          (mat as THREE.Material & { fog?: boolean }).fog = false;
+        }
+      }
+    });
     this.scene.add(aircraft);
 
     const approachDir = request.approachDirection?.clone().normalize() ?? DEFAULT_APPROACH.clone();
@@ -265,32 +277,6 @@ export class AirSupportManager implements GameSystem {
       requesterFaction: request.requesterFaction,
       missionData: {},
     };
-
-    // Create physics-driven flight controller for supported mission types
-    const physicsConfig = this.getPhysicsConfig(request.type);
-    if (physicsConfig) {
-      const startPos = request.targetPosition.clone()
-        .addScaledVector(approachDir, -500);
-      startPos.y = (this.terrainSystem?.getHeightAt(startPos.x, startPos.z) ?? 0) + config.altitude;
-
-      const fc = new NPCFlightController(
-        aircraft,
-        startPos,
-        physicsConfig,
-        this.terrainSystem ? createRuntimeTerrainProbe(this.terrainSystem) : undefined,
-      );
-      const missionType = request.type === 'spooky' ? 'orbit' as const
-        : request.type === 'recon' || request.type === 'arclight' ? 'flyover' as const
-        : 'attack_run' as const;
-      fc.setMission(buildAirSupportMission(
-        request.targetPosition,
-        approachDir,
-        config.altitude,
-        config.speed,
-        missionType,
-      ));
-      this.flightControllers.set(mission.id, fc);
-    }
 
     // Initialize mission-specific state
     switch (request.type) {
@@ -311,30 +297,12 @@ export class AirSupportManager implements GameSystem {
   }
 
   private updateMission(mission: AirSupportMission, dt: number): void {
-    // Update physics-driven flight if available
-    const fc = this.flightControllers.get(mission.id);
-    if (fc && mission.state !== 'outbound') {
-      const terrainH = this.terrainSystem?.getHeightAt(
-        mission.aircraft.position.x, mission.aircraft.position.z
-      ) ?? 0;
-      fc.update(dt, terrainH);
-      // Physics controller syncs aircraft position/quaternion automatically
-    }
-
     if (mission.state === 'outbound') {
-      if (fc) {
-        // Let physics handle outbound flight too
-        const terrainH = this.terrainSystem?.getHeightAt(
-          mission.aircraft.position.x, mission.aircraft.position.z
-        ) ?? 0;
-        fc.update(dt, terrainH);
-      } else {
-        // Legacy: direct manipulation for non-physics missions
-        const speed = AIR_SUPPORT_CONFIGS[mission.type].speed;
-        mission.aircraft.position.x += mission.approachDirection.x * speed * dt;
-        mission.aircraft.position.z += mission.approachDirection.z * speed * dt;
-        mission.aircraft.position.y += 10 * dt; // climb out
-      }
+      // Kinematic climb-out along the approach heading until cleanup.
+      const speed = AIR_SUPPORT_CONFIGS[mission.type].speed;
+      mission.aircraft.position.x += mission.approachDirection.x * speed * dt;
+      mission.aircraft.position.z += mission.approachDirection.z * speed * dt;
+      mission.aircraft.position.y += 10 * dt; // climb out
       return;
     }
 
@@ -347,7 +315,7 @@ export class AirSupportManager implements GameSystem {
 
     switch (mission.type) {
       case 'spooky':
-        updateSpooky(mission, dt, this.combatantSystem, this.audioManager, this.tracerPool, getHeight, this.flightControllers.has(mission.id), mission.requesterFaction);
+        updateSpooky(mission, dt, this.combatantSystem, this.audioManager, this.tracerPool, getHeight, false, mission.requesterFaction);
         // Spooky auto-transitions to outbound when duration expires
         if (mission.elapsed >= mission.duration) {
           mission.state = 'outbound';
@@ -372,27 +340,7 @@ export class AirSupportManager implements GameSystem {
     }
   }
 
-  /**
-   * Get the FixedWing physics config for a mission type, if physics-driven flight is available.
-   * Currently enabled for spooky (AC-47) only; other missions use legacy direct positioning.
-   */
-  private getPhysicsConfig(type: AirSupportType) {
-    switch (type) {
-      case 'spooky': return FIXED_WING_CONFIGS.AC47_SPOOKY?.physics;
-      // The B-52 is non-flyable this cycle, so it has no FIXED_WING_CONFIGS
-      // entry; it uses a standalone high-altitude physics profile to drive the
-      // airborne NPCFlightController for the run-in/outbound flight.
-      case 'arclight': return B52_ARCLIGHT_PHYSICS;
-      default: return undefined;
-    }
-  }
-
   private cleanupMission(mission: AirSupportMission): void {
-    const fc = this.flightControllers.get(mission.id);
-    if (fc) {
-      fc.dispose();
-      this.flightControllers.delete(mission.id);
-    }
     if (typeof (this.modelLoader as any).isSharedInstance === 'function'
       && this.modelLoader.isSharedInstance(mission.aircraft)) {
       this.modelLoader.disposeInstance(mission.aircraft);

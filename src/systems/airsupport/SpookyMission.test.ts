@@ -74,6 +74,17 @@ describe('SpookyMission', () => {
     expect(radius).toBeGreaterThan(1); // standing off, not on top of target
   });
 
+  it('seats the aircraft on its orbit during init, before the first update tick', () => {
+    // Regression: the gunship must be placed on its orbit ring at init so it
+    // never renders a frame parked at the world origin (where the GLB loads)
+    // between spawn and the first updateSpooky.
+    const mission = createAirSupportMission('spooky', { x: 300, z: 300 });
+    initSpooky(mission);
+    const dx = mission.aircraft.position.x - mission.targetPosition.x;
+    const dz = mission.aircraft.position.z - mission.targetPosition.z;
+    expect(Math.hypot(dx, dz)).toBeGreaterThan(1);
+  });
+
   it('keeps a roughly constant orbital radius as it circles', () => {
     const mission = createAirSupportMission('spooky', { x: 0, z: 0 });
     initSpooky(mission);
