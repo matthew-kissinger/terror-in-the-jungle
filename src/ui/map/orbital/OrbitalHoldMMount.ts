@@ -2,14 +2,15 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 /**
- * Hold-M (Shift+M) mount for the opt-in 3D orbital map.
+ * In-combat mount for the 3D orbital map (plain M, default).
  *
  * Keeps `FullMapSystem`'s call-site to a single `toggle()`: this helper builds
  * the full-screen overlay, reads the shared renderer + live terrain from the
  * registries, wires the live orbital map (capture points coloured by current
  * owner + spawn points), and returns a small toggle/dispose handle.
  *
- * Default hold-M stays the fast 2D map — this overlay only appears on Shift+M.
+ * Owner decision 2026-06-30: plain M opens this 3D relief (toggle); the fast 2D
+ * tactical map moved to Shift+M.
  */
 
 import type * as THREE from 'three';
@@ -88,7 +89,7 @@ class HoldMOrbitalMount implements HoldMOrbitalHandle {
     ].join(';');
 
     const hint = document.createElement('div');
-    hint.textContent = 'TOPOGRAPHIC MAP — drag to orbit, scroll/pinch to zoom, Shift+M to close';
+    hint.textContent = 'TOPOGRAPHIC MAP — drag to orbit, scroll/pinch to zoom, M to close (Shift+M for 2D map)';
     hint.style.cssText = [
       'position:absolute',
       'top:12px',

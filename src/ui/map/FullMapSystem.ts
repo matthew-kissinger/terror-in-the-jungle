@@ -80,7 +80,7 @@ export class FullMapSystem implements GameSystem {
   private inputHandler: FullMapInput;
   private visibilityListeners = new Set<(visible: boolean) => void>();
 
-  // Opt-in 3D orbital map (Shift+M). Lazily created; default hold-M stays 2D.
+  // 3D orbital relief map (plain M, default). Lazily created; Shift+M opens 2D.
   private orbital3D: HoldMOrbitalHandle | null = null;
 
   constructor(camera: THREE.Camera) {
@@ -133,9 +133,9 @@ export class FullMapSystem implements GameSystem {
       `;
     } else {
       instructions.innerHTML = `
-        Hold <strong>M</strong> to view map<br>
-        <strong>Scroll</strong> to zoom<br>
-        <strong>ESC</strong> to close
+        Hold <strong>Shift+M</strong> for this 2D map<br>
+        <strong>M</strong> opens the 3D relief map<br>
+        <strong>Scroll</strong> to zoom · <strong>ESC</strong> to close
       `;
     }
 
@@ -222,10 +222,11 @@ export class FullMapSystem implements GameSystem {
   }
 
   /**
-   * Opt-in 3D orbital relief map (Shift+M, or the pause-menu "Topographic Map"
+   * 3D orbital relief map (plain M, or the pause-menu "Topographic Map"
    * button). Lazily mounts the shared orbital component over the live terrain +
    * zones; all wiring lives in the host mount helper so this stays a 1-call
-   * toggle. Default hold-M remains the fast 2D map.
+   * toggle. Owner decision 2026-06-30: this is the default in-combat map; the
+   * fast 2D tactical map is on Shift+M.
    */
   toggleOrbital3D(): void {
     if (!this.orbital3D) {
