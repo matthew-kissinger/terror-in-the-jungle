@@ -96,3 +96,64 @@ describe('FixedWingHUD — nose-gun ammo readout', () => {
     expect(weaponLabel()).toBe('GUN');
   });
 });
+
+describe('FixedWingHUD — seat / fire cue + airborne-gate hint', () => {
+  let hud: FixedWingHUD;
+  let parent: HTMLElement;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    parent = document.createElement('div');
+    document.body.appendChild(parent);
+    hud = new FixedWingHUD();
+    hud.mount(parent);
+  });
+
+  afterEach(() => {
+    hud.dispose();
+    document.body.removeChild(parent);
+    vi.useRealTimers();
+  });
+
+  function cueShown(ref: string): boolean {
+    const el = hud.element.querySelector(`[data-ref="${ref}"]`) as HTMLElement;
+    return el.style.display !== 'none';
+  }
+
+  function airborneHintShown(): boolean {
+    const el = hud.element.querySelector('[data-ref="airborneHint"]') as HTMLElement;
+    return el.classList.contains('airborneHintVisible');
+  }
+
+  it('always names the pilot seat', () => {
+    const seat = hud.element.querySelector('.seatLabel') as HTMLElement;
+    expect(seat.textContent).toBe('PILOT');
+  });
+
+  it('lights the LMB-fire cue only on an armed airframe', () => {
+    hud.setSeatFireCue(false);
+    expect(cueShown('seatFireCue')).toBe(false);
+
+    hud.setSeatFireCue(true);
+    expect(cueShown('seatFireCue')).toBe(true);
+  });
+
+  it('shows the broadside gun-cam note only for the AC-47 broadside airframe', () => {
+    hud.setSeatFireCue(true, /* broadside */ false);
+    expect(cueShown('seatBroadsideCue')).toBe(false);
+
+    hud.setSeatFireCue(true, /* broadside */ true);
+    expect(cueShown('seatBroadsideCue')).toBe(true);
+  });
+
+  it('flashes the "Airborne to fire" hint on a ground fire attempt, then fades it', () => {
+    expect(airborneHintShown()).toBe(false);
+
+    hud.flashAirborneHint(1500);
+    expect(airborneHintShown()).toBe(true);
+
+    // The hint is transient — it clears itself rather than sticking on the HUD.
+    vi.advanceTimersByTime(1600);
+    expect(airborneHintShown()).toBe(false);
+  });
+});

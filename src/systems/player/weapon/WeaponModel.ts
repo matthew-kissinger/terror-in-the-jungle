@@ -65,7 +65,9 @@ export class WeaponModel {
 
     const adsProgress = this.animations.getADSProgress()
     const basePos = this.animations.getBasePosition()
-    const adsPos = this.animations.getADSPosition()
+    // Resolve the ADS sight-line offset per-weapon so bulky guns (e.g. the M60)
+    // clear the sight line; unlisted weapons fall back to the M16-tuned default.
+    const adsPos = this.animations.getADSPosition(rigManager.getCurrentWeaponType())
 
     const px = THREE.MathUtils.lerp(basePos.x, adsPos.x, adsProgress)
     const py = THREE.MathUtils.lerp(basePos.y, adsPos.y, adsProgress)

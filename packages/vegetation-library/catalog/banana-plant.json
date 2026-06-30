@@ -32,7 +32,7 @@
       "baseColorPath": "banana-plant/card/atlas.base-color.png",
       "normalPath": "banana-plant/card/atlas.normal.png",
       "worldSize": [3.916, 2.774],
-      "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1, "textureMb": 0.3 }
+      "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1, "textureMb": 0.3 }
     }
   ],
   "lod": {
@@ -40,7 +40,7 @@
     "rationale": "Big banana fronds read as real 3D broadleaf up close (cheap mesh), but past ~30m the cluster flattens to an alpha card. Far band is a baked ground card; no impostor needed for a 2.8m understory plant.",
     "bands": [
       { "minDistanceMeters": 0, "maxDistanceMeters": 30, "representationId": "mesh-banana", "budget": { "trisPerInstance": 1144, "drawCallsPerBatch": 2 } },
-      { "minDistanceMeters": 30, "maxDistanceMeters": 70, "representationId": "card-banana", "budget": { "trisPerInstance": 2, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced + hard-culled at 70m." }
+      { "minDistanceMeters": 30, "maxDistanceMeters": 70, "representationId": "card-banana", "budget": { "trisPerInstance": 8, "drawCallsPerBatch": 1 }, "notes": "Baked front-view alpha card (scripts/bake-veg-card.mjs); instanced two-sided cross + hard-culled at 70m." }
     ]
   },
   "ecology": {

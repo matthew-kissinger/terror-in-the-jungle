@@ -555,6 +555,45 @@ describe('FixedWingModel', () => {
       expect(cs.handlePlayerShot).not.toHaveBeenCalled();
     });
 
+    it('flashes the HUD airborne hint when the trigger is pulled on the ground', async () => {
+      const cs = makeCombatantSystem();
+      const hud = { showMessage: vi.fn(), flashFixedWingAirborneHint: vi.fn() };
+      model.setCombatantSystem(cs);
+      model.setHUDSystem(hud as any);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0);
+      model.setPilotedAircraft('fw1'); // grounded at parking spot
+
+      model.startFiring('fw1');
+      model.update(0.2);
+
+      // No rounds leave the gun on the ground, but the player gets told why
+      // instead of silence.
+      expect(cs.handlePlayerShot).not.toHaveBeenCalled();
+      expect(hud.flashFixedWingAirborneHint).toHaveBeenCalled();
+    });
+
+    it('does not flash the airborne hint once the aircraft is actually airborne', async () => {
+      const cs = makeCombatantSystem();
+      const hud = { showMessage: vi.fn(), flashFixedWingAirborneHint: vi.fn() };
+      const metadata = createSpawnMetadata();
+      model.setCombatantSystem(cs);
+      model.setHUDSystem(hud as any);
+      model.setPlayerController(makeAirbornePlayerController() as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1'); // airborne
+
+      model.startFiring('fw1');
+      model.update(0.2);
+
+      // Airborne firing actually shoots and never raises the "not yet" hint.
+      expect(cs.handlePlayerShot).toHaveBeenCalled();
+      expect(hud.flashFixedWingAirborneHint).not.toHaveBeenCalled();
+    });
+
     it('stops firing when the trigger is released', async () => {
       const cs = makeCombatantSystem();
       const metadata = createSpawnMetadata();

@@ -3,24 +3,24 @@
   "class": "aircraft",
   "action": "new",
   "tijTarget": "vehicles/aircraft/kiln-war-2026-06/uh-1h-huey-transport.glb",
-  "provider": "google",
-  "model": "gemini-3.5-flash",
-  "sourceTimestamp": "2026-06-25T14:02:08.577Z",
-  "sourcePrompt": "A UH-1H \"Huey\" transport helicopter, the workhorse of the US Army in Vietnam, about thirteen meters nose to tail and parked on its skids. A rounded greenhouse cockpit with chin windows flows into a broad slab-sided cabin with wide open side doorways; from there a slim tail boom, longer than the cabin itself, tapers back to. Low-poly, +X forward, ground at Y=0; named pivots for moving parts.",
-  "handEdit": "Kiln war-export-plan 2026-06-25; grade C; generation 165df51e-b7c7-414c-9554-1528f91efee3",
+  "provider": "anthropic",
+  "model": "claude-fable-5",
+  "sourceTimestamp": "2026-06-28T17:40:00.000Z",
+  "sourcePrompt": "A UH-1H \"Huey\" transport helicopter, the workhorse of the US Army in Vietnam, about thirteen meters nose to tail and parked on its skids. The nose is a rounded cockpit whose FRONT is two flat windscreen panels angled forward to a thin central post, clearly facing forward like a windshield you look straight into, with smaller chin bubble windows below; the curved glass wraps only above and to the sides and never folds the front windows into each other across the nose. The cockpit flows into a broad slab-sided cabin with wide open side doorways. From the cabin a slender tail boom, distinctly thinner than the cabin, a slim tapering tube, runs back longer than the cabin itself and narrows steadily to a small vertical fin carrying a two-bladed tail rotor and short horizontal stabilizers. Two long landing skids ride on tubular cross struts. A two-bladed main rotor longer than the fuselage sits on a tall mast above the cabin. Olive-drab overall, iconic and utilitarian. Keep the main rotor and the tail rotor as separate spinning parts.",
+  "handEdit": "Kiln re-roll 2026-06-28: thinner tail boom + forward-facing cockpit glass (owner playtest)",
   "appliedNormalization": "+X forward -> +Z forward",
   "graftedJoints": [
     {
       "name": "Joint_MainRotor",
       "type": "mainBlades",
       "spinAxis": "y",
-      "meshCount": 4
+      "meshCount": 10
     },
     {
       "name": "Joint_TailRotor",
       "type": "tailBlades",
       "spinAxis": "z",
-      "meshCount": 3
+      "meshCount": 5
     }
   ],
   "budgetStatus": "PASS",

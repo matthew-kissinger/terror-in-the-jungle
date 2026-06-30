@@ -102,6 +102,7 @@ function makeBaseColorMaterial(source) {
   const material = new THREE.MeshBasicMaterial({
     color: source?.color instanceof THREE.Color ? source.color : new THREE.Color(0xffffff),
     map: source?.map ?? null,
+    vertexColors: Boolean(source?.vertexColors),
     transparent: Boolean(source?.transparent) || Number(source?.opacity ?? 1) < 1,
     opacity: Number(source?.opacity ?? 1),
     alphaTest: Number(source?.alphaTest ?? 0),

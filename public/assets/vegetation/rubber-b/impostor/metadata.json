@@ -1,7 +1,7 @@
 {
   "generator": "scripts/bake-vegetation-impostor.mjs",
-  "generatedAt": "2026-06-26T07:48:51.799Z",
-  "modelUrl": "http://localhost:8765/assets/vegetation/rubber-b/rubber-b.glb",
+  "generatedAt": "2026-06-26T17:26:19.782Z",
+  "modelUrl": "http://127.0.0.1:8765/assets/vegetation/rubber-b/rubber-b.glb",
   "columns": 8,
   "rows": 3,
   "tileSize": [

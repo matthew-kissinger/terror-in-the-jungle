@@ -13,6 +13,7 @@ import {
   AMMO_LOAD_OPTIONS,
   clonePlayerLoadout,
   DEFAULT_PLAYER_LOADOUT,
+  getAmmoLoadHandlingFactor,
   getAmmoLoadReserveFactor,
   getDefaultLoadoutForFaction,
   getGrenadeTypeForEquipment,
@@ -31,7 +32,13 @@ interface LoadoutRuntimeTargets {
   // intentionally NOT part of the fenced IFirstPersonWeapon surface. Declared
   // here as an optional method so applyToRuntime can call it fence-safely; test
   // doubles and the interface alone remain valid.
-  firstPersonWeapon?: IFirstPersonWeapon & { setReserveAmmoFactor?: (factor: number) => void };
+  firstPersonWeapon?: IFirstPersonWeapon & {
+    setReserveAmmoFactor?: (factor: number) => void;
+    // `setHandlingFactor` is likewise a concrete-class capability: it slows the
+    // weapon's ADS-transition by the ammo-load handling penalty so heavier
+    // reserves cost handling speed. Optional-call so doubles stay valid.
+    setHandlingFactor?: (factor: number) => void;
+  };
   grenadeSystem?: GrenadeSystem;
 }
 
@@ -523,8 +530,14 @@ export class LoadoutService {
     // Selectable ammo load scales the player's spawn RESERVE ammo. Optional-call
     // so runtime test doubles without the concrete method stay valid (it lives
     // on the concrete FirstPersonWeapon, not the fenced IFirstPersonWeapon).
+    const ammoLoad = loadout.ammoLoad ?? AmmoLoad.STANDARD;
     targets.firstPersonWeapon?.setReserveAmmoFactor?.(
-      getAmmoLoadReserveFactor(loadout.ammoLoad ?? AmmoLoad.STANDARD)
+      getAmmoLoadReserveFactor(ammoLoad)
+    );
+    // The handling penalty is the tradeoff for that extra reserve: a heavier
+    // load slows the weapon's ADS-transition (STANDARD = 1.0, no change).
+    targets.firstPersonWeapon?.setHandlingFactor?.(
+      getAmmoLoadHandlingFactor(ammoLoad)
     );
     if (grenadeType) {
       targets.grenadeSystem?.setGrenadeType(grenadeType);

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { StaticImpostorArchetype } from '../../config/staticImpostorArchetypes';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
+import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 import { classifyBiome, computeSlopeDeg } from './BiomeClassifier';
 
 /**
@@ -96,6 +97,7 @@ export class GLBHeroScatterer {
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
   private biomePalettes = new Map<string, BiomeVegetationEntry[]>();
+  private exclusionZones: Array<{ x: number; z: number; radiusSq: number }> = [];
 
   private worldHalfExtent = Infinity;
   private visualMargin = 200;
@@ -129,6 +131,19 @@ export class GLBHeroScatterer {
     this.defaultBiomeId = defaultBiomeId;
     this.biomePalettes = new Map(biomePalettes);
     this.biomeRules = biomeRules.slice();
+  }
+
+  /**
+   * POI exclusion zones (runways, bases, structures). Heroes share ONE exclusion
+   * contract with the ground-card scatterer: same data source, same gate. Zones
+   * are stored as squared radii so the placement-time test is a cheap dot product.
+   */
+  setExclusionZones(zones: TerrainExclusionZone[]): void {
+    this.exclusionZones = zones.map((zone) => ({
+      x: zone.x,
+      z: zone.z,
+      radiusSq: zone.radius * zone.radius,
+    }));
   }
 
   /** Whether any configured palette places at least one hero archetype. */
@@ -173,7 +188,7 @@ export class GLBHeroScatterer {
     let added = 0;
     while (added < maxAdds && this.pendingAdditions.length > 0) {
       const key = this.pendingAdditions.shift()!;
-      this.generateCell(key);
+      this.generateCell(key, playerPosition);
       added++;
       didWork = true;
     }
@@ -260,7 +275,7 @@ export class GLBHeroScatterer {
     this.activeCells.delete(key);
   }
 
-  private generateCell(key: string): void {
+  private generateCell(key: string, playerPosition: THREE.Vector3): void {
     if (this.activeCells.has(key)) return;
 
     const comma = key.indexOf(',');
@@ -279,7 +294,7 @@ export class GLBHeroScatterer {
       return;
     }
 
-    const placements = this.computePlacements(cellX, cellZ, baseX, baseZ);
+    const placements = this.computePlacements(cellX, cellZ, baseX, baseZ, playerPosition);
     const residency: HeroCellResidency = { generation: 0, ids: [], objects: [], inFlight: 0 };
     this.activeCells.set(key, residency);
 
@@ -343,7 +358,13 @@ export class GLBHeroScatterer {
   }
 
   /** Deterministic sparse hero placements for a cell (one pass per hero archetype in the palette). */
-  private computePlacements(cellX: number, cellZ: number, baseX: number, baseZ: number): HeroPlacement[] {
+  private computePlacements(
+    cellX: number,
+    cellZ: number,
+    baseX: number,
+    baseZ: number,
+    playerPosition: THREE.Vector3,
+  ): HeroPlacement[] {
     const centerX = baseX + this.cellSize * 0.5;
     const centerZ = baseZ + this.cellSize * 0.5;
     const centerHeight = this.deps.getHeight(centerX, centerZ);
@@ -356,7 +377,7 @@ export class GLBHeroScatterer {
     for (const entry of palette) {
       const archetype = this.deps.archetypes[entry.typeId];
       if (!archetype || entry.densityMultiplier <= 0) continue;
-      this.placeHeroSpecies(archetype, entry.densityMultiplier, cellX, cellZ, baseX, baseZ, placements);
+      this.placeHeroSpecies(archetype, entry.densityMultiplier, cellX, cellZ, baseX, baseZ, playerPosition, placements);
     }
     return placements;
   }
@@ -368,6 +389,7 @@ export class GLBHeroScatterer {
     cellZ: number,
     baseX: number,
     baseZ: number,
+    playerPosition: THREE.Vector3,
     out: HeroPlacement[],
   ): void {
     // Effective spacing grows as density falls: spacing = base / sqrt(density).
@@ -385,6 +407,12 @@ export class GLBHeroScatterer {
         const localZ = (gz + jz) * cellStep;
         const worldX = baseX + localX;
         const worldZ = baseZ + localZ;
+        const cullDistance = archetype.cullDistanceMeters;
+        if (cullDistance !== undefined) {
+          const dx = worldX - playerPosition.x;
+          const dz = worldZ - playerPosition.z;
+          if (dx * dx + dz * dz > cullDistance * cullDistance) continue;
+        }
 
         // Low-frequency patch gate so heroes cluster naturally rather than gridding.
         const patch = valueNoise01(worldX / 64, worldZ / 64, salt ^ 0xBEEF);
@@ -394,6 +422,7 @@ export class GLBHeroScatterer {
         if (h < 0) continue; // underwater
         const slope = computeSlopeDeg(worldX, worldZ, GLBHeroScatterer.SLOPE_SAMPLE_DIST_M, this.deps.getHeight);
         if (slope > GLBHeroScatterer.MAX_SLOPE_DEG) continue;
+        if (this.isExcluded(worldX, worldZ)) continue;
 
         const yawHash = hashInts(gx + cellX * 977, gz + cellZ * 977, salt ^ 0xA5A5);
         const yaw = (yawHash / 0xffffffff) * 360 * DEG2RAD;
@@ -411,6 +440,15 @@ export class GLBHeroScatterer {
         });
       }
     }
+  }
+
+  private isExcluded(worldX: number, worldZ: number): boolean {
+    for (const zone of this.exclusionZones) {
+      const dx = worldX - zone.x;
+      const dz = worldZ - zone.z;
+      if (dx * dx + dz * dz <= zone.radiusSq) return true;
+    }
+    return false;
   }
 }
 

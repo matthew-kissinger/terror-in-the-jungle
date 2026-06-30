@@ -402,12 +402,13 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundLateralFriction: 7.4,
       rollingResistance: 0.014,
       brakeDeceleration: 14,
-      // Re-banded to the Kiln A-1 catalog dims (kiln-war-2026-06): the GLB
-      // bottoms out just 0.03 m below model origin (minY -0.03), so the parked
-      // origin sits 0.03 m over the ground to seat the gear. The
-      // `?aircraftArt=legacy` escape hatch reuses this on the legacy GLB
-      // (best-effort; a small parked-height drift is cosmetic).
-      gearClearance: 0.03,
+      // Re-banded to the Kiln A-1 catalog dims after the re-roll (f8c3518c):
+      // the GLB bottoms out 0.06 m below model origin (catalog minY -0.06), so
+      // the parked origin sits 0.06 m over the ground to seat the gear with its
+      // lowest mesh point exactly on the runway. The `?aircraftArt=legacy`
+      // escape hatch reuses this on the legacy GLB (best-effort; a small parked-
+      // height drift is cosmetic).
+      gearClearance: 0.06,
       liftoffClearance: 0.2,
       rotationPitchLimitDeg: 14,
       groundEffectStrength: 0.35,

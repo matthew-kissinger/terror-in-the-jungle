@@ -31,12 +31,16 @@ export const M151_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   mass: 1120,
   wheelbase: 2.06,
   trackWidth: 1.42,
-  engineTorque: 420,
+  // 2026-06-28 owner playtest: the jeep felt too slow/floaty. Stronger pull-away
+  // torque + much lighter velocity damping (0.88 -> 0.95) raise the steady-state
+  // cruise without turning into ice — damping still bleeds speed off-throttle, so
+  // it stops feeling like it coasts forever.
+  engineTorque: 520,
   gearRatio: 5.2,
   maxSteer: 0.58,
   maxClimbSlope: 0.76,
   rollingCoef: 85,
-  velocityDamping: 0.88,
+  velocityDamping: 0.95,
   angularDamping: 0.76,
   lateralGripDamping: 0.08,
   slopeDriveFloor: 0.65,

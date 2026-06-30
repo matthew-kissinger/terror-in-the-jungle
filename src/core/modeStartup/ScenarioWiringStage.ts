@@ -51,6 +51,7 @@ export function applyLaunchSelection(engine: GameEngine, definition: GameModeDef
   engine.systemManager.firstPersonWeapon.setPlayerFaction(selection.faction);
   engine.systemManager.combatantSystem.setPlayerFaction(selection.faction);
   engine.systemManager.zoneManager.setPlayerAlliance(selection.alliance);
+  engine.systemManager.taskingDirector.setPlayerAlliance(selection.alliance);
 
   const labels = resolveFactionLabels(definition);
   engine.systemManager.hudSystem.setFactionLabels(labels.blufor, labels.opfor);

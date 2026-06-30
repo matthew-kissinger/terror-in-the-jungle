@@ -8,7 +8,9 @@ import type {
 } from '../../config/gameModeTypes';
 import { StrategicRoutePlanner } from '../strategy/StrategicRoutePlanner';
 import type {
+  TerrainExclusionZone,
   TerrainFlowPath,
+  TerrainFlowPathPoint,
   TerrainStampConfig,
   TerrainSurfacePatch,
 } from './TerrainFeatureTypes';
@@ -38,7 +40,23 @@ interface TerrainFlowCompileResult {
   stamps: TerrainStampConfig[];
   surfacePatches: TerrainSurfacePatch[];
   flowPaths: TerrainFlowPath[];
+  /**
+   * Vegetation-exclusion corridors traced along each compiled route centerline.
+   * Same circular-zone contract the POI exclusion uses (TerrainExclusionZone),
+   * so the scatterers gate on routes and POIs through ONE exclusion path.
+   */
+  vegetationExclusionZones: TerrainExclusionZone[];
 }
+
+// Route veg-exclusion corridor tuning.
+//
+// Half-width of the cleared band, as a fraction of the route width. The visible
+// gray trail surface paint extends routeWidth/2 from the centerline; clearing
+// the same half-width keeps trees off the trail without scalping the flanking
+// jungle. Centerline samples are stepped at a fraction of that radius so the
+// overlapping circles fully cover the polyline with no gaps between samples.
+const ROUTE_EXCLUSION_HALF_WIDTH_SCALE = 0.5;
+const ROUTE_EXCLUSION_SAMPLE_STEP_SCALE = 0.85;
 
 interface RoutePair {
   from: ZoneConfig;
@@ -92,6 +110,7 @@ function emptyResult(): TerrainFlowCompileResult {
     stamps: [],
     surfacePatches: [],
     flowPaths: [],
+    vegetationExclusionZones: [],
   };
 }
 
@@ -210,6 +229,13 @@ function appendRouteFlow(
     points,
   });
 
+  // Trace a veg-exclusion corridor down the centerline so the scatterers stop
+  // planting trees on the trail. Emitted for every route (independent of
+  // `routeStamping`) — the corridor follows the painted trail, not the flatten.
+  for (const zone of routeCorridorExclusionZones(points, routeWidth, pathId)) {
+    result.vegetationExclusionZones.push(zone);
+  }
+
   if ((policy.routeStamping ?? 'full') !== 'full') {
     return;
   }
@@ -280,6 +306,53 @@ function appendRouteFlow(
       });
     }
   }
+}
+
+/**
+ * Trace circular vegetation-exclusion zones along a route centerline.
+ *
+ * Pure + deterministic: given the sanitized centerline `points` and the route
+ * width, walks each segment and drops overlapping circles spaced so the union
+ * covers the whole polyline with no gaps. Each circle's radius is half the route
+ * width (the visible trail half-width) so the cleared band tracks the painted
+ * trail without scalping the flanking jungle. Exported so the corridor geometry
+ * is unit-testable independently of the route planner.
+ */
+export function routeCorridorExclusionZones(
+  points: ReadonlyArray<TerrainFlowPathPoint>,
+  routeWidth: number,
+  sourceId?: string,
+): TerrainExclusionZone[] {
+  const zones: TerrainExclusionZone[] = [];
+  if (points.length === 0) {
+    return zones;
+  }
+
+  const radius = Math.max(1, routeWidth * ROUTE_EXCLUSION_HALF_WIDTH_SCALE);
+  const step = Math.max(1, radius * ROUTE_EXCLUSION_SAMPLE_STEP_SCALE);
+
+  // Always anchor the first centerline node.
+  zones.push({ x: points[0].x, z: points[0].z, radius, sourceId });
+
+  for (let i = 1; i < points.length; i++) {
+    const start = points[i - 1];
+    const end = points[i];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const length = Math.hypot(dx, dz);
+    if (length < 1e-3) {
+      continue;
+    }
+    // Interior samples along the segment, then the segment end node, so adjacent
+    // segments share a circle at every vertex (no gap at corners).
+    const samples = Math.max(1, Math.ceil(length / step));
+    for (let s = 1; s <= samples; s++) {
+      const t = s / samples;
+      zones.push({ x: start.x + dx * t, z: start.z + dz * t, radius, sourceId });
+    }
+  }
+
+  return zones;
 }
 
 // Slope-aware drape blend.

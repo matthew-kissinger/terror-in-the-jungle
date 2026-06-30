@@ -33,12 +33,20 @@ export function mountPersistentAttribution(): void {
   el.textContent = ATTRIBUTION_LINE;
   el.title = ATTRIBUTION_LINE;
   el.setAttribute('aria-hidden', 'false');
+  // Bottom-CENTER, flush to the screen edge. The bottom-left corner is the
+  // health pill's slot and the bottom-right is the ammo slot (see
+  // HUDLayoutStyles grid), so a left/bottom-anchored notice overlaps the
+  // health readout. The weapon bar sits in the bottom-center *row* but its
+  // content is vertically centered, not flush, so this 10px line tucks
+  // beneath it. Stays pointer-events:none so it never steals input.
   Object.assign(el.style, {
     position: 'fixed',
-    left: '6px',
-    bottom: '4px',
+    left: '50%',
+    bottom: '2px',
+    transform: 'translateX(-50%)',
     zIndex: '2147482000',
     maxWidth: 'min(70vw, 540px)',
+    textAlign: 'center',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
@@ -49,6 +57,18 @@ export function mountPersistentAttribution(): void {
     userSelect: 'none',
   } as Partial<CSSStyleDeclaration>);
   document.body.appendChild(el);
+}
+
+/**
+ * Show/hide the persistent corner notice. Hidden in the live play scene so it
+ * never overlaps the weapon bar / HUD; the full AGPL + CC BY-SA attribution
+ * stays in the Credits/About panel and on the menu screens, so the
+ * "Appropriate Legal Notices" remain reasonably visible (see LICENSING.md).
+ */
+export function setAttributionVisible(visible: boolean): void {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById(CREDIT_ID);
+  if (el) el.style.display = visible ? '' : 'none';
 }
 
 /** Show the Credits / About panel with the full AGPL + CC BY-SA notice. */

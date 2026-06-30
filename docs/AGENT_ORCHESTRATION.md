@@ -198,9 +198,41 @@ manifest file as usual.
 
 ## Current state
 
-**No active campaign.** Both 2026-06-09 `/goal` campaigns completed
-2026-06-10 (engineering closed; owner walks pending in
-[PLAYTEST_PENDING](PLAYTEST_PENDING.md)):
+**CAMPAIGN COMPLETE — [CAMPAIGN_2026-06-29-cinematic-field-pass.md](CAMPAIGN_2026-06-29-cinematic-field-pass.md)**
+(7 phases + P4b wiring + PX terrain-spike). CLOSED 2026-06-29 (autonomous-loop).
+All 9 PRs (#457-#465) merged to `master`, ZERO fence changes, combat120 baseline
+restored (P0), full suite 7238 green. Shipped: TSL post-stack (filmic grade +
+bloom + atmospheric depth, DEFAULT-OFF); 3D orbital topo map (deploy/pause rich-3D
++ opt-in hold-M, default 2D); revived radial radio dial (desktop wheel + touch
+sheet) on a dedicated HUD slot + a headless `RadioStationSystem` (3 Kevin MacLeod
+CC-BY tracks, lazy, DEFAULT-OFF) wired to the dial (P4b); day/night
+`SoundscapeDirector` replacing the permanent loop; device-aware tasking-director
+card; and a terrain-tower fix (impostor card height clamped — the ~100m "towers"
+were inflated GLB billboard cards, NOT terrain). NOT deployed (deploy is MANUAL —
+owner ships after the walk). Owner feel-walks + the post default-on flip (behind a
+MAIN-worktree combat120 p99 neutrality proof) are queued in
+[PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
+
+**Prior campaign — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
+(6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
+from the owner playtest triage). Phase 1
+(`cycle-2026-06-28-control-discoverability`) CLOSED 2026-06-28 (#425-#428,
+playtest-deferred); Phase 2 (`cycle-2026-06-28-combat-vehicle-feel`) CLOSED
+2026-06-28 (#429-#433, perf A/B PASS, playtest-deferred); Phase 3
+(`cycle-2026-06-28-terrain-vegetation-asset-defects`) CLOSED 2026-06-28 (#434-#440,
+perf A/B PASS −23%, playtest-deferred); Phase 4 (`cycle-2026-06-28-arsenal-expansion`)
+CLOSED 2026-06-28 (#441-#443, perf A/B PASS, playtest-deferred); Phase 5
+(`cycle-2026-06-28-deploy-armory-faction-select`) CLOSED 2026-06-29 (#444-#450,
+no perf gate — UI/deploy, playtest-deferred); Phase 6
+(`cycle-2026-06-28-ashau-purpose-and-missions`) CLOSED 2026-06-29 (#451-#455, perf
+A/B PASS R1 −5.6% / R2 +0.6%, playtest-deferred). **CAMPAIGN COMPLETE** — all 6
+phases closed; 31 PRs (#425-#455) merged, zero fence changes. NOT deployed (deploy
+is MANUAL — owner ships after the morning walk). The owner-walk deferrals for all 6
+phases are queued in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
+
+Prior campaigns (engineering closed; owner walks pending in
+[PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed
+2026-06-10:
 
 - [CAMPAIGN_2026-06-09-lighting-rig.md](CAMPAIGN_2026-06-09-lighting-rig.md)
   — ALL PHASES COMPLETE (#363-#381): unified rig is the shipped default
@@ -222,13 +254,20 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** (none — between cycles. Seed the next cycle here: active slug,
-  R0 evidence, task DAG, dependencies, file-ownership, cycle-specific
-  hard-stops.)
-- **Previous:** `cycle-2026-06-11-war-asset-repaint` (12/12: #383-#394 incl.
-  3 mid-cycle defect-fix PRs, closed 2026-06-12) — KATALOG-1 code-complete;
-  see BACKLOG "Recently Completed" and the PLAYTEST_PENDING owner-walk row.
-  Briefs archived at `docs/tasks/archive/cycle-2026-06-11-war-asset-repaint/`.
+- **Active:** none. No cycle is in flight. The cinematic-field-pass campaign
+  closed 2026-06-29 (all 9 PRs #457-#465 merged; see "Current state" above and
+  BACKLOG "Recently Completed"). The next `/goal` or `/orchestrate` invocation
+  fills this section from a fresh cycle brief.
+- **Previous:** `CAMPAIGN_2026-06-29-cinematic-field-pass` (7 phases + P4b + PX,
+  closed 2026-06-29, autonomous-loop, playtest-deferred) — P0 cinematic
+  foundations (combat120 baseline restore + shared `src/core/tsl/` lib +
+  non-fenced `TerrainSystem.getBakedHeightmap()`), TSL post-stack (DEFAULT-OFF),
+  3D orbital topo map (opt-in, default 2D), revived radio dial + wired
+  `RadioStationSystem` (CC-BY, DEFAULT-OFF), day/night `SoundscapeDirector`,
+  device-aware task card, terrain-tower (impostor-card) fix. Zero fence changes;
+  full suite 7238 green. Briefs archived at
+  `docs/tasks/archive/cycle-2026-06-29-cinematic-field-pass/`. See PLAYTEST_PENDING
+  for the owner walks + the post default-on flip (behind a MAIN combat120 p99 proof).
 
 ## Dispatch protocol
 

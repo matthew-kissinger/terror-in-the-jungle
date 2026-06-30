@@ -15,21 +15,40 @@ import type {
  *
  * Promotes the closest plants (within each species' meshFarEdge) to their real
  * GLB mesh, up to a global cap, and demotes those that walk back out past a
- * hysteresis band so the GLB loader does not thrash. The matching far-tier card
- * instance is hidden while a near mesh is shown (no double-draw) and restored on
- * demotion.
+ * hysteresis band so the GLB loader does not thrash.
+ *
+ * Across a `transitionFadeMeters` band just inside meshFarEdge the near GLB mesh
+ * cross-fades against the far card instead of hard-popping: the mesh fades in (and
+ * the card stays visible underneath) as the player approaches, and fades back out
+ * before it is demoted. This mirrors the hero octahedral-impostor path's opacity
+ * crossfade so the coconut palm — which uses THIS tier — no longer snaps mesh<->card.
+ * The card instance is only fully hidden once the mesh reaches full opacity (no
+ * double-draw at rest) and is restored on demotion.
  *
  * The tier READS the scatterer's live residency map (never mutates it) and owns
  * only its own near-mesh bookkeeping: the promoted-mesh registry, the in-flight
  * promotion guard, and the load counter. The scatterer drives it via refresh()
  * (every frame), evictCell() (when a cell streams out), and the debug getters.
  */
+interface NearMeshFadeMaterialRecord {
+  /** Cloned material whose opacity we drive (the GLB's original is restored on dispose). */
+  material: THREE.Material;
+  /** Opacity the asset shipped with; the fade scales relative to this so authored alpha survives. */
+  baseOpacity: number;
+  baseTransparent: boolean;
+  baseDepthWrite: boolean;
+}
+
 interface NearMeshEntry {
   object: THREE.Object3D;
   cellKey: string;
   slug: string;
   index: number;
   generation: number;
+  /** Per-mesh fade materials; empty when the fade band is disabled (transitionFadeMeters <= 0). */
+  fadeMaterials: NearMeshFadeMaterialRecord[];
+  /** Whether the matching card instance is currently hidden (mesh fully opaque). */
+  cardHidden: boolean;
 }
 
 interface NearMeshCandidate {
@@ -40,7 +59,44 @@ interface NearMeshCandidate {
   dSq: number;
 }
 
+/** Opacity split across the mesh<->card transition band. Sums to 1 across the band. */
+export interface NearMeshFadeBlend {
+  meshOpacity: number;
+  cardOpacity: number;
+}
+
+/**
+ * Default transition-band width (m). Matches the hero octahedral-impostor vegetation path's
+ * DEFAULT_VEGETATION_IMPOSTOR_TRANSITION_METERS (28) so the coconut palm — which uses THIS
+ * mesh<->card tier — crossfades over the same distance as the hero octa swap.
+ */
+export const DEFAULT_GROUND_CARD_TRANSITION_FADE_METERS = 28;
+const MAX_GROUND_CARD_TRANSITION_FADE_METERS = 80;
+
 const HIDDEN_MATRIX = new THREE.Matrix4().makeScale(0, 0, 0);
+
+/**
+ * Mesh<->card opacity split for a plant at `distance` from the player, given the
+ * tier's `meshFarEdge` swap distance and the `fade` band width. Mirrors the hero
+ * octahedral-impostor approach: the mesh is fully opaque up to (meshFarEdge - fade),
+ * then fades linearly to 0 at meshFarEdge while the card fades complementarily to 1.
+ * Allocation-free; pure (exported for the behavior test).
+ */
+export function computeNearMeshFadeBlend(
+  distance: number,
+  meshFarEdge: number,
+  fade: number,
+): NearMeshFadeBlend {
+  if (fade <= 0) {
+    // Binary switch: full mesh inside the edge, full card outside (legacy behavior).
+    const meshOpacity = distance <= meshFarEdge ? 1 : 0;
+    return { meshOpacity, cardOpacity: 1 - meshOpacity };
+  }
+  // 0 at the inner edge of the band, 1 at meshFarEdge.
+  const t = clamp((distance - (meshFarEdge - fade)) / fade, 0, 1);
+  const meshOpacity = 1 - t;
+  return { meshOpacity, cardOpacity: t };
+}
 
 export interface GroundCardNearMeshTierDeps {
   scene: THREE.Object3D;
@@ -53,10 +109,16 @@ export interface GroundCardNearMeshTierDeps {
   maxNearMeshes: number;
   /** Live residency map owned by the scatterer; the tier reads it, never mutates. */
   activeCells: ReadonlyMap<string, GroundCardCellResidency>;
+  /**
+   * Width (m) of the mesh<->card crossfade band just inside meshFarEdge. Defaults to
+   * {@link DEFAULT_GROUND_CARD_TRANSITION_FADE_METERS}. 0 keeps the legacy hard switch.
+   */
+  transitionFadeMeters?: number;
 }
 
 export class GroundCardNearMeshTier {
   private readonly deps: GroundCardNearMeshTierDeps;
+  private readonly transitionFadeMeters: number;
 
   private readonly nearMeshes = new Map<string, NearMeshEntry>();
   private readonly promoting = new Set<string>();
@@ -64,6 +126,11 @@ export class GroundCardNearMeshTier {
 
   constructor(deps: GroundCardNearMeshTierDeps) {
     this.deps = deps;
+    this.transitionFadeMeters = clamp(
+      deps.transitionFadeMeters ?? DEFAULT_GROUND_CARD_TRANSITION_FADE_METERS,
+      0,
+      MAX_GROUND_CARD_TRANSITION_FADE_METERS,
+    );
   }
 
   /** Number of plants currently promoted to a real GLB near mesh. */
@@ -80,41 +147,44 @@ export class GroundCardNearMeshTier {
   evictCell(cellKey: string): void {
     for (const [nearKey, entry] of [...this.nearMeshes]) {
       if (entry.cellKey !== cellKey) continue;
-      this.deps.modelLoader.disposeInstance(entry.object);
+      this.disposeEntry(entry);
       this.nearMeshes.delete(nearKey);
     }
   }
 
   /**
    * Promote the closest plants (within meshFarEdge) to real GLB meshes, up to the global
-   * cap, and demote those that walked out past the hysteresis band. Hidden card instances
-   * are restored on demotion so the far tier stays whole.
+   * cap, and demote those that walked out past the hysteresis band. Across the transition
+   * band the near mesh cross-fades against the (still-visible) card; the card is fully
+   * hidden only at full mesh opacity and restored on demotion so the far tier stays whole.
    */
   refresh(player: THREE.Vector3): void {
     if (this.deps.maxNearMeshes <= 0) return;
 
     // 1. Demote near meshes that fell out of band (cell still resident; stale cells were
-    //    already cleaned by evictCell).
+    //    already cleaned by evictCell). Live ones get their crossfade opacity driven here.
     for (const [nearKey, entry] of [...this.nearMeshes]) {
       const residency = this.deps.activeCells.get(entry.cellKey);
       if (!residency || residency.generation !== entry.generation) {
-        this.deps.modelLoader.disposeInstance(entry.object);
+        this.disposeEntry(entry);
         this.nearMeshes.delete(nearKey);
         continue;
       }
       const batch = residency.batches.find((b) => b.slug === entry.slug);
       if (!batch) {
-        this.deps.modelLoader.disposeInstance(entry.object);
+        this.disposeEntry(entry);
         this.nearMeshes.delete(nearKey);
         continue;
       }
       const p = batch.placements[entry.index];
       const dSq = distSqXZ(player, p.x, p.z);
       if (dSq > batch.meshDemoteSq) {
-        this.deps.modelLoader.disposeInstance(entry.object);
+        this.disposeEntry(entry);
         this.nearMeshes.delete(nearKey);
         this.setInstanceHidden(batch, entry.index, false);
+        continue;
       }
+      this.applyCrossfade(entry, batch, Math.sqrt(dSq));
     }
 
     // 2. Gather promotion candidates within meshFarEdge from cells near the player.
@@ -133,12 +203,14 @@ export class GroundCardNearMeshTier {
         if (distSqXZ(player, nx, nz) > batch.meshFarEdgeSq) continue;
 
         for (let i = 0; i < batch.placements.length; i++) {
-          if (batch.hidden.has(i)) continue; // already promoted
           const p = batch.placements[i];
           const dSq = distSqXZ(player, p.x, p.z);
           if (dSq > batch.meshFarEdgeSq) continue;
           const candKey = `${cellKey}|${batch.slug}|${i}`;
-          if (this.promoting.has(candKey)) continue;
+          // Skip plants already promoted (live near mesh) or mid-load. In the no-fade path
+          // batch.hidden also flags promoted plants; in the fade path the card stays visible,
+          // so the nearMeshes/promoting registries are the source of truth.
+          if (this.nearMeshes.has(candKey) || this.promoting.has(candKey)) continue;
           candidates.push({ key: candKey, cellKey, batch, index: i, dSq });
         }
       }
@@ -160,8 +232,12 @@ export class GroundCardNearMeshTier {
     const placement = batch.placements[index];
     const generationAtLoad = residency.generation;
 
-    // Hide the card instance immediately so there is no double-draw while the GLB loads.
-    this.setInstanceHidden(batch, index, true);
+    // With a fade band the card stays visible until the mesh reaches full opacity (the
+    // crossfade reveals it through the loading window); with no band keep the legacy
+    // hide-immediately behavior so there is no double-draw while the GLB loads.
+    if (this.transitionFadeMeters <= 0) {
+      this.setInstanceHidden(batch, index, true);
+    }
     this.promoting.add(candKey);
     this.inFlightNearLoads++;
 
@@ -193,10 +269,16 @@ export class GroundCardNearMeshTier {
     object: THREE.Group,
   ): void {
     const residency = this.deps.activeCells.get(cellKey);
-    // Cell evicted/regenerated while loading, or the card was already restored: discard.
-    if (!residency || residency.generation !== generationAtLoad || !batch.hidden.has(index)) {
+    const fading = this.transitionFadeMeters > 0;
+    // Cell evicted/regenerated while loading, or (no-fade path) the card was already
+    // restored: discard. In the fade path the card is still shown, so only the
+    // generation guard applies.
+    const stale = !residency
+      || residency.generation !== generationAtLoad
+      || (!fading && !batch.hidden.has(index));
+    if (stale) {
       this.deps.modelLoader.disposeInstance(object);
-      if (residency && residency.generation === generationAtLoad) {
+      if (residency && residency.generation === generationAtLoad && batch.hidden.has(index)) {
         this.setInstanceHidden(batch, index, false);
       }
       return;
@@ -209,13 +291,55 @@ export class GroundCardNearMeshTier {
     object.updateMatrixWorld(true);
     this.deps.scene.add(object);
 
-    this.nearMeshes.set(candKey, {
+    const entry: NearMeshEntry = {
       object,
       cellKey,
       slug: batch.slug,
       index,
       generation: generationAtLoad,
-    });
+      fadeMaterials: fading ? prepareFadeMaterials(object) : [],
+      cardHidden: batch.hidden.has(index),
+    };
+    this.nearMeshes.set(candKey, entry);
+    // The crossfade opacity is driven on the next refresh() against the live player
+    // distance, so a plant that loads mid-band blends rather than popping to full mesh.
+  }
+
+  /**
+   * Drive the mesh<->card opacity for a live near mesh at `distance`. Inside the band the
+   * mesh material opacity follows computeNearMeshFadeBlend; at full opacity the card is
+   * hidden (no double-draw), otherwise it is shown so it reads through the fading mesh.
+   */
+  private applyCrossfade(entry: NearMeshEntry, batch: GroundCardBatch, distance: number): void {
+    if (this.transitionFadeMeters <= 0 || entry.fadeMaterials.length === 0) {
+      // No band: keep the legacy invariant (card hidden, mesh opaque).
+      if (!entry.cardHidden) {
+        this.setInstanceHidden(batch, entry.index, true);
+        entry.cardHidden = true;
+      }
+      return;
+    }
+    const meshFarEdge = Math.sqrt(batch.meshFarEdgeSq);
+    // Never let the band run past the player (inner edge < 0): a species whose near edge is
+    // shorter than the default band would otherwise never reach full mesh opacity at the feet.
+    const fade = Math.min(this.transitionFadeMeters, meshFarEdge);
+    const { meshOpacity } = computeNearMeshFadeBlend(distance, meshFarEdge, fade);
+    setFadeMaterialOpacity(entry.fadeMaterials, meshOpacity);
+
+    const shouldHideCard = meshOpacity >= 0.999;
+    if (shouldHideCard && !entry.cardHidden) {
+      this.setInstanceHidden(batch, entry.index, true);
+      entry.cardHidden = true;
+    } else if (!shouldHideCard && entry.cardHidden) {
+      this.setInstanceHidden(batch, entry.index, false);
+      entry.cardHidden = false;
+    }
+  }
+
+  private disposeEntry(entry: NearMeshEntry): void {
+    restoreFadeMaterials(entry.fadeMaterials);
+    entry.fadeMaterials.length = 0;
+    this.deps.modelLoader.disposeInstance(entry.object);
   }
 
   private setInstanceHidden(batch: GroundCardBatch, index: number, hidden: boolean): void {
@@ -242,4 +366,45 @@ function distSqXZ(player: THREE.Vector3, x: number, z: number): number {
   const dx = player.x - x;
   const dz = player.z - z;
   return dx * dx + dz * dz;
+}
+
+/**
+ * Clone the loaded GLB's materials so we can drive their opacity without mutating the
+ * shared source material (the loader may cache/reuse it). Mirrors the hero impostor path's
+ * prepareStaticImpostorFadeMaterials. Returns one record per (mesh, material slot).
+ */
+function prepareFadeMaterials(root: THREE.Object3D): NearMeshFadeMaterialRecord[] {
+  const records: NearMeshFadeMaterialRecord[] = [];
+  root.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const original = child.material;
+    const originalArray = Array.isArray(original) ? original : [original];
+    const cloned = originalArray.map((m) => m.clone());
+    child.material = Array.isArray(original) ? cloned : cloned[0];
+    for (const material of cloned) {
+      records.push({
+        material,
+        baseOpacity: material.opacity,
+        baseTransparent: material.transparent,
+        baseDepthWrite: material.depthWrite,
+      });
+    }
+  });
+  return records;
+}
+
+function setFadeMaterialOpacity(records: readonly NearMeshFadeMaterialRecord[], opacity: number): void {
+  const fade = clamp(opacity, 0, 1);
+  const opaque = fade >= 0.999;
+  for (const record of records) {
+    record.material.opacity = record.baseOpacity * fade;
+    record.material.transparent = opaque ? record.baseTransparent : true;
+    record.material.depthWrite = opaque ? record.baseDepthWrite : false;
+  }
+}
+
+function restoreFadeMaterials(records: readonly NearMeshFadeMaterialRecord[]): void {
+  for (const record of records) {
+    record.material.dispose();
+  }
 }

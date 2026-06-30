@@ -22,6 +22,23 @@ import type { DeploySessionKind } from '../world/runtime/DeployFlowSession';
 const HELIPAD_INFANTRY_STANDOFF_METERS = 12;
 
 /**
+ * Read-only presence check: does a given helipad actually have a boardable
+ * helicopter provisioned at it right now? Satisfied structurally by
+ * HelicopterModel (which owns helicopter spawning) so the spawn selector can
+ * label a helipad honestly without coupling to the fenced IHelicopterModel.
+ * When this provider is absent (e.g. before the vehicle runtime is composed or
+ * in unit tests that don't wire it) helipad presence is treated as unknown and
+ * the optimistic helipad label is kept.
+ */
+export interface BoardableHelicopterPresence {
+  hasBoardableHelicopterForHelipad(helipadId: string): boolean;
+}
+
+// On-foot label for a helipad that currently has no boardable helicopter, so
+// the deploy list never promises an aircraft that isn't there.
+const ON_FOOT_PAD_NAME = 'Forward Pad';
+
+/**
  * Encapsulates all spawn point selection logic: gathering available spawn
  * points from zones/helipads/insertions, filtering by alliance, sorting by
  * priority, and resolving preferred/policy-driven spawn positions.
@@ -36,6 +53,7 @@ export class SpawnPointSelector {
   private terrainSystem?: ITerrainRuntime;
   private helipadSystem?: HelipadSystem;
   private loadoutService?: LoadoutService;
+  private boardableHelicopterPresence?: BoardableHelicopterPresence;
 
   // --- Dependency setters ------------------------------------------------
 
@@ -61,6 +79,10 @@ export class SpawnPointSelector {
 
   setLoadoutService(loadoutService: LoadoutService): void {
     this.loadoutService = loadoutService;
+  }
+
+  setBoardableHelicopterPresence(presence: BoardableHelicopterPresence): void {
+    this.boardableHelicopterPresence = presence;
   }
 
   // --- Public API --------------------------------------------------------
@@ -144,19 +166,13 @@ export class SpawnPointSelector {
     if (playerAlliance === Alliance.BLUFOR) {
       const runtimeHelipads = this.helipadSystem?.getAllHelipads() ?? [];
       const configuredHelipads = this.gameModeManager?.getCurrentConfig().helipads ?? [];
-      const helipadCandidates = runtimeHelipads.length > 0
-        ? runtimeHelipads.map(hp => ({
-            id: hp.id,
-            name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
-            position: this.getHelipadInfantrySpawnPosition(hp.position),
-            aircraft: hp.aircraft,
-          }))
-        : configuredHelipads.map(hp => ({
-            id: hp.id,
-            name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
-            position: this.getHelipadInfantrySpawnPosition(hp.position),
-            aircraft: hp.aircraft,
-          }));
+      const helipadSources = runtimeHelipads.length > 0 ? runtimeHelipads : configuredHelipads;
+      const helipadCandidates = helipadSources.map(hp => ({
+        id: hp.id,
+        name: this.getHelipadSpawnLabel(hp.id, hp.aircraft),
+        position: this.getHelipadInfantrySpawnPosition(hp.position),
+        aircraft: hp.aircraft,
+      }));
 
       for (const hp of helipadCandidates) {
         const alreadyListed = spawnPoints.some(sp => sp.id === hp.id);
@@ -329,6 +345,23 @@ export class SpawnPointSelector {
     return alliance === Alliance.BLUFOR
       ? zone.state === ZoneState.BLUFOR_CONTROLLED
       : zone.state === ZoneState.OPFOR_CONTROLLED;
+  }
+
+  /**
+   * Honest helipad spawn label. Promises the helicopter ("Helipad: <aircraft>")
+   * only when a boardable helicopter is actually present at that pad. When the
+   * presence provider reports none is there, the spawn is relabeled to an
+   * on-foot pad so the label never lies. When no provider is wired, presence is
+   * unknown and the optimistic helicopter label is kept (back-compat).
+   */
+  private getHelipadSpawnLabel(helipadId: string, aircraft: string): string {
+    if (
+      this.boardableHelicopterPresence
+      && !this.boardableHelicopterPresence.hasBoardableHelicopterForHelipad(helipadId)
+    ) {
+      return ON_FOOT_PAD_NAME;
+    }
+    return `Helipad: ${aircraft.replace(/_/g, ' ')}`;
   }
 
   private getHelipadSpawnPriority(helipadId: string, aircraft?: string): number {
