@@ -17,7 +17,7 @@ interface GameEvents extends Record<string, unknown> {
   };
   player_killed: { killerId: string; killerFaction: Faction; position: THREE.Vector3 };
   player_kill: { victimId: string; victimFaction: Faction; isHeadshot: boolean; weaponType?: string };
-  zone_captured: { zoneId: string; zoneName: string; faction: Faction };
+  zone_captured: { zoneId: string; zoneName: string; faction: Faction; position: THREE.Vector3; radius: number };
   zone_lost: { zoneId: string; zoneName: string; faction: Faction };
   explosion: { position: THREE.Vector3; radius: number; source: string };
   grenade_thrown: { position: THREE.Vector3; faction: Faction };

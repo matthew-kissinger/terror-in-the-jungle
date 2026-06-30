@@ -142,5 +142,11 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     refDistance: 30,
     maxDistance: 400,
     rolloffFactor: 1.0
+  },
+  // Zone capture confirmation sting. CC0, see
+  // docs/asset-provenance/audio-2026-06/zone-captured-sting.provenance.json.
+  zoneCaptured: {
+    path: 'assets/optimized/zoneCaptured.ogg',
+    volume: 0.6
   }
 };

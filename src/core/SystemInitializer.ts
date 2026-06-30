@@ -35,6 +35,7 @@ import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSyst
 import { getRenderDistanceMultiplier } from '../utils/DeviceDetector';
 import { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
@@ -154,6 +155,7 @@ export class SystemInitializer {
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
     refs.zoneManager = new ZoneManager(scene);
+    refs.zoneCaptureEffects = new ZoneCaptureEffects(scene);
     refs.ticketSystem = new TicketSystem();
     refs.playerHealthSystem = new PlayerHealthSystem();
     refs.playerRespawnManager = new PlayerRespawnManager(scene, camera);
@@ -254,6 +256,7 @@ export class SystemInitializer {
       refs.firstPersonWeapon,
       refs.combatantSystem,
       refs.zoneManager,
+      refs.zoneCaptureEffects,
       refs.ticketSystem,
       refs.playerHealthSystem,
       refs.playerRespawnManager,
