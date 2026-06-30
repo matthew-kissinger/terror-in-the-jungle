@@ -208,6 +208,17 @@ export class SystemInitializer {
     if (refs.terrainSystem) {
       refs.commandInputManager.setTerrainSystem(refs.terrainSystem);
     }
+    // Radio dial -> headless RadioStationSystem (cycle-2026-06-29-radio-station-
+    // wiring, P4b). The dial's STATIONS slot routes a tune to the concrete
+    // AudioManager (off the fence); the selected id pre-highlights the dial.
+    // Tuning while music is disabled only records the choice (no fetch/play).
+    // Capture the (already-constructed) AudioManager so the tune callback keeps
+    // a stable, defined handle.
+    const radioAudioManager = refs.audioManager;
+    refs.commandInputManager.setStationTuner((stationId) => {
+      void radioAudioManager.tuneRadioStation(stationId);
+    });
+    refs.commandInputManager.setSelectedStation(radioAudioManager.getSelectedRadioStationId());
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
     refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.terrainSystem);
