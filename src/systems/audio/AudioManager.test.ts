@@ -45,8 +45,15 @@ vi.mock('./AudioDuckingSystem', () => ({
   AudioDuckingSystem: class { update = vi.fn(); },
 }));
 const setVolumeSpy = vi.fn();
-vi.mock('./AmbientSoundManager', () => ({
-  AmbientSoundManager: class { start = vi.fn(); setVolume = setVolumeSpy; getAmbientSounds = vi.fn().mockReturnValue([]); dispose = vi.fn(); },
+vi.mock('./SoundscapeDirector', () => ({
+  SoundscapeDirector: class {
+    start = vi.fn();
+    setVolume = setVolumeSpy;
+    setSkyRuntime = vi.fn();
+    update = vi.fn();
+    getActiveBeds = vi.fn().mockReturnValue([]);
+    dispose = vi.fn();
+  },
 }));
 vi.mock('./AudioWeaponSounds', () => ({ AudioWeaponSounds: class {} }));
 vi.mock('../../core/GameEventBus', () => ({
@@ -127,8 +134,8 @@ describe('AudioManager — SFX bank decode deferred beyond critical path', () =>
   let pendingLoads: PendingLoad[];
 
   const BOOT_CRITICAL_PATHS = new Set([
-    'assets/optimized/jungle1.ogg',
-    'assets/optimized/jungle2.ogg',
+    'assets/audio/ambient/jungle-day.ogg',
+    'assets/audio/ambient/jungle-night.ogg',
   ]);
 
   beforeEach(() => {
