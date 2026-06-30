@@ -228,7 +228,7 @@ export class FullMapSystem implements GameSystem {
    * toggle. Owner decision 2026-06-30: this is the default in-combat map; the
    * fast 2D tactical map is on Shift+M.
    */
-  toggleOrbital3D(): void {
+  toggleOrbital3D(): boolean {
     if (!this.orbital3D) {
       this.orbital3D = mountHoldMOrbitalToggle({
         camera: this.camera,
@@ -236,7 +236,7 @@ export class FullMapSystem implements GameSystem {
         worldSize: this.worldSize,
       });
     }
-    this.orbital3D?.toggle();
+    return this.orbital3D?.toggle() ?? false;
   }
 
   onVisibilityChange(listener: (visible: boolean) => void): () => void {

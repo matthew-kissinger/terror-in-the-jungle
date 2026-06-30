@@ -20,7 +20,8 @@ import { getOrbitalSharedRenderer, getOrbitalLiveTerrain } from './OrbitalRender
 import type { OrbitalTopoMap } from './OrbitalTopoMap';
 
 export interface HoldMOrbitalHandle {
-  toggle(): void;
+  /** Toggles open/closed and returns the resulting open state. */
+  toggle(): boolean;
   dispose(): void;
 }
 
@@ -37,12 +38,13 @@ class HoldMOrbitalMount implements HoldMOrbitalHandle {
 
   constructor(private readonly options: HoldMOrbitalOptions) {}
 
-  toggle(): void {
+  toggle(): boolean {
     if (this.open) {
       this.hide();
     } else {
       this.show();
     }
+    return this.open;
   }
 
   private show(): void {
