@@ -198,7 +198,16 @@ manifest file as usual.
 
 ## Current state
 
-**ACTIVE CAMPAIGN — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
+**ACTIVE CAMPAIGN — [CAMPAIGN_2026-06-29-cinematic-field-pass.md](CAMPAIGN_2026-06-29-cinematic-field-pass.md)**
+(7 phases — P0 foundations + 6 workstreams: visual post-stack, 3D orbital topo
+map, radio dial revival, command-HUD fit, soundscape, radio stations).
+SCAFFOLDED 2026-06-29 from the owner playtest + a 5-design/critique
+(`titj-big-cycle-design`) workflow and 4 DEM/audio recon agents. All 7 briefs are
+authored in `docs/tasks/cycle-2026-06-29-*`; "Current cycle" below seeds P0.
+Owner decisions are locked in the manifest; auto-advance + posture are owner-set
+at kickoff. NOT started, NOT deployed (deploy is MANUAL).
+
+**Prior campaign — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
 (6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
 from the owner playtest triage). Phase 1
 (`cycle-2026-06-28-control-discoverability`) CLOSED 2026-06-28 (#425-#428,
@@ -239,11 +248,19 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** none. **CAMPAIGN_2026-06-28-field-readiness COMPLETE** (all 6
-  phases closed 2026-06-28/29; 31 PRs #425-#455 merged, zero fence changes; NOT
-  deployed — deploy is MANUAL). All owner-walk deferrals are queued in
-  [PLAYTEST_PENDING](PLAYTEST_PENDING.md). The next cycle is owner-chosen (see
-  [BACKLOG](BACKLOG.md) "Proposed next cycle" / "Owner-gated cycles").
+- **Active:** `cycle-2026-06-29-cinematic-foundations` (Phase 0 of
+  CAMPAIGN_2026-06-29-cinematic-field-pass) — brief:
+  [tasks/cycle-2026-06-29-cinematic-foundations.md](tasks/cycle-2026-06-29-cinematic-foundations.md).
+  Restore the `combat120` perf baseline (HARD exit gate), build the shared
+  `src/core/tsl/` node library, add the non-fenced
+  `TerrainSystem.getBakedHeightmap()`. **Awaiting owner kickoff** (posture /
+  auto-advance TBD). All 7 phase briefs authored under `docs/tasks/cycle-2026-06-29-*`.
+  - **Dependencies:** P0 blocks P5 (`orbital-topo-map`) + P6 (`visual-post-stack`)
+    — neither dispatches until P0's exit gate is green. P1
+    (`soundscape-loop-replacement`) and P2 (`task-card-hud-fit`) are independent
+    and may run in parallel with P0. Inside P3 (`radio-dial-revival`), P3a
+    (CommandInputManager re-trace) precedes P3b/c/d; P4 (`radio-stations-music`)
+    core runs parallel to P3a/b, its UI joins at P3d.
 - **Previous:** `cycle-2026-06-28-ashau-purpose-and-missions` (Phase 6 FINAL, 5/5:
   #451-#455, R1 (4 parallel) + R2 (1), perf A/B PASS — R1 situation-readout −5.6%
   (dormant in ai_sandbox), R2 tasking-director +0.6% (dormant when war sim idle),
