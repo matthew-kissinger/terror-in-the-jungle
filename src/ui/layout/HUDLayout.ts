@@ -27,6 +27,7 @@ const ALL_REGIONS: HUDRegion[] = [
   'compass',
   'minimap',
   'objectives',
+  'control-hints',
   'stats',
   'kill-feed',
   'ammo',
