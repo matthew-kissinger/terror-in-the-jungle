@@ -1,0 +1,223 @@
+/**
+ * RadioBottomSheet — touch presentation of the radio dial.
+ * Bottom-sheet drill list with safe-area insets and ≥44px tap targets.
+ */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  z-index: 14;
+}
+
+.sheet[data-visible="true"] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.sheet::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.6));
+}
+
+.panel {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  max-height: 82dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding:
+    14px
+    max(14px, env(safe-area-inset-right, 0px))
+    max(14px, env(safe-area-inset-bottom, 0px))
+    max(14px, env(safe-area-inset-left, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(168, 116, 42, 0.28);
+  border-radius: 16px 16px 0 0;
+  background:
+    linear-gradient(180deg, rgba(43, 38, 32, 0.97), rgba(43, 38, 32, 0.95));
+  box-shadow: 0 -18px 40px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.back {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid rgba(231, 217, 186, 0.25);
+  border-radius: 10px;
+  background: rgba(43, 38, 32, 0.86);
+  color: rgba(231, 217, 186, 0.92);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.back[data-show="true"] {
+  display: flex;
+}
+
+.title {
+  flex: 1;
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(231, 217, 186, 0.96);
+}
+
+.close {
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(231, 217, 186, 0.25);
+  border-radius: 10px;
+  background: rgba(43, 38, 32, 0.86);
+  color: rgba(231, 217, 186, 0.9);
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 1px solid rgba(231, 217, 186, 0.2);
+  border-radius: 10px;
+  background: rgba(43, 38, 32, 0.76);
+  color: rgba(231, 217, 186, 0.92);
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: rgba(79, 107, 58, 0.5);
+  background: rgba(58, 79, 42, 0.9);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hint {
+  margin: 4px 2px;
+  font-family: var(--font-primary, var(--type));
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(182, 164, 135, 0.85);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.segment {
+  min-height: 52px;
+  border: 1px solid rgba(231, 217, 186, 0.2);
+  border-radius: 10px;
+  background: rgba(43, 38, 32, 0.76);
+  color: rgba(231, 217, 186, 0.92);
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.segment[aria-pressed="true"] {
+  border-color: rgba(79, 107, 58, 0.5);
+  background: rgba(58, 79, 42, 0.9);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 14px;
+  border: 1px solid rgba(231, 217, 186, 0.2);
+  border-radius: 12px;
+  background: rgba(43, 38, 32, 0.76);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.rowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rowName {
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(231, 217, 186, 0.96);
+}
+
+.rowDetail {
+  font-family: var(--font-primary, var(--type));
+  font-size: 12px;
+  line-height: 1.3;
+  color: rgba(182, 164, 135, 0.8);
+}
+
+.rowStatus {
+  font-family: var(--font-primary, var(--type-stamp));
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(125, 154, 90, 0.95);
+}
+
+.row:disabled .rowStatus {
+  color: rgba(168, 116, 42, 0.95);
+}
