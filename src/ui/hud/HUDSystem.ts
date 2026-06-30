@@ -173,11 +173,11 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.situationReadout.mount(this.controlHints.getRoot());
 
     // Tasking-director card (tasking-director-mvp): a distinct, higher-emphasis
-    // element atop the objectives list — "your assignment" above "all
-    // objectives". The director (a strategy system) owns the task logic and
-    // drives this card via HUDSystem.getTaskCard(); the card forwards its reward
-    // out to the existing score-popup surface so it never reaches HUD internals.
-    this.taskCard.mount(this.elements.objectivesList);
+    // element. Desktop homes it as a sibling atop the objectives slot ("your
+    // assignment" above "all objectives"); the objectives slot is display:none on
+    // touch, so there it lives under the MobileStatusBar (status-bar slot). The
+    // director owns the task logic; the card forwards rewards to the score popup.
+    this.taskCard.mount(this.hudLayout.getSlot(isTouchDevice() ? 'status-bar' : 'objectives'));
     this.taskCard.setRewardDispatcher((type, points, multiplier) =>
       this.spawnScorePopup(type, points, multiplier),
     );
