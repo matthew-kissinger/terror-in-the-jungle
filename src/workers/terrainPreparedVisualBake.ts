@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
+import {
+  collarExtrapolatedHeight,
+  computePlayableHeightEnvelope,
+  type PlayableHeightEnvelope,
+} from '../systems/terrain/collarExtrapolation';
+
 const SOURCE_DELTA_EPSILON_METERS = 0.01;
-const MIN_EDGE_SLOPE_SAMPLE_METERS = 8;
-const MAX_EDGE_SLOPE_SAMPLE_METERS = 64;
-const MAX_EDGE_EXTRAPOLATION_METERS = 320;
 const SOURCE_DELTA_CACHE_TARGET_SPACING_METERS = 64;
 const SOURCE_DELTA_CACHE_MIN_GRID_SIZE = 33;
 const SOURCE_DELTA_CACHE_MAX_GRID_SIZE = 129;
@@ -41,6 +44,11 @@ export function bakePreparedVisualGrid<TConfig>(
     visualMargin,
     worldSize,
   );
+  // Playable height envelope, computed once: the collar can never exceed it.
+  const playableEnvelope = computePlayableHeightEnvelope(
+    (x, z) => samplePreparedGrid(preparedData, preparedGridSize, playableWorldSize, x, z),
+    Math.max(0, playableWorldSize * 0.5),
+  );
 
   for (let z = 0; z < gridSize; z++) {
     for (let x = 0; x < gridSize; x++) {
@@ -52,6 +60,7 @@ export function bakePreparedVisualGrid<TConfig>(
         playableWorldSize,
         visualMargin,
         sourceDeltaCache,
+        playableEnvelope,
         wx,
         wz,
       );
@@ -67,6 +76,7 @@ function samplePreparedVisualHeight(
   playableWorldSize: number,
   visualMargin: number,
   sourceDeltaCache: SourceDeltaCache,
+  playableEnvelope: PlayableHeightEnvelope,
   worldX: number,
   worldZ: number,
 ): number {
@@ -88,17 +98,12 @@ function samplePreparedVisualHeight(
     return edgeBaseHeight + sourceDelta;
   }
 
-  return edgeBaseHeight + estimatePreparedEdgeSlopeDelta(
-    preparedData,
-    preparedGridSize,
-    playableWorldSize,
-    worldX,
-    worldZ,
-    clampedX,
-    clampedZ,
-    halfPlayable,
-    halfVisual,
-  );
+  // No real source data beyond the edge: bounded, envelope-clamped collar
+  // extrapolation, shared with the main thread + terrain worker so the three
+  // copies can never drift (collarExtrapolation.ts).
+  const sampleBase = (x: number, z: number): number =>
+    samplePreparedGrid(preparedData, preparedGridSize, playableWorldSize, x, z);
+  return collarExtrapolatedHeight(sampleBase, worldX, worldZ, clampedX, clampedZ, halfPlayable, edgeBaseHeight, playableEnvelope);
 }
 
 function buildSourceDeltaCache<TConfig>(
@@ -161,56 +166,6 @@ function samplePreparedGrid(
   const h0 = h00 * (1 - fx) + h10 * fx;
   const h1 = h01 * (1 - fx) + h11 * fx;
   return h0 * (1 - fz) + h1 * fz;
-}
-
-function estimatePreparedEdgeSlopeDelta(
-  preparedData: Float32Array,
-  preparedGridSize: number,
-  playableWorldSize: number,
-  worldX: number,
-  worldZ: number,
-  clampedX: number,
-  clampedZ: number,
-  halfPlayable: number,
-  halfVisual: number,
-): number {
-  const outsideX = worldX - clampedX;
-  const outsideZ = worldZ - clampedZ;
-  const outsideDistance = Math.hypot(outsideX, outsideZ);
-  if (outsideDistance <= 0) return 0;
-
-  const sampleStep = clamp(halfPlayable / 128, MIN_EDGE_SLOPE_SAMPLE_METERS, MAX_EDGE_SLOPE_SAMPLE_METERS);
-  let delta = 0;
-  let weight = 0;
-
-  if (Math.abs(outsideX) > 0) {
-    const signX = Math.sign(outsideX);
-    const innerX = clamp(clampedX - signX * sampleStep, -halfPlayable, halfPlayable);
-    const inwardDistance = Math.abs(clampedX - innerX);
-    if (inwardDistance > 0) {
-      const edge = samplePreparedGrid(preparedData, preparedGridSize, playableWorldSize, clampedX, clampedZ);
-      const inner = samplePreparedGrid(preparedData, preparedGridSize, playableWorldSize, innerX, clampedZ);
-      delta += ((edge - inner) / inwardDistance) * Math.abs(outsideX);
-      weight++;
-    }
-  }
-
-  if (Math.abs(outsideZ) > 0) {
-    const signZ = Math.sign(outsideZ);
-    const innerZ = clamp(clampedZ - signZ * sampleStep, -halfPlayable, halfPlayable);
-    const inwardDistance = Math.abs(clampedZ - innerZ);
-    if (inwardDistance > 0) {
-      const edge = samplePreparedGrid(preparedData, preparedGridSize, playableWorldSize, clampedX, clampedZ);
-      const inner = samplePreparedGrid(preparedData, preparedGridSize, playableWorldSize, clampedX, innerZ);
-      delta += ((edge - inner) / inwardDistance) * Math.abs(outsideZ);
-      weight++;
-    }
-  }
-
-  if (weight === 0) return 0;
-  const averagedDelta = delta / weight;
-  const fade = 1 - clamp(outsideDistance / Math.max(1, halfVisual - halfPlayable), 0, 1) * 0.35;
-  return clamp(averagedDelta * fade, -MAX_EDGE_EXTRAPOLATION_METERS, MAX_EDGE_EXTRAPOLATION_METERS);
 }
 
 export function generateNormalData(heightData: Float32Array, width: number, height: number, worldSize: number): Uint8Array {

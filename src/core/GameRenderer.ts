@@ -2,7 +2,7 @@
 // Copyright (c) 2025-2026 Matthew Kissinger
 
 import * as THREE from 'three';
-import type { PostProcessingManager } from '../systems/effects/PostProcessingManager';
+import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
 import { CrosshairSystem } from '../ui/hud/CrosshairSystem';
 import type { CrosshairMode, HeliReticleWeapon, TraverseStopDir } from '../ui/hud/CrosshairSystem';
 import { LoadingUI } from './LoadingUI';
@@ -258,10 +258,18 @@ export class GameRenderer {
   }
 
   private setupPostProcessing(): void {
-    // Pixel Forge NPCs now render as close skinned meshes plus mid/far impostors.
-    // The old low-res quantized post pass made flat GLBs and vegetation harder
-    // to read, so runtime rendering goes directly to the backbuffer for now.
-    this.postProcessing = undefined;
+    // The P6 TSL node post-stack (filmic grade + tier-gated bloom + atmospheric
+    // depth) is owned by PostProcessingManager. It only attaches to the unified
+    // WebGPU renderer (+ its WebGL2 fallback) and is DEFAULT-OFF behind the
+    // `NodePostProcessing` kill-switch (mobile-off, `?renderer=webgl`-off).
+    //
+    // The bootstrap WebGL renderer present at construction is NOT post-eligible
+    // (`isWebGPURenderer === false`), so the stack stays inert here; it is
+    // (re)built against the LIVE `this.renderer` in `initializeRendererBackend`
+    // once the WebGPU/WebGL2 backend resolves. Building it now keeps the
+    // `postProcessing` handle non-undefined so the loop's begin/end brackets and
+    // the viewport `setSize` wiring stay live across the backend swap.
+    this.postProcessing = new PostProcessingManager(this.renderer, this.scene, this.camera);
   }
 
   async initializeRendererBackend(): Promise<void> {
@@ -336,6 +344,11 @@ export class GameRenderer {
           `Renderer initialized as ${resolvedBackend}.`,
         ],
       };
+
+      // The bootstrap WebGL renderer has been replaced by the live WebGPU/WebGL2
+      // renderer; (re)build the P6 post stack against it. It self-gates on
+      // eligibility + the kill-switch, so this is a no-op when post is off.
+      this.postProcessing?.attachRenderer(this.renderer);
 
       Logger.info(
         'Renderer',

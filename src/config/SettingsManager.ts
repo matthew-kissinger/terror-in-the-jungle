@@ -10,6 +10,9 @@ export type ControllerDpadMode = 'weapons' | 'quickCommands';
 
 interface GameSettings {
   masterVolume: number;       // 0-100
+  ambientVolume: number;      // 0-100 (jungle soundscape beds)
+  musicVolume: number;        // 0-100 (radio stations)
+  musicEnabled: boolean;      // radio music default OFF (esp. touch)
   mouseSensitivity: number;   // 1-10 (UI scale), mapped to 0.001-0.005 internally
   touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.003-0.015 internally
   controllerPreset: ControllerPreset;
@@ -33,6 +36,9 @@ const LEGACY_STORAGE_KEY = 'pixelart-sandbox-settings';
 
 const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
+  ambientVolume: 100,
+  musicVolume: 50,
+  musicEnabled: false,
   mouseSensitivity: 5,
   touchSensitivity: 3,
   controllerPreset: 'default',
@@ -100,6 +106,16 @@ export class SettingsManager {
   /** Returns master volume as 0-1 float */
   getMasterVolumeNormalized(): number {
     return this.settings.masterVolume / 100;
+  }
+
+  /** Returns ambient (soundscape) volume as 0-1 float */
+  getAmbientVolumeNormalized(): number {
+    return this.settings.ambientVolume / 100;
+  }
+
+  /** Returns radio music volume as 0-1 float */
+  getMusicVolumeNormalized(): number {
+    return this.settings.musicVolume / 100;
   }
 
   onChange(listener: SettingsListener): () => void {

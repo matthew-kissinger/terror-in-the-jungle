@@ -31,6 +31,14 @@ const PLAYER_POINT_SIZE = 12;
 const NPC_POINT_SIZE = 0.55;
 const MUZZLE_FLASH_PERF_CATEGORY = 'muzzle_flash_fx';
 
+/**
+ * Peak luminance gain applied to a full-life muzzle-flash particle. Raised above
+ * the P6 post-stack bloom threshold (1.0) so flashes bloom; see the colour
+ * upload in `uploadSlots`. Tuned to clear the threshold for the bright early-life
+ * window without washing the whole burst.
+ */
+export const MUZZLE_FLASH_BLOOM_GAIN = 2.2;
+
 // CPU-side particle state (plain arrays for tight memory layout)
 interface CpuParticle {
   x: number; y: number; z: number;
@@ -149,7 +157,12 @@ function uploadSlots(
       positions[i3 + 1] = HIDDEN_POINT;
       positions[i3 + 2] = HIDDEN_POINT;
     }
-    const intensity = s.life * 1.6;
+    // P6 bloom: push hot vertex colours above the post-stack bloom threshold
+    // (BloomPass.BLOOM_THRESHOLD = 1.0) so muzzle flashes bloom while ordinary
+    // lit surfaces (tonemapped <= ~1.0) do not. Additive blending already reads
+    // > 1.0 colours; the higher peak guarantees the flash clears the threshold
+    // even after the early-life decay. Harmless when post is off.
+    const intensity = s.life * MUZZLE_FLASH_BLOOM_GAIN;
     colors[i3]        = s.r * intensity;
     colors[i3 + 1]    = s.g * intensity;
     colors[i3 + 2]    = s.b * intensity;

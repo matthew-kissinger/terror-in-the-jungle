@@ -422,6 +422,17 @@ export class TerrainSystem implements GameSystem {
     return this.terrainQueries.getNormalAt(x, z, target);
   }
 
+  /**
+   * Baked GPU-coherent heightmap as a CPU-readable 1024²-capped grid (NOT the
+   * 2304² source DEM); null until the surface has baked. Concrete-class facade
+   * over the private surface runtime — deliberately NOT on the fenced
+   * ITerrainRuntime — for the orbital topo map to read relief without coupling
+   * to GPU heightmap internals.
+   */
+  getBakedHeightmap(): { data: Float32Array; gridSize: number; worldSize: number } | null {
+    return this.isInitialized ? this.surfaceRuntime.getBakedHeightmap() : null;
+  }
+
   // ──── Collision objects ────
 
   registerCollisionObject(

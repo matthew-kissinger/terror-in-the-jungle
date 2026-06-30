@@ -1,0 +1,13 @@
+{
+  "slug": "wildlife-bird",
+  "role": "one-shot wildlife cue (day)",
+  "provider": "first-party (synthesized)",
+  "sourceUrl": null,
+  "license": "CC BY-SA 4.0",
+  "status": "shipped-placeholder",
+  "localPath": "public/assets/audio/ambient/wildlife-bird.ogg",
+  "attributionRequired": false,
+  "author": "Matthew Kissinger (ffmpeg/libopus synthesis)",
+  "format": "Opus .ogg, mono, ~40 kbps, ~1.2 s",
+  "notes": "FIRST-PARTY PLACEHOLDER, not a field recording. Synthesized chirp (see generate-beds.sh). Fires from the SoundscapeDirector one-shot pool while the day bed dominates. Owner follow-up: replace with a genuine CC0/CC-BY bird recording."
+}

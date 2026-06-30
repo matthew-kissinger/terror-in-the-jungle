@@ -198,14 +198,20 @@ manifest file as usual.
 
 ## Current state
 
-**ACTIVE CAMPAIGN — [CAMPAIGN_2026-06-29-cinematic-field-pass.md](CAMPAIGN_2026-06-29-cinematic-field-pass.md)**
-(7 phases — P0 foundations + 6 workstreams: visual post-stack, 3D orbital topo
-map, radio dial revival, command-HUD fit, soundscape, radio stations).
-SCAFFOLDED 2026-06-29 from the owner playtest + a 5-design/critique
-(`titj-big-cycle-design`) workflow and 4 DEM/audio recon agents. All 7 briefs are
-authored in `docs/tasks/cycle-2026-06-29-*`; "Current cycle" below seeds P0.
-Owner decisions are locked in the manifest; auto-advance + posture are owner-set
-at kickoff. NOT started, NOT deployed (deploy is MANUAL).
+**CAMPAIGN COMPLETE — [CAMPAIGN_2026-06-29-cinematic-field-pass.md](CAMPAIGN_2026-06-29-cinematic-field-pass.md)**
+(7 phases + P4b wiring + PX terrain-spike). CLOSED 2026-06-29 (autonomous-loop).
+All 9 PRs (#457-#465) merged to `master`, ZERO fence changes, combat120 baseline
+restored (P0), full suite 7238 green. Shipped: TSL post-stack (filmic grade +
+bloom + atmospheric depth, DEFAULT-OFF); 3D orbital topo map (deploy/pause rich-3D
++ opt-in hold-M, default 2D); revived radial radio dial (desktop wheel + touch
+sheet) on a dedicated HUD slot + a headless `RadioStationSystem` (3 Kevin MacLeod
+CC-BY tracks, lazy, DEFAULT-OFF) wired to the dial (P4b); day/night
+`SoundscapeDirector` replacing the permanent loop; device-aware tasking-director
+card; and a terrain-tower fix (impostor card height clamped — the ~100m "towers"
+were inflated GLB billboard cards, NOT terrain). NOT deployed (deploy is MANUAL —
+owner ships after the walk). Owner feel-walks + the post default-on flip (behind a
+MAIN-worktree combat120 p99 neutrality proof) are queued in
+[PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
 
 **Prior campaign — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
 (6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
@@ -248,37 +254,20 @@ Directive status: [docs/DIRECTIVES.md](DIRECTIVES.md).
 
 ## Current cycle
 
-- **Active:** `cycle-2026-06-29-cinematic-foundations` (Phase 0 of
-  CAMPAIGN_2026-06-29-cinematic-field-pass) — brief:
-  [tasks/cycle-2026-06-29-cinematic-foundations.md](tasks/cycle-2026-06-29-cinematic-foundations.md).
-  Restore the `combat120` perf baseline (HARD exit gate), build the shared
-  `src/core/tsl/` node library, add the non-fenced
-  `TerrainSystem.getBakedHeightmap()`. **Awaiting owner kickoff** (posture /
-  auto-advance TBD). All 7 phase briefs authored under `docs/tasks/cycle-2026-06-29-*`.
-  - **Dependencies:** P0 blocks P5 (`orbital-topo-map`) + P6 (`visual-post-stack`)
-    — neither dispatches until P0's exit gate is green. P1
-    (`soundscape-loop-replacement`) and P2 (`task-card-hud-fit`) are independent
-    and may run in parallel with P0. Inside P3 (`radio-dial-revival`), P3a
-    (CommandInputManager re-trace) precedes P3b/c/d; P4 (`radio-stations-music`)
-    core runs parallel to P3a/b, its UI joins at P3d.
-- **Previous:** `cycle-2026-06-28-ashau-purpose-and-missions` (Phase 6 FINAL, 5/5:
-  #451-#455, R1 (4 parallel) + R2 (1), perf A/B PASS — R1 situation-readout −5.6%
-  (dormant in ai_sandbox), R2 tasking-director +0.6% (dormant when war sim idle),
-  closed 2026-06-29, playtest-deferred) — A Shau situation-readout HUD + opt-in
-  `TaskingDirector` (capture+defend) + 3 design docs (premiere BR, healing/looting,
-  director spike). No reviewer/fence scope. Mid-phase doc-drift gate-repair
-  (`378a4313`, cleaned at close). In-cycle budget ratchet (HUDSystem→878,
-  SystemManager→63 methods). See BACKLOG "Recently Completed" and PLAYTEST_PENDING.
-  Briefs archived at `docs/tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/`.
-- **Phase 5:** `cycle-2026-06-28-deploy-armory-faction-select` (7/7:
-  #444-#450, R1 (4) + R2 (2) + R3 (1), no perf gate — UI/deploy, closed 2026-06-29,
-  playtest-deferred) — A Shau faction picker, armory weapon-stats readout +
-  layout reflow, respawn-map navigation (bounded pan/zoom/recenter/spawn-cycle),
-  honest helipad labels, selectable crew-a-vehicle spawn, 3D-map feasibility spike.
-  Zero fence changes; no reviewer scope. In-cycle budget ratchet (sanctioned, no
-  CARRY_OVERS row): `DeployScreen.ts`→1142, `PlayerRespawnManager.ts`→800. See
-  BACKLOG "Recently Completed" and PLAYTEST_PENDING. Briefs archived at
-  `docs/tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/`.
+- **Active:** none. No cycle is in flight. The cinematic-field-pass campaign
+  closed 2026-06-29 (all 9 PRs #457-#465 merged; see "Current state" above and
+  BACKLOG "Recently Completed"). The next `/goal` or `/orchestrate` invocation
+  fills this section from a fresh cycle brief.
+- **Previous:** `CAMPAIGN_2026-06-29-cinematic-field-pass` (7 phases + P4b + PX,
+  closed 2026-06-29, autonomous-loop, playtest-deferred) — P0 cinematic
+  foundations (combat120 baseline restore + shared `src/core/tsl/` lib +
+  non-fenced `TerrainSystem.getBakedHeightmap()`), TSL post-stack (DEFAULT-OFF),
+  3D orbital topo map (opt-in, default 2D), revived radio dial + wired
+  `RadioStationSystem` (CC-BY, DEFAULT-OFF), day/night `SoundscapeDirector`,
+  device-aware task card, terrain-tower (impostor-card) fix. Zero fence changes;
+  full suite 7238 green. Briefs archived at
+  `docs/tasks/archive/cycle-2026-06-29-cinematic-field-pass/`. See PLAYTEST_PENDING
+  for the owner walks + the post default-on flip (behind a MAIN combat120 p99 proof).
 
 ## Dispatch protocol
 

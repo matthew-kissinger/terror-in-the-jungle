@@ -59,6 +59,18 @@ export function mountPersistentAttribution(): void {
   document.body.appendChild(el);
 }
 
+/**
+ * Show/hide the persistent corner notice. Hidden in the live play scene so it
+ * never overlaps the weapon bar / HUD; the full AGPL + CC BY-SA attribution
+ * stays in the Credits/About panel and on the menu screens, so the
+ * "Appropriate Legal Notices" remain reasonably visible (see LICENSING.md).
+ */
+export function setAttributionVisible(visible: boolean): void {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById(CREDIT_ID);
+  if (el) el.style.display = visible ? '' : 'none';
+}
+
 /** Show the Credits / About panel with the full AGPL + CC BY-SA notice. */
 export function showCreditsPanel(): void {
   if (typeof document === 'undefined' || !document.body) return;

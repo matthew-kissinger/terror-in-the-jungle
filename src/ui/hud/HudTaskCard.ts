@@ -18,8 +18,10 @@ import type { TaskCandidate, TaskKind } from '../../systems/missions/TaskingDire
  *
  * Mirrors `HudSituationReadout`: self-contained element, injected styles, a
  * value-equality guard so re-applying an identical view is a DOM no-op, and a
- * clean `dispose`. It sits as a distinct, higher-emphasis element directly
- * above the objectives list — "your assignment" atop "all objectives".
+ * clean `dispose`. The host gives it a device-aware home (a sibling atop the
+ * objectives grid slot on desktop, under the MobileStatusBar on touch); the
+ * card mounts as the slot's first child so it reads as "your assignment" above
+ * whatever follows — it never nests inside the objectives glass panel.
  */
 
 export type TaskCardState = 'idle' | 'offer' | 'active';
@@ -110,7 +112,7 @@ export class HudTaskCard {
     };
   }
 
-  /** Mount as the first child of the objectives column. Idempotent. */
+  /** Mount as the first child of the given grid slot (atop it). Idempotent. */
   mount(parent: HTMLElement): void {
     if (this.mounted) return;
     HudTaskCard.injectStyles();
@@ -280,6 +282,29 @@ export class HudTaskCard {
       }
       .hud-task-card__btn:hover { background: ${colors.buttonHover}; }
       .hud-task-card__btn--accept { border-color: ${colors.success}; }
+
+      /* Touch home: the card lives under the MobileStatusBar (status-bar slot)
+       * because the objectives slot is hidden on touch. Descendant selector so
+       * the card never carries data-device itself. Wider, finger-sized targets,
+       * a single-line ellipsised title, and a safe-area nudge below the notch. */
+      [data-device="touch"] .hud-task-card {
+        width: min(80vw, 360px);
+        max-width: none;
+        margin: env(safe-area-inset-top, 0px) auto 8px;
+        pointer-events: auto;
+      }
+      [data-device="touch"] .hud-task-card__title {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 13px;
+      }
+      [data-device="touch"] .hud-task-card__body { font-size: 14px; }
+      [data-device="touch"] .hud-task-card__btn {
+        min-height: 40px;
+        font-size: 13px;
+        padding: 8px 10px;
+      }
     `;
     document.head.appendChild(style);
   }

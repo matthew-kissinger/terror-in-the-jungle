@@ -2,8 +2,16 @@
   position: fixed;
   inset: 0;
   display: flex;
-  align-items: center;
+  /* Overflow-to-top fix: a centered flex child taller than the viewport clips
+     its TOP unreachably (flex centering pushes overflow both ways, but the
+     scroll origin can't reach above the start edge). Anchor to the top edge and
+     let the overlay itself scroll, so an over-tall radio panel always reveals
+     its header / close button. Vertical centering is restored via `margin: auto`
+     on the panel for the common case where it DOES fit. */
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding:
     max(12px, env(safe-area-inset-top, 0px))
     max(12px, env(safe-area-inset-right, 0px))
@@ -30,12 +38,13 @@
 .panel {
   position: relative;
   width: min(100%, 720px);
-  max-height: calc(100dvh - 24px);
+  /* `margin: auto` centers the panel vertically when it fits, but yields to the
+     overlay's scroll when it does not — so the top never clips out of reach. */
+  margin: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 18px;
-  overflow: auto;
   border: 1px solid rgba(168, 116, 42, 0.28);
   border-radius: 8px;
   background:
@@ -255,6 +264,10 @@
   .panel {
     width: 100%;
     max-height: 86vh;
+    /* Bottom-sheet: pin to the bottom edge and scroll internally. */
+    margin: auto 0 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     gap: 10px;
     padding: 12px;
     border-radius: 8px 8px 0 0;

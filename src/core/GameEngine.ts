@@ -226,6 +226,21 @@ export class GameEngine {
         }
         break;
       }
+      case 'musicEnabled': {
+        // Radio music is default-OFF; flipping the toggle enables/disables the
+        // dedicated music bus on the concrete AudioManager (off the fence).
+        if (this.systemManager.audioManager) {
+          this.systemManager.audioManager.setMusicEnabled(value as boolean);
+        }
+        break;
+      }
+      case 'musicVolume': {
+        const settings = SettingsManager.getInstance();
+        if (this.systemManager.audioManager) {
+          this.systemManager.audioManager.setMusicVolume(settings.getMusicVolumeNormalized());
+        }
+        break;
+      }
       case 'enableShadows': {
         const enabled = value as boolean;
         this.renderer.renderer.shadowMap.enabled = enabled;

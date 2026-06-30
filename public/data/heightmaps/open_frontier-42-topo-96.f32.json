@@ -1,0 +1,10 @@
+{
+  "gridSize": 96,
+  "worldSize": 3200,
+  "minHeight": -8,
+  "maxHeight": 135.56396484375,
+  "sourceGridSize": 1024,
+  "provenance": "Procedurally generated seed DEM (open_frontier-42), downsampled.",
+  "license": "NASADEM public-domain / CC0 (A Shau); procedural (seeded maps)",
+  "bakedAt": "2026-06-30T02:52:10.084Z"
+}

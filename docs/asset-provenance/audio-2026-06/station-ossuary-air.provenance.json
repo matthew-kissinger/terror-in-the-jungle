@@ -1,0 +1,18 @@
+{
+  "slug": "station-ossuary-air",
+  "role": "radio station track (ambient drone)",
+  "title": "Ossuary 6 - Air",
+  "author": "Kevin MacLeod",
+  "provider": "incompetech.com",
+  "sourceUrl": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Ossuary%206%20-%20Air.mp3",
+  "infoUrl": "https://incompetech.com/music/royalty-free/index.html?keywords=Ossuary",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "status": "shipped-third-party",
+  "localPath": "public/assets/audio/music/station-ossuary-air.ogg",
+  "attributionRequired": true,
+  "attributionText": "\"Ossuary 6 - Air\" by Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 License (https://creativecommons.org/licenses/by/4.0/).",
+  "format": "Opus .ogg, stereo, ~80 kbps, ~250 s",
+  "fetchedOn": "2026-06-29",
+  "notes": "Fetched directly from incompetech.com (HTTP 200) during cycle-2026-06-29-radio-stations-music and re-encoded MP3 -> Opus stereo 80kbps with ffmpeg/libopus (metadata stripped). Substituted for the brief's cited Bartmann CC0 drone / AFN CC-BY surf because those sources are account/credential-bound and could not be fetched license-clean in this autonomous run; this incompetech CC BY 4.0 dark-ambient drone fills the 'ambient' station instead. Lazy-loaded only when tuned (music default-OFF)."
+}
