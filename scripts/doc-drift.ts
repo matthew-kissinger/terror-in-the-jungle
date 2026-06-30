@@ -119,6 +119,8 @@ const SKIP_PREFIXES = ['archive', 'cycles', 'tasks/archive', 'tasks\\archive'];
 // with `npx tsx scripts/doc-drift.ts --print-grandfather`.
 // >>> GRANDFATHER-START <<<
 const GRANDFATHER: ReadonlySet<string> = new Set<string>([
+  "docs/AGENT_ORCHESTRATION.md::missing_code_path::src/core/tsl",
+  "docs/CAMPAIGN_2026-06-29-cinematic-field-pass.md::missing_code_path::src/core/tsl",
   "docs/COMBAT.md::missing_code_path::src/systems/strategy/AbstractCombatResolver",
   "docs/REARCHITECTURE.md::missing_code_path::scripts/perf-active-driver.js",
   "docs/directives/webgpu-migration-10.md::missing_package_script::check:hydrology-bakes",
@@ -138,6 +140,19 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/file.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/other.ts",
   "docs/tasks/_TEMPLATE.md::missing_code_path::src/path/to/test.test.ts",
+  "docs/tasks/cycle-2026-06-29-cinematic-foundations.md::missing_code_path::src/core/tsl",
+  "docs/tasks/cycle-2026-06-29-cinematic-foundations.md::missing_code_path::src/core/tsl/NodeMaterialLibrary.ts",
+  "docs/tasks/cycle-2026-06-29-cinematic-foundations.md::missing_code_path::src/core/tsl/PostGradeNodes.ts",
+  "docs/tasks/cycle-2026-06-29-orbital-topo-map.md::missing_code_path::scripts/bake-topo-dem.ts",
+  "docs/tasks/cycle-2026-06-29-orbital-topo-map.md::missing_code_path::src/ui/map/orbital/OrbitalTopoMeshBuilder.ts",
+  "docs/tasks/cycle-2026-06-29-radio-dial-revival.md::missing_code_path::src/ui/hud/radio/RadialDialView.ts",
+  "docs/tasks/cycle-2026-06-29-radio-dial-revival.md::missing_code_path::src/ui/hud/radio/RadioDialModel.ts",
+  "docs/tasks/cycle-2026-06-29-radio-dial-revival.md::missing_code_path::src/ui/hud/radio/RadioHotbarSlot.ts",
+  "docs/tasks/cycle-2026-06-29-radio-stations-music.md::missing_code_path::src/config/radioStations.ts",
+  "docs/tasks/cycle-2026-06-29-radio-stations-music.md::missing_code_path::src/systems/audio/RadioStationSystem.ts",
+  "docs/tasks/cycle-2026-06-29-soundscape-loop-replacement.md::missing_code_path::src/config/soundscape.ts",
+  "docs/tasks/cycle-2026-06-29-soundscape-loop-replacement.md::missing_code_path::src/systems/audio/SoundscapeDirector.ts",
+  "docs/tasks/cycle-2026-06-29-visual-post-stack.md::missing_code_path::src/systems/effects/NodePostProcessing.ts",
 ]);
 // >>> GRANDFATHER-END <<<
 // ---------------------------------------------------------------------------
