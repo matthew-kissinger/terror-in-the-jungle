@@ -12,7 +12,9 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 - **Slash commands** in `.claude/commands/`: `/validate`, `/perf-capture`, `/playtest`, `/orchestrate`.
 - **Subagent types** in `.claude/agents/`: `executor`, `combat-reviewer`, `terrain-nav-reviewer`, `perf-analyst`, plus an `orchestrator` role kicked off via the `/orchestrate` slash command against `docs/AGENT_ORCHESTRATION.md`.
-- **Skills** in `.claude/skills/`: `webgpu-threejs-tsl` — third-party WebGPU + TSL reference (Three.js node materials, compute shaders, TSL syntax, device-loss handling, WGSL integration). Vendored from https://github.com/dgreenheck/webgpu-claude-skill on 2026-05-15. Mirrored for Cursor at `.cursor/rules/*.mdc` via `@file` references — no duplication.
+- **Skills** in `.claude/skills/`:
+  - `webgpu-threejs-tsl` — third-party WebGPU + TSL reference (Three.js node materials, compute shaders, TSL syntax, device-loss handling, WGSL integration). Vendored from https://github.com/dgreenheck/webgpu-claude-skill on 2026-05-15. Mirrored for Cursor at `.cursor/rules/*.mdc` via `@file` references — no duplication.
+  - `threejs-*` pack (`threejs-game-director` router + `threejs-gameplay-systems`, `threejs-aaa-graphics-builder`, `threejs-game-ui-designer`, `threejs-debug-profiler`, `threejs-qa-release`, `threejs-3d-generator`, `threejs-image-generator`, `threejs-audio-generator`) — third-party Three.js game-dev consultation skills. Vendored from https://github.com/majidmanzarpour/threejs-game-skills on 2026-06-29. Generator skills (`3d`/`image`/`audio`) call external paid APIs (Tripo / Gemini / ElevenLabs) and are advisory only — do not run them without explicit owner sign-off.
 - **Orchestration runbook entry point**: [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md). Individual task briefs live in `docs/tasks/*.md`.
 - **Local Claude settings** live in `.claude/settings.local.json`, which is intentionally untracked and may differ per machine.
 - **Statusline** at `~/.claude/statusline.ps1` (user-level global).
