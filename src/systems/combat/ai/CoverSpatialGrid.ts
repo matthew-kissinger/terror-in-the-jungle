@@ -32,7 +32,7 @@ import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 export const COVER_GRID_CELL_SIZE = 8;
 
 /** Result of a grid query. `distance` is the linear distance, not squared. */
-export interface CoverGridQueryResult {
+interface CoverGridQueryResult {
   coverId: string;
   position: THREE.Vector3;
   distance: number;

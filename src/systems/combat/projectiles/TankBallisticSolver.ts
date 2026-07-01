@@ -32,7 +32,7 @@ export interface TrajectorySample {
   z: number;
 }
 
-export type SolverBackend = 'ts' | 'wasm';
+type SolverBackend = 'ts' | 'wasm';
 
 /** Integration step (seconds). Mirrors the Rust crate. */
 const STEP_SECONDS = 1 / 60;

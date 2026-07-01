@@ -49,7 +49,7 @@ export const M2HB_STATS = Object.freeze({
 /** Seconds between rounds at cyclic RPM. */
 const ROUND_INTERVAL_SEC = 60 / M2HB_STATS.rpm;
 
-export interface M2HBWeaponSnapshot {
+interface M2HBWeaponSnapshot {
   ammo: number;
   ammoMax: number;
   cooldownRemainingSec: number;

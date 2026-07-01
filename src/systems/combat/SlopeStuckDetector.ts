@@ -42,7 +42,7 @@ import type { Combatant } from './types';
 export const STUCK_SPEED_EPSILON = 0.5;
 export const SLOPE_STALL_TIME_MS = 1500;
 
-export type SlopeStuckAction =
+type SlopeStuckAction =
   /** No recovery action this tick. NPC may or may not be stalled. */
   | 'none'
   /** NPC is in recovery; caller should apply a downhill slide velocity. */

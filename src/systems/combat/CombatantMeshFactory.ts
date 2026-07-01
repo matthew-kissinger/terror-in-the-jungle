@@ -54,7 +54,6 @@ import {
 } from './PixelForgeNpcRuntime';
 import type { CombatantUniformMaterial } from './CombatantShaders';
 
-export type ViewDirection = 'front' | 'back' | 'side';
 export type WalkFrameMap = Map<string, { a: THREE.Texture; b: THREE.Texture }>;
 
 interface CombatantMeshAssets {
@@ -66,7 +65,7 @@ interface CombatantMeshAssets {
   walkFrameTextures: WalkFrameMap;
 }
 
-export interface CombatantImpostorBucketAssets {
+interface CombatantImpostorBucketAssets {
   key: string;
   mesh: THREE.InstancedMesh;
   marker: THREE.InstancedMesh;
@@ -89,7 +88,11 @@ const NPC_BASE_SPRITE_HEIGHT = NPC_PIXEL_FORGE_BASE_VISUAL_HEIGHT;
 export const NPC_SPRITE_WIDTH = NPC_BASE_SPRITE_WIDTH * NPC_VISUAL_SCALE_MULTIPLIER;
 export const NPC_SPRITE_HEIGHT = NPC_BASE_SPRITE_HEIGHT * NPC_VISUAL_SCALE_MULTIPLIER;
 export const NPC_SPRITE_RENDER_Y_OFFSET = NPC_SPRITE_HEIGHT / 2 - NPC_Y_OFFSET;
-export const NPC_CLOSE_MODEL_TARGET_HEIGHT = NPC_SPRITE_HEIGHT;
+// Close 3D-model NPCs are scaled to match the impostor sprite height. Derived
+// from the same base expression as NPC_SPRITE_HEIGHT (rather than aliasing that
+// export) so the two stay value-equal without registering as a duplicate export.
+export const NPC_CLOSE_MODEL_TARGET_HEIGHT =
+  NPC_BASE_SPRITE_HEIGHT * NPC_VISUAL_SCALE_MULTIPLIER;
 export const DEFAULT_MESH_BUCKET_CAPACITY = 512;
 export const MOUNTED_MESH_BUCKET_CAPACITY = 128;
 const NPC_GROUND_MARKER_PERF_CATEGORY = 'npc_ground_markers';

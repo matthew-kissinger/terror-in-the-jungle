@@ -22,6 +22,11 @@ import { handleCombatantDeath, DeathBookkeepingHooks } from './CombatantDeathPip
  * still reconciles the victim's squad) plus the player-squad respawn hooks the
  * spawn manager owns. Set once by CombatantSystem; mirrors the hooks the
  * explosion path already passes in CombatantSystemDamage.
+ *
+ * Exported for a cross-file consumer that knip cannot trace: CombatantCombat
+ * references it via an inline `import('./CombatantDamage').DeathBookkeeping`
+ * type annotation, which the static export scan does not count as usage.
+ * This is a documented knip false-positive — the export must stay.
  */
 export interface DeathBookkeeping extends DeathBookkeepingHooks {
   getSquads(): Map<string, Squad>;

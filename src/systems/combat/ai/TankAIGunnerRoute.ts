@@ -127,7 +127,7 @@ const _barrelTip = new THREE.Vector3()
 const _barrelDir = new THREE.Vector3()
 const _targetVelHorizontal = new THREE.Vector3()
 
-export interface TankAIGunnerRouteOptions {
+interface TankAIGunnerRouteOptions {
   /** Cone tolerance in radians (defaults to ~2.86°). */
   coneToleranceRad?: number
   /** Reload time between shots in seconds (defaults to 3.5). */
@@ -138,7 +138,7 @@ export interface TankAIGunnerRouteOptions {
   ammoType?: 'AP' | 'HEAT' | 'HE'
 }
 
-export interface TankAIGunnerRouteResult {
+interface TankAIGunnerRouteResult {
   /** True iff a cannon round actually launched this tick. */
   fired: boolean
   /** Reason fire was withheld (diagnostic, empty when `fired === true`). */

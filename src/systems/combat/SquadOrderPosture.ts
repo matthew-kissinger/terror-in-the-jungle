@@ -13,7 +13,7 @@ import { SquadCommandConfig } from '../../config/SquadCommandConfig';
  * the surrounding combat code has flagged nondeterminism, so this helper stays
  * trivially testable and reproducible.
  */
-export interface SquadOrderIntent {
+interface SquadOrderIntent {
   /**
    * False only for an active leashed order whose anchor is known. When false the
    * caller must apply the leash gate (`isWithinLeash`) before acquiring/chasing

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-export interface PixelForgeNpcViewTile {
+interface PixelForgeNpcViewTile {
   column: number;
   row: number;
 }
@@ -19,7 +19,7 @@ function clampTile(value: number, size: number): number {
   return Math.min(size - 1, Math.max(0, value));
 }
 
-export function getPixelForgeNpcOctahedralViewTile(
+function getPixelForgeNpcOctahedralViewTile(
   localX: number,
   localY: number,
   localZ: number,

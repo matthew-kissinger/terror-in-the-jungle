@@ -62,7 +62,7 @@ interface CombatantSystemDependencies {
   playerSuppressionSystem: PlayerSuppressionSystem;
 }
 
-export interface CombatantMaterializationProfile {
+interface CombatantMaterializationProfile {
   checkedAtMs: number;
   playerPosition: { x: number; y: number; z: number };
   closeModelStats: CloseModelRuntimeStats;
