@@ -84,6 +84,7 @@ describe('CombatantSystemDamage', () => {
         showHitMarker: vi.fn(),
         spawnDamageNumber: vi.fn(),
         addKillToFeed: vi.fn(),
+        addKill: vi.fn(),
       };
     }
     function addEnemy(id: string, health: number, x: number) {
@@ -107,7 +108,7 @@ describe('CombatantSystemDamage', () => {
       expect(isKill).toBe(false);
     });
 
-    it('shows a kill marker + kill damage number when a player explosion kills an enemy', () => {
+    it('credits the kill (count/streak/marker via addKill) + a kill damage number', () => {
       const hud = makeHud();
       damage.setHUDSystem(hud as never);
       const enemy = addEnemy('e1', 10, 0.5);
@@ -115,9 +116,24 @@ describe('CombatantSystemDamage', () => {
       damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
 
       expect(enemy.state).toBe(CombatantState.DEAD);
-      expect(hud.showHitMarker).toHaveBeenCalledWith('kill');
+      // Kills route through the canonical player-kill entry point, which credits
+      // the kill counter + streak and shows the kill marker — same as a rifle.
+      expect(hud.addKill).toHaveBeenCalledTimes(1);
+      expect(hud.addKill).toHaveBeenCalledWith(false);
       const isKill = hud.spawnDamageNumber.mock.calls[0][3];
       expect(isKill).toBe(true);
+    });
+
+    it('credits one addKill per enemy killed by a single blast (multikill)', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      addEnemy('e1', 10, 0.5);
+      addEnemy('e2', 10, 0.6);
+      addEnemy('e3', 10, 0.7);
+
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
+
+      expect(hud.addKill).toHaveBeenCalledTimes(3);
     });
 
     it('shows no player feedback for an explosion the player did not cause', () => {
@@ -144,23 +160,23 @@ describe('CombatantSystemDamage', () => {
       expect(hud.showHitMarker).not.toHaveBeenCalled(); // but no enemy marker
     });
 
-    it('rate-limits rapid non-kill hit markers yet never suppresses a kill', () => {
+    it('rate-limits rapid non-kill hit markers yet never suppresses a kill credit', () => {
       const hud = makeHud();
       damage.setHUDSystem(hud as never);
       const nowSpy = vi.spyOn(performance, 'now').mockReturnValue(1000);
 
       addEnemy('e1', 100, 2);
       damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
-      expect(hud.showHitMarker).toHaveBeenCalledTimes(1); // first hit shows
+      expect(hud.showHitMarker).toHaveBeenCalledTimes(1); // first non-kill hit shows
 
       addEnemy('e2', 100, 2);
       damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
       expect(hud.showHitMarker).toHaveBeenCalledTimes(1); // within cooldown: suppressed
 
-      addEnemy('e3', 5, 0.5); // dies this blast
+      addEnemy('e3', 5, 0.5); // dies this blast (kill path, not the 'hit' marker path)
       damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
-      expect(hud.showHitMarker).toHaveBeenCalledTimes(2); // kill punches through
-      expect(hud.showHitMarker).toHaveBeenLastCalledWith('kill');
+      expect(hud.addKill).toHaveBeenCalled(); // kill credited despite the cooldown
+      expect(hud.showHitMarker).toHaveBeenCalledTimes(1); // kills don't emit a 'hit' marker
 
       nowSpy.mockRestore();
     });

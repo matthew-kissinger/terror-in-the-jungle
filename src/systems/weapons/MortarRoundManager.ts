@@ -111,12 +111,16 @@ export class MortarRoundManager {
       this.audioManager.playExplosionAt(round.position);
     }
 
-    // Damage
+    // Damage. The mortar is a player-only weapon (deployed from the player's
+    // loadout), so credit the round to 'PLAYER': kill count, streak, and
+    // hit/kill markers, matching the grenade launcher.
     if (this.combatantSystem) {
       this.combatantSystem.applyExplosionDamage(
         round.position,
         this.DAMAGE_RADIUS,
-        this.MAX_DAMAGE
+        this.MAX_DAMAGE,
+        'PLAYER',
+        'mortar'
       );
     }
   }

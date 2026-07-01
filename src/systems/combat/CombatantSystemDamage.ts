@@ -300,8 +300,13 @@ export class CombatantSystemDamage {
     if (kills.length > 0) {
       for (const kill of kills) {
         hudSystem.spawnDamageNumber(kill.position, kill.damage, false, true);
+        // Credit the kill exactly as a rifle kill does (CombatantCombat →
+        // hudSystem.addKill): increments the kill counter + player streak
+        // (PlayerStatsTracker.addKill), fires the kill marker, and spawns the
+        // score popup. This is what wires explosive / air-strike kills into the
+        // scoreboard. Explosions carry no headshot, so isHeadshot = false.
+        hudSystem.addKill(false);
       }
-      hudSystem.showHitMarker('kill');
       this.audioManager?.playHitFeedback('kill');
       this.lastPlayerHitFeedbackAt = performance.now();
       return;
