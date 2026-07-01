@@ -438,9 +438,14 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
 
     // Surface the door-gun belt count through the existing heli weapon-status
     // HUD slot (no new ammo economy — this is the same belt the AI crew shares).
+    // Thread the belt capacity too so the crew panel can flag the LOW state as a
+    // real ratio; it is an optional additive arg on the concrete HUD (beyond the
+    // fenced IHUDSystem 2-arg signature), so widen the type to pass it.
     const status = model.getPlayerDoorGunStatus?.(heliId);
     if (status && hudSystem) {
-      hudSystem.setHelicopterWeaponStatus?.(status.name, status.ammo);
+      (hudSystem as IHUDSystem & {
+        setHelicopterWeaponStatus?(name: string, ammo: number, maxAmmo?: number): void;
+      }).setHelicopterWeaponStatus?.(status.name, status.ammo, status.maxAmmo);
     }
   }
 

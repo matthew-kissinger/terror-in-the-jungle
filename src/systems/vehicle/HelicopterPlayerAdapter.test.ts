@@ -394,7 +394,9 @@ describe('HelicopterPlayerAdapter', () => {
       adapter.toggleDoorGunSeat();
       const built = createUpdateContext();
       adapter.update(built.ctx);
-      expect(built.setHelicopterWeaponStatus).toHaveBeenCalledWith('M60 Door Gun', 500);
+      // Belt capacity is threaded alongside the count so the crew panel can flag
+      // LOW ammo as a real ratio (full belt here: 500/500).
+      expect(built.setHelicopterWeaponStatus).toHaveBeenCalledWith('M60 Door Gun', 500, 500);
     });
 
     it('releases the door gun when the player dismounts straight from the gun seat', () => {

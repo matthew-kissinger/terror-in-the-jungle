@@ -329,9 +329,14 @@ export class HelicopterWeaponSystem {
         }
       }
 
-      // Push HUD status
+      // Push HUD status. Thread the magazine capacity too so the HUD can flag
+      // the LOW-ammo state as a real remaining/capacity ratio. Capacity is an
+      // optional additive arg on the concrete HUD (beyond the fenced IHUDSystem
+      // 2-arg signature) — widen the type here to pass it without a fence change.
       if (this.hudSystem) {
-        this.hudSystem.setHelicopterWeaponStatus(active.config.name, active.ammo);
+        (this.hudSystem as IHUDSystem & {
+          setHelicopterWeaponStatus(name: string, ammo: number, maxAmmo?: number): void;
+        }).setHelicopterWeaponStatus(active.config.name, active.ammo, active.config.ammoCapacity);
       }
     }
   }

@@ -420,6 +420,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* LOW: remaining rounds under 20% of capacity — stamp-red call-out. Applied to
+   both the pilot weapon ammo and the door-gun belt count. Mirrors the
+   FixedWingHUD .ammoLow treatment so both aircraft classes flag low ammo alike. */
+.ammoLow {
+  color: var(--hot);
+  background: rgba(181, 71, 47, 0.25);
+}
+
 /* --- Damage section --- */
 .damageSection {
   flex-direction: row;

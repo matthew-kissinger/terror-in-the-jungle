@@ -93,17 +93,52 @@ describe('HudControlHints', () => {
     hints.dispose();
   });
 
-  it('lists airborne-fire and exit binds in an aircraft', () => {
+  it('lists airborne-fire and exit binds in a helicopter', () => {
     const hints = new HudControlHints();
     hints.mount(host);
 
-    hints.setContext('aircraft');
+    hints.setContext('helicopter');
 
     const text = legendText(host);
-    // The finding the owner reported: he could not tell that planes fire.
+    // The finding the owner reported: he could not tell that aircraft fire.
     expect(text).toContain('Fire guns');
     expect(text).toContain('Throttle / Altitude');
     expect(text).toContain('Exit aircraft');
+    hints.dispose();
+  });
+
+  it('surfaces the helicopter-only altitude lock and weapon-cycle keys', () => {
+    const hints = new HudControlHints();
+    hints.mount(host);
+
+    hints.setContext('helicopter');
+
+    const rows = legendRows(host).join(' | ');
+    // Altitude lock (H) and the gun/rocket cycle keys (1/2) were invisible
+    // anywhere in the hint UI before — both belong to the rotary craft only.
+    expect(rows).toContain('Altitude lock');
+    expect(rows.toLowerCase()).toContain('rockets');
+    // Space auto-hovers a rotary craft (it does not "flight assist").
+    expect(rows).toContain('Auto-hover');
+    // Deploy-squad `G` never fires in the plane; it is not a helicopter bind row.
+    expect(rows).not.toContain('Deploy squad');
+  });
+
+  it('shows fixed-wing flight-assist Space and no dead squad-deploy or altitude-lock rows', () => {
+    const hints = new HudControlHints();
+    hints.mount(host);
+
+    hints.setContext('fixedWing');
+
+    const rows = legendRows(host).join(' | ');
+    expect(rows).toContain('Fire guns');
+    expect(rows).toContain('Exit aircraft');
+    // A plane arms flight assist on Space (not auto-hover), has no altitude lock,
+    // and the `G` deploy-squad key does nothing on it — none of those show.
+    expect(rows).toContain('Flight assist');
+    expect(rows).not.toContain('Auto-hover');
+    expect(rows).not.toContain('Altitude lock');
+    expect(rows).not.toContain('Deploy squad');
     hints.dispose();
   });
 
@@ -111,7 +146,7 @@ describe('HudControlHints', () => {
     const hints = new HudControlHints();
     hints.mount(host);
 
-    hints.setContext('aircraft');
+    hints.setContext('helicopter');
     expect(legendText(host)).toContain('Fire guns');
 
     hints.setContext('foot');
@@ -155,8 +190,21 @@ describe('HudControlHints', () => {
     hints.mount(host);
     expect(hints.isShown()).toBe(true);
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+    // Backslash, not KeyH: KeyH is the helicopter altitude-lock bind, so the
+    // legend toggle stays clear of it.
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backslash' }));
     expect(hints.isShown()).toBe(false);
+    hints.dispose();
+  });
+
+  it('does not toggle on KeyH — that key is the helicopter altitude lock', () => {
+    const hints = new HudControlHints();
+    hints.mount(host);
+    expect(hints.isShown()).toBe(true);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+    // The legend must ignore KeyH so it never fights the altitude-lock bind.
+    expect(hints.isShown()).toBe(true);
     hints.dispose();
   });
 
@@ -180,7 +228,7 @@ describe('HudControlHints', () => {
     expect(host.querySelector('.hud-control-hints')).toBeNull();
 
     // A toggle key after dispose must not throw or re-show anything.
-    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Backslash' }));
     expect(document.querySelector('.hud-control-hints')).toBeNull();
   });
 });
@@ -291,5 +339,78 @@ describe('HudControlHints — seat / fire cues', () => {
 
     hints.setSeatHint(HudControlHints.seatHintFromContext(null));
     expect(seatText(host)).toBe('');
+  });
+});
+
+describe('HudControlHints — per-airframe legend gating', () => {
+  let host: HTMLDivElement;
+  let hints: HudControlHints;
+
+  // A broadside-capable plane (AC-47) reports a viewToggle; a plain fighter/attack
+  // plane (A-1 / F-4 / armed door path) does not.
+  const ac47: VehicleUIContext = {
+    kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
+    viewToggle: { inactiveLabel: 'SIDE', activeLabel: 'CHASE', active: false },
+  };
+  const strikePlane: VehicleUIContext = {
+    kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    hints = new HudControlHints();
+    hints.mount(host);
+    hints.setContext('fixedWing');
+  });
+
+  afterEach(() => {
+    hints.dispose();
+    host.remove();
+    document.querySelectorAll('.hud-control-hints').forEach((el) => el.remove());
+  });
+
+  it('shows the V side/chase-view row for the AC-47 broadside gunship', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(ac47));
+    const rows = legendRows(host).join(' | ');
+    expect(rows).toContain('Side / chase view');
+  });
+
+  it('hides the V view row for a plane with no broadside view', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(strikePlane));
+    const rows = legendRows(host).join(' | ');
+    // The key does nothing on this airframe, so no dead hint.
+    expect(rows).not.toContain('Side / chase view');
+  });
+
+  it('drops the V row again when leaving the AC-47 for a non-broadside plane', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(ac47));
+    expect(legendRows(host).join(' | ')).toContain('Side / chase view');
+
+    hints.setSeatHint(HudControlHints.seatHintFromContext(strikePlane));
+    expect(legendRows(host).join(' | ')).not.toContain('Side / chase view');
+  });
+
+  it('never shows the V row in the helicopter legend even with a stale broadside hint', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext(ac47));
+    hints.setContext('helicopter');
+    // Broadside view is a fixed-wing concept; the rotary legend never carries it.
+    expect(legendRows(host).join(' | ')).not.toContain('Side / chase view');
+  });
+});
+
+describe('HudControlHints.actorToContext', () => {
+  it('maps helicopter and plane to distinct flight buckets', () => {
+    expect(HudControlHints.actorToContext('helicopter')).toBe('helicopter');
+    expect(HudControlHints.actorToContext('plane')).toBe('fixedWing');
+  });
+
+  it('maps ground actors and infantry as before', () => {
+    expect(HudControlHints.actorToContext('car')).toBe('groundVehicle');
+    expect(HudControlHints.actorToContext('turret')).toBe('groundVehicle');
+    expect(HudControlHints.actorToContext('infantry')).toBe('foot');
   });
 });

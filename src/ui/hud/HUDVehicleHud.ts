@@ -68,8 +68,12 @@ export class HUDVehicleHud {
     this.helicopterHUD.setAircraftRole(role);
   }
 
-  setHelicopterWeaponStatus(name: string, ammo: number): void {
-    this.helicopterHUD.setWeaponStatus(name, ammo);
+  // `maxAmmo` is an optional additive parameter beyond the fenced IHUDSystem
+  // 2-arg signature: when supplied it drives the HelicopterHUD LOW-ammo state.
+  // Callers holding the fenced interface pass only name + ammo; the weapon
+  // systems that know the capacity widen the type to pass it through.
+  setHelicopterWeaponStatus(name: string, ammo: number, maxAmmo?: number): void {
+    this.helicopterHUD.setWeaponStatus(name, ammo, maxAmmo);
   }
 
   setHelicopterDamage(healthPercent: number): void {

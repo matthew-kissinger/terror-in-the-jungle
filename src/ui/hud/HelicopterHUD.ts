@@ -91,6 +91,13 @@ export class HelicopterHUD extends UIComponent {
   // Weapon status
   private weaponName = this.signal('');
   private weaponAmmo = this.signal(0);
+  /**
+   * Magazine/belt capacity for the active weapon. Drives the LOW-ammo state as a
+   * real remaining/capacity ratio rather than a hardcoded per-weapon guess. 0
+   * means "capacity unknown" — the LOW state stays off in that case so an
+   * airframe that never reports a capacity never falsely flags LOW.
+   */
+  private weaponCapacity = this.signal(0);
 
   // Damage
   private healthPercent = this.signal(100);
@@ -312,9 +319,22 @@ export class HelicopterHUD extends UIComponent {
     // panel reads it as the pilot weapon, the gunship panel reads the ammo as
     // the door-gun belt count. Only the active variant's panel is visible.
     this.effect(() => {
+      const ammo = this.weaponAmmo.value;
+      const capacity = this.weaponCapacity.value;
       this.text('[data-ref="weaponNameEl"]', this.weaponName.value);
-      this.text('[data-ref="weaponAmmoEl"]', String(this.weaponAmmo.value));
-      this.text('[data-ref="crewBeltEl"]', String(this.weaponAmmo.value));
+      this.text('[data-ref="weaponAmmoEl"]', String(ammo));
+      this.text('[data-ref="crewBeltEl"]', String(ammo));
+
+      // LOW state lights when the remaining rounds drop under 20% of capacity
+      // (empty also reads LOW). Mirrors the FixedWingHUD gun-ammo threshold so
+      // the two aircraft classes flag low ammo the same way. A 0 capacity (never
+      // reported) leaves the state off. Both the pilot-weapon and door-gun crew
+      // readouts share the flag since only one panel is visible per variant.
+      const low = capacity > 0 && ammo <= capacity * 0.2;
+      const weaponAmmoEl = this.$('[data-ref="weaponAmmoEl"]');
+      const crewBeltEl = this.$('[data-ref="crewBeltEl"]');
+      weaponAmmoEl?.classList.toggle(styles.ammoLow, low);
+      crewBeltEl?.classList.toggle(styles.ammoLow, low);
     });
 
     // Effect: damage bar
@@ -393,10 +413,18 @@ export class HelicopterHUD extends UIComponent {
    * gunship crew panel reads the ammo as the door-gun belt count. Display-only:
    * the ammo is floored to whole rounds so the readout never shows a fractional
    * count (rocket pods rearm in floating increments; belts are whole rounds).
+   *
+   * `maxAmmo` (optional) is the weapon's magazine/belt capacity. When supplied
+   * it drives the LOW-ammo state (remaining under 20% of capacity). Omitting it
+   * (or passing 0) leaves the capacity unknown and the LOW state off, so
+   * existing callers that only push name + ammo are unaffected.
    */
-  setWeaponStatus(name: string, ammo: number): void {
+  setWeaponStatus(name: string, ammo: number, maxAmmo?: number): void {
     this.weaponName.value = name;
     this.weaponAmmo.value = Math.max(0, Math.floor(ammo));
+    if (maxAmmo !== undefined) {
+      this.weaponCapacity.value = Math.max(0, Math.floor(maxAmmo));
+    }
   }
 
   setDamage(healthPercent: number): void {

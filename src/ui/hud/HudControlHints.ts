@@ -30,8 +30,15 @@ import type { ActorMode, VehicleUIContext } from '../layout/types';
  *    not need to touch the shared grid layout or the global SettingsManager.
  */
 
-/** The control context the legend renders binds for. */
-export type ControlHintContext = 'foot' | 'groundVehicle' | 'aircraft';
+/**
+ * The control context the legend renders binds for. Helicopter and fixed-wing
+ * are distinct buckets: a rotary craft hovers, altitude-locks and cycles its
+ * gun/rockets; a plane has flight assist, no altitude lock, and (on the AC-47
+ * only) a broadside view. They used to collapse into one `aircraft` bucket,
+ * which surfaced dead hints (a plane pilot saw `G: Deploy squad`, which never
+ * fires in a fixed wing) and mislabeled `Space`.
+ */
+export type ControlHintContext = 'foot' | 'groundVehicle' | 'helicopter' | 'fixedWing';
 
 /**
  * The seat the player currently occupies in a multi-crew / armed craft, plus
@@ -56,6 +63,12 @@ export interface SeatHint {
    * gun camera.
    */
   readonly note?: string;
+  /**
+   * This airframe has a broadside/chase view toggle (the AC-47 gunship). Drives
+   * the dynamic `V` legend row so a non-broadside plane (UH-1 door path / A-1 /
+   * F-4) never shows a hint for a key that does nothing on it.
+   */
+  readonly broadsideView?: boolean;
 }
 
 /** A single legend row: a key/button label and what it does. */
@@ -107,28 +120,62 @@ const CONTEXT_BINDS: Record<ControlHintContext, ContextLegend> = {
       { keys: 'TAB', action: 'Scoreboard' },
     ],
   },
-  aircraft: {
-    title: 'AIRCRAFT',
+  helicopter: {
+    title: 'HELICOPTER',
     hints: [
       { keys: 'W/S', action: 'Throttle / Altitude' },
       { keys: 'A/D', action: 'Rudder / Yaw' },
       { keys: 'Arrows', action: 'Pitch / Roll' },
       { keys: 'LMB', action: 'Fire guns' },
+      { keys: '1 / 2', action: 'Gun / Rockets' },
+      // Space auto-hovers a rotary craft (PlayerInput routes it to
+      // onToggleAutoHover in helicopter mode); H locks the current altitude.
+      { keys: 'Space', action: 'Auto-hover' },
+      { keys: 'H', action: 'Altitude lock' },
+      { keys: 'Right Ctrl', action: 'Mouse flight toggle' },
+      { keys: 'E', action: 'Exit aircraft' },
+      { keys: 'T', action: 'Air support radio' },
+    ],
+  },
+  fixedWing: {
+    title: 'FIXED WING',
+    hints: [
+      { keys: 'W/S', action: 'Throttle / Altitude' },
+      { keys: 'A/D', action: 'Rudder / Yaw' },
+      { keys: 'Arrows', action: 'Pitch / Roll' },
+      { keys: 'LMB', action: 'Fire guns' },
+      // Space arms flight assist on a fixed wing (PlayerInput routes it to
+      // onToggleFlightAssist in plane mode). No altitude lock and no `G` squad
+      // deploy here — those only fire in helicopter mode.
       { keys: 'Space', action: 'Flight assist' },
       { keys: 'Right Ctrl', action: 'Mouse flight toggle' },
-      { keys: 'V', action: 'AC-47 side / chase view' },
       { keys: 'E', action: 'Exit aircraft' },
-      { keys: 'G', action: 'Deploy squad' },
       { keys: 'T', action: 'Air support radio' },
+      // `V` (broadside / chase view) is appended dynamically for the AC-47 only
+      // — see BROADSIDE_VIEW_HINT / setSeatHint. It is NOT a static row because
+      // the key does nothing on a UH-1 / A-1 / F-4.
     ],
   },
 };
 
 /**
+ * The `V` broadside/chase-view row, appended to the fixed-wing legend only when
+ * the active airframe reports a `viewToggle` (currently the AC-47 broadside
+ * gunship). Kept out of the static list so a non-broadside plane never shows a
+ * hint for a control that does nothing on it.
+ */
+const BROADSIDE_VIEW_HINT: ControlHint = { keys: 'V', action: 'Side / chase view' };
+
+/**
  * Default key that toggles the legend. Display-only here: the element listens
  * for it on `document` while mounted. PlayerInput is intentionally untouched.
+ *
+ * `Backslash`, not `KeyH`: `KeyH` is the real (helicopter-only) altitude-lock
+ * bind in PlayerInput, and altitude lock is the gameplay-relevant control, so
+ * the legend's own show/hide toggle yields the key rather than colliding with
+ * it. Any host that owns a different toggle key passes `toggleKeyCode`.
  */
-const DEFAULT_TOGGLE_KEY = 'KeyH';
+const DEFAULT_TOGGLE_KEY = 'Backslash';
 
 /** Persisted on/off preference. Default-on (absent value reads as visible). */
 const STORAGE_KEY = 'tij.hud.controlHints.visible';
@@ -143,15 +190,17 @@ function seatHintEquals(a: SeatHint | null, b: SeatHint | null): boolean {
     a.label === b.label &&
     a.hasSecondSeat === b.hasSecondSeat &&
     a.armed === b.armed &&
-    a.note === b.note
+    a.note === b.note &&
+    a.broadsideView === b.broadsideView
   );
 }
 
 export interface HudControlHintsOptions {
   /**
-   * KeyboardEvent.code that toggles the legend (default `KeyH`). When the
-   * element is mounted it binds a `document` keydown listener for this code.
-   * Pass `null` to disable the built-in key (e.g. when a host owns the bind).
+   * KeyboardEvent.code that toggles the legend (default `Backslash` — `KeyH` is
+   * the helicopter altitude-lock bind, so the legend toggle stays clear of it).
+   * When the element is mounted it binds a `document` keydown listener for this
+   * code. Pass `null` to disable the built-in key (e.g. when a host owns the bind).
    */
   toggleKeyCode?: string | null;
   /**
@@ -237,10 +286,12 @@ export class HudControlHints {
   }
 
   /**
-   * Switch the legend by the actor mode the player is in. Aircraft
-   * (helicopter + plane) share the flight binds; ground vehicles and turrets
-   * share the ground-vehicle binds; everything else is on-foot. Lets callers
-   * pass their existing `ActorMode` without mapping it themselves.
+   * Switch the legend by the actor mode the player is in. Helicopters and
+   * fixed-wing planes each get their own flight binds (a rotary craft
+   * altitude-locks and cycles gun/rockets; a plane has flight assist and no
+   * altitude lock); ground vehicles and turrets share the ground-vehicle binds;
+   * everything else is on-foot. Lets callers pass their existing `ActorMode`
+   * without mapping it themselves.
    */
   setContextForActor(actor: ActorMode): void {
     this.setContext(HudControlHints.actorToContext(actor));
@@ -250,8 +301,9 @@ export class HudControlHints {
   static actorToContext(actor: ActorMode): ControlHintContext {
     switch (actor) {
       case 'helicopter':
+        return 'helicopter';
       case 'plane':
-        return 'aircraft';
+        return 'fixedWing';
       case 'car':
       case 'turret':
         return 'groundVehicle';
@@ -272,8 +324,14 @@ export class HudControlHints {
    */
   setSeatHint(seat: SeatHint | null): void {
     if (seatHintEquals(this.seat, seat)) return;
+    const broadsideChanged = (this.seat?.broadsideView ?? false) !== (seat?.broadsideView ?? false);
     this.seat = seat;
     this.renderSeat();
+    // The AC-47 `V` legend row is derived from the seat hint's broadsideView
+    // flag, so re-render the bind list when that flag flips (fixed-wing only).
+    if (broadsideChanged && this.context === 'fixedWing') {
+      this.render();
+    }
   }
 
   /**
@@ -304,6 +362,9 @@ export class HudControlHints {
         hasSecondSeat: false,
         armed,
         note: 'RMB: broadside gun cam',
+        // A viewToggle is present only on broadside-capable airframes (AC-47) —
+        // gate the dynamic `V` legend row on it so other planes don't show it.
+        broadsideView: !!context.viewToggle,
       };
     }
 
@@ -385,7 +446,14 @@ export class HudControlHints {
     const legend = CONTEXT_BINDS[this.context];
     this.titleEl.textContent = legend.title;
     this.listEl.replaceChildren();
-    for (const hint of legend.hints) {
+    // The broadside/chase `V` row is airframe-specific: appended to the
+    // fixed-wing legend only when the active seat hint reports a view toggle
+    // (AC-47). Every other plane omits it since the key is a no-op there.
+    const hints =
+      this.context === 'fixedWing' && this.seat?.broadsideView
+        ? [...legend.hints, BROADSIDE_VIEW_HINT]
+        : legend.hints;
+    for (const hint of hints) {
       const row = document.createElement('div');
       row.className = 'hud-control-hints__row';
 
