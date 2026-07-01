@@ -1,6 +1,6 @@
 # Vegetation Pass Inventory - 2026-06-13
 
-Cycle: `docs/tasks/cycle-2026-06-13-jungle-vegetation-aggregate-lod.md`
+Cycle: `docs/tasks/archive/cycle-2026-06-13-jungle-vegetation-aggregate-lod/cycle-2026-06-13-jungle-vegetation-aggregate-lod.md`
 
 Status: R1 engineering complete for the safe vegetation subset. This is the
 keep/change/remove/add truth table, the current runtime placement evidence, and

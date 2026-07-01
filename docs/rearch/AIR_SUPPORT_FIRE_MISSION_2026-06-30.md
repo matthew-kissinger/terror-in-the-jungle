@@ -5,7 +5,7 @@ Slug: `air-support-fire-mission` · Date: 2026-06-30 · Owner review required.
 
 **Decisions locked (2026-06-30, owner):** (1) **Targeting** = world-space laze + confirm (primary modality). (2) **Radio key** = add a visible **T** key-hint badge only — do NOT bind `Digit4` (it is SANDBAG, which suppresses the radio's `T`) and no backtick alias. (3) **Audio** = free/CC0 + existing sounds only — no ElevenLabs generation; procedural radial-gradient fire texture as the flame stopgap (no image-gen). (4) **Scope** = execute all phases 0-3. These override the recommendations in §9 where they differ (notably §3.3 radio binding and §5.5 manifest).
 
-Companion source of truth (VERIFIED, do not re-derive): [`AIR_SUPPORT_FIRE_MISSION_ANALYSIS_2026-06-30.md`](AIR_SUPPORT_FIRE_MISSION_ANALYSIS_2026-06-30.md) (same directory) (fix backlog #1-14). Prior spike that wired the working sortie engine: `docs/rearch/AIR_SUPPORT_RADIO_SPIKE_2026-06-03.md`. Brief precedent: `docs/tasks/air-support-radio.md`.
+Companion source of truth (VERIFIED, do not re-derive): [`AIR_SUPPORT_FIRE_MISSION_ANALYSIS_2026-06-30.md`](AIR_SUPPORT_FIRE_MISSION_ANALYSIS_2026-06-30.md) (same directory) (fix backlog #1-14). Prior spike that wired the working sortie engine: `docs/rearch/AIR_SUPPORT_RADIO_SPIKE_2026-06-03.md`. Brief precedent: `docs/tasks/archive/air-support-radio/air-support-radio.md`.
 
 > Scope note: this is a design/planning doc (a spike). The cycle brief that dispatches the work will be created (at cycle kickoff) at `docs/tasks/air-support-fire-mission.md` (≤80 LOC, per `docs/tasks/_TEMPLATE.md`) and links back here. This doc is exhaustive on purpose; the brief will be terse.
 

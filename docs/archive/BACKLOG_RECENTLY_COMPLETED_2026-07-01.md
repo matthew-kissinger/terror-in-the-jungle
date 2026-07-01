@@ -1,0 +1,539 @@
+# Backlog Recently Completed Archive (2026-07-01 batch)
+
+Archived 2026-07-01 from [docs/BACKLOG.md](../BACKLOG.md) to keep the active
+backlog as a compact current-work index (its own stated target is ≤200
+measured lines; it had grown to 717). This file preserves historical cycle
+closeout notes for audit/search only; current truth remains in
+[docs/state/CURRENT.md](../state/CURRENT.md), [docs/DIRECTIVES.md](../DIRECTIVES.md),
+[docs/CARRY_OVERS.md](../CARRY_OVERS.md), and [docs/BACKLOG.md](../BACKLOG.md).
+See also the prior batch: [docs/archive/BACKLOG_RECENTLY_COMPLETED_2026-06-08.md](BACKLOG_RECENTLY_COMPLETED_2026-06-08.md).
+
+Inline historical code paths were left as originally written. Explicit Markdown
+links were adjusted for this archive location.
+
+## Recently Completed (cycle-2026-06-29-cinematic-field-pass)
+
+CAMPAIGN_2026-06-29-cinematic-field-pass — a visual + audio + map + HUD pass,
+9 PRs (#457-#465) merged to `master` 2026-06-29 (autonomous-loop, **NOT
+deployed** — deploy is MANUAL). Zero fence changes across all 9 PRs; full suite
+7238 green; combat120 baseline restored (P0).
+
+- **P0 cinematic-foundations** (#457): restored the `combat120` perf baseline
+  (`perf-baselines.json`), added the shared `src/core/tsl/` node-material library,
+  and the non-fenced `TerrainSystem.getBakedHeightmap()` facade.
+- **P1 soundscape-loop-replacement** (`e7e0c516`): killed the permanent jungle
+  loop; day/night `SoundscapeDirector` crossfades beds by sun elevation. Beds are
+  FIRST-PARTY CC BY-SA 4.0 **placeholders** — owner-action to source production
+  CC0/CC-BY field recordings (THIRD-PARTY-ASSETS.md).
+- **P2 task-card-hud-fit** (`3d90cddd`): device-aware home for the tasking-director
+  card (no more objective overlap; real mobile placement).
+- **P3 radio-dial-revival** (`5a307960`): revived radial dial (desktop wheel + touch
+  bottom-sheet, one model) on a dedicated non-weapon HUD slot; squad/fire-support
+  issue through the existing paths. combat-reviewer PASS-WITH-NOTES.
+- **P4 radio-stations-music** (`f1ca489d`) + **P4b station-wiring** (`a34124f7`):
+  headless `RadioStationSystem` (lazy decode, ≤2-buffer cache, own music bus,
+  DEFAULT-OFF) wired through `AudioManager` (concrete, off-fence) → the dial tuner +
+  `musicEnabled`/`musicVolume` settings. Ships 3 Kevin MacLeod (incompetech) **CC BY
+  4.0** tracks (substituted for the brief-cited credential-bound sources; honest
+  provenance in `docs/asset-provenance/audio-2026-06/`). Combat ducking attenuates
+  the music bed only while enabled.
+- **P5 orbital-topo-map** (`a5247e95`): 3D orbital topo map on deploy/pause (rich 3D)
+  + opt-in hold-M (default stays 2D). CPU-displaced `.f32` PlaneGeometry; NASADEM
+  (CC0) for the seed DEMs (A Shau covered live via `getBakedHeightmap()`). WebGL2
+  Lambert + WebGPU/TSL upgrade. Render-on-demand → ~0 steady-state combat cost closed.
+- **P6 visual-post-stack** (`5e1060da`): filled the no-op post shim with a TSL stack
+  (filmic grade + 3 LUTs + tier-gated bloom + atmospheric depth), **DEFAULT-OFF**
+  behind `DEFAULT_POST_ENABLED_DESKTOP`. Only phase on the combat hot path → flip to
+  default-on-desktop AFTER a MAIN-worktree combat120 p99 neutrality proof.
+- **PX terrain-spike-fix** (`950764c1`): the owner-reported random ~100m terrain
+  "towers" were **inflated GLB impostor billboard cards** (card vertical scale from a
+  live `Box3` Y-extent with no upper clamp), NOT terrain — the DEM was proven clean by
+  direct `.f32` scan. Fixed by clamping card height to authored bounds + a one-time
+  warn-log naming any over-inflated archetype at runtime.
+
+**Deferred / carry-overs** (owner walks in `docs/PLAYTEST_PENDING.md`):
+- The **post default-on flip** + the combat120 baseline finalization (multiple MAIN
+  captures, ±6ms noise) — held for a low-load window per the owner's machine-use note.
+- **Pre-existing** `check:tod-coherence` foliage FAIL (correlation 0.810 / rangeRatio
+  2.735) — master-state, P6 proved it is not a regression; the known foliage
+  clamp-band signature, a candidate for a future visual pass.
+- `AShauValleyConfig` worldSize/DEM-box ~1.93% mismatch (edge-droop latent bug) and
+  re-normalizing the one over-inflated hero GLB (the PX warn-log names it at runtime).
+- P1 ambient beds = production-field-recording sourcing; the N1 test nit
+  (`CommandInputManager.test.ts:193` etc. hardcode catalog counts 7/7/6).
+
+Briefs archived at `docs/tasks/archive/cycle-2026-06-29-cinematic-field-pass/`.
+
+## Recently Completed (cycle-2026-06-28-ashau-purpose-and-missions)
+
+Phase 6 (FINAL) of CAMPAIGN_2026-06-28-field-readiness (overnight,
+autonomous-loop) — **campaign complete**. 5 PRs #451-#455, R1 (4 parallel) + R2
+(1), zero fence changes, no reviewer scope. Perf-gated (both rounds A/B PASS).
+Answers the owner's "what is A Shau for": `situation-readout-hud` (#454) surfaces
+war posture + nearest contested objective + a direction nudge on the HUD
+(read-only off `IZoneQuery`/`TicketSystem`, 2Hz tick); `tasking-director-mvp`
+(#455) adds an opt-in `TaskingDirector` (`src/systems/missions/`) + `HudTaskCard`
+with **capture + defend** archetypes from live zone/war state, explicit
+accept/decline, score-on-complete (throttled + event-driven; destroy deferred per
+the spike). Plus 3 design docs for future cycles: `tasking-director-spike` (#451,
+the MVP blueprint), `premiere-battle-royale-design` (#452, defer-the-build BR),
+`healing-and-looting-scope` (#453, healing + `WeaponPickupSystem` activation).
+**Perf:** R1 −5.6% (situation readout dormant in ai_sandbox, `usesZones=false`);
+R2 +0.6% (director dormant when war sim idle) — both well under +5%, validated
+with same-session multi-capture A/B (machine-noise outliers discarded; a real
++cost cannot dip below baseline, and R-captures did). **Wiring:** the
+StrategicFeedback analog is `OperationalRuntimeComposer.wireStrategyRuntime` (not
+GameplayRuntimeComposer). **Budget:** in-cycle ratchet (sanctioned, no CARRY_OVERS
+row) — `HUDSystem.ts`→878 LOC, `SystemManager.ts`→63 methods. **Gate-repair:**
+master went doc-drift-RED mid-phase (Phase 5 brief archival + Phase 6 spike
+forward-refs, undetected because docs-only commits are CI-path-ignored); repaired
+in `378a4313` and cleaned at close (links repointed to archives, grandfather back
+to baseline). Owner walk pending in PLAYTEST_PENDING (situation readout legibility
++ the opt-in task loop on A Shau). Briefs archived at
+`docs/tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/`.
+
+## Recently Completed (cycle-2026-06-28-deploy-armory-faction-select)
+
+Phase 5 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+7 PRs #444-#450, R1 (4 parallel) + R2 (2) + R3 (1), zero fence changes, no
+reviewer scope (UI/deploy/player-spawn). **Not perf-gated** (UI/deploy work, no
+combat hot path — every PR's `perf` job skipped). Rebuilds the deploy surfaces
+the owner called out. `faction-side-picker` (#444): A Shau BLUFOR-vs-OPFOR side
+picker (`isFactionSelectable`/`FACTION_SELECTABLE_MODES`; `ModeSelectScreen`
+emits `{mode, alliance?}` into the existing `resolveLaunchSelection`) — A Shau +
+future premiere ONLY. `weapon-stats-panel` (#446): armory surfaces the existing
+`WeaponSpec` (rpm/damage/falloff/recoil/ADS) via `WEAPON_SPECS` + a static
+`getWeaponSpec` accessor. `deploy-map-navigation` (#447): bounded pan + zoom +
+recenter + spawn-cycling on the respawn map (`OpenFrontierRespawnMapUtils`),
+larger hit targets — A Shau's 21km canvas usable. `armory-layout-reflow` (#448):
+declutter the armory to a single selection affordance. `helipad-spawn-truth`
+(#449): helipad spawns relabel to "Forward Pad" when no boardable heli is
+provisioned (`BoardableHelicopterPresence` + `HelicopterModel.hasBoardableHelicopterForHelipad`,
+wired at `StartupPlayerRuntimeComposer`) — the label never lies.
+`crew-vehicle-selectable` (#450): CREW-A-VEHICLE is now a real spawn — adopts the
+vehicle position (Deploy enables), shows the vehicle marker + an "F to board"
+hint, lands the player at the vehicle via the shared `confirmRespawn→respawn`
+path (was a dead no-op). `deploy-map-3d-spike` (#445): feasibility doc for a fast
+3D map (recommends a baked low-poly proxy; no build this campaign). **Budget:**
+in-cycle ratchet (sanctioned, no CARRY_OVERS row) — `DeployScreen.ts`→1142 LOC,
+`PlayerRespawnManager.ts`→800 LOC across the co-edited tasks. Owner walk pending
+in PLAYTEST_PENDING (deploy/armory/map flow + faction read). Briefs archived at
+`docs/tasks/archive/cycle-2026-06-28-deploy-armory-faction-select/`.
+
+## Recently Completed (cycle-2026-06-28-arsenal-expansion)
+
+Phase 4 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+3 PRs #441-#443, R1 (2 parallel) + R2 (1), zero fence changes, no reviewer
+scope (weapon/loadout/UI). Adds the NVA marksman + SKS the owner asked for —
+WIRING cataloged GLBs as new RUNTIME weapon types, not new art.
+`marksman-rifle-class` (#442): MARKSMAN/DMR runtime weapon (OPFOR NVA/VC),
+Dragunov SVD rig, own GunplayCore spec (rpm 80, dmg 75/55, tight spread,
+ADS divisor 2.6), wired all the way through WeaponSwitching/WeaponAmmo/
+ArmoryPreviewConfig so it is selectable. `sks-rifle-wiring` (#443): SKS
+semi-auto runtime weapon (OPFOR NVA/VC), iron sights, spec between AK and DMR
+(rpm 200, dmg 45/32). `ammo-load-tradeoff` (#441): EXTENDED/HEAVY now cost
+ADS-transition time (1.0/1.15/1.30) so they are a real tradeoff, not strictly
+better — reserve multiplier + mag size unchanged. **Perf gate PASS** (combat120
+A/B: steady-state p99 33.60→34.45ms R1 (+2.53%) → 31.65ms full Phase-4 (−5.80%),
+both under +5%; both weapons OPFOR-loadout-only and reachability-dormant in
+ai_sandbox — flat program/geometry ceiling proves no new weapon mesh executes).
+**Brief-gap fix:** a new LoadoutWeapon value compile-breaks the exhaustive
+Record<LoadoutWeapon,...> tables — found empirically by the marksman executor,
+Files-touched amended before re-dispatch. **Budget:** WeaponRigManager crossed
+700 (699→735) adding the SKS runtime type; admitted to the grandfather list with
+a split target (extract per-weapon spec/core/rig registry), CARRY_OVERS
+budget-ratchet note, no new carry-over. Carry-overs 5→5. Owner feel-walk row in
+PLAYTEST_PENDING (incl. the open ammo-load tradeoff-vs-collapse decision); memo
+at `docs/playtests/cycle-2026-06-28-arsenal-expansion.md`. Follow-up: the
+WeaponRigManager split (per-weapon registry extraction).
+
+## Recently Completed (cycle-2026-06-28-terrain-vegetation-asset-defects)
+
+Phase 3 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+7 PRs #434-#440, R1 (5 parallel) + R2 (2), zero fence changes,
+terrain-nav-reviewer gated 3 (all APPROVE / APPROVE-WITH-NOTES).
+`veg-poi-exclusion` (#435): hero scatterer now respects POI exclusion zones
+(`GLBHeroScatterer.setExclusionZones` + `isExcluded`, mirroring the ground-card
+path) — no more hero trees on the airfield runway. `route-corridor-exclusion`
+(#440): veg-exclusion corridors traced down each compiled route centerline so
+both scatterers skip the gray "trail" patches (joins the same
+`vegetationExclusionZones` stream via `TerrainFeatureCompiler`). `vegetation-
+density-retune` (#434): bamboo-thicket 2.8→1.8, riverbank coconut 1.25→0.7
+(config-only). `coconut-card-crossfade` (#437): ported `transitionFadeMeters`
+opacity blend into `GroundCardNearMeshTier` (default 28m) — coconut palm no
+longer hard-pops mesh↔card. `sun-disc-banding-fix` (#436): band-limited the
+sun-disc sine terms (×317→48) across TSL/GLSL/CPU mirrors — kills the LED-dot
+lattice, keeps a warm body. `structure-import-corruption-fix` (#438): aid-station
+double-root-yaw fixed at the importer (`stripRedundantRootYaw`) + re-imported;
+barracks-tent verified byte-clean (not corrupt); command-tent flagged same-class
+out-of-scope. `asset-reroll-requests` (#439, doc-only): UH-1 + A-1 re-rolls
+marked DONE (`f8c3518c`); B-52D fuselage-aspect + A-37 scale advisories filed.
+**Perf gate PASS** (same-machine combat120 A/B: steady-state p99 40.70→31.20ms,
+Δ−23.34%, an improvement; vegetation dormant in ai_sandbox — `veg=0/0 chunks=0` —
+so the veg PRs are reachability-dormant in the gate scenario, only #436/#438
+execute; absolute non-quiet-machine, A/B delta is the signal). One CI hiccup:
+route-corridor's +3 LOC tripped the `lint:budget` ratchet on grandfathered
+`TerrainFeatureCompiler.ts` (764→767) — resolved by sanctioned snapshot rebase,
+no new carry-over. Carry-overs 5→5. Owner visual walk row in PLAYTEST_PENDING;
+memo at `docs/playtests/cycle-2026-06-28-terrain-vegetation-asset-defects.md`.
+Follow-ups (non-blocking): coconut-card `needsUpdate` micro-cost remains in the
+straightened mesh-near / card-far `coconut-palm` route; route-corridor edge-sliver
+and `map_only` latent over-clear.
+
+## Recently Completed (cycle-2026-06-28-combat-vehicle-feel)
+
+Phase 2 of CAMPAIGN_2026-06-28-field-readiness (overnight, autonomous-loop).
+5 PRs #429-#433, one parallel round (all roots, disjoint files), zero fence
+changes, zero reviewers needed (vehicle/player/weapon/config scope).
+`tank-exit-and-seatswap` (#433): real bug — tanks were undismountable (F
+consumed by seat-swap, only Escape exited); `E` now exits (universal vehicle
+exit) with side-ejection, `F` keeps driver↔gunner swap; repro-first L3 test.
+`tank-turret-traverse` (#429): yaw 30→75°/s, barrel pitch 8→25°/s (rate cap
+kept). `tank-hill-authority` (#432): maxClimbSlope 0.6→0.78, slopeDriveFloor→
+0.62, slopeGravityScale→0.20 on M48+T-54 ("slower but stronger"). `ground-
+vehicle-speed-and-camera` (#431): faster jeep (damping 0.88→0.95, torque 420→
+520) + chassis-aware follow-cam (M35 truck framed from outside its bed).
+`weapon-ads-per-weapon-offset` (#430): per-weapon ADS offset so the M60 clears
+the sight line. **Perf gate PASS** (same-machine combat120 A/B: p99 37.10→
+37.70ms, Δ+1.6%, under the +5% HALT line; Vehicles system dormant in
+ai_sandbox so the delta is render noise, not Phase-2 cost). Carry-overs 5→5.
+Owner feel-walk row in PLAYTEST_PENDING; memo at
+`docs/playtests/cycle-2026-06-28-combat-vehicle-feel.md`.
+
+## Recently Completed (cycle-2026-06-28-control-discoverability)
+
+Phase 1 of CAMPAIGN_2026-06-28-field-readiness (overnight, `posture:
+autonomous-loop`). 4 PRs #425-#428, R1 (3 parallel) + R2 (1), zero fence
+changes, zero dropped tasks. Closes the campaign's dominant finding — the game
+does more than it shows. `control-hints-hud` (#426): a persistent right-edge
+context-sensitive control legend (foot/vehicle/aircraft) sourced from the live
+keybinds — surfaces T radio / Z squad / F board / TAB scoreboard. `radio-command-menu`
+(#427, combat-reviewer APPROVE-WITH-NOTES): unified `T` menu listing all 7
+fire-support sorties (+ cooldowns + SMOKE/WP/GRID marks) AND the 6 squad orders
+(Shift+1-6 with plain effect lines), driving the existing `requestSupport` path.
+`hud-overlap-and-scoreboard` (#425): attribution notice moved bottom-left →
+bottom-center (off the health pill); hold-Tab scoreboard hint (tracking was
+always correct). `seat-and-fire-cues` (#428): seat label + F-swap (multi-crew
+only) + LMB-fire cue + transient "Airborne to fire" on a grounded fixed-wing
+fire attempt. No perf gate (additive HUD, no hot path). The campaign base
+`348e935b` arrived CI-red (doc-drift gate from briefs committed ahead of code +
+a pre-existing FixedWingConfigs gear-clearance failure from the `f8c3518c` A-1
+re-roll); both healed inside #426 (the keystone that creates the doc-drift-named
+files). Carry-overs 5→5. Owner walk row in PLAYTEST_PENDING; memo at
+`docs/playtests/cycle-2026-06-28-control-discoverability.md`. Follow-up: confirm
+`CommandModeOverlay` tolerates `hasSquad:false` without the squad-loss auto-close.
+
+## Recently Completed (cycle-2026-06-11-war-asset-repaint)
+
+KATALOG-1 → code-complete (owner walk pending). 12 PRs #383-#394, 4 rounds,
+zero fence changes, zero dropped tasks. R1 generalized importer
+(`assets:import-war-catalog`: per-class axis wrap, joint grafts, budget
+triage, generated `warAssetCatalog` with per-asset forward/dims/node
+metadata) + two post-merge importer defect classes fixed at the ASSET layer,
+not the consumers (#384 mixed indexed/non-indexed primitives, #385 mixed
+interleaved/packed vertex storage — both broke r184 `mergeGeometries`).
+R2 ×5: gallery route, weapons rig (catalog `magazineNodes`/`muzzleNodes`),
+helicopter (rotor-contract rewrite), fixed-wing (5 dormant airframes),
+ground vehicles (m48 turret re-seat via `attach()` — caught a latent
+wrapper-rotation bug). R3 ×3: world catalog refresh (6 net-new buildings,
+parked armor, displayScale fudges removed; +9-15.6k map tris, EXCEPTION
+documented), wildlife MVP (greenfield `WildlifeSystem`, combat120
+animal-free verified), B-52 arclight call-in (12-bomb stick, IFF reuses the
+centralized napalm gate — combat-reviewer verified). Post-close hotfix #394:
+owner-reported viewmodel mag off/rotated — mag group was re-homed outside
+the `TIJ_AxisNormalize` wrapper; same defect class as the m48 turret, now
+policy in `ASSET_ACCEPTANCE_STANDARD` (attach()-only re-parenting +
+wrapper-bearing test fixtures). Round gates: post-R2 33.60 / post-R3
+33.70ms steady-state combat120 p99 vs R0 33.70 (halt 35.39). 8 structure
+budget REJECTs keep prior GLBs (`REROLL_REQUESTS.md`). Owner walk row in
+PLAYTEST_PENDING (5 sub-walks).
+
+Deferred follow-ups (strategic reserve): new-weapon loadout variants
+(m14/sks/dragunov/rpd), melee (kbar), deployable claymore, enemy armor AI
+(t54), transport/role aircraft (c130/ch47/oh6/ov10/hh3e), enemy air (mig17),
+boats-on-water (post water rework), bird/reptile wildlife tier 2, re-roll
+re-import round (same importer, idempotent), `AirSupportManager`
+concurrent-pass guard (pre-existing, all strike types), arclight
+active→outbound camera-handoff polish (reviewer LOW), market/riverside
+settlement prefabs catalog-ready but not yet referenced by mode configs,
+lighting-rig kill-switch flag removal (carried from lighting campaign, still
+due), A Shau heap-peak churn profiling (close captures show ~139-145MB
+transient peak with FULL recovery — no leak — vs R0's 15MB; analyst attributes
+to GLB decode/material working set + effect-pool pressure under sustained
+combat; profile buffer lifetime + pool sizing), harness debt: ashau:short
+driver flake (one dead-driver run at close: 0 shots) + combat120
+run-wide-max startup sensitivity (steady-state gating policy adopted this
+cycle).
+
+## Recently Completed (cycle-2026-06-09-lighting-acceptance)
+
+Phase 4 — FINAL phase — of
+[CAMPAIGN_2026-06-09-lighting-rig](../CAMPAIGN_2026-06-09-lighting-rig.md);
+campaign engineering CLOSED (owner prod acceptance row in PLAYTEST_PENDING).
+2/2 merged: tod-coherence-gate #380 (standing `check:tod-coherence`
+acceptance gate — tolerances as named constants in
+`scripts/tod-coherence-gate.ts` (corr ≥0.92, rangeRatio [0.6,1.6], dawn
+≤0.85), NPC-in-frame fixture that materializes a combatant via the public
+`materializeAgent` API when the harness has none (npc row reads real impostor
+pixels 8/8 TODs), deterministic median-of-9 anchor sorted by stable
+world-position key — closes the Phase 3 anchor-variance finding; pre-deploy
+checklist tier, NOT CI-blocking per the STABILIZAT-1 GPU-runner rationale)
+and legacy-path-deletion #381 (rig DEFAULT ON; legacy paths deleted −405 LOC:
+whole `AtmosphereLightingColor.ts` / `shapeDirectLightForRenderer`, legacy
+scene-light + fog shaping, terrain night stabilizer + night-fill emissive,
+billboard [0.40,0.78] clamp band, NPC scene scan; flag-gated selects
+collapsed — the dead ALU both terrain reviews flagged is gone; one-release
+runtime kill-switch `window.__lightingRig.enabled=false` reverts CPU scene
+authority only — deleted in-shader paths do NOT return; flag removal next
+cycle). Evidence: gate GREEN post-flip (foliage 0.953, npc 0.997, dawn 0.050,
+midnight 0.016); combat120 p99 IMPROVED 38.80→33.60ms / peak 43.6→34.2ms
+(same-machine same-session A/B); combat-reviewer APPROVE; terrain-nav
+REQUEST-CHANGES resolved (its blocking claim was factually wrong —
+`emissiveNode` defaults to null and `toBeDefined()` passes on null — but the
+assertion WAS vacuous; now asserts the deletion). Advisory carry-over: GLB
+rangeRatio 6.6× (direct-sun swing on vehicle bodies; promote to
+`HARD_GATED_FAMILIES` later if wanted). Per-scenario gate coverage (5 presets
+× 4 TODs) noted in the script header as a follow-up. HARNESS GOTCHA for the
+record: combat120 captures CANNOT run from an agent worktree on Windows —
+the Chromium profile under `<worktree>\artifacts\perf\<ts>\browser-profile`
+exceeds MAX_PATH and every worker/dynamic-import fetch dies with ERR_FAILED
+while the static page loads; run from a short path (junction works for the
+capture but `vite build` cannot run through a junction — build from the real
+path, capture with `--no-build`).
+Briefs: `docs/tasks/archive/cycle-2026-06-09-lighting-acceptance/`.
+
+## Recently Completed (cycle-2026-06-09-exposure-atmosphere-unify)
+
+Phase 3 of [CAMPAIGN_2026-06-09-lighting-rig](../CAMPAIGN_2026-06-09-lighting-rig.md).
+1/1 merged: exposure-fog-presets-rig #379 (rig-path scene fog reads the single
+rig fogColor authority — no dawn/dusk fog-line seam against the Hosek sky;
+exposure policy RATIFIED as in-shader/scene-radiance, computed exactly once on
+`LightingRigState.exposure` and read by both consumers, AGX stays
+presentation-only at 1.0, regression-tested; scenario presets re-expressed as
+bounded `rigTrim` multipliers — ashau warm, tdm dusk-warm, zc golden, of
+dimmer, combat120 identity-BY-DESIGN for perf comparability). Merge evidence:
+p3-on bands HOLD (foliage corr 0.989, rangeRatio 0.945; legacy p3-off
+reproduces the 0.290 defect signature). Two findings flagged to Phase 4:
+(1) the sweep's foliage anchor is streaming-order timing-dependent — one run
+landed a shadowed dusk cluster and read corr 0.874 while a master control +
+re-run read 0.996/0.989 on 3-decimal-identical renders; `tod-coherence-gate`
+must make the anchor deterministic before tolerances become pass/fail.
+(2) Trims are sub-rounding in the sweep's fog-dominated box averages (live
+runtime probe: moonLight ratios match tint × intensity exactly) — visible on
+direct-lit surfaces, invisible under haze, as designed. The branch was rebased
+onto master mid-review (originally cut pre-#378, so its first A/B ran on the
+old instrument — root cause of an apparent band failure that was actually
+instrument drift).
+Brief: `docs/tasks/archive/cycle-2026-06-09-exposure-atmosphere-unify/`.
+
+## Recently Completed (cycle-2026-06-09-foliage-npc-lighting)
+
+Phase 2 of [CAMPAIGN_2026-06-09-lighting-rig](../CAMPAIGN_2026-06-09-lighting-rig.md).
+2/2 merged: billboard-rig-migration #376 (foliage low-sun fade + hemi trim
+tuned against real rig radiance; billboard scene.fog.color authority folded;
+DISCOVERED the sweep's foliage/npc rows sampled bare terrain — fixed-box
+fallback, terrain-vs-terrain metrics), npc-impostor-and-effects-rig #378
+(combat-reviewer APPROVE-WITH-NOTES: sweep instrument fixed — regions now
+anchor on real rendered pixels; **foliage band MET on the fixed instrument:
+corr 1.000, rangeRatio 0.966** — the owner's "foliage maintains the same
+lighting" defect is solved and honestly measured on the rig path; NPC
+impostors consume the SAME shared constants by import with the scene-children
+scan bypassed [second authority gone on the rig path]; full lit-surface
+consumer sweep documented — effects are unlit-by-construction, GLB family
+already rig-driven). NPC row remains unmeasurable at the fixture (no NPC in
+frame) — Phase 4 `tod-coherence-gate` owns spawning one. Phase 4 checklist
+additions from review: re-validate per-faction PIXEL_FORGE parity tuning
+under the rig; NPC-in-frame visual check.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-foliage-npc-lighting/`.
+
+## Recently Completed (cycle-2026-06-09-helicopter-craft)
+
+Phase 3 (final) of [CAMPAIGN_2026-06-09-craft-specialization](../CAMPAIGN_2026-06-09-craft-specialization.md)
+— **campaign COMPLETE: 3 phases, 11 PRs, zero fence changes.** 3/3 merged:
+door-gun-seat #374 (player-crewable UH1C door gun — pilot↔door_gun toggle on a
+heli-mode F binding [the factory seat machinery is flight-gated], arc-clamped
+aim, fire through the existing hitscan path, AI auto-fire suspended while the
+player crews, `door_gun` reticle), gunship-reticle-upgrade #375 (Cobra
+CCIP-lite rocket-fall cue from existing ballistics, per-weapon reticle
+prominence, live weapon/ammo HUD; added the fence-clean GameRenderer
+crosshair-passthrough seam), heli-hud-consolidation #377 (per-variant
+HELI_VARIANT_DESCRIPTORS panel table retiring role duck-typing, door-side
+gunner POV with leak-proof restore, traverse-stop reticle ticks wired for
+door_gun + emplacement_mg). Follow-ups: gunship MANNED/AI crew badge needs a
+fenced IHUDSystem method (deliberately dropped); door-gun belt panel reuses
+the fenced weapon-status path. Owner feel-walk row in PLAYTEST_PENDING.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-helicopter-craft/`.
+
+## Recently Completed (cycle-2026-06-09-fixed-wing-craft)
+
+Phase 2 of [CAMPAIGN_2026-06-09-craft-specialization](../CAMPAIGN_2026-06-09-craft-specialization.md).
+3/3 merged, fence untouched: fixedwing-gunsight #370 (fence-clean `fixed_wing`
+reflector reticle + visible ammo counter — the hidden hardcoded 600 is now a
+named per-airframe magazine with HUD readout + LOW state), per-aircraft-ordnance
+#372 (closes the AVIATSIYA-5/6 guns-identity deferral via the new data-driven
+FixedWingArmament module: A-1 4x20mm wing cannons w/ paired convergence, F-4
+nose rotary, AC-47 nose gun REMOVED for the signature 3x7.62 broadside firing
+90° left; AI untouched by construction — no NPC gun path exists),
+fixedwing-camera-fit #373 (per-airframe chase tuning, reticle-on-convergence
+alignment proven by NDC projection tests, AC-47 RMB-toggled broadside gunner
+view reusing the tank-sight restore guarantees). Follow-ups:
+FixedWingDisplayInfo camera fields now unused (cleanup candidate); bombs/
+rockets remain a future ordnance cycle; AI AC-47 orbit-fire is a follow-up if
+AI ever flies it. Owner feel-walk row in PLAYTEST_PENDING.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-fixed-wing-craft/`.
+
+## Recently Completed (cycle-2026-06-09-lighting-rig-spike)
+
+Phase 0 of [CAMPAIGN_2026-06-09-lighting-rig](../CAMPAIGN_2026-06-09-lighting-rig.md).
+3/3 merged, fence untouched: lighting-audit-memo #363 (rig spec + 3-clamp
+inventory + coherence band; found the capture tool is a 5th snapshot consumer,
+BillboardBufferManager reads scene.fog.color directly, and
+TerrainSystem.setAtmosphereLighting is a sixth shaping site),
+tod-capture-harness #365 (8-TOD per-family luminance curves; baseline proves
+the defect: foliage range ratio 0.459/0.290 vs terrain, GLB corr -0.77 to -0.83),
+rig-prototype #368 (flag-gated LightingRig + terrain/billboard branches;
+terrain-nav APPROVE-WITH-NOTES). A/B verdict: clamp bypass CONFIRMED (foliage
+min 0.129→0.012, range ratio →1.564 in-band); foliage corr 0.533 vs ≥0.92 NOT
+met — structural (terrain stacks legacy scene lights on rig terms), so Phase 1
+re-scopes scene-light-unification as a co-requisite of terrain-rig-migration.
+Recorded GO pending owner review (PLAYTEST_PENDING row). Reviewer follow-ups:
+OFF-path dead ALU until Phase 4; terrain→environment binding coupling on the
+Phase 4 deletion checklist; midnight rig-path darkness check at the owner A/B.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-lighting-rig-spike/`.
+
+## Recently Completed (cycle-2026-06-09-ground-gunnery-craft)
+
+Phase 1 of [CAMPAIGN_2026-06-09-craft-specialization](../CAMPAIGN_2026-06-09-craft-specialization.md).
+5/5 merged, fence untouched (CrosshairMode union widened in CrosshairSystem.ts
+— additive, fence-clean by type-reference): reticle-framework #362 (tank_gunner
++ emplacement_mg modes routed through the adapter lifecycle), npc-tank-cannon-wiring
+#364 (dormant TankAIGunnerRoute bound in prod — setTankGunnerRoute had ZERO prod
+callers; combat-reviewer caught a real double-stepping regression → single-owner
+CannonStepGate + scaled-dt beginFrame(deltaTime), NPC shells now respect
+TimeScale), tank-gunner-sight #366 (stadia reticle, FJ TankGunnerPanel, RMB
+2.8x zoom), m2hb-gun-experience #367 (MG reticle, belt counter, traverse cue,
+visual recoil; M2HB weapon files untouched — getters existed),
+tank-sight-prod-wiring #369 (orchestrator-inline: TankGunnerAdapter had zero
+prod imports AND PlayerCamera never called any computeGunnerSightCamera — the
+sight POV was unreachable for every adapter; new shared TankSightSurface +
+optional sight pose/FOV on VehicleFollowCamera). Follow-ups: converge
+TankGunnerAdapter onto TankSightSurface or retire it; in-flight cannon round
+freezes on dismount (MVP caveat, pre-existing); NPC fire cadence still
+wall-clock (documented bypass list). Owner feel-walk row in PLAYTEST_PENDING.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-ground-gunnery-craft/`.
+
+## Recently Completed (cycle-2026-06-09-weapon-input-and-gate-hardening)
+
+Phase 1 of [CAMPAIGN_2026-06-09-consultation-remediation](../CAMPAIGN_2026-06-09-consultation-remediation.md).
+4/4 merged, fence untouched: real-mouse-input #338 (real LMB state on PlayerInput;
+dead duck-probes deleted from tank/M2HB/gunner adapters), frame-order-guard #337
+(locks Vehicles-before-Player order + 'Other'-loop exclusion), budget-ratchet #339
+(grandfather list is now a no-growth ratchet with measured snapshots),
+ci-gate-consolidation #340 (lint:budget / check:fence / lint:docs / knip:ci now
+blocking on PRs; dead perf-baselines.json refs removed; index.html in PR paths
+filter). Follow-ups: knip:ci gates a documented subset (141-item export/type
+backlog excluded; orphan files in package.json knip.ignore await Phase 5
+deletion tasks); live tank-cannon/M2HB LMB smoke re-verifies at Phase 2 close
+(composer wiring is Phase 2). Briefs:
+`docs/tasks/archive/cycle-2026-06-09-weapon-input-and-gate-hardening/`.
+
+## Recently Completed (cycle-2026-06-09-vehicle-occupancy-truth)
+
+Phase 2 of [CAMPAIGN_2026-06-09-consultation-remediation](../CAMPAIGN_2026-06-09-consultation-remediation.md).
+5/5 merged, fence untouched: tank-interpolation #341 (M48 render-time interpolation —
+high-refresh jitter class), vehicle-seat-lifecycle #342 (all enter/exit through the
+IVehicle seat model via a VehicleSeatBinder on VehicleSessionController — kills seat
+ghosts), tank-cannon-wiring #343 (player tank cannon + M2HB live on LMB; true
+composition site is StartupPlayerRuntimeComposer, not OperationalRuntimeComposer;
+combat-reviewer APPROVE-WITH-NOTES), vehicle-player-position-sync #344
+(playerState.position tracks the chassis for ground/water/emplacement — streaming/AI/
+zones/minimap truth), watercraft-camera #345 (follow-cam wired; boats dormant).
+Live proof refreshed: land-vehicle-runtime-proof 11/11 PASS post-cycle. Owner walk
+row in PLAYTEST_PENDING. Follow-ups (reviewer notes): Escape-exit bypasses the
+factory detach hook (defended by mounted guards — candidate for Phase 5
+dedup-vehicle-adapters), M2HB one-frame latch ordering vs SystemUpdater Combat/Player
+blocks, in-flight cannon round freezes on dismount (stepper rides the adapter),
+NPC tank cannon (TankCannonProjectileSystem) still unconstructed in prod.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-vehicle-occupancy-truth/`.
+
+## Recently Completed (cycle-2026-06-09-combat-death-and-alliance)
+
+Phase 3 of [CAMPAIGN_2026-06-09-consultation-remediation](../CAMPAIGN_2026-06-09-consultation-remediation.md).
+6/6 merged, all combat-reviewer gated (4 APPROVE, 2 APPROVE-WITH-NOTES), fence
+untouched: zone-defenders-prune #346, fire-gate-ordering #347 (aborted shots no
+longer eat fire-rate/bloom), faction-isally-sweep #348 (suppression/cluster/zone
+owner checks on canonical alliance helpers), combat-death-unification #349
+(CombatantDeathPipeline single owner; rifle-path promotion/empty-squad-delete was
+the real bug; explosion via spatialGridManager.queryRadius), ai-timing-gate #350
+(diagnostics behind isPerfDiagnosticsEnabled; per-tick allocs hoisted; LOD interval
+params cached), combat-death-body-persistence #351 (R2 split: LODManager sole
+body-despawn owner, racing SpawnManager sweep deleted, player-rifle squads + AI-
+killed player-squad respawns rehomed through the pipeline).
+**Exit gate PASS: combat120 p99 50.6→~31ms (-38%), avg 31→24ms vs Phase 2 close**
+(`artifacts/perf/2026-06-09T20-50-12-389Z` → `2026-06-09T21-57-12-684Z`; same
+non-quiet box, Combat-phase tail 13.2→9.8ms; p99 now under the 35ms STABILIZAT-1
+target, formal close still needs the quiet-box capture + committed baseline).
+Reviewer follow-ups (non-blocking): alive-but-no-longer-defending ids still hold
+zoneDefenders slots until death (#346 note); owner-display/resupply sites still
+raw `=== Faction.US` (ZoneRenderer, CompassZoneMarkers, OpenFrontierRespawnMapUtils,
+AmmoSupplySystem/AmmoManager — sweep candidate); RespawnManager.queueRespawn lacks
+a dedup guard (single-call contract — add comment or originalId dedup); watch
+raycast-budget denial rate in playtest (blocked NPCs now re-poll the terrain gate).
+Briefs: `docs/tasks/archive/cycle-2026-06-09-combat-death-and-alliance/`.
+
+## Recently Completed (cycle-2026-06-09-terrain-fidelity-and-worker-safety)
+
+Phase 4 of [CAMPAIGN_2026-06-09-consultation-remediation](../CAMPAIGN_2026-06-09-consultation-remediation.md).
+4/4 merged, all terrain-nav APPROVE-WITH-NOTES, fence untouched:
+bvh-rebuild-double-buffer #352 (front/back MeshSlab; LOS reads a consistent
+snapshot, never hybrid rows; ~87KB), terrain-worker-safety #353 (dispose/onerror
+reject pendingTasks, 60s bake timeout, real task queue, demBufferCache evicted on
+provider swap — 21MB/worker leak), gameplay-heightmap-resolution #354 (**the
+stall-tail bet, premise CONFIRMED**: gameplay queries read the 512-wide GPU grid
+at ~42m/sample; now a 1024 CPU-only grid baked from the source DEM —
+steep-cell contour flips 0.74%→0.08% (~9x), mean |Δh| 1.12→0.34m, +3MB CPU,
+0 GPU; DEM_COVERAGE_METERS=21136 verified correct, "drift" was a red herring),
+navmesh-coverage-ashau #355 (full-map A Shau tiled prebake, 18.5MB
+`public/data/navmesh/a_shau_valley.bin`, worker-offloaded tiled gen; perimeter
+band beyond the old anchor window now paths instead of beelining).
+**Mid-phase checkpoint:** combat120 post-heightmap-fix — avg 24.0→20.9ms, max
+63.5→46.6ms, p99 flat (~32ms), and the terrain-stall warning storm is GONE
+(0 stall recoveries vs 28-suppressed at Phase 2 close; maxStuckSec 0.3, 0 route
+resets) → no further solver tuning dispatched; `combat-movement-stall-tail`
+retirement assessed at campaign close.
+Reviewer follow-ups (non-blocking): LOS near-field serves an N-frame-stale
+consistent snapshot during rebuild (~150-300ms during fast traverse — note in
+MOVEMENT_NAV_CHECKIN if rediscovered); future real-BVH wiring must
+computeBoundsTree on the back slab pre-swap; add an end-to-end dispose/mode-
+switch race test (primitives covered); a-shau navmesh .bin is immutable-cached
+under a fixed filename — re-bakes need a cache-bust; add an L2 test for the
+syncCpuHeightsToGpu round-trip; proposed split: lift the GPU surface grid to
+1024 for CPU↔render coherence (max 18m visual mismatch on sharp ridges,
+mean 0.86m — owner-walk item). NOTE: navmesh crowd was re-enabled 2026-05-18
+(steered direction) — older "crowd disabled" notes are stale.
+Briefs: `docs/tasks/archive/cycle-2026-06-09-terrain-fidelity-and-worker-safety/`.
+
+## Recently Completed (cycle-2026-06-09-deploy-weight-reduction)
+
+Phase 5 (FINAL) of [CAMPAIGN_2026-06-09-consultation-remediation](../CAMPAIGN_2026-06-09-consultation-remediation.md)
+— campaign COMPLETE, 25/25 tasks merged across 5 phases. This cycle: 6/6 merged,
+fence untouched. settings-key-migration #356 ('pixelart-sandbox-settings' →
+'terror-in-the-jungle-settings' with read-old/write-new shim; audit found no
+other legacy keys), prune-prod-mockups #357 (build-only Vite plugin strips
+public/mockups from dist + dist-perf; files stay in git as reference; ~769KB),
+dedup-map-renderers #358 (shared `src/ui/map/MapProjection.ts`: north-up +
+player-centered transforms + faction palette across the 4 canvas renderers;
+deploy map inherits via OpenFrontierRespawnMapUtils), purge-water-remnants #359
+(setUnderwater/underwater overrides/a-shau-rivers required-pin/2 dead textures
+deleted; -195 LOC; capture scripts' 'underwater' shot kind now a no-op —
+follow-up), delete-orphan-modules #360 (terrain-nav APPROVE; Konveyer compute
+spike + generateChunk/'generate' branch deleted, -794 LOC; TankGunnerAdapter +
+NpcM2HBAdapter verified LIVE and kept — consultation orphan list was a lead,
+not a verdict; knip.ignore could NOT honestly shrink: every entry load-bearing),
+dedup-vehicle-adapters #361 (free-function helpers in VehicleAdapterShared.ts;
+-217 adapter LOC; zero test files touched — full suite as no-op proof).
+**Exit gate PASS:** dist 110.2→109.4 MB, knip:ci clean, no mockup routes,
+settings migration test-proven. Follow-ups: red-laterite.webp + sandy-beach.webp
+binaries still in public/assets (owner decision); two capture scripts call the
+removed setUnderwater inside browser closures (no-op, not type-coupled).
+Briefs: `docs/tasks/archive/cycle-2026-06-09-deploy-weight-reduction/`.
