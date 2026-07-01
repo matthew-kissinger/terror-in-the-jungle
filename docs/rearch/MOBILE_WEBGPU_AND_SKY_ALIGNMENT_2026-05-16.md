@@ -1,7 +1,9 @@
 # Mobile WebGPU + Sky Recovery — Alignment Memo
 
 R2 deliverable for
-[`cycle-2026-05-16-mobile-webgpu-and-sky-recovery`](../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+`cycle-2026-05-16-mobile-webgpu-and-sky-recovery` (cycle brief deleted at
+close, commit `1c1c98ba`; not archived — predates the
+`docs/tasks/archive/<cycle-id>/` convention).
 Orchestrator-authored synthesis of the five R1 investigation memos under
 [`docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/`](MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/).
 Closes `KB-MOBILE-WEBGPU` and `KB-SKY-BLAND` with promotion-to-fix-cycle
@@ -439,7 +441,8 @@ cycle delta: 0. Cycle exits clean, no INCOMPLETE flag.
 ## References
 
 - Cycle brief:
-  [`docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md`](../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+  `docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md`
+  (deleted at cycle close, commit `1c1c98ba`; not archived).
 - R1 memos:
   - [`mobile-renderer-mode-truth.md`](MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/mobile-renderer-mode-truth.md)
   - [`webgl-fallback-pipeline-diff.md`](MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/webgl-fallback-pipeline-diff.md)

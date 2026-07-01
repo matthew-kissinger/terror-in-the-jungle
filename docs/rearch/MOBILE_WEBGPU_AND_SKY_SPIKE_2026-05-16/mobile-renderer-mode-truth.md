@@ -374,7 +374,8 @@ re-run the probe.
 ## Cross-references
 
 - Cycle brief:
-  [`docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md`](../../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+  `docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md`
+  (deleted at cycle close, commit `1c1c98ba`; not archived).
 - Parent campaign manifest:
   [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md).
 - POST-KONVEYER milestone memo:

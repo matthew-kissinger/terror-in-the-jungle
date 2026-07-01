@@ -38,8 +38,8 @@ on GPU but visually unacceptable.
    `git show 79103082:<path>`. Also walked back the two intermediate
    commits that did the bulk of the change:
    - `09d0b562` — `refactor(konveyer): retire hidden cloud plane`
-     (deleted `src/systems/environment/atmosphere/CloudLayer.ts`,
-     -351 LoC).
+     (deleted `src/systems/environment/atmosphere/CloudLayer.ts` — this
+     path no longer exists on disk, -351 LoC).
    - `8f3d560b` — `refactor(konveyer): render sky dome with standard
      material` (deleted `hosekWilkie.glsl.ts` -214 LoC, swapped
      `ShaderMaterial` → `MeshBasicMaterial` reading a baked

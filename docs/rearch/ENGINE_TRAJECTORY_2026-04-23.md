@@ -187,7 +187,7 @@ Cycle-sized tasks, ordered by value / blast radius. Each line is a future cycle'
 
 1. **`engine-doc-snapshot`** — write down, in one doc, the packaging boundaries we want (`@engine/terrain`, `@engine/navmesh`, `@engine/audio`, `@engine/determinism`, `@engine/spatial`, `@engine/input`, `@engine/combat-frame`). Not real npm packages yet; module boundaries inside the repo that a later split can follow.
 2. **`terrain-package-extraction`** — move `TerrainSystem` + `CDLODRenderer` + `HeightQueryCache` + `terrain.worker.ts` + `NoiseHeightProvider` behind a boot-without-`GameEngine` entry point. The `terrain-param-sandbox` from this cycle is the driver. Ship a standalone demo that instantiates a terrain scene with no other engine systems.
-3. **`determinism-package-extraction`** — extract `SeededRandom` / `ReplayRecorder` / `ReplayPlayer` from `src/core/` into `src/engine/determinism/`. Smallest-blast-radius item on the list; gets one subpackage shape documented.
+3. **`determinism-package-extraction`** — extract `SeededRandom` / `ReplayRecorder` / `ReplayPlayer` from `src/core/` into `src/engine/determinism/` (not built; those three files still live under `src/core/` today, and no engine-package extraction directory has been created). Smallest-blast-radius item on the list; gets one subpackage shape documented.
 4. **`combat-doctrine-library-pattern`** — formalize `FactionCombatTuning` into an `ICombatDoctrine` fence + doctrine-registry pattern. Games ship their own doctrines; the engine ships the combat-AI frame. This is the D2 pattern promoted to an interface.
 5. **`audio-manifest-convention`** — define an audio-manifest schema that a location ships (sound names, sample paths, fallback chains). Standardize the loader side so adding "Korean War ambient" is a manifest drop.
 6. **`asset-manifest-convention`** — same for GLBs + textures. `ASSET_MANIFEST.md` is the existing scaffold.
@@ -217,7 +217,7 @@ Tempting moves that would hurt more than help.
 | Next 3 cycles | Next 6 months |
 |---|---|
 | Refresh `MEMORY.md` + `CLAUDE.md` to say `three@0.184`, not `r183` (trivial doc fix). | Ship `@engine/terrain` as a standalone-bootable module; use it to drive `terrain-param-sandbox` and at least one new-location prototype. |
-| Extract `SeededRandom` + replay primitives into `src/engine/determinism/` (smallest subpackage; sets the pattern). | Ship `@engine/combat-frame` with an `ICombatDoctrine` fence; validate by writing a non-Vietnam doctrine file that slots in. |
+| Extract `SeededRandom` + replay primitives into `src/engine/determinism/` (not built; smallest subpackage; sets the pattern). | Ship `@engine/combat-frame` with an `ICombatDoctrine` fence; validate by writing a non-Vietnam doctrine file that slots in. |
 | Promote `FactionCombatTuning` to an `ICombatDoctrine` fence in `SystemInterfaces.ts` (additive fence change; human-reviewed). | Decide E1 (ECS) and E2 (rendering at scale) with updated spike data against the 2026-04 engine baseline — today's spike memos are from 2026-04-16 and predate the Airframe + LOD work. |
 | Land the `engine-doc-snapshot` doc — packaging boundaries drawn on paper. | Fold the audio + input subsystems into the extracted module set. |
 | Use `terrain-param-sandbox` outputs to drive a `simplex-noise` swap eval; decide to swap or not based on the noise-artifact evidence, not theory. | Split `IHUDSystem` into shell + content registry (breaking fence change; planned, not rushed). |

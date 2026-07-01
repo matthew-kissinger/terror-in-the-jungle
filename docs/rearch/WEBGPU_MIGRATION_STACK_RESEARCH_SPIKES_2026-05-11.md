@@ -380,8 +380,10 @@ Recommended next water spike:
 
 2026-05-11 water pass:
 
-- `npm run check:hydrology-bakes` passes, proving the current hydrology bake
-  artifacts still match `public/data/hydrology/bake-manifest.json`.
+- `npm run check:hydrology-bakes` passed at the time, proving the current
+  hydrology bake artifacts still matched
+  `public/data/hydrology/bake-manifest.json` (hydrology stripped 2026-06-09
+  per VODA-1/VODA-2 in `docs/DIRECTIVES.md`; this script no longer exists).
 - Source audit
   `artifacts/perf/2026-05-11T21-33-05-844Z/projekt-143-water-system-audit/water-system-audit.json`
   records the current contract as WARN: global water remains a standard
@@ -410,8 +412,10 @@ Recommended next water spike:
   startup. A downstream elevation profile is applied before the water ribbon
   and terrain stamps consume the path, so noisy terrain samples no longer
   render as stepped river plates.
-- `npm run check:water-runtime -- --headless` passes against
-  `artifacts/perf/2026-05-21T00-27-21-410Z/projekt-143-water-runtime-proof/`.
+- `npm run check:water-runtime -- --headless` passed at the time against
+  `artifacts/perf/2026-05-21T00-27-21-410Z/projekt-143-water-runtime-proof/`
+  (hydrology stripped 2026-06-09 per VODA-1/VODA-2 in `docs/DIRECTIVES.md`;
+  this script no longer exists).
   Visual evidence under
   `artifacts/water-hydrology-polish/2026-05-21T00-18-53-086Z/loaded-terrain-visual/`
   shows loaded-terrain player, oblique, and map passes for Open Frontier and A

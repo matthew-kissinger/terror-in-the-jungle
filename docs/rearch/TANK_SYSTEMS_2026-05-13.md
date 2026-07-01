@@ -316,8 +316,11 @@ bus the rifle / RPG / mortar already use.
   Owns turret + barrel `Object3D` references (extracted from GLB
   once, cached). Exposes `getMuzzleWorldTransform()`. ~150-200 lines.
 
-- **`src/systems/vehicle/TankCannonProjectile.ts`.** Ballistic
-  projectile per §"Ballistic main cannon". Pool-managed (~16 slots).
+- **`src/systems/combat/projectiles/TankCannonProjectile.ts`** (this
+  memo originally planned a src/systems/vehicle/ path; the class was
+  actually built under src/systems/combat/projectiles/ instead).
+  Ballistic projectile per §"Ballistic main cannon".
+  Pool-managed (~16 slots).
   **Grep first** — `grep -rn "class.*BallisticProjectile" src/` is
   empty as of this memo; fresh class expected. ~250-300 lines.
 

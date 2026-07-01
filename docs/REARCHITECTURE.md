@@ -108,7 +108,7 @@ What does a structured action/observation interface look like that lets an exter
 
 Two reasons this isn't just hypothetical:
 
-1. The existing `scripts/perf-active-driver.js` is already an agent-as-player (even if a dumb one). Its bugs (teleport, thrash) come from riding the human-keyboard path. A structured action API would solve those classes of bugs.
+1. The existing `scripts/perf-active-driver.cjs` is already an agent-as-player (even if a dumb one). Its bugs (teleport, thrash) come from riding the human-keyboard path. A structured action API would solve those classes of bugs.
 2. Your stated aspiration: "game for agents in real time." Not a pillar, but building toward it is cheap *if* we design primitives correctly and expensive *if* we bolt it on later.
 
 ### What a decision requires

@@ -13,7 +13,9 @@ to the owner; the deferral is tracked in
 ## Posture override (why this memo replaces a real-device run)
 
 The cycle brief at
-[`docs/tasks/cycle-mobile-webgl2-fallback-fix.md`](../../tasks/cycle-mobile-webgl2-fallback-fix.md)
+`docs/tasks/cycle-mobile-webgl2-fallback-fix.md` (deleted at cycle close,
+commit `7931d179`; not archived — predates the
+`docs/tasks/archive/<cycle-id>/` convention)
 names real-device evidence as the cycle's merge gate. Under
 autonomous-loop posture, rule 3 of the orchestrator playbook applies:
 
@@ -250,7 +252,7 @@ Per `cycle-mobile-webgl2-fallback-fix.md` "Acceptance Criteria (cycle close)":
 
 ## References
 
-- Cycle brief: [`docs/tasks/cycle-mobile-webgl2-fallback-fix.md`](../../tasks/cycle-mobile-webgl2-fallback-fix.md)
+- Cycle brief: `docs/tasks/cycle-mobile-webgl2-fallback-fix.md` (deleted at cycle close, commit `7931d179`; not archived)
 - R2 alignment memo: [`MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md`](../MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md)
 - Campaign manifest: [`docs/CAMPAIGN_2026-05-13-POST-WEBGPU.md`](../../archive/CAMPAIGN_2026-05-13-POST-WEBGPU.md)
 - Playtest deferral sink: [`docs/PLAYTEST_PENDING.md`](../../PLAYTEST_PENDING.md)

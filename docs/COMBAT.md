@@ -44,7 +44,7 @@ Combat does **not** own:
 - Terrain, navmesh, audio, HUD rendering. Combat consumes these through
   setter injection; it does not reach into them directly beyond the
   documented interfaces.
-- Strategy-layer combat (`src/systems/strategy/AbstractCombatResolver`).
+- Strategy-layer combat (`src/systems/strategy/AbstractCombatResolver.ts`).
   Strategic agents are materialized into combat via
   `CombatantSystem.materializeAgent` / `dematerializeAgent`.
 

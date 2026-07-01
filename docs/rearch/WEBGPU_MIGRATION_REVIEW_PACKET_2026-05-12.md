@@ -115,7 +115,9 @@ remaining fallback is at the designed materialization-tier cap boundary.
 
 ### Water/hydrology bridge
 
-- `npm run check:hydrology-bakes` passes. Source audit + runtime proof
+- `npm run check:hydrology-bakes` passed at the time (hydrology stripped
+  2026-06-09 per VODA-1/VODA-2 in `docs/DIRECTIVES.md`; this script no
+  longer exists). Source audit + runtime proof
   exist; `WaterSystem.sampleWaterInteraction` is the consumer-ready
   contract for buoyancy/swimming/wading.
 - Runtime proof: `artifacts/perf/2026-05-11T21-33-31-662Z/projekt-143-water-runtime-proof/water-runtime-proof.json`.

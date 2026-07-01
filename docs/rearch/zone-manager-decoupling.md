@@ -282,7 +282,10 @@ be zero unless explicitly noted):
    2026-05-08 backface Z-flip; we want them in the loop.)
 
 Recommended test placement: a new
-`src/integration/scenarios/zone-query-parity.test.ts`. It exercises the
+`src/integration/scenarios/zone-query-parity.test.ts` (never built under
+this name — git history has no record of the file; this was a proposed,
+intentionally self-deleting scaffold, not an expected permanent
+artifact). It exercises the
 real `ZoneManager` through the `IZoneQuery` seam (no mocks) and is
 deleted at the end of Batch C — its only purpose is to ride along with
 the migration.

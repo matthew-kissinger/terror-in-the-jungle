@@ -363,7 +363,9 @@ Three.js's `Water` example renders into a 512×512 reflection
 `WebGLRenderTarget` every frame plus its own complex shader. Known
 mobile-killer if water is visible.
 
-**Post-merge (`src/systems/environment/WaterSystem.ts:165-180`):**
+**Post-merge (`src/systems/environment/WaterSystem.ts:165-180`, path no
+longer exists — hydrology + all water stripped to first principles
+2026-06-09 per VODA-1/VODA-2 in `docs/DIRECTIVES.md`):**
 ```
 const waterMaterial = new THREE.MeshStandardMaterial({
   name: 'global-water-standard-material',
@@ -449,7 +451,8 @@ the terrain fragment-shader cost in Rank 1.)
 ## Cross-references
 
 - Cycle brief:
-  [docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md](../../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md).
+  docs/tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md
+  (deleted at cycle close, commit `1c1c98ba`; not archived).
 - Sibling R1 memos in this folder (when merged):
   `mobile-renderer-mode-truth.md`, `tsl-shader-cost-audit.md`,
   `sky-visual-and-cost-regression.md`, `mobile-startup-and-frame-budget.md`.

@@ -197,7 +197,10 @@ R3 — Validation:
    `TerrainSystem.getHeightAt(spawn.x, spawn.z) + 0.85` for all OF
    Sampan + PBR spawn points.
 2. `scripts/capture-of-water-airfield-shots.ts` produces zero post-merge
-   frames with `hoverAboveTerrainMeters > 0.5`.
+   frames with `hoverAboveTerrainMeters > 0.5` (script deleted 2026-06-09
+   in the water-to-first-principles scorch, commit `d17a98f3`; hydrology
+   stripped per VODA-1/VODA-2 in `docs/DIRECTIVES.md`; this script no
+   longer exists).
 3. `terrain-nav-reviewer` APPROVE on R2.2 (Pass C is load-bearing).
 4. `combat120` p99 within ±2ms of baseline (compositor adds compose-time
    cost, not frame-time cost).
