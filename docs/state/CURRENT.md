@@ -1,8 +1,8 @@
 # Current State
 
-Last aligned: 2026-07-01 local. The July 1 owner-playtest follow-up batch was
+Last aligned: 2026-07-01 hotfix release path. The July 1 owner-playtest follow-up batch was
 code-complete, but owner playtest reopened the map/radio/tracer surfaces. The
-current local hotfix removes the 3D topographic map from player-facing deploy,
+current hotfix removes the 3D topographic map from player-facing deploy,
 `M` / `Shift+M`, and pause-menu paths; keeps the 2D tactical map as the ship
 path; stabilizes desktop radio outer-ring selection including right-click
 confirm; and centers non-shotgun player tracers so the LMG/M60 no longer reads
@@ -11,8 +11,8 @@ ambient/static soundscape layers, promoted fal.ai objective/capture local
 variant pools, source-local objective audio, Fire Support/Squad/Signals radio
 IA with smoke-target drilldown, imported Kiln field radio, held radio/smoke
 equipment, throwable smoke target marks, and helicopter player-airframe
-single-owner effects. Local proof for this hotfix is focused tests plus
-typecheck/build; production owner acceptance remains open in
+single-owner effects. Engineering proof for this hotfix is focused tests plus
+typecheck/build/fast validation; production owner acceptance remains open in
 [PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md). Previous dropped-frame
 completion is still not claimed until reboot/quiet-machine Open Frontier +
 A Shau EARS captures and owner playtest pass. NOTE - all basin/level-depth
