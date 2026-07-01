@@ -17,7 +17,7 @@ import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 import type { GrenadeSystem } from '../../weapons/GrenadeSystem'
 
 type WeaponFiringInternals = {
-  resolveTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3
+  resolveTracerStart(target: THREE.Vector3, weaponType: ShotCommand['weaponType'], isADS: boolean): THREE.Vector3
 }
 
 // Mock dependencies
@@ -324,23 +324,16 @@ describe('WeaponFiring', () => {
       // Should not crash even if statsTracker/audioManager/hudSystem are missing
     })
 
-    it('damages from the camera ray while tracing from the projected weapon muzzle', () => {
+    it('damages from the camera ray while the LMG traces from one centered presentation anchor', () => {
       const muzzleRef = new THREE.Object3D()
       weaponFiring.setMuzzleRef(muzzleRef)
+      command.weaponType = 'lmg'
 
       vi.spyOn(muzzleRef, 'getWorldPosition').mockImplementation((target) => {
         target.set(0.62, -0.28, -0.72)
         return target
       })
       weaponFiring.executeShot(command)
-
-      const expectedMuzzleNdc = new THREE.Vector3(0.62, -0.28, -0.72).project(overlayCamera)
-      const expectedMuzzleRayPoint = new THREE.Vector3(expectedMuzzleNdc.x, expectedMuzzleNdc.y, 0.5).unproject(camera)
-      const expectedTracerStart = expectedMuzzleRayPoint
-        .sub(camera.position)
-        .normalize()
-        .multiplyScalar(1.35)
-        .add(camera.position)
 
       const firedRay = vi.mocked(combatantSystem.handlePlayerShot).mock.calls[0][0] as THREE.Ray
       expect(firedRay.origin.x).toBeCloseTo(0)
@@ -350,24 +343,68 @@ describe('WeaponFiring', () => {
       expect(firedRay.direction.y).toBeCloseTo(0)
       expect(firedRay.direction.z).toBeCloseTo(-1)
       expect(combatantSystem.resolvePlayerAimPoint).not.toHaveBeenCalled()
+      expect(combatantSystem.handlePlayerShot).toHaveBeenCalledTimes(1)
+      expect(tracerPool.spawn).toHaveBeenCalledTimes(1)
+      expect(tracerPool.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          x: expect.closeTo(0.07, 3),
+          y: expect.closeTo(-0.08, 3),
+          z: expect.closeTo(-1.35, 3),
+        }),
+        expect.objectContaining({ x: 0, y: 0, z: -10 }),
+        120
+      )
+      const diagnostics = weaponFiring.getLastShotOriginDiagnostics()
+      expect(diagnostics?.weaponType).toBe('lmg')
+      expect(diagnostics?.projectionMode).toBe('hip-camera')
+      expect(diagnostics?.overlayMuzzleNdc).toBeNull()
+      expect(diagnostics?.damageRayOrigin).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }))
+      expect(diagnostics?.visualTracerStart.x).toBeCloseTo(0.07, 3)
+    })
+
+    it('keeps shotgun visual tracers tied to a usable overlay muzzle projection', () => {
+      const muzzleRef = new THREE.Object3D()
+      weaponFiring.setMuzzleRef(muzzleRef)
+      command.weaponType = 'shotgun'
+      command.pelletRays = [
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.1, 0, -1).normalize()),
+      ]
+
+      vi.spyOn(muzzleRef, 'getWorldPosition').mockImplementation((target) => {
+        target.set(0.42, -0.2, -0.72)
+        return target
+      })
+      weaponFiring.executeShot(command)
+
+      const expectedMuzzleNdc = new THREE.Vector3(0.42, -0.2, -0.72).project(overlayCamera)
+      const expectedMuzzleRayPoint = new THREE.Vector3(expectedMuzzleNdc.x, expectedMuzzleNdc.y, 0.5).unproject(camera)
+      const expectedTracerStart = expectedMuzzleRayPoint
+        .sub(camera.position)
+        .normalize()
+        .multiplyScalar(1.35)
+        .add(camera.position)
+
       expect(tracerPool.spawn).toHaveBeenCalledWith(
         expect.objectContaining({
           x: expect.closeTo(expectedTracerStart.x, 2),
           y: expect.closeTo(expectedTracerStart.y, 2),
           z: expect.closeTo(expectedTracerStart.z, 2),
         }),
-        expect.objectContaining({ x: 0, y: 0, z: -10 }),
-        120
+        expect.any(THREE.Vector3),
+        100
       )
       const diagnostics = weaponFiring.getLastShotOriginDiagnostics()
+      expect(diagnostics?.weaponType).toBe('shotgun')
       expect(diagnostics?.projectionMode).toBe('overlay-muzzle')
-      expect(diagnostics?.damageRayOrigin).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }))
-      expect(diagnostics?.visualTracerStart.x).toBeCloseTo(expectedTracerStart.x, 2)
     })
 
     it('falls back from unusable overlay muzzle projections instead of drawing a stray origin', () => {
       const muzzleRef = new THREE.Object3D()
       weaponFiring.setMuzzleRef(muzzleRef)
+      command.weaponType = 'shotgun'
+      command.pelletRays = [
+        new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)),
+      ]
 
       vi.spyOn(muzzleRef, 'getWorldPosition').mockImplementation((target) => {
         target.set(9, -0.2, -0.72)
@@ -382,8 +419,8 @@ describe('WeaponFiring', () => {
       expect(diagnostics?.damageRayOrigin).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }))
       expect(tracerPool.spawn).toHaveBeenCalledWith(
         expect.objectContaining({ x: expect.closeTo(0.18, 3), y: expect.closeTo(-0.14, 3) }),
-        expect.objectContaining({ x: 0, y: 0, z: -10 }),
-        120
+        expect.any(THREE.Vector3),
+        100
       )
     })
 
@@ -405,7 +442,7 @@ describe('WeaponFiring', () => {
       const normalizeSpy = vi.spyOn(THREE.Vector3.prototype, 'normalize')
 
       try {
-        const result = (weaponFiring as unknown as WeaponFiringInternals).resolveTracerStart(target, false)
+        const result = (weaponFiring as unknown as WeaponFiringInternals).resolveTracerStart(target, 'rifle', false)
 
         expect(result).toBe(target)
         expect(normalizeSpy).toHaveBeenCalledTimes(1)

@@ -35,8 +35,26 @@ const _launcherVelocity = new THREE.Vector3()
 
 const PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE = 1.35
 const PLAYER_TRACER_OVERLAY_NDC_LIMIT = 1.15
-const PLAYER_BARREL_FALLBACK_RIGHT = 0.18
-const PLAYER_BARREL_FALLBACK_UP = -0.14
+
+type CameraBasisTracerAnchor = {
+  right: number
+  up: number
+  forward: number
+}
+
+const DEFAULT_HIP_TRACER_ANCHOR: CameraBasisTracerAnchor = {
+  right: 0.18,
+  up: -0.14,
+  forward: PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE,
+}
+
+const HIP_TRACER_ANCHORS: Partial<Record<ShotCommand['weaponType'], CameraBasisTracerAnchor>> = {
+  lmg: {
+    right: 0.07,
+    up: -0.08,
+    forward: PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE,
+  },
+}
 
 export type ShotOriginProjectionMode = 'overlay-muzzle' | 'ads-camera' | 'hip-camera'
 
@@ -255,7 +273,7 @@ export class WeaponFiring {
   }
 
   private spawnBarrelAlignedTracer(command: ShotCommand, result: ShotResult): void {
-    this.resolveTracerStart(_barrelOrigin, command.isADS)
+    this.resolveTracerStart(_barrelOrigin, command.weaponType, command.isADS)
     this.resolveAimPoint(command, _aimPoint, result.hitPoint)
     _tracerEnd.copy(_aimPoint)
 
@@ -302,11 +320,15 @@ export class WeaponFiring {
     return target.copy(command.ray.origin).addScaledVector(command.ray.direction, 200)
   }
 
-  private resolveTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3 {
+  private resolveTracerStart(target: THREE.Vector3, weaponType: ShotCommand['weaponType'], isADS: boolean): THREE.Vector3 {
     this.camera.getWorldPosition(_cameraPos)
     this.camera.getWorldDirection(_forward)
     this.lastTracerProjectionMode = isADS ? 'ads-camera' : 'hip-camera'
     this.hasLastOverlayMuzzleNdc = false
+
+    if (weaponType !== 'shotgun') {
+      return this.resolveCameraBasisTracerStart(target, weaponType, isADS)
+    }
 
     if (this.muzzleRef && this.overlayCamera) {
       this.camera.updateMatrixWorld(true)
@@ -317,7 +339,7 @@ export class WeaponFiring {
       this.overlayMuzzleNdcForDiagnostics.copy(_overlayMuzzleNdc)
       this.hasLastOverlayMuzzleNdc = true
       if (!isUsableOverlayMuzzleProjection(_overlayMuzzleNdc)) {
-        return this.resolveCameraBasisTracerStart(target, isADS)
+        return this.resolveCameraBasisTracerStart(target, weaponType, isADS)
       }
       _muzzleRayPoint
         .set(_overlayMuzzleNdc.x, _overlayMuzzleNdc.y, 0.5)
@@ -332,10 +354,10 @@ export class WeaponFiring {
       }
     }
 
-    return this.resolveCameraBasisTracerStart(target, isADS)
+    return this.resolveCameraBasisTracerStart(target, weaponType, isADS)
   }
 
-  private resolveCameraBasisTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3 {
+  private resolveCameraBasisTracerStart(target: THREE.Vector3, weaponType: ShotCommand['weaponType'], isADS: boolean): THREE.Vector3 {
     if (isADS) {
       // ADS: barrel is centered on screen, use camera origin with small forward offset
       this.lastTracerProjectionMode = 'ads-camera'
@@ -350,10 +372,11 @@ export class WeaponFiring {
     // creating a visible second ray from the wrong origin.
     _cameraRight.set(1, 0, 0).applyQuaternion(_cameraQuat)
     _cameraUp.set(0, 1, 0).applyQuaternion(_cameraQuat)
+    const anchor = HIP_TRACER_ANCHORS[weaponType] ?? DEFAULT_HIP_TRACER_ANCHOR
     return target.copy(_cameraPos)
-      .addScaledVector(_cameraRight, PLAYER_BARREL_FALLBACK_RIGHT)
-      .addScaledVector(_cameraUp, PLAYER_BARREL_FALLBACK_UP)
-      .addScaledVector(_forward, PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE)
+      .addScaledVector(_cameraRight, anchor.right)
+      .addScaledVector(_cameraUp, anchor.up)
+      .addScaledVector(_forward, anchor.forward)
   }
 
   private recordShotOriginDiagnostics(command: ShotCommand): void {

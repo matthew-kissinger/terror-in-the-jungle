@@ -113,11 +113,30 @@ describe('RadioDialController', () => {
     expect(intents).toHaveLength(0);
   });
 
+  it('does not notify subscribers while cooldown display state is unchanged', () => {
+    const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support') as Extract<RadioOption, { kind: 'fire-support' }>;
+    const listener = vi.fn();
+    controller.focusCategory('fire-support');
+    const dispose = controller.onChange(listener);
+
+    controller.setCooldowns({ [asset.assetId]: 75 });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    listener.mockClear();
+    controller.setCooldowns({ [asset.assetId]: 74.8 });
+    expect(listener).not.toHaveBeenCalled();
+    expect(controller.getFocusedCategory()?.id).toBe('fire-support');
+
+    controller.setCooldowns({ [asset.assetId]: 74 });
+    expect(listener).toHaveBeenCalledTimes(1);
+    dispose();
+  });
+
   it('notifies change subscribers when drill or selection state moves', () => {
     const listener = vi.fn();
     const dispose = controller.onChange(listener);
     controller.focusCategory('squad');
-    controller.setSelectedMarking('smoke');
+    controller.setSelectedMarking('willie_pete');
     expect(listener.mock.calls.length).toBeGreaterThanOrEqual(2);
     dispose();
     listener.mockClear();

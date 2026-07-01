@@ -48,7 +48,7 @@ interface SettingsModalController {
     onResume: () => void;
     onSquadCommands: () => void;
     onQuitToMenu: () => void;
-    onTopographicMap?: () => void;
+    onTacticalMap?: () => void;
   }): void;
 }
 
@@ -1179,7 +1179,7 @@ export class PlayerController implements GameSystem {
         this.commandInputManager?.toggleCommandMode();
       },
       onQuitToMenu: () => window.location.reload(),
-      onTopographicMap: () => { settingsModal.hide(); this.fullMapSystem?.toggleOrbital3D(); },
+      onTacticalMap: () => { settingsModal.hide(); this.fullMapSystem?.toggleVisibility(); },
     });
     settingsModal.setOnVisibilityChange((visible) => {
       if (!this.gameStarted) {

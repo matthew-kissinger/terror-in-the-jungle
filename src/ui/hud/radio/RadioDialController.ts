@@ -101,6 +101,7 @@ export class RadioDialController {
 
   /** Reset to the top (category) level — call when the dial opens. */
   reset(): void {
+    if (this.focusedCategory === null && this.pendingFireSupportAssetId === null) return;
     this.focusedCategory = null;
     this.pendingFireSupportAssetId = null;
     this.emitChange();
@@ -126,16 +127,19 @@ export class RadioDialController {
   }
 
   setCooldowns(cooldowns: AirSupportRadioCooldowns): void {
+    if (cooldownDisplayStateMatches(this.cooldowns, cooldowns)) return;
     this.cooldowns = cooldowns;
     this.emitChange();
   }
 
   setSelectedMarking(marking: AirSupportTargetMarking): void {
+    if (this.selectedMarking === marking) return;
     this.selectedMarking = marking;
     this.emitChange();
   }
 
   setSelectedStationId(stationId: string | null): void {
+    if (this.selectedStationId === stationId) return;
     this.selectedStationId = stationId;
     this.emitChange();
   }
@@ -203,4 +207,23 @@ export class RadioDialController {
   private emitChange(): void {
     for (const listener of this.changeListeners) listener();
   }
+}
+
+function cooldownDisplayStateMatches(
+  current: AirSupportRadioCooldowns,
+  next: AirSupportRadioCooldowns,
+): boolean {
+  const keys = new Set([...Object.keys(current), ...Object.keys(next)]);
+  for (const key of keys) {
+    const assetId = key as keyof AirSupportRadioCooldowns;
+    if (cooldownDisplayBucket(current[assetId]) !== cooldownDisplayBucket(next[assetId])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function cooldownDisplayBucket(value: number | undefined): number {
+  const remaining = Number.isFinite(value) ? Math.max(0, value ?? 0) : 0;
+  return remaining <= 0 ? 0 : Math.ceil(remaining);
 }

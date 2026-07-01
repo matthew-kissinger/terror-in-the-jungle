@@ -140,4 +140,22 @@ describe('SettingsModal', () => {
     expect(callback).toHaveBeenNthCalledWith(1, true);
     expect(callback).toHaveBeenNthCalledWith(2, false);
   });
+
+  it('surfaces a tactical map action in the field menu without topographic copy', () => {
+    const onTacticalMap = vi.fn();
+    modal.setGameplayMenuActions({
+      onResume: vi.fn(),
+      onSquadCommands: vi.fn(),
+      onQuitToMenu: vi.fn(),
+      onTacticalMap,
+    });
+
+    const tacticalButton = modal.element.querySelector('[data-ref="tacticalmap"]') as HTMLButtonElement | null;
+    expect(tacticalButton).not.toBeNull();
+    expect(tacticalButton?.textContent).toBe('Tactical Map');
+    expect(modal.element.textContent).not.toContain('Topographic Map');
+
+    tacticalButton?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    expect(onTacticalMap).toHaveBeenCalledTimes(1);
+  });
 });

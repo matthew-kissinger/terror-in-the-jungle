@@ -29,7 +29,6 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
 import { worldToNorthUpMap, factionMarkerFill } from './MapProjection';
 import { refreshVehicleMarkersFromSource, type VehicleMarker, type VehicleMarkerSource } from './VehicleMarkers';
-import { mountHoldMOrbitalToggle, type HoldMOrbitalHandle } from './orbital/OrbitalHoldMMount';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -80,9 +79,6 @@ export class FullMapSystem implements GameSystem {
   private inputHandler: FullMapInput;
   private visibilityListeners = new Set<(visible: boolean) => void>();
 
-  // 3D orbital relief map (plain M, default). Lazily created; Shift+M opens 2D.
-  private orbital3D: HoldMOrbitalHandle | null = null;
-
   constructor(camera: THREE.Camera) {
     this.camera = camera;
 
@@ -91,7 +87,6 @@ export class FullMapSystem implements GameSystem {
       onShow: () => this.show(),
       onHide: () => this.hide(),
       onRender: () => this.render(),
-      onToggleOrbital3D: () => this.toggleOrbital3D(),
     });
 
     // Create map container
@@ -133,8 +128,8 @@ export class FullMapSystem implements GameSystem {
       `;
     } else {
       instructions.innerHTML = `
-        Hold <strong>Shift+M</strong> for this 2D map<br>
-        <strong>M</strong> opens the 3D relief map<br>
+        Hold <strong>M</strong> for tactical map<br>
+        <strong>Shift+M</strong> also works<br>
         <strong>Scroll</strong> to zoom · <strong>ESC</strong> to close
       `;
     }
@@ -219,24 +214,6 @@ export class FullMapSystem implements GameSystem {
 
   toggleVisibility(): void {
     this.inputHandler.toggle();
-  }
-
-  /**
-   * 3D orbital relief map (plain M, or the pause-menu "Topographic Map"
-   * button). Lazily mounts the shared orbital component over the live terrain +
-   * zones; all wiring lives in the host mount helper so this stays a 1-call
-   * toggle. Owner decision 2026-06-30: this is the default in-combat map; the
-   * fast 2D tactical map is on Shift+M.
-   */
-  toggleOrbital3D(): boolean {
-    if (!this.orbital3D) {
-      this.orbital3D = mountHoldMOrbitalToggle({
-        camera: this.camera,
-        zoneQuery: this.zoneQuery,
-        worldSize: this.worldSize,
-      });
-    }
-    return this.orbital3D?.toggle() ?? false;
   }
 
   onVisibilityChange(listener: (visible: boolean) => void): () => void {
@@ -819,8 +796,6 @@ export class FullMapSystem implements GameSystem {
 
   dispose(): void {
     this.inputHandler.dispose();
-    this.orbital3D?.dispose();
-    this.orbital3D = null;
     if (this.mapContainer.parentNode) {
       this.mapContainer.parentNode.removeChild(this.mapContainer);
     }

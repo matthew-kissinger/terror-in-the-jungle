@@ -8,8 +8,6 @@ import { Logger } from '../../utils/Logger';
 import type { IZoneQuery } from '../../types/SystemInterfaces';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 import type { VehicleMarker } from '../../ui/minimap/MinimapRenderer';
-import { mountDeployOrbitalViewport, type DeployOrbitalHandle } from '../../ui/map/orbital/OrbitalDeployMount';
-import { resolveTopoBakedUrl } from '../../ui/map/orbital/OrbitalTopoBakedUrl';
 
 /**
  * Coordinates between the main game and the respawn map view.
@@ -20,61 +18,13 @@ export class RespawnMapController {
   private gameModeManager?: GameModeManager;
   private onZoneSelected?: (zoneId: string, zoneName: string) => void;
   private updateInterval?: number;
-  private zoneQuery?: IZoneQuery;
-  private spawnPoints: RespawnSpawnPoint[] = [];
-  // Embedded 3D relief viewport: a dedicated-renderer canvas layered inside the
-  // deploy map panel (#respawn-map), above the 2D map. Default view; the deploy
-  // chrome (tabs / Armory / spawn list / DEPLOY) stays visible at all times.
-  private orbital3D: DeployOrbitalHandle | null = null;
 
   constructor() {
     this.openFrontierRespawnMap = new OpenFrontierRespawnMap();
-    this.openFrontierRespawnMap.setOrbitalToggleCallback(() => this.toggleOrbital3D());
   }
 
   setZoneManager(query: IZoneQuery): void {
-    this.zoneQuery = query;
     this.openFrontierRespawnMap.setZoneQuery(query);
-  }
-
-  private ensureOrbital3D(): DeployOrbitalHandle {
-    if (!this.orbital3D) {
-      const worldSize = this.gameModeManager?.getWorldSize() ?? 3200;
-      this.orbital3D = mountDeployOrbitalViewport({
-        zoneQuery: this.zoneQuery,
-        spawns: () => this.spawnPoints.map((s) => ({ id: s.id, name: s.name, position: { x: s.position.x, z: s.position.z } })),
-        worldSize,
-        bakedUrl: resolveTopoBakedUrl(this.currentGameMode),
-        onZoneSelected: (zoneId, zoneName) => this.onZoneSelected?.(zoneId, zoneName),
-        onRequestClose: () => this.closeOrbital3DToTwoD(),
-      });
-    }
-    return this.orbital3D;
-  }
-
-  /**
-   * Default deploy view is the embedded 3D relief: show the 3D layer over the
-   * 2D map inside the map panel — but only if the relief actually loads (a
-   * missing baked DEM keeps the 2D map visible instead of a black box). The
-   * deploy chrome stays visible; the player flips back to 2D via the in-viewport
-   * "2D" control.
-   */
-  private async openOrbital3D(): Promise<void> {
-    await this.ensureOrbital3D().show();
-  }
-
-  /** Flip back to the 2D deploy map (in-viewport "2D" control or the toggle). */
-  private closeOrbital3DToTwoD(): void {
-    this.orbital3D?.hide();
-  }
-
-  /** "3D" / "2D" controls toggle between the embedded 3D relief and the 2D map. */
-  private toggleOrbital3D(): void {
-    if (this.orbital3D?.isOpen()) {
-      this.closeOrbital3DToTwoD();
-    } else {
-      void this.openOrbital3D();
-    }
   }
 
   setGameModeManager(manager: GameModeManager): void {
@@ -89,7 +39,6 @@ export class RespawnMapController {
   }
 
   setSpawnPoints(spawnPoints: RespawnSpawnPoint[]): void {
-    this.spawnPoints = spawnPoints;
     this.openFrontierRespawnMap.setSpawnPoints(spawnPoints);
   }
 
@@ -138,12 +87,6 @@ export class RespawnMapController {
     this.openFrontierRespawnMap.focusSpawnPoints();
 
     this.startMapUpdateInterval();
-
-    // Embed the 3D relief viewport into the map panel (above the 2D canvas) and
-    // default to it. Falls back to the 2D map if the relief fails to load. The
-    // deploy chrome (tabs / Armory / DEPLOY) stays visible either way.
-    this.ensureOrbital3D().attach(mapContainer);
-    void this.openOrbital3D();
   }
 
   focusSpawnPoints(preferredSpawnPointId?: string): void {
@@ -167,10 +110,6 @@ export class RespawnMapController {
       clearInterval(this.updateInterval);
       this.updateInterval = undefined;
     }
-    // The deploy screen is closing (deploy / cancel): hide the 3D relief layer
-    // so its render pump stops. The layer lives inside #respawn-map, which the
-    // deploy flow tears down, so nothing leaks into gameplay.
-    this.orbital3D?.hide();
   }
 
   clearSelection(): void {
@@ -179,7 +118,5 @@ export class RespawnMapController {
 
   dispose(): void {
     this.stopMapUpdateInterval();
-    this.orbital3D?.dispose();
-    this.orbital3D = null;
   }
 }

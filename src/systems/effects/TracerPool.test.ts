@@ -5,6 +5,16 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { TracerPool } from './TracerPool';
 
+function readLineWorldEndpoint(line: THREE.Line, endpointIndex: 0 | 1): THREE.Vector3 {
+  const position = (line.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
+  const offset = endpointIndex * 3;
+  return new THREE.Vector3(
+    position.array[offset],
+    position.array[offset + 1],
+    position.array[offset + 2],
+  ).applyMatrix4(line.matrixWorld);
+}
+
 describe('TracerPool', () => {
   it('tags pooled tracer drawables for render attribution', () => {
     const scene = new THREE.Scene();
@@ -41,6 +51,22 @@ describe('TracerPool', () => {
     expect(position.version).toBeGreaterThan(versionBeforeSpawn);
     expect(position.updateRanges.at(-1)).toEqual({ start: 0, count: 6 });
     expect(group.visible).toBe(true);
+
+    pool.dispose();
+  });
+
+  it('keeps core and glow endpoints coincident away from the world origin', () => {
+    const scene = new THREE.Scene();
+    const pool = new TracerPool(scene, 1);
+    const group = scene.children[0] as THREE.Group;
+    const coreLine = group.children[0] as THREE.Line;
+    const glowLine = group.children[1] as THREE.Line;
+
+    pool.spawn(new THREE.Vector3(10, 20, 30), new THREE.Vector3(12, 23, 34));
+    group.updateMatrixWorld(true);
+
+    expect(readLineWorldEndpoint(glowLine, 0).distanceTo(readLineWorldEndpoint(coreLine, 0))).toBeCloseTo(0);
+    expect(readLineWorldEndpoint(glowLine, 1).distanceTo(readLineWorldEndpoint(coreLine, 1))).toBeCloseTo(0);
 
     pool.dispose();
   });

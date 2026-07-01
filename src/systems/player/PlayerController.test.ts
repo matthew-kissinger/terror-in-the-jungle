@@ -260,6 +260,7 @@ describe('PlayerController', () => {
       setOnVisibilityChange: vi.fn((callback: (visible: boolean) => void) => {
         settingsModalVisibilityListener = callback;
       }),
+      setGameplayMenuActions: vi.fn(),
     };
   });
 
@@ -338,6 +339,22 @@ describe('PlayerController', () => {
       expect(playerController['input'].setControlsEnabled).toHaveBeenCalledWith(true);
       expect(playerController['input'].setInputContext).toHaveBeenCalledWith('gameplay');
       expect(playerController['input'].setPointerLockEnabled).toHaveBeenCalledWith(true);
+    });
+
+    it('routes the pause-menu tactical map action to the 2D full map', () => {
+      const fullMapSystem = {
+        toggleVisibility: vi.fn(),
+        toggleOrbital3D: vi.fn(),
+      };
+      playerController['fullMapSystem'] = fullMapSystem as any;
+      playerController.setSettingsModal(mockSettingsModal);
+
+      const actions = mockSettingsModal.setGameplayMenuActions.mock.calls[0][0];
+      actions.onTacticalMap();
+
+      expect(mockSettingsModal.hide).toHaveBeenCalledTimes(1);
+      expect(fullMapSystem.toggleVisibility).toHaveBeenCalledTimes(1);
+      expect(fullMapSystem.toggleOrbital3D).not.toHaveBeenCalled();
     });
   });
 

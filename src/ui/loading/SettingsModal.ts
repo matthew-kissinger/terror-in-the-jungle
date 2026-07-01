@@ -29,8 +29,8 @@ interface GameplayMenuActions {
   onResume: () => void;
   onSquadCommands: () => void;
   onQuitToMenu: () => void;
-  /** Optional opt-in: open the 3D orbital topographic map from the pause menu. */
-  onTopographicMap?: () => void;
+  /** Optional action: open the player tactical map from the pause menu. */
+  onTacticalMap?: () => void;
 }
 
 export class SettingsModal extends UIComponent {
@@ -89,7 +89,7 @@ export class SettingsModal extends UIComponent {
           <div class="${styles.gameplayActionsGrid}">
             <button class="${styles.secondaryBtn}" data-ref="resume" type="button">Resume</button>
             <button class="${styles.secondaryBtn}" data-ref="squad" type="button">Squad Commands</button>
-            <button class="${styles.secondaryBtn}" data-ref="topomap" type="button">Topographic Map</button>
+            <button class="${styles.secondaryBtn}" data-ref="tacticalmap" type="button">Tactical Map</button>
             <button class="${styles.secondaryBtn}" data-ref="fullscreen" type="button">Toggle Fullscreen</button>
             <button class="${styles.secondaryBtn}" data-ref="quit" type="button">Quit to Menu</button>
           </div>
@@ -259,10 +259,10 @@ export class SettingsModal extends UIComponent {
       this.listen(squadBtn, 'click', (e) => e.preventDefault());
     }
 
-    const topoMapBtn = this.$('[data-ref="topomap"]');
-    if (topoMapBtn) {
-      this.listen(topoMapBtn, 'pointerdown', () => this.gameplayMenuActions?.onTopographicMap?.());
-      this.listen(topoMapBtn, 'click', (e) => e.preventDefault());
+    const tacticalMapBtn = this.$('[data-ref="tacticalmap"]');
+    if (tacticalMapBtn) {
+      this.listen(tacticalMapBtn, 'pointerdown', () => this.gameplayMenuActions?.onTacticalMap?.());
+      this.listen(tacticalMapBtn, 'click', (e) => e.preventDefault());
     }
 
     const fullscreenBtn = this.$('[data-ref="fullscreen"]');
@@ -340,10 +340,10 @@ export class SettingsModal extends UIComponent {
   setGameplayMenuActions(actions: GameplayMenuActions | null): void {
     this.gameplayMenuActions = actions ?? undefined;
     this.gameplayActionsEnabled.value = Boolean(actions);
-    // Topographic-map button only shows when a host wires the opt-in action.
-    const topoMapBtn = this.$('[data-ref="topomap"]');
-    if (topoMapBtn) {
-      (topoMapBtn as HTMLElement).style.display = actions?.onTopographicMap ? '' : 'none';
+    // Tactical-map button only shows when a host wires the action.
+    const tacticalMapBtn = this.$('[data-ref="tacticalmap"]');
+    if (tacticalMapBtn) {
+      (tacticalMapBtn as HTMLElement).style.display = actions?.onTacticalMap ? '' : 'none';
     }
   }
 

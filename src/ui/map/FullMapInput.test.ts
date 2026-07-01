@@ -8,20 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { FullMapInput } from './FullMapInput';
 import { InputContextManager } from '../../systems/input/InputContextManager';
 
-/**
- * Regression coverage for the plain-M "3D relief" toggle path (owner decision
- * 2026-06-30, commit f88db617): keydown/keyup must track the 3D mount's own
- * reported open state, not the unrelated 2D Shift+M hold flag. Before this
- * fix, plain M never left the 'gameplay' input context (so movement/firing
- * stayed live under the full-screen map and Escape couldn't close it), and
- * every M release unconditionally ran the 2D hold-to-view teardown.
- */
 describe('FullMapInput', () => {
   let input: FullMapInput;
   let onShow: ReturnType<typeof vi.fn>;
   let onHide: ReturnType<typeof vi.fn>;
   let onRender: ReturnType<typeof vi.fn>;
-  let onToggleOrbital3D: ReturnType<typeof vi.fn>;
   let contextManager: InputContextManager;
 
   function dispatchKey(type: 'keydown' | 'keyup', key: string, opts: Partial<KeyboardEventInit> = {}) {
@@ -34,8 +25,7 @@ describe('FullMapInput', () => {
     onShow = vi.fn();
     onHide = vi.fn();
     onRender = vi.fn();
-    onToggleOrbital3D = vi.fn();
-    input = new FullMapInput({ onShow, onHide, onRender, onToggleOrbital3D });
+    input = new FullMapInput({ onShow, onHide, onRender });
     input.setupEventListeners(document.createElement('canvas'));
   });
 
@@ -44,60 +34,44 @@ describe('FullMapInput', () => {
     InputContextManager.resetInstance();
   });
 
-  describe('plain M — 3D relief toggle', () => {
-    it('opening switches the input context to map without firing 2D show/hide callbacks', () => {
-      onToggleOrbital3D.mockReturnValue(true);
+  describe('plain M — 2D tactical map hold', () => {
+    it('opens the tactical map and switches the input context to map', () => {
       dispatchKey('keydown', 'm');
 
-      expect(onToggleOrbital3D).toHaveBeenCalledTimes(1);
-      expect(contextManager.getContext()).toBe('map');
-      expect(onShow).not.toHaveBeenCalled();
-    });
-
-    it('releasing M after opening the relief does not spuriously tear down map state', () => {
-      onToggleOrbital3D.mockReturnValue(true);
-      dispatchKey('keydown', 'm');
-      dispatchKey('keyup', 'm');
-
-      expect(onHide).not.toHaveBeenCalled();
+      expect(onShow).toHaveBeenCalledTimes(1);
       expect(contextManager.getContext()).toBe('map');
     });
 
-    it('pressing M again closes the relief and restores gameplay context', () => {
-      onToggleOrbital3D.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    it('hides on key release and restores gameplay context', () => {
       dispatchKey('keydown', 'm');
       dispatchKey('keyup', 'm');
-      dispatchKey('keydown', 'm');
 
-      expect(onToggleOrbital3D).toHaveBeenCalledTimes(2);
+      expect(onHide).toHaveBeenCalledTimes(1);
       expect(contextManager.getContext()).toBe('gameplay');
     });
 
-    it('Escape closes an open relief and restores gameplay context', () => {
-      onToggleOrbital3D.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    it('Escape closes an open tactical map and restores gameplay context', () => {
       dispatchKey('keydown', 'm');
-      dispatchKey('keyup', 'm');
 
       dispatchKey('keydown', 'Escape');
 
-      expect(onToggleOrbital3D).toHaveBeenCalledTimes(2);
+      expect(onHide).toHaveBeenCalledTimes(1);
       expect(contextManager.getContext()).toBe('gameplay');
     });
 
-    it('stays in gameplay context when the toggle reports it could not open (e.g. no live runtime)', () => {
-      onToggleOrbital3D.mockReturnValue(false);
+    it('ignores repeat keydown while the key is held', () => {
       dispatchKey('keydown', 'm');
+      dispatchKey('keydown', 'm', { repeat: true });
 
-      expect(contextManager.getContext()).toBe('gameplay');
+      expect(onShow).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Shift+M — 2D tactical peek (hold to view)', () => {
-    it('opens on keydown via the 2D show callback', () => {
+  describe('Shift+M — alternate tactical map hold', () => {
+    it('opens on keydown via the same 2D show callback', () => {
       dispatchKey('keydown', 'm', { shiftKey: true });
 
       expect(onShow).toHaveBeenCalledTimes(1);
-      expect(onToggleOrbital3D).not.toHaveBeenCalled();
       expect(contextManager.getContext()).toBe('map');
     });
 

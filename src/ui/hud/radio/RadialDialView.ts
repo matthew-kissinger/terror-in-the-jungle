@@ -37,6 +37,7 @@ export class RadialDialView {
   private controller?: RadioDialController;
   private unsubscribe?: () => void;
   private onCloseRequested?: () => void;
+  private activeOptionId: string | null = null;
 
   constructor() {
     this.root = document.createElement('div');
@@ -66,6 +67,7 @@ export class RadialDialView {
     this.root.addEventListener('click', (event) => {
       if (event.target === this.root) this.onCloseRequested?.();
     });
+    this.root.addEventListener('contextmenu', (event) => this.handleContextMenu(event));
   }
 
   getElement(): HTMLElement {
@@ -101,6 +103,9 @@ export class RadialDialView {
     this.svg.replaceChildren();
     const categories = this.controller.getCategories();
     const focused = this.controller.getFocusedCategory();
+    if (!focused?.options.some((option) => option.id === this.activeOptionId)) {
+      this.activeOptionId = null;
+    }
 
     forEachSector(categories.length, (index, start, end, mid) => {
       this.drawCategorySector(categories[index], focused?.id === categories[index].id, start, end, mid);
@@ -136,11 +141,51 @@ export class RadialDialView {
     const enabled = this.controller?.isOptionEnabled(option) ?? true;
     const sector = this.makeSectorGroup(OPTION_INNER, OPTION_OUTER, start, end, mid);
     sector.path.classList.toggle(styles.disabled, !enabled);
+    sector.path.classList.toggle(styles.focused, option.id === this.activeOptionId);
+    sector.group.dataset.radioOption = option.id;
     sector.path.dataset.radioOption = option.id;
     sector.label.textContent = this.optionShort(option);
+    sector.group.addEventListener('pointerenter', () => this.setActiveOption(option.id));
+    sector.group.addEventListener('focusin', () => this.setActiveOption(option.id));
     if (enabled) {
       sector.group.addEventListener('click', () => this.controller?.selectOption(option));
     }
+  }
+
+  private handleContextMenu(event: MouseEvent): void {
+    if (!this.isVisible()) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const optionId = this.optionIdFromEvent(event) ?? (this.isWheelEvent(event) ? this.activeOptionId : null);
+    if (optionId) this.selectOptionById(optionId);
+  }
+
+  private optionIdFromEvent(event: Event): string | null {
+    const target = event.target instanceof Element ? event.target : null;
+    return target?.closest<SVGElement>('[data-radio-option]')?.dataset.radioOption ?? null;
+  }
+
+  private isWheelEvent(event: Event): boolean {
+    return event.target instanceof Node && this.svg.contains(event.target);
+  }
+
+  private setActiveOption(optionId: string): void {
+    if (this.activeOptionId === optionId) return;
+    this.activeOptionId = optionId;
+    this.syncActiveOptionVisual();
+  }
+
+  private syncActiveOptionVisual(): void {
+    for (const path of this.svg.querySelectorAll<SVGPathElement>('path[data-radio-option]')) {
+      path.classList.toggle(styles.focused, path.dataset.radioOption === this.activeOptionId);
+    }
+  }
+
+  private selectOptionById(optionId: string): void {
+    const focused = this.controller?.getFocusedCategory();
+    const option = focused?.options.find((entry) => entry.id === optionId);
+    if (option) this.controller?.selectOption(option);
   }
 
   private optionShort(option: RadioOption): string {

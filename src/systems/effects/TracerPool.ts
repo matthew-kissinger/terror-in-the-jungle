@@ -82,12 +82,12 @@ export class TracerPool extends EffectPool<Tracer> {
     coreLine.userData.perfCategory = TRACER_PERF_CATEGORY;
     group.add(coreLine);
 
-    // Glow effect line (slightly larger) - shares same geometry as core line
+    // Glow effect line shares geometry and transform with the core line so it
+    // cannot separate into a second visible tracer.
     const glowMat = this.glowMaterial.clone();
     const glowLine = new THREE.Line(geometry, glowMat);
     glowLine.name = 'TracerGlow';
     glowLine.userData.perfCategory = TRACER_PERF_CATEGORY;
-    glowLine.scale.set(1.1, 1.1, 1.1);
     group.add(glowLine);
 
     group.visible = false;

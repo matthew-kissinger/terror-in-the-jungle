@@ -146,4 +146,17 @@ describe('OpenFrontierRespawnMap navigation (deploy-map-navigation)', () => {
     expect(map.cycleSpawn(1)).toBeUndefined();
     expect(map.getSelectedZoneId()).toBeUndefined();
   });
+
+  it('does not expose a 3D topographic view control on the deploy map', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    host.appendChild(map.getCanvas());
+
+    map.render();
+
+    expect(host.querySelector('#respawn-map-3d')).toBeNull();
+    expect(host.textContent).not.toContain('3D');
+
+    host.remove();
+  });
 });

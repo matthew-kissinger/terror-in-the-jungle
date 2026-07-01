@@ -1,17 +1,18 @@
 # Current State
 
-Last aligned: 2026-07-01 local. The July 1 owner-playtest follow-up batch is
-code-complete and queued for production owner review: 3D deploy markers now have
-in-air labels + legend, ambient/static soundscape layers are default-off, the
-approved fal.ai objective/capture clips are promoted as local variant pools,
-objective audio is source-local instead of global, the radio IA is
-Fire Support/Squad/Signals with smoke-target drilldown, the Kiln field radio is
-imported through the war-asset catalog, the radio/smoke marker are held
-first-person equipment, throwable smoke creates a target mark, helicopter
-player-airframe effects have one firing owner, and infantry shot-origin
-diagnostics/tracer convergence are instrumented. Local proof: `npm run
-validate:fast`, `npm run build`, and `npm run check:asset-gallery -- --only
-field-radio-viewmodel`. Production owner acceptance remains open in
+Last aligned: 2026-07-01 local. The July 1 owner-playtest follow-up batch was
+code-complete, but owner playtest reopened the map/radio/tracer surfaces. The
+current local hotfix removes the 3D topographic map from player-facing deploy,
+`M` / `Shift+M`, and pause-menu paths; keeps the 2D tactical map as the ship
+path; stabilizes desktop radio outer-ring selection including right-click
+confirm; and centers non-shotgun player tracers so the LMG/M60 no longer reads
+as two visual rays. The broader July 1 batch still includes default-off
+ambient/static soundscape layers, promoted fal.ai objective/capture local
+variant pools, source-local objective audio, Fire Support/Squad/Signals radio
+IA with smoke-target drilldown, imported Kiln field radio, held radio/smoke
+equipment, throwable smoke target marks, and helicopter player-airframe
+single-owner effects. Local proof for this hotfix is focused tests plus
+typecheck/build; production owner acceptance remains open in
 [PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md). Previous dropped-frame
 completion is still not claimed until reboot/quiet-machine Open Frontier +
 A Shau EARS captures and owner playtest pass. NOTE - all basin/level-depth
