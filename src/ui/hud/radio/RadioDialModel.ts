@@ -161,8 +161,8 @@ export function buildFireSupportTargetOptions(assetId: AirSupportRadioAssetId): 
     {
       kind: 'fire-support-target',
       id: `${assetId}:current-smoke`,
-      label: 'Use Smoke',
-      detail: 'Use the active smoke marker.',
+      label: 'Use Active Smoke',
+      detail: 'Call this mission on the active smoke marker.',
       targetMode: 'current-smoke',
       assetId,
     },
@@ -177,8 +177,8 @@ export function buildFireSupportTargetOptions(assetId: AirSupportRadioAssetId): 
     {
       kind: 'fire-support-target',
       id: `${assetId}:reticle-grid`,
-      label: 'Reticle/Grid',
-      detail: 'Designate where you look.',
+      label: 'Aim Mark',
+      detail: 'Designate the ground under your aim.',
       targetMode: 'reticle-grid',
       assetId,
     },

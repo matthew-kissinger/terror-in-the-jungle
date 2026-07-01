@@ -15,7 +15,11 @@
 import { RadioDialController } from './RadioDialController';
 import { RadialDialView } from './RadialDialView';
 import { RadioBottomSheet } from './RadioBottomSheet';
-import type { AirSupportRadioCooldowns, AirSupportTargetMarking } from '../../../systems/airsupport/AirSupportRadioCatalog';
+import type {
+  AirSupportRadioAssetId,
+  AirSupportRadioCooldowns,
+  AirSupportTargetMarking,
+} from '../../../systems/airsupport/AirSupportRadioCatalog';
 import type { RadioIntent } from './RadioDialModel';
 
 export class RadioDialPresenter {
@@ -86,10 +90,17 @@ export class RadioDialPresenter {
    * Cooldowns are already pushed via `setCooldowns` before this; the seed only
    * carries the active marking + squad availability the owner snapshots on open.
    */
-  open(seed: { marking: AirSupportTargetMarking; squadAvailable: boolean }): void {
+  open(seed: {
+    marking: AirSupportTargetMarking;
+    squadAvailable: boolean;
+    focusAssetId?: AirSupportRadioAssetId;
+  }): void {
     this.controller.setSelectedMarking(seed.marking);
     this.controller.setSquadAvailable(seed.squadAvailable);
     this.controller.reset();
+    if (seed.focusAssetId) {
+      this.controller.focusFireSupportAsset(seed.focusAssetId);
+    }
     this.visible = true;
     this.showActiveView();
   }

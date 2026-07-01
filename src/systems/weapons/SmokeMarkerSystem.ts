@@ -36,6 +36,8 @@ interface SmokeCanister {
   bobbleTime: number;
 }
 
+export type SmokeMarkerThrowModeEndReason = 'cancelled' | 'thrown';
+
 export class SmokeMarkerSystem implements GameSystem {
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.Camera;
@@ -48,7 +50,7 @@ export class SmokeMarkerSystem implements GameSystem {
   private nextId = 1;
   private activeMark: TargetMark | null = null;
   private readonly canisters: SmokeCanister[] = [];
-  private onThrowModeEnd?: () => void;
+  private onThrowModeEnd?: (reason: SmokeMarkerThrowModeEndReason) => void;
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, terrainSystem?: ITerrainRuntime) {
     this.scene = scene;
@@ -91,7 +93,7 @@ export class SmokeMarkerSystem implements GameSystem {
     this.terrainSystem = terrainSystem;
   }
 
-  setThrowModeEndHook(hook: () => void): void {
+  setThrowModeEndHook(hook: (reason: SmokeMarkerThrowModeEndReason) => void): void {
     this.onThrowModeEnd = hook;
   }
 
@@ -125,13 +127,13 @@ export class SmokeMarkerSystem implements GameSystem {
     _start.y -= 0.28;
     SmokeMarkerSystem.computeThrowVelocity(_direction, this.power, _velocity);
     this.spawnCanister(_start, _velocity);
-    this.finishThrowMode();
+    this.finishThrowMode('thrown');
     return true;
   }
 
   cancelThrowMode(): boolean {
     if (!this.equipped && !this.charging) return false;
-    this.finishThrowMode();
+    this.finishThrowMode('cancelled');
     return true;
   }
 
@@ -201,13 +203,13 @@ export class SmokeMarkerSystem implements GameSystem {
     return target;
   }
 
-  private finishThrowMode(): void {
+  private finishThrowMode(reason: SmokeMarkerThrowModeEndReason): void {
     this.equipped = false;
     this.charging = false;
     this.power = 0.3;
     this.powerTime = 0;
     this.arcRenderer.showArc(false);
-    this.onThrowModeEnd?.();
+    this.onThrowModeEnd?.(reason);
   }
 
   private spawnCanister(position: THREE.Vector3, velocity: THREE.Vector3): void {

@@ -107,6 +107,13 @@ export class RadioDialController {
     this.emitChange();
   }
 
+  /** Open directly on the target choices for a specific fire-support asset. */
+  focusFireSupportAsset(assetId: AirSupportRadioAssetId): void {
+    this.focusedCategory = 'fire-support';
+    this.pendingFireSupportAssetId = assetId;
+    this.emitChange();
+  }
+
   /** Drill into a category (inner-ring focus / sheet sub-list). */
   focusCategory(categoryId: RadioCategoryId): void {
     if (this.focusedCategory === categoryId) return;

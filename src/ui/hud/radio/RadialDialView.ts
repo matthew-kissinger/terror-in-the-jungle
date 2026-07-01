@@ -3,7 +3,7 @@
 
 /**
  * RadialDialView — the DESKTOP presentation of the radio dial: an SVG annular
- * wheel. The inner ring is the four categories; hovering a category drills into
+ * wheel. The inner ring is the three categories; hovering a category drills into
  * it and the focused category's options fill the outer ring. Clicking an outer
  * sector selects that option. It is driven entirely by a shared
  * `RadioDialController` and issues NOTHING itself.

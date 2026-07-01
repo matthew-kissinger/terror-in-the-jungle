@@ -55,7 +55,7 @@ describe('RadioDialModel', () => {
     }
   });
 
-  it('builds the fire-support target drilldown for current smoke, throw smoke, and reticle/grid', () => {
+  it('builds the fire-support target drilldown for active smoke, throw smoke, and aim mark', () => {
     const asset = AIR_SUPPORT_RADIO_ASSETS[0];
     const targets = buildFireSupportTargetOptions(asset.id);
     expect(targets.map((option) => option.kind)).toEqual([
@@ -68,6 +68,13 @@ describe('RadioDialModel', () => {
       'throw-smoke-marker',
       'reticle-grid',
     ]);
+    expect(targets.map((option) => option.label)).toEqual([
+      'Use Active Smoke',
+      'Throw Smoke',
+      'Aim Mark',
+    ]);
+    expect(targets.map((option) => option.label)).not.toContain('Use Smoke');
+    expect(targets.map((option) => option.label)).not.toContain('Reticle/Grid');
   });
 
   it('greys assets that share a sortie type together when one is cooling down', () => {

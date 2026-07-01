@@ -122,6 +122,10 @@ describe('revived radio dial', () => {
     expect(dial.querySelector(`[data-radio-option="${asset.id}:current-smoke"]`)).toBeTruthy();
     expect(dial.querySelector(`[data-radio-option="${asset.id}:throw-smoke-marker"]`)).toBeTruthy();
     expect(dial.querySelector(`[data-radio-option="${asset.id}:reticle-grid"]`)).toBeTruthy();
+    expect(dial.textContent).toContain('Use Active Smoke');
+    expect(dial.textContent).toContain('Aim Mark');
+    expect(dial.textContent).not.toContain('Use Smoke');
+    expect(dial.textContent).not.toContain('Reticle/Grid');
 
     manager.dispose();
     layout.dispose();
@@ -182,7 +186,7 @@ describe('revived radio dial', () => {
       new MouseEvent('click', { bubbles: true }),
     );
 
-    // Selecting the reticle/grid target method closes the dial and enters
+    // Selecting the aim-mark target method closes the dial and enters
     // DESIGNATE (re-aimable). The strike only goes out on confirm.
     expect(requestSupport).not.toHaveBeenCalled();
     expect(visibleDial()).toBeNull();

@@ -5,7 +5,10 @@ code-complete, but owner playtest reopened the map/radio/tracer surfaces. The
 current hotfix removes the 3D topographic map from player-facing deploy,
 `M` / `Shift+M`, and pause-menu paths; keeps the 2D tactical map as the ship
 path; stabilizes desktop radio outer-ring selection including right-click
-confirm; and centers non-shotgun player tracers so the LMG/M60 no longer reads
+confirm; tightens the radio fire-support target flow to mission-first
+`Aim Mark` / `Throw Smoke` / `Use Active Smoke`, with a visible smoke-marker
+armed prompt and selected-mission preservation through smoke-marker settlement;
+and centers non-shotgun player tracers so the LMG/M60 no longer reads
 as two visual rays. The broader July 1 batch still includes default-off
 ambient/static soundscape layers, promoted fal.ai objective/capture local
 variant pools, source-local objective audio, Fire Support/Squad/Signals radio
