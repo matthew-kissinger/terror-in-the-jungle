@@ -31,7 +31,6 @@ started, the cycle is `INCOMPLETE` per the rule in
 | ID | Title | Opened | Cycles open | Owning subsystem | Blocking? | Notes |
 |----|-------|--------|------------:|------------------|-----------|-------|
 | STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 27 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** **2026-06-01: the combat-side p99 lever — NPC convergence terrain-stall cost + oscillation — shipped via `task/combat-convergence-stall-fix` (contour re-score cache, serve-stale-on-throttle, hold dispersal, opt-in stagger); frame-time certification is what the quiet-machine refresh still owes. See [docs/state/perf-trust.md](state/perf-trust.md) 2026-06-01 update.** **2026-06-02: `perf-baselines.json` was removed from the repo; with no tracked baseline `perf:compare` prints raw latest-capture metrics and does not gate (the CI perf step is advisory). "Refresh" now means re-establishing a baseline via `perf:update-baseline` if/when the owner re-queues — this item stays open as the frame-time-certification gap, not a file-refresh task.** |
-| AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | cycle-2026-04-23-debug-cleanup | 26 | aviation / combat | no | Resolves via human playtest gate (Phase 0 rule 20). |
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 24 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
 | KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 20 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 22 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
@@ -49,6 +48,12 @@ the cycle that re-opens it.
 | AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | 2026-05-12 vision-pivot park | cycle-2026-04-22-heap-and-polish (7 cycles open at park) | Audit memo exists at `docs/rearch/helicopter-parity-audit.md`; work is documented, not actioned. Not vision-critical under the 2026-05-12 directions. | Phase 4 F5 close-out resumes, or the helicopter-adapter cluster is touched again. |
 
 History log:
+
+- 2026-07-01 — bookkeeping reconciliation (doc-drift-remediation): AVIATSIYA-1 /
+  DEFEKT-5 closed (stale entry, superseded by the 2026-05-08 rotor-directionality
+  audit that DIRECTIVES.md already recorded `done`; un-walked "close-NPC +
+  explosion" substance moved to a fresh PLAYTEST_PENDING.md row). Active count:
+  5 → 4.
 
 - 2026-06-28 — budget-ratchet admission (sks-rifle-wiring, Phase 4 Field
   Readiness): `src/systems/player/weapon/WeaponRigManager.ts` crossed the 700-LOC
@@ -439,6 +444,8 @@ History log:
 ## Closed
 
 (Entries get appended here as carry-overs close. Format: `<ID> | <title> | closed in <cycle-id> | resolution one-liner`.)
+
+- AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | closed 2026-07-01 (bookkeeping reconciliation, doc-drift-remediation) | Stale — DIRECTIVES.md recorded both AVIATSIYA-1 and DEFEKT-5 `done` on 2026-05-08 (`projekt-143-visual-integrity-audit`) but this carry-over, opened earlier (cycle-2026-04-23-debug-cleanup) under the same two IDs, was never closed alongside it. The 2026-05-08 audit covered rotor directionality + naming only; "close-NPC" and "explosion" visual review were never separately walked. Closing the stale carry-over entry rather than letting it sit for a 27th cycle; the un-walked substance is preserved as a fresh row in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) instead of an indefinite carry-over.
 
 - worldbuilder-invulnerable-wiring | `PlayerHealthSystem.takeDamage` early-return when WorldBuilder `invulnerable` flag active | closed in cycle-2026-05-09-doc-decomposition-and-wiring | wired in `src/systems/player/PlayerHealthSystem.ts` behind `import.meta.env.DEV`; behavior test in `PlayerHealthSystem.test.ts`.
 - worldbuilder-infinite-ammo-wiring | `AmmoManager` / `WeaponShotExecutor` skip decrement when `infiniteAmmo` flag active | closed in cycle-2026-05-09-doc-decomposition-and-wiring | `AmmoManager.consumeRound()` returns true without decrement when flag active; new `AmmoManager.test.ts` covers the no-op.
