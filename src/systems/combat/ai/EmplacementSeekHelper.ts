@@ -107,7 +107,7 @@ export interface INpcVehicleBoarding {
 // ── Tuning constants ──────────────────────────────────────────────────────
 
 /** Max range an NPC will divert to mount an emplacement (cycle brief). */
-export const MOUNT_SEEK_RADIUS_M = 8
+const MOUNT_SEEK_RADIUS_M = 8
 
 /**
  * Per-combatant `buildEmplacementContext()` cache lifetime.
@@ -124,7 +124,7 @@ export const MOUNT_SEEK_RADIUS_M = 8
  * up on the next refresh. Wall-clock (`performance.now()`) is used so the
  * cache is not affected by `TimeScale` pauses or scaled deltaTime.
  */
-export const EMPLACEMENT_CANDIDATE_CACHE_TTL_MS = 500
+const EMPLACEMENT_CANDIDATE_CACHE_TTL_MS = 500
 
 /**
  * Default field-of-fire cone half-angle (radians) used by the synthetic-cone
@@ -142,7 +142,7 @@ export const STALE_TARGET_DISMOUNT_MS = 5000
  * (~0.6-0.9) so an in-range, in-cone friendly emplacement out-scores fading
  * for US/NVA/ARVN. Hard-gated to 0 when no candidate is supplied.
  */
-export const MOUNT_EMPLACEMENT_BASE_REWARD = 1.2
+const MOUNT_EMPLACEMENT_BASE_REWARD = 1.2
 
 // ── Public helpers ─────────────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ export function enemyInFieldOfFire(
  * of `origin`. Alliance-based (`isAlly`) so US can mount ARVN tripods and
  * vice versa. Deterministic ordering (squared distance, no Math.random).
  */
-export function findMountableEmplacement(
+function findMountableEmplacement(
   combatant: Combatant,
   origin: THREE.Vector3,
   query: INpcEmplacementQuery,

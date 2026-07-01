@@ -14,7 +14,7 @@ import {
   type CombatantHitProxyPositionMode,
 } from './CombatantBodyMetrics'
 
-export interface CombatantRaycastOptions {
+interface CombatantRaycastOptions {
   positionMode?: CombatantHitProxyPositionMode
 }
 

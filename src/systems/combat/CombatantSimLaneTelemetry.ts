@@ -78,7 +78,7 @@ export function cloneSimLaneTransitionStats(stats: SimLaneTransitionStats): SimL
   };
 }
 
-export function recordSimLaneTransition(
+function recordSimLaneTransition(
   stats: SimLaneTransitionStats,
   previousLane: CombatantSimLane,
   nextLane: CombatantSimLane,
@@ -95,7 +95,7 @@ export function recordSimLaneTransition(
   incrementLaneCounter(stats, nextLane, 'to');
 }
 
-export function recordSimLaneRenderedLag(
+function recordSimLaneRenderedLag(
   stats: SimLaneTransitionStats,
   combatant: Combatant,
   transitionChanged: boolean,

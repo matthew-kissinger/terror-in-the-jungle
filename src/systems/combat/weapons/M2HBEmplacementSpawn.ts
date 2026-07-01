@@ -132,7 +132,7 @@ function buildM2HBTripodBase(material: THREE.Material): THREE.Mesh {
   return base;
 }
 
-export interface CreateM2HBEmplacementOptions {
+interface CreateM2HBEmplacementOptions {
   vehicleId: string;
   position: THREE.Vector3;
   faction: Faction;

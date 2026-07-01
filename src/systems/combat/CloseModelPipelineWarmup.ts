@@ -7,7 +7,7 @@ const WARMUP_DISTANCE_METERS = 12;
 const WARMUP_SPACING_METERS = 2.25;
 const WARMUP_MAX_COLUMNS = 10;
 
-export interface CloseModelPipelineWarmupHandle {
+interface CloseModelPipelineWarmupHandle {
   count: number;
   poolCounts: Record<string, number>;
   restore(): void;

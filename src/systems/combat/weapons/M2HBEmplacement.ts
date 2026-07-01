@@ -258,7 +258,6 @@ export class M2HBEmplacementSystem implements GameSystem {
   }
 }
 
-// Re-export weapon component for callers that import this file as the
+// Re-export M2HB tuning for callers that import this file as the
 // single entry point.
-export { M2HBWeapon, M2HB_STATS } from './M2HBWeapon';
-export type { M2HBWeaponSnapshot } from './M2HBWeapon';
+export { M2HB_STATS } from './M2HBWeapon';

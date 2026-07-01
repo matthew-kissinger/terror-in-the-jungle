@@ -30,8 +30,6 @@
   ],
   "knip": {
     "entry": [
-      "index.html",
-      "src/main.ts",
       "public/sw.js",
       "scripts/**/*.{test,spec}.ts",
       "scripts/hud-state-probe.ts",
@@ -71,9 +69,6 @@
       "tools/weapon/capture-ads-align.mjs",
       "src/systems/assets/PixelForgePropCatalog.ts",
       "src/systems/combat/weapons/NpcM2HBAdapter.ts"
-    ],
-    "ignoreBinaries": [
-      "gh"
     ],
     "tags": [
       "-lintignore"

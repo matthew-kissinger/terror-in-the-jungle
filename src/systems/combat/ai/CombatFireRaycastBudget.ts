@@ -8,7 +8,7 @@
 
 const DEFAULT_MAX_FIRE_RAYCASTS = 16;
 
-export type CombatFireRaycastKind = 'aimed' | 'suppressive';
+type CombatFireRaycastKind = 'aimed' | 'suppressive';
 
 let maxFireRaycasts = DEFAULT_MAX_FIRE_RAYCASTS;
 let fireRaycastsThisFrame = 0;

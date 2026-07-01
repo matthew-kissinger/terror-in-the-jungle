@@ -188,7 +188,7 @@ export interface TerrainRecoveryEvent {
  * enough to require swimming. NPCs (R1) cannot swim, so deep readings
  * trigger route-around at the navmesh layer.
  */
-export interface NpcWaterSampler {
+interface NpcWaterSampler {
   sampleImmersion01(x: number, z: number, surfaceY: number): number;
 }
 
@@ -198,7 +198,7 @@ export interface NpcWaterSampler {
  * splash pool was stripped with the water rework (2026-06-09); this surface
  * stays inert (no emitter is ever bound) until water is rebuilt.
  */
-export interface NpcWadeSplashEmitter {
+interface NpcWadeSplashEmitter {
   tryEmitForCombatant(combatantId: string, footPosition: THREE.Vector3, isGroundedAndMoving: boolean): boolean;
   forgetEmitter(combatantId: string): void;
 }

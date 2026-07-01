@@ -31,23 +31,23 @@ export type CombatantHitProxy =
       radius: number;
     };
 
-export const COMBATANT_HIT_PROXY_COUNT = 5;
+const COMBATANT_HIT_PROXY_COUNT = 5;
 export const COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER = 1.16;
 export const COMBATANT_HIT_PROXY_HEAD_CENTER_RATIO = 0.84;
 export const COMBATANT_HIT_PROXY_HEAD_RADIUS_RATIO = 0.115;
 export const COMBATANT_HIT_PROXY_CHEST_START_RATIO = 0.46;
 export const COMBATANT_HIT_PROXY_CHEST_END_RATIO = 0.72;
-export const COMBATANT_HIT_PROXY_CHEST_CENTER_RATIO =
+const COMBATANT_HIT_PROXY_CHEST_CENTER_RATIO =
   (COMBATANT_HIT_PROXY_CHEST_START_RATIO + COMBATANT_HIT_PROXY_CHEST_END_RATIO) / 2;
-export const COMBATANT_HIT_PROXY_CHEST_RADIUS_RATIO = 0.18;
+const COMBATANT_HIT_PROXY_CHEST_RADIUS_RATIO = 0.18;
 export const COMBATANT_HIT_PROXY_PELVIS_CENTER_RATIO = 0.34;
-export const COMBATANT_HIT_PROXY_PELVIS_RADIUS_RATIO = 0.17;
+const COMBATANT_HIT_PROXY_PELVIS_RADIUS_RATIO = 0.17;
 export const COMBATANT_HIT_PROXY_LEG_START_RATIO = 0.08;
 export const COMBATANT_HIT_PROXY_LEG_END_RATIO = 0.34;
-export const COMBATANT_HIT_PROXY_LEG_RADIUS_RATIO = 0.075;
-export const COMBATANT_HIT_PROXY_LEG_OFFSET_RATIO = 0.045;
+const COMBATANT_HIT_PROXY_LEG_RADIUS_RATIO = 0.075;
+const COMBATANT_HIT_PROXY_LEG_OFFSET_RATIO = 0.045;
 
-export interface CharacterHitProxyInput {
+interface CharacterHitProxyInput {
   anchor: THREE.Vector3;
   scaleY?: number;
   visualRotation?: number;
@@ -77,13 +77,6 @@ export function getCombatantVisualChestAimYOffset(scaleY = 1): number {
     * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
     * scaleY;
   return visualHeight * COMBATANT_HIT_PROXY_CHEST_CENTER_RATIO - NPC_Y_OFFSET;
-}
-
-export function getCombatantVisualChestProxyRadius(scaleY = 1): number {
-  return NPC_PIXEL_FORGE_VISUAL_HEIGHT
-    * COMBATANT_HIT_PROXY_VISUAL_HEIGHT_MULTIPLIER
-    * scaleY
-    * COMBATANT_HIT_PROXY_CHEST_RADIUS_RATIO;
 }
 
 export function copyPlayerCenterMassPosition(out: THREE.Vector3, playerEyeAnchor: THREE.Vector3): THREE.Vector3 {

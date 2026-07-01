@@ -12,7 +12,7 @@ import { Combatant, Squad } from './types';
  * spliced the member array directly and did neither — leaving squads with a
  * dead leaderId and ghost squads that never got removed.
  */
-export type DeathCause = 'rifle' | 'explosion';
+type DeathCause = 'rifle' | 'explosion';
 
 /**
  * Optional hooks the unified handler invokes after squad membership is

@@ -22,7 +22,7 @@ interface CombatLineOfSightTelemetry {
   fullEvaluationBlocked: number;
 }
 
-export interface CloseEngagementProfile {
+interface CloseEngagementProfile {
   engagement: CloseEngagementTelemetry;
   targetAcquisition: TargetAcquisitionTelemetry;
   targetDistribution: TargetDistributionTelemetry;
