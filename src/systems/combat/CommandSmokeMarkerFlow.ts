@@ -44,8 +44,8 @@ export class CommandSmokeMarkerFlow {
     this.pendingAssetId = null;
   }
 
-  clearPendingForTopLevelRadio(focusAssetId?: AirSupportRadioAssetId): void {
-    if (!focusAssetId) this.clearPending();
+  clearPendingForTopLevelRadio(): void {
+    this.clearPending();
   }
 
   armThrow(assetId: AirSupportRadioAssetId, assetLabel: string): void {

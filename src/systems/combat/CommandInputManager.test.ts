@@ -205,7 +205,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('drills fire support into target methods without issuing a squad command', () => {
+  it('selects a fire-support asset directly without opening target methods', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -224,13 +224,10 @@ describe('CommandInputManager', () => {
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'ac47_orbit');
 
-    // Fire support now drills into target methods before any strike is armed.
-    expect(visibleDialog()).not.toBeNull();
-    expect(dial.querySelector('[data-radio-option="ac47_orbit:reticle-grid"]')).toBeTruthy();
-    expect(dial.querySelector('[data-radio-option="ac47_orbit:throw-smoke-marker"]')).toBeTruthy();
-    expect(dial.textContent).toContain('Aim Mark');
-    expect(dial.textContent).toContain('Use Active Smoke');
-    expect(dial.textContent).not.toContain('Reticle/Grid');
+    expect(visibleDialog()).toBeNull();
+    expect(document.body.textContent).not.toContain('Aim Mark');
+    expect(document.body.textContent).not.toContain('Use Active Smoke');
+    expect(document.body.textContent).not.toContain('Reticle/Grid');
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
 
@@ -268,7 +265,6 @@ describe('CommandInputManager', () => {
     const dial = visibleDialog()!;
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'a1_napalm');
-    clickSector(dial, 'a1_napalm:throw-smoke-marker');
 
     expect(visibleDialog()).toBeNull();
     expect(smoke.system.beginThrowMode).toHaveBeenCalledTimes(1);
@@ -289,7 +285,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('pressing radio while smoke is armed cancels the throw and returns to that mission target choices', () => {
+  it('pressing radio while smoke is armed cancels the throw and reopens the radio top level', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     const smoke = createSmokeMarkerStub();
@@ -316,16 +312,16 @@ describe('CommandInputManager', () => {
     const dial = visibleDialog()!;
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'a1_napalm');
-    clickSector(dial, 'a1_napalm:throw-smoke-marker');
 
     manager.toggleRadioMenu();
 
     const reopened = visibleDialog();
     expect(reopened).not.toBeNull();
     expect(smoke.system.cancelThrowMode).toHaveBeenCalledTimes(1);
-    expect(reopened?.querySelector('[data-radio-option="a1_napalm:throw-smoke-marker"]')).toBeTruthy();
-    expect(reopened?.querySelector('[data-radio-option="a1_napalm:reticle-grid"]')).toBeTruthy();
-    expect(reopened?.textContent).toContain('Aim Mark');
+    expect(reopened?.querySelector('[data-radio-category="fire-support"]')).toBeTruthy();
+    expect(reopened?.querySelector('[data-radio-option="a1_napalm:throw-smoke-marker"]')).toBeNull();
+    expect(reopened?.querySelector('[data-radio-option="a1_napalm:reticle-grid"]')).toBeNull();
+    expect(reopened?.textContent).not.toContain('Aim Mark');
 
     manager.dispose();
     layout.dispose();
@@ -366,7 +362,6 @@ describe('CommandInputManager', () => {
     const dial = visibleDialog()!;
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'b52_arclight');
-    clickSector(dial, 'b52_arclight:throw-smoke-marker');
 
     smoke.emitThrown();
     smoke.setActiveMark(mark);
@@ -389,9 +384,10 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('arms a designate step on asset select, then dispatches the call-in on confirm', () => {
+  it('does not enter aim-mark designation from direct asset selection', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
+    const smoke = createSmokeMarkerStub();
     manager.mountTo(layout);
     manager.bindInputManager({
       unlockPointer: vi.fn(),
@@ -410,29 +406,22 @@ describe('CommandInputManager', () => {
     } as any);
     manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
     manager.setPlayerController(lookDownController());
+    manager.configureHeldEquipment({
+      firstPersonWeapon: createWeaponVisibilityStub(true) as any,
+      heldEquipment: { setMode: vi.fn() } as any,
+      smokeMarkerSystem: smoke.system as any,
+    });
 
     manager.toggleRadioMenu();
     const dial = visibleDialog()!;
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'ac47_orbit');
-    clickSector(dial, 'ac47_orbit:reticle-grid');
 
-    // Choosing the aim-mark target method closes the dial and enters
-    // DESIGNATE (re-aimable). The strike only goes out on confirm.
     expect(requestSupport).not.toHaveBeenCalled();
     expect(visibleDialog()).toBeNull();
-
-    manager.update(0.1); // track the view ray onto the ground
-
-    // LMB confirms the painted target.
-    expect(manager.handleStrikeConfirm()).toBe(true);
-
-    expect(requestSupport).toHaveBeenCalledTimes(1);
-    const request = requestSupport.mock.calls[0][0];
-    expect(request.type).toBe('spooky'); // ac47_orbit fulfils via the spooky sortie
-    expect(request.requesterFaction).toBe(Faction.US); // called strikes spare friendlies
-    expect(request.marking).toBe('smoke'); // active mark threaded into the request
-    expect(request.targetPosition).toBeInstanceOf(THREE.Vector3);
+    expect(smoke.system.beginThrowMode).toHaveBeenCalledTimes(1);
+    expect(manager.handleStrikeConfirm()).toBe(false);
+    expect(requestSupport).not.toHaveBeenCalled();
 
     manager.dispose();
     layout.dispose();

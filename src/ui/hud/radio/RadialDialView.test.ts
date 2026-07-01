@@ -62,6 +62,17 @@ describe('RadialDialView', () => {
     expect(intents[0].kind).toBe('squad');
   });
 
+  it('keeps a focused category pinned while moving toward outer options', () => {
+    drillCategory('fire-support');
+
+    const squad = view.getElement().querySelector<SVGElement>('[data-radio-category="squad"]');
+    expect(squad).toBeTruthy();
+    squad!.dispatchEvent(new MouseEvent('pointerenter', { bubbles: true }));
+
+    expect(controller.getFocusedCategory()?.id).toBe('fire-support');
+    expect(view.getElement().querySelector('[data-radio-option="a1_napalm"]')).toBeTruthy();
+  });
+
   function drillCategory(categoryId: string): void {
     const category = view.getElement().querySelector<SVGElement>(`[data-radio-category="${categoryId}"]`);
     expect(category).toBeTruthy();

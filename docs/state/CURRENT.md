@@ -5,14 +5,14 @@ code-complete, but owner playtest reopened the map/radio/tracer surfaces. The
 current hotfix removes the 3D topographic map from player-facing deploy,
 `M` / `Shift+M`, and pause-menu paths; keeps the 2D tactical map as the ship
 path; stabilizes desktop radio outer-ring selection including right-click
-confirm; tightens the radio fire-support target flow to mission-first
-`Aim Mark` / `Throw Smoke` / `Use Active Smoke`, with a visible smoke-marker
-armed prompt and selected-mission preservation through smoke-marker settlement;
+confirm; tightens the radio fire-support flow so choosing a mission directly
+arms that mission's smoke marker, closes the radial, shows the smoke marker in
+hand with a visible armed prompt, and cancels cleanly on weapon swap;
 and centers non-shotgun player tracers so the LMG/M60 no longer reads
 as two visual rays. The broader July 1 batch still includes default-off
 ambient/static soundscape layers, promoted fal.ai objective/capture local
 variant pools, source-local objective audio, Fire Support/Squad/Signals radio
-IA with smoke-target drilldown, imported Kiln field radio, held radio/smoke
+IA with direct smoke-marker mission selection, imported Kiln field radio, held radio/smoke
 equipment, throwable smoke target marks, and helicopter player-airframe
 single-owner effects. Engineering proof for this hotfix is focused tests plus
 typecheck/build/fast validation; production owner acceptance remains open in

@@ -36,8 +36,8 @@ function fireSupportOptions(): Extract<RadioOption, { kind: 'fire-support' }>[] 
  * path. Extracted from `CommandModeOverlay` to keep that file within budget.
  *
  * Smoke/WP/grid is no longer a top-level peer control here. The revived radio
- * dial owns the target-method drilldown (`Use Smoke`, `Throw Smoke`,
- * `Reticle/Grid`) so this legacy panel cannot reintroduce the vague Mark IA.
+ * dial owns direct mission selection; picking a fire-support asset arms that
+ * mission's smoke marker and closes the dial.
  */
 export class CommandRadioFireSupportPanel {
   static readonly STYLE_ID = 'command-radio-fire-support-styles';
@@ -69,7 +69,7 @@ export class CommandRadioFireSupportPanel {
 
     const sub = document.createElement('span');
     sub.className = 'command-radio-fire__sub';
-    sub.textContent = 'Radio (T) — call where you look, or use the radial to throw/use smoke.';
+    sub.textContent = 'Radio (T) - choose a sortie to arm its smoke marker.';
     this.element.appendChild(sub);
 
     const list = document.createElement('div');

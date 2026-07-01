@@ -19,14 +19,6 @@ function optionIn(controller: RadioDialController, categoryId: string, predicate
   return option;
 }
 
-function focusedOption(controller: RadioDialController, predicate: (o: RadioOption) => boolean): RadioOption {
-  const category = controller.getFocusedCategory();
-  expect(category).toBeTruthy();
-  const option = category!.options.find(predicate)!;
-  expect(option, 'focused option not found').toBeTruthy();
-  return option;
-}
-
 describe('RadioDialController', () => {
   let controller: RadioDialController;
   let intents: Array<{ intent: RadioIntent; closesDial: boolean }>;
@@ -45,43 +37,16 @@ describe('RadioDialController', () => {
     expect(controller.getFocusedCategory()).toBeNull();
   });
 
-  it('drills fire support into target choices before issuing an aim-mark intent', () => {
-    controller.setSelectedMarking('willie_pete');
-    const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support');
+  it('selects a fire-support asset as a direct smoke-marker intent', () => {
+    const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support') as Extract<
+      RadioOption,
+      { kind: 'fire-support' }
+    >;
     controller.selectOption(asset);
-    expect(intents).toHaveLength(0);
-    expect(controller.getFocusedCategory()?.label).toBe(asset.label);
-
-    const reticle = focusedOption(controller, (o) => o.kind === 'fire-support-target' && o.targetMode === 'reticle-grid');
-    expect(reticle.label).toBe('Aim Mark');
-    controller.selectOption(reticle);
     expect(intents).toHaveLength(1);
     expect(intents[0].closesDial).toBe(true);
-    expect(intents[0].intent).toMatchObject({ kind: 'fire-support', marking: 'willie_pete', targetMode: 'reticle-grid' });
-  });
-
-  it('issues a throw-smoke-marker intent from the fire-support target drilldown', () => {
-    const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support');
-    controller.selectOption(asset);
-    const smoke = focusedOption(controller, (o) => o.kind === 'fire-support-target' && o.targetMode === 'throw-smoke-marker');
-    controller.selectOption(smoke);
-    expect(intents).toHaveLength(1);
-    expect(intents[0].intent).toMatchObject({ kind: 'throw-smoke-marker', assetId: (asset as any).assetId });
-    expect(intents[0].closesDial).toBe(true);
-  });
-
-  it('disables current-smoke target selection until a smoke mark exists', () => {
-    const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support');
-    controller.selectOption(asset);
-    const currentSmoke = focusedOption(controller, (o) => o.kind === 'fire-support-target' && o.targetMode === 'current-smoke');
-    expect(currentSmoke.label).toBe('Use Active Smoke');
-    controller.selectOption(currentSmoke);
-    expect(intents).toHaveLength(0);
-
-    controller.setHasSmokeMark(true);
-    controller.selectOption(currentSmoke);
-    expect(intents).toHaveLength(1);
-    expect(intents[0].intent).toMatchObject({ kind: 'fire-support', targetMode: 'current-smoke' });
+    expect(intents[0].intent).toMatchObject({ kind: 'throw-smoke-marker', assetId: asset.assetId });
+    expect(controller.getFocusedCategory()).toBeNull();
   });
 
   it('issues a squad intent that dismisses the dial', () => {

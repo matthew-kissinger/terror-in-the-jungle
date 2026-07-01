@@ -6,14 +6,14 @@
 
 // Behaviour tests for the revived radio dial (cycle-2026-06-29-radio-dial-revival):
 // T opens ONE catalog-driven surface listing every fire-support call-in, every
-// squad order, fire-support target methods, and the radio stations. We assert
+// squad order, direct smoke-armed fire support, and the radio stations. We assert
 // what the player can reach and what selecting a sector does — not the DOM
 // shape of any single view.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { HUDLayout } from '../../ui/layout/HUDLayout';
-import { Faction, SquadCommand } from './types';
+import { SquadCommand } from './types';
 import { CommandInputManager } from './CommandInputManager';
 import { getQuickCommandOption, SQUAD_QUICK_COMMAND_OPTIONS } from './SquadCommandPresentation';
 import { ViewportManager } from '../../ui/design/responsive';
@@ -110,8 +110,16 @@ describe('revived radio dial', () => {
     layout.dispose();
   });
 
-  it('drills fire-support assets into smoke and reticle target methods', () => {
-    const { manager } = openDial();
+  it('selects a fire-support asset as a direct smoke marker action', () => {
+    const smoke = createSmokeMarkerStub();
+    const heldModes: string[] = [];
+    const { manager } = openDial((m) => {
+      m.configureHeldEquipment({
+        firstPersonWeapon: createWeaponVisibilityStub(true) as any,
+        heldEquipment: { setMode: vi.fn((mode: string) => heldModes.push(mode)) } as any,
+        smokeMarkerSystem: smoke.system as any,
+      });
+    });
     const dial = focusCategory('fire-support');
     const asset = AIR_SUPPORT_RADIO_ASSETS[0];
 
@@ -119,13 +127,13 @@ describe('revived radio dial', () => {
       new MouseEvent('click', { bubbles: true }),
     );
 
-    expect(dial.querySelector(`[data-radio-option="${asset.id}:current-smoke"]`)).toBeTruthy();
-    expect(dial.querySelector(`[data-radio-option="${asset.id}:throw-smoke-marker"]`)).toBeTruthy();
-    expect(dial.querySelector(`[data-radio-option="${asset.id}:reticle-grid"]`)).toBeTruthy();
-    expect(dial.textContent).toContain('Use Active Smoke');
-    expect(dial.textContent).toContain('Aim Mark');
-    expect(dial.textContent).not.toContain('Use Smoke');
-    expect(dial.textContent).not.toContain('Reticle/Grid');
+    expect(visibleDial()).toBeNull();
+    expect(smoke.system.beginThrowMode).toHaveBeenCalledTimes(1);
+    expect(heldModes.at(-1)).toBe('smoke-marker');
+    expect(document.body.textContent).toContain('SMOKE MARKER ARMED');
+    expect(document.body.textContent).not.toContain('Use Active Smoke');
+    expect(document.body.textContent).not.toContain('Aim Mark');
+    expect(document.body.textContent).not.toContain('Reticle/Grid');
 
     manager.dispose();
     layout.dispose();
@@ -165,40 +173,6 @@ describe('revived radio dial', () => {
       new MouseEvent('click', { bubbles: true }),
     );
     expect(requestSupport).not.toHaveBeenCalled();
-
-    manager.dispose();
-    layout.dispose();
-  });
-
-  it('arms designate on fire-support select, then drives requestSupport on confirm', () => {
-    const requestSupport = vi.fn(() => true);
-    const { manager } = openDial((m) => {
-      m.setAirSupportManager({ requestSupport, getCooldownRemaining: vi.fn(() => 0) } as any);
-      m.setTerrainSystem({ getHeightAt: () => 0 } as any);
-      m.setPlayerController(lookController());
-    });
-    const dial = focusCategory('fire-support');
-
-    dial.querySelector<HTMLElement>('[data-radio-option="cobra_rocket_run"]')?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
-    );
-    dial.querySelector<HTMLElement>('[data-radio-option="cobra_rocket_run:reticle-grid"]')?.dispatchEvent(
-      new MouseEvent('click', { bubbles: true }),
-    );
-
-    // Selecting the aim-mark target method closes the dial and enters
-    // DESIGNATE (re-aimable). The strike only goes out on confirm.
-    expect(requestSupport).not.toHaveBeenCalled();
-    expect(visibleDial()).toBeNull();
-
-    manager.update(0.1); // track the view ray onto the ground
-    expect(manager.handleStrikeConfirm()).toBe(true);
-
-    expect(requestSupport).toHaveBeenCalledTimes(1);
-    const request = requestSupport.mock.calls[0][0];
-    expect(request.type).toBe('rocket_run'); // cobra run fulfils via the rocket_run sortie
-    expect(request.requesterFaction).toBe(Faction.US); // called strikes spare friendlies
-    expect(request.targetPosition).toBeInstanceOf(THREE.Vector3);
 
     manager.dispose();
     layout.dispose();
@@ -302,6 +276,31 @@ function createSquadControllerStub(overrides?: { hasSquad?: boolean; memberCount
     }),
     selectSquad: vi.fn(() => true),
     getPlayerSquadId: vi.fn(() => state.selectedSquadId),
+  };
+}
+
+function createSmokeMarkerStub() {
+  let hook: ((reason: 'cancelled' | 'thrown') => void) | undefined;
+  const system = {
+    setThrowModeEndHook: vi.fn((cb: (reason: 'cancelled' | 'thrown') => void) => {
+      hook = cb;
+    }),
+    beginThrowMode: vi.fn(),
+    cancelThrowMode: vi.fn(() => {
+      hook?.('cancelled');
+      return true;
+    }),
+    isHandlingInput: vi.fn(() => true),
+    getActiveMark: vi.fn(() => null),
+    clearActiveMark: vi.fn(),
+  };
+  return { system };
+}
+
+function createWeaponVisibilityStub(visible: boolean) {
+  return {
+    getWeaponPresentationState: vi.fn(() => ({ requestedVisible: visible })),
+    setWeaponVisibility: vi.fn(),
   };
 }
 

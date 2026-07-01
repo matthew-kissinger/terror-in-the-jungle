@@ -15,9 +15,9 @@ Related analysis: [OWNER_PLAYTEST_INTAKE_2026-07-01.md](OWNER_PLAYTEST_INTAKE_20
 | Global objective feedback was wrong semantic layer | `TaskingDirector` plays objective-complete audio only near the objective source through concrete `AudioManager.playVariantSet(...)`; no global objective stinger added. | Future comms/callout layer can add global speech/radio separately. |
 | Attack-helicopter shots appeared from two places | `HelicopterModel` no longer advances the standalone `HelicopterDoorGunner` firing/effects path for the player-controlled helicopter; `HelicopterWeaponSystem` remains the only player-airframe firing/effects authority. | Browser capture for Cobra/UH-1C visual origins; future AI crew targeting should delegate into `HelicopterWeaponSystem` rather than emitting its own stream. |
 | Infantry gun looked like barrel plus another ray | `WeaponFiring` still uses the camera ray for damage, but now bounds overlay-muzzle projection for visual tracers and records a `ShotOriginDiagnostics` snapshot with damage ray and visual tracer origin/end. | Use diagnostics during playtest if the artifact persists; tune weapon-specific camera-space anchors only with screenshot evidence. |
-| Radio radial IA was unclear and outer ring was unreliable | Radio model is now three inner categories: `Fire Support`, `Squad`, `Signals`. Stations moved under `Signals`; vague top-level `Mark` removed. Fire support drills into target choices including `Use Smoke`, `Throw Smoke`, and `Reticle/Grid`; controller tests cover third-ring and bottom-sheet parity. | Desktop Playwright click test for outer/third ring hit targets; human ergonomics pass. |
+| Radio radial IA was unclear and outer ring was unreliable | Radio model is now three inner categories: `Fire Support`, `Squad`, `Signals`. Stations moved under `Signals`; vague top-level `Mark` removed. Fire support selection is direct: choosing a mission arms that mission's smoke marker and closes the dial. The desktop radial pins the focused category so moving toward an outer option does not reset the ring; hidden desktop/touch presentations are non-interactive so one surface cannot steal the other's clicks. Controller/view/bottom-sheet tests cover direct smoke-marker parity. | Desktop Playwright click test for direct outer-ring selection; human ergonomics pass. |
 | Radio should be held in first person | Added non-firearm `HeldEquipmentViewmodelSystem` with modes `none`, `radio`, and `smoke-marker`; opening radio suppresses the weapon and raises the imported field-radio viewmodel. | Screenshot check that radio does not block reticle or threat readability. |
-| Smoke mark should be a real mechanic | Added `SmokeMarkerSystem` using custom grenade-style ballistic logic and the existing arc renderer: LMB hold charges, release throws a canister, it bounces/bobbles/settles, emits smoke, and emits `target_mark_set`. Fire support can consume the current smoke mark. | Human throw-feel pass; future clear/new-mark UX and guidance-system layering. |
+| Smoke mark should be a real mechanic | Added `SmokeMarkerSystem` using custom grenade-style ballistic logic and the existing arc renderer: LMB hold charges, release throws a canister, it bounces/bobbles/settles, emits smoke, and emits `target_mark_set`. Fire support now starts by equipping a mission-specific targeting smoke marker rather than a separate target-method selection. | Human throw-feel pass; future clear/new-mark UX and guidance-system layering. |
 | Radio model import should use proper pipeline/provenance | Added importer append/merge support and imported `field-radio-viewmodel` through `scripts/import-war-catalog.ts` without overwriting the existing generated catalog. Provenance records the Kiln 2026-07 source batch. | `npm run check:asset-gallery` runtime gallery proof. |
 
 ## Runtime Boundaries
@@ -37,7 +37,7 @@ Focused tests cover:
 
 - audio variant pools and objective proximity playback
 - importer append/merge and Kiln provenance
-- radio category/drilldown/bottom-sheet model behavior
+- radio category/direct-smoke-selection/bottom-sheet model behavior
 - smoke marker charge, settle, target-mark creation, and cleanup
 - 3D deploy marker labels and legend composition
 - helicopter player-airframe firing authority
@@ -51,8 +51,11 @@ Completed locally on 2026-07-01:
 - `npm run build`
 - `npm run validate:fast`
 - `npm run check:asset-gallery -- --only field-radio-viewmodel`
+- direct-smoke hotfix: focused radio/smoke/player tests (`138`), browser
+  report `artifacts/radio-smoke-ux-probe/radio-direct-smoke-browser-report.json`
+  (`ok: true`)
 
 Remaining checks are human/browser acceptance: 3D deploy-map screenshot
-readability, desktop radial outer/third-ring click feel, first-person radio
+readability, desktop radial direct outer-ring click feel, first-person radio
 framing, smoke throw feel, objective/capture audio feel, and helicopter/infantry
 shot-origin readability.

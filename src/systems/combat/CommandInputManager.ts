@@ -389,9 +389,8 @@ export class CommandInputManager implements GameSystem {
 
   toggleRadioDial(): void {
     if (this.heldEquipmentBridge.isSmokeMarkerHandlingInput()) {
-      const focusAssetId = this.smokeMarkerFlow.getPendingAssetId() ?? undefined;
       if (this.heldEquipmentBridge.cancelSmokeMarkerThrow()) {
-        this.openRadioDial(focusAssetId);
+        this.openRadioDial();
       }
       return;
     }
@@ -409,14 +408,18 @@ export class CommandInputManager implements GameSystem {
     this.radioDial.setCooldowns(cooldowns);
   }
 
+  cancelSmokeMarkerThrow(): boolean {
+    return this.heldEquipmentBridge.cancelSmokeMarkerThrow();
+  }
+
   private setSelectedMarking(marking: AirSupportTargetMarking): void {
     this.selectedMarking = marking;
     this.commandModeOverlay.setSelectedMarking(marking);
     this.radioDial.setSelectedMarking(marking);
   }
 
-  private openRadioDial(focusAssetId?: AirSupportRadioAssetId): void {
-    this.smokeMarkerFlow.clearPendingForTopLevelRadio(focusAssetId);
+  private openRadioDial(): void {
+    this.smokeMarkerFlow.clearPendingForTopLevelRadio();
     if (this.overlayVisible) this.closeOverlay(false);
     this.heldEquipmentBridge.show('radio');
     this.dialVisible = true;
@@ -427,7 +430,6 @@ export class CommandInputManager implements GameSystem {
     this.radioDial.open({
       marking: this.selectedMarking,
       squadAvailable: this.latestSquadState.hasSquad,
-      focusAssetId,
     });
     this.inputManager?.unlockPointer?.();
     this.openOverlayTouchPassThrough();
@@ -453,18 +455,6 @@ export class CommandInputManager implements GameSystem {
         }
       } else {
         this.playerSquadController.issueQuickCommand(intent.slot);
-      }
-    } else if (intent.kind === 'fire-support') {
-      this.selectedMarking = intent.marking;
-      if (intent.targetMode === 'current-smoke') {
-        const mark = this.heldEquipmentBridge.getActiveSmokeMark();
-        if (mark) this.beginStrikeDesignation(intent.assetId, intent.marking, mark.position, true);
-        else {
-          const asset = getAirSupportRadioAsset(intent.assetId);
-          this.airSupportRadioMenu.setState({ selectedAssetId: intent.assetId, statusText: `${asset.label} needs a smoke marker` });
-        }
-      } else {
-        this.beginStrikeDesignation(intent.assetId, intent.marking);
       }
     } else if (intent.kind === 'throw-smoke-marker') {
       if (this.heldEquipmentBridge.beginSmokeMarkerThrow()) {

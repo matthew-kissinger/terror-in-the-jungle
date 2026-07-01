@@ -3,8 +3,8 @@
 
 /**
  * RadialDialView — the DESKTOP presentation of the radio dial: an SVG annular
- * wheel. The inner ring is the three categories; hovering a category drills into
- * it and the focused category's options fill the outer ring. Clicking an outer
+ * wheel. The inner ring is the three categories; focusing a category pins it
+ * and the focused category's options fill the outer ring. Clicking an outer
  * sector selects that option. It is driven entirely by a shared
  * `RadioDialController` and issues NOTHING itself.
  *
@@ -132,8 +132,11 @@ export class RadialDialView {
     sector.path.classList.toggle(styles.focused, focused);
     sector.path.dataset.radioCategory = category.id;
     sector.label.textContent = category.label.toUpperCase();
-    // Hover OR click drills into the category (so it works without a click).
-    sector.group.addEventListener('pointerenter', () => this.controller?.focusCategory(category.id));
+    // Hover previews only when nothing is focused; click pins the category so
+    // moving toward an outer option cannot accidentally reset the ring.
+    sector.group.addEventListener('pointerenter', () => {
+      if (!this.controller?.getFocusedCategory()) this.controller?.focusCategory(category.id);
+    });
     sector.group.addEventListener('click', () => this.controller?.focusCategory(category.id));
   }
 
