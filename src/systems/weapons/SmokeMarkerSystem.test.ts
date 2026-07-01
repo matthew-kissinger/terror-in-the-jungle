@@ -41,21 +41,27 @@ describe('SmokeMarkerSystem', () => {
 
   it('cancels an equipped marker without leaving charge state', () => {
     const system = new SmokeMarkerSystem(scene, camera, terrain());
+    const endHook = vi.fn();
+    system.setThrowModeEndHook(endHook);
     system.beginThrowMode();
     expect(system.beginCharge()).toBe(true);
     expect(system.cancelThrowMode()).toBe(true);
     expect(system.isHandlingInput()).toBe(false);
     expect(system.getActiveMark()).toBeNull();
+    expect(endHook).toHaveBeenCalledWith('cancelled');
   });
 
   it('settles the thrown canister, starts smoke, and records a target mark', () => {
     const system = new SmokeMarkerSystem(scene, camera, terrain());
     const emitSpy = vi.spyOn(GameEventBus, 'emit');
+    const endHook = vi.fn();
+    system.setThrowModeEndHook(endHook);
 
     system.beginThrowMode();
     system.beginCharge();
     system.update(1.0);
     expect(system.releaseThrow()).toBe(true);
+    expect(endHook).toHaveBeenCalledWith('thrown');
 
     for (let i = 0; i < 240 && !system.getActiveMark(); i++) {
       system.update(1 / 60);

@@ -45,7 +45,7 @@ describe('RadioDialController', () => {
     expect(controller.getFocusedCategory()).toBeNull();
   });
 
-  it('drills fire support into target choices before issuing a reticle/grid intent', () => {
+  it('drills fire support into target choices before issuing an aim-mark intent', () => {
     controller.setSelectedMarking('willie_pete');
     const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support');
     controller.selectOption(asset);
@@ -53,6 +53,7 @@ describe('RadioDialController', () => {
     expect(controller.getFocusedCategory()?.label).toBe(asset.label);
 
     const reticle = focusedOption(controller, (o) => o.kind === 'fire-support-target' && o.targetMode === 'reticle-grid');
+    expect(reticle.label).toBe('Aim Mark');
     controller.selectOption(reticle);
     expect(intents).toHaveLength(1);
     expect(intents[0].closesDial).toBe(true);
@@ -73,6 +74,7 @@ describe('RadioDialController', () => {
     const asset = optionIn(controller, 'fire-support', (o) => o.kind === 'fire-support');
     controller.selectOption(asset);
     const currentSmoke = focusedOption(controller, (o) => o.kind === 'fire-support-target' && o.targetMode === 'current-smoke');
+    expect(currentSmoke.label).toBe('Use Active Smoke');
     controller.selectOption(currentSmoke);
     expect(intents).toHaveLength(0);
 

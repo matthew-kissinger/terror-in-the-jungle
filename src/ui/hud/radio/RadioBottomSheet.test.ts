@@ -51,9 +51,24 @@ describe('RadioBottomSheet', () => {
     chip('fire-support')?.click();
     sheet.getElement().querySelector<HTMLButtonElement>('[data-radio-option]')?.click();
     const targetRows = Array.from(sheet.getElement().querySelectorAll<HTMLButtonElement>('[data-radio-option]'));
-    targetRows.find((row) => row.textContent?.includes('Reticle/Grid'))?.click();
+    expect(targetRows.some((row) => row.textContent?.includes('Aim Mark'))).toBe(true);
+    expect(targetRows.some((row) => row.textContent?.includes('Reticle/Grid'))).toBe(false);
+    targetRows.find((row) => row.textContent?.includes('Aim Mark'))?.click();
     expect(intents).toHaveLength(1);
     expect(intents[0].kind).toBe('fire-support');
+  });
+
+  it('keeps active-smoke disabled until a smoke mark exists on touch', () => {
+    chip('fire-support')?.click();
+    sheet.getElement().querySelector<HTMLButtonElement>('[data-radio-option]')?.click();
+    const disabledSmoke = Array.from(sheet.getElement().querySelectorAll<HTMLButtonElement>('[data-radio-option]'))
+      .find((row) => row.textContent?.includes('Use Active Smoke'));
+    expect(disabledSmoke?.disabled).toBe(true);
+
+    controller.setHasSmokeMark(true);
+    const enabledSmoke = Array.from(sheet.getElement().querySelectorAll<HTMLButtonElement>('[data-radio-option]'))
+      .find((row) => row.textContent?.includes('Use Active Smoke'));
+    expect(enabledSmoke?.disabled).toBe(false);
   });
 
   it('requests close when the close button is tapped', () => {

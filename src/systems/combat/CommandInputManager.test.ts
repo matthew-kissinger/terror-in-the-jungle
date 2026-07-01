@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
+import { GameEventBus, type TargetMark } from '../../core/GameEventBus';
 import { HUDLayout } from '../../ui/layout/HUDLayout';
 import { SquadCommand, Faction } from './types';
 import { CommandInputManager } from './CommandInputManager';
@@ -31,6 +32,7 @@ describe('CommandInputManager', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     document.head.innerHTML = '';
+    GameEventBus.clear();
     ViewportManager.resetForTest();
     canvasContext = createCanvasContextStub();
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => canvasContext as never);
@@ -130,7 +132,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('opens the radio shell from the squad overlay without issuing a squad command', () => {
+  it('opens the shared radio dial from the squad overlay without issuing a squad command', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -148,8 +150,11 @@ describe('CommandInputManager', () => {
     document.body.querySelector<HTMLButtonElement>('.command-mode-overlay__radio')?.click();
 
     expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
-    expect(document.body.querySelector<HTMLElement>('[role="dialog"]')?.dataset.visible).toBe('true');
-    expect(document.body.textContent).toContain('Air Support');
+    const dial = visibleDialog();
+    expect(dial?.dataset.visible).toBe('true');
+    expect(dial?.querySelector('[data-radio-category="fire-support"]')).toBeTruthy();
+    expect(dial?.querySelector('[data-radio-category="squad"]')).toBeTruthy();
+    expect(dial?.querySelector('[data-radio-category="signals"]')).toBeTruthy();
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
 
@@ -223,8 +228,162 @@ describe('CommandInputManager', () => {
     expect(visibleDialog()).not.toBeNull();
     expect(dial.querySelector('[data-radio-option="ac47_orbit:reticle-grid"]')).toBeTruthy();
     expect(dial.querySelector('[data-radio-option="ac47_orbit:throw-smoke-marker"]')).toBeTruthy();
+    expect(dial.textContent).toContain('Aim Mark');
+    expect(dial.textContent).toContain('Use Active Smoke');
+    expect(dial.textContent).not.toContain('Reticle/Grid');
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('arms smoke marker equipment with a visible prompt without calling support', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    const smoke = createSmokeMarkerStub();
+    const weapon = createWeaponVisibilityStub(true);
+    const heldModes: string[] = [];
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+    const requestSupport = vi.fn(() => true);
+    manager.setAirSupportManager({ requestSupport, getCooldownRemaining: vi.fn(() => 0) } as any);
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+    manager.setPlayerController(lookDownController());
+    manager.configureHeldEquipment({
+      firstPersonWeapon: weapon as any,
+      heldEquipment: { setMode: vi.fn((mode: string) => heldModes.push(mode)) } as any,
+      smokeMarkerSystem: smoke.system as any,
+    });
+
+    manager.toggleRadioMenu();
+    const dial = visibleDialog()!;
+    drillCategory(dial, 'fire-support');
+    clickSector(dial, 'a1_napalm');
+    clickSector(dial, 'a1_napalm:throw-smoke-marker');
+
+    expect(visibleDialog()).toBeNull();
+    expect(smoke.system.beginThrowMode).toHaveBeenCalledTimes(1);
+    expect(heldModes.at(-1)).toBe('smoke-marker');
+    expect(weapon.setWeaponVisibility).toHaveBeenCalledWith(false);
+    expect(requestSupport).not.toHaveBeenCalled();
+    expect(document.body.querySelector<HTMLElement>('[aria-live="polite"]')?.getAttribute('aria-hidden')).toBe('false');
+    expect(document.body.textContent).toContain('SMOKE MARKER ARMED');
+    expect(document.body.textContent).toContain('A-1 NAPALM');
+
+    expect(manager.handleCancel()).toBe(true);
+    expect(smoke.system.cancelThrowMode).toHaveBeenCalledTimes(1);
+    expect(heldModes.at(-1)).toBe('none');
+    expect(weapon.setWeaponVisibility).toHaveBeenLastCalledWith(true);
+    expect(document.body.querySelector<HTMLElement>('[aria-live="polite"]')?.getAttribute('aria-hidden')).toBe('true');
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('pressing radio while smoke is armed cancels the throw and returns to that mission target choices', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    const smoke = createSmokeMarkerStub();
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+    manager.setAirSupportManager({ requestSupport: vi.fn(() => true), getCooldownRemaining: vi.fn(() => 0) } as any);
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+    manager.setPlayerController(lookDownController());
+    manager.configureHeldEquipment({
+      firstPersonWeapon: createWeaponVisibilityStub(true) as any,
+      heldEquipment: { setMode: vi.fn() } as any,
+      smokeMarkerSystem: smoke.system as any,
+    });
+
+    manager.toggleRadioMenu();
+    const dial = visibleDialog()!;
+    drillCategory(dial, 'fire-support');
+    clickSector(dial, 'a1_napalm');
+    clickSector(dial, 'a1_napalm:throw-smoke-marker');
+
+    manager.toggleRadioMenu();
+
+    const reopened = visibleDialog();
+    expect(reopened).not.toBeNull();
+    expect(smoke.system.cancelThrowMode).toHaveBeenCalledTimes(1);
+    expect(reopened?.querySelector('[data-radio-option="a1_napalm:throw-smoke-marker"]')).toBeTruthy();
+    expect(reopened?.querySelector('[data-radio-option="a1_napalm:reticle-grid"]')).toBeTruthy();
+    expect(reopened?.textContent).toContain('Aim Mark');
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('calls the selected asset on a settled smoke marker after throw mode ends', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    const smoke = createSmokeMarkerStub();
+    const requestSupport = vi.fn(() => true);
+    const mark: TargetMark = {
+      id: 'smoke-marker-test',
+      kind: 'smoke-marker',
+      position: new THREE.Vector3(36, 0, 84),
+      createdAt: 1,
+      source: 'player',
+    };
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+    manager.setAirSupportManager({ requestSupport, getCooldownRemaining: vi.fn(() => 0) } as any);
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+    manager.setPlayerController(lookDownController());
+    manager.configureHeldEquipment({
+      firstPersonWeapon: createWeaponVisibilityStub(true) as any,
+      heldEquipment: { setMode: vi.fn() } as any,
+      smokeMarkerSystem: smoke.system as any,
+    });
+
+    manager.toggleRadioMenu();
+    const dial = visibleDialog()!;
+    drillCategory(dial, 'fire-support');
+    clickSector(dial, 'b52_arclight');
+    clickSector(dial, 'b52_arclight:throw-smoke-marker');
+
+    smoke.emitThrown();
+    smoke.setActiveMark(mark);
+    GameEventBus.emit('target_mark_set', { mark });
+    GameEventBus.flush();
+
+    expect(visibleDialog()).toBeNull();
+    expect(requestSupport).not.toHaveBeenCalled();
+    expect(manager.handleStrikeConfirm()).toBe(true);
+    expect(requestSupport).toHaveBeenCalledTimes(1);
+    expect(requestSupport.mock.calls[0][0]).toMatchObject({
+      type: 'arclight',
+      requesterFaction: Faction.US,
+      marking: 'smoke',
+    });
+    expect(requestSupport.mock.calls[0][0].targetPosition).toEqual(mark.position);
+    expect(smoke.system.clearActiveMark).toHaveBeenCalledTimes(1);
 
     manager.dispose();
     layout.dispose();
@@ -258,7 +417,7 @@ describe('CommandInputManager', () => {
     clickSector(dial, 'ac47_orbit');
     clickSector(dial, 'ac47_orbit:reticle-grid');
 
-    // Choosing the reticle/grid target method closes the dial and enters
+    // Choosing the aim-mark target method closes the dial and enters
     // DESIGNATE (re-aimable). The strike only goes out on confirm.
     expect(requestSupport).not.toHaveBeenCalled();
     expect(visibleDialog()).toBeNull();
@@ -757,6 +916,47 @@ function createPlayerControllerStub(position: THREE.Vector3) {
       getWorldDirection: vi.fn((target: THREE.Vector3) => target.copy(cameraDirection))
     })),
     getPosition: vi.fn((target?: THREE.Vector3) => (target ?? new THREE.Vector3()).copy(position))
+  };
+}
+
+function createWeaponVisibilityStub(visible: boolean) {
+  return {
+    getWeaponPresentationState: vi.fn(() => ({ requestedVisible: visible })),
+    setWeaponVisibility: vi.fn(),
+  };
+}
+
+function createSmokeMarkerStub() {
+  let activeMark: TargetMark | null = null;
+  let handlingInput = false;
+  let throwEndHook: ((reason: 'cancelled' | 'thrown') => void) | undefined;
+  const system = {
+    setThrowModeEndHook: vi.fn((hook: (reason: 'cancelled' | 'thrown') => void) => {
+      throwEndHook = hook;
+    }),
+    beginThrowMode: vi.fn(() => {
+      handlingInput = true;
+    }),
+    cancelThrowMode: vi.fn(() => {
+      handlingInput = false;
+      throwEndHook?.('cancelled');
+      return true;
+    }),
+    isHandlingInput: vi.fn(() => handlingInput),
+    getActiveMark: vi.fn(() => activeMark),
+    clearActiveMark: vi.fn(() => {
+      activeMark = null;
+    }),
+  };
+  return {
+    system,
+    setActiveMark(mark: TargetMark | null) {
+      activeMark = mark;
+    },
+    emitThrown() {
+      handlingInput = false;
+      throwEndHook?.('thrown');
+    },
   };
 }
 

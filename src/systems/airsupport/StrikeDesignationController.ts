@@ -50,6 +50,7 @@ export class StrikeDesignationController {
   private pickProvider?: StrikePickProvider;
   private originProvider?: () => THREE.Vector3;
   private friendlyCountInRadius?: (center: THREE.Vector3, radius: number) => number;
+  private onCommitted?: () => void;
 
   private active = false;
   private assetId?: AirSupportRadioAssetId;
@@ -91,6 +92,10 @@ export class StrikeDesignationController {
 
   setFriendlyCountProvider(fn: (center: THREE.Vector3, radius: number) => number): void {
     this.friendlyCountInRadius = fn;
+  }
+
+  setCommitListener(listener: () => void): void {
+    this.onCommitted = listener;
   }
 
   isActive(): boolean {
@@ -246,9 +251,13 @@ export class StrikeDesignationController {
       default: statusLabel = 'NO GROUND'; statusKind = 'invalid'; break;
     }
 
-    const hint = this.gate.status === 'danger_close'
-      ? '[LMB] mark (danger close)   [Esc] back'
-      : '[LMB] mark   [Esc] back';
+    const hint = this.fixedTarget
+      ? (this.gate.status === 'danger_close'
+        ? '[LMB] call smoke (danger close)   [Esc] abort'
+        : '[LMB] call on smoke   [Esc] abort')
+      : (this.gate.status === 'danger_close'
+        ? '[LMB] mark (danger close)   [Esc] back'
+        : '[LMB] mark   [Esc] back');
     this.banner.showDesignate({ asset: label, statusLabel, statusKind, hint });
   }
 
@@ -277,6 +286,7 @@ export class StrikeDesignationController {
       spawnSmokeCloud(this.target);
     }
 
+    if (accepted) this.onCommitted?.();
     this.finish();
   }
 

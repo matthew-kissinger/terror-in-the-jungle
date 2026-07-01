@@ -73,4 +73,32 @@ describe('PlayerCombatController — flight-vehicle fire routing', () => {
     expect(fixedWingModel.startFiring).not.toHaveBeenCalled();
     expect(weaponInput.triggerFireStart).toHaveBeenCalledTimes(1);
   });
+
+  it('routes LMB hold and release to the armed smoke-marker tool before weapons', () => {
+    const hudSystem = {
+      showGrenadePowerMeter: vi.fn(),
+      hideGrenadePowerMeter: vi.fn(),
+    };
+    const smokeMarkerSystem = {
+      isEquippedForThrow: vi.fn(() => true),
+      beginCharge: vi.fn(() => true),
+      isHandlingInput: vi.fn(() => true),
+      releaseThrow: vi.fn(() => true),
+    };
+    controller.configure({
+      hudSystem: hudSystem as any,
+      smokeMarkerSystem: smokeMarkerSystem as any,
+    });
+    const state = makePlayerState();
+
+    controller.beginFire(state, WeaponSlot.PRIMARY, camera);
+    controller.endFire(state, WeaponSlot.PRIMARY);
+
+    expect(smokeMarkerSystem.beginCharge).toHaveBeenCalledTimes(1);
+    expect(smokeMarkerSystem.releaseThrow).toHaveBeenCalledTimes(1);
+    expect(hudSystem.showGrenadePowerMeter).toHaveBeenCalledTimes(1);
+    expect(hudSystem.hideGrenadePowerMeter).toHaveBeenCalledTimes(1);
+    expect(weaponInput.triggerFireStart).not.toHaveBeenCalled();
+    expect(weaponInput.triggerFireStop).not.toHaveBeenCalled();
+  });
 });

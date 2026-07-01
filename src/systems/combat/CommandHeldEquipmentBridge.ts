@@ -4,25 +4,31 @@
 import type { TargetMark } from '../../core/GameEventBus';
 import type { FirstPersonWeapon } from '../player/FirstPersonWeapon';
 import type { HeldEquipmentMode, HeldEquipmentViewmodelSystem } from '../player/HeldEquipmentViewmodelSystem';
-import type { SmokeMarkerSystem } from '../weapons/SmokeMarkerSystem';
+import type { SmokeMarkerSystem, SmokeMarkerThrowModeEndReason } from '../weapons/SmokeMarkerSystem';
 
 export interface CommandHeldEquipmentConfig {
   firstPersonWeapon?: FirstPersonWeapon;
   heldEquipment?: HeldEquipmentViewmodelSystem;
   smokeMarkerSystem?: SmokeMarkerSystem;
+  onSmokeMarkerThrowModeEnd?: (reason: SmokeMarkerThrowModeEndReason) => void;
 }
 
 export class CommandHeldEquipmentBridge {
   private firstPersonWeapon?: FirstPersonWeapon;
   private heldEquipment?: HeldEquipmentViewmodelSystem;
   private smokeMarkerSystem?: SmokeMarkerSystem;
+  private onSmokeMarkerThrowModeEnd?: (reason: SmokeMarkerThrowModeEndReason) => void;
   private weaponVisibleBeforeEquipment: boolean | null = null;
 
   configure(config: CommandHeldEquipmentConfig): void {
     this.firstPersonWeapon = config.firstPersonWeapon;
     this.heldEquipment = config.heldEquipment;
     this.smokeMarkerSystem = config.smokeMarkerSystem;
-    this.smokeMarkerSystem?.setThrowModeEndHook(() => this.restore());
+    this.onSmokeMarkerThrowModeEnd = config.onSmokeMarkerThrowModeEnd;
+    this.smokeMarkerSystem?.setThrowModeEndHook((reason) => {
+      this.restore();
+      this.onSmokeMarkerThrowModeEnd?.(reason);
+    });
   }
 
   show(mode: Exclude<HeldEquipmentMode, 'none'>): void {
@@ -62,5 +68,9 @@ export class CommandHeldEquipmentBridge {
 
   getActiveSmokeMark(): TargetMark | null {
     return this.smokeMarkerSystem?.getActiveMark() ?? null;
+  }
+
+  clearActiveSmokeMark(): void {
+    this.smokeMarkerSystem?.clearActiveMark();
   }
 }
