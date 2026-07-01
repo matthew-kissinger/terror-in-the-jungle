@@ -4,8 +4,8 @@
 /**
  * RadioBottomSheet — the TOUCH presentation of the radio dial. A drill list
  * bottom-sheet: category chips at the top, the focused category's options as a
- * scrollable list of ≥44px rows, plus a segmented marking control. It is driven
- * entirely by a shared `RadioDialController`; it issues NOTHING itself.
+ * scrollable list of >=44px rows. It is driven entirely by a shared
+ * `RadioDialController`; it issues NOTHING itself.
  *
  * Mobile-first: large tap targets, safe-area insets, and a drill-back affordance
  * so the whole tree is reachable one-handed.
@@ -189,11 +189,6 @@ export class RadioBottomSheet {
     if (option.kind === 'fire-support') {
       const remaining = radioOptionCooldown(option, this.controller?.getCooldowns() ?? {});
       return remaining > 0 ? formatRadioCooldown(remaining) : 'READY';
-    }
-    if (option.kind === 'fire-support-target') {
-      const remaining = radioOptionCooldown(option, this.controller?.getCooldowns() ?? {});
-      if (remaining > 0) return formatRadioCooldown(remaining);
-      return this.controller?.isOptionEnabled(option) ? 'SELECT' : 'NO SMOKE';
     }
     if (option.kind === 'station') {
       return option.stationId === this.controller?.getSelectedStationId() ? 'TUNED' : 'TUNE';

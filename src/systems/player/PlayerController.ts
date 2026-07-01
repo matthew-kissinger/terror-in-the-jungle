@@ -276,8 +276,8 @@ export class PlayerController implements GameSystem {
       },
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
       onWeaponSlotChange: (slot: WeaponSlot) => {
-        // Route through InventoryManager so FirstPersonWeapon's onSlotChange callback
-        // fires and actually switches the weapon model/ammo (not just visibility).
+        this.commandInputManager?.cancelSmokeMarkerThrow();
+        // Route through InventoryManager so FirstPersonWeapon switches model/ammo.
         if (this.inventoryManager) {
           this.inventoryManager.setCurrentSlot(slot);
         }

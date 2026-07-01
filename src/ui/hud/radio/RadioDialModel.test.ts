@@ -9,7 +9,6 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  buildFireSupportTargetOptions,
   buildRadioCategories,
   formatRadioCooldown,
   isRadioOptionReady,
@@ -55,26 +54,13 @@ describe('RadioDialModel', () => {
     }
   });
 
-  it('builds the fire-support target drilldown for active smoke, throw smoke, and aim mark', () => {
-    const asset = AIR_SUPPORT_RADIO_ASSETS[0];
-    const targets = buildFireSupportTargetOptions(asset.id);
-    expect(targets.map((option) => option.kind)).toEqual([
-      'fire-support-target',
-      'fire-support-target',
-      'fire-support-target',
-    ]);
-    expect(targets.map((option) => option.kind === 'fire-support-target' ? option.targetMode : '')).toEqual([
-      'current-smoke',
-      'throw-smoke-marker',
-      'reticle-grid',
-    ]);
-    expect(targets.map((option) => option.label)).toEqual([
-      'Use Active Smoke',
-      'Throw Smoke',
-      'Aim Mark',
-    ]);
-    expect(targets.map((option) => option.label)).not.toContain('Use Smoke');
-    expect(targets.map((option) => option.label)).not.toContain('Reticle/Grid');
+  it('does not expose a fire-support target-method drilldown', () => {
+    const labels = optionsOf('fire-support').map((option) => option.label);
+    expect(labels).not.toContain('Use Active Smoke');
+    expect(labels).not.toContain('Throw Smoke');
+    expect(labels).not.toContain('Aim Mark');
+    expect(labels).not.toContain('Use Smoke');
+    expect(labels).not.toContain('Reticle/Grid');
   });
 
   it('greys assets that share a sortie type together when one is cooling down', () => {

@@ -16,7 +16,6 @@ import { RadioDialController } from './RadioDialController';
 import { RadialDialView } from './RadialDialView';
 import { RadioBottomSheet } from './RadioBottomSheet';
 import type {
-  AirSupportRadioAssetId,
   AirSupportRadioCooldowns,
   AirSupportTargetMarking,
 } from '../../../systems/airsupport/AirSupportRadioCatalog';
@@ -93,14 +92,10 @@ export class RadioDialPresenter {
   open(seed: {
     marking: AirSupportTargetMarking;
     squadAvailable: boolean;
-    focusAssetId?: AirSupportRadioAssetId;
   }): void {
     this.controller.setSelectedMarking(seed.marking);
     this.controller.setSquadAvailable(seed.squadAvailable);
     this.controller.reset();
-    if (seed.focusAssetId) {
-      this.controller.focusFireSupportAsset(seed.focusAssetId);
-    }
     this.visible = true;
     this.showActiveView();
   }

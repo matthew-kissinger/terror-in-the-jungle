@@ -245,6 +245,7 @@ describe('PlayerController', () => {
       toggleRadioMenu: vi.fn(),
       issueQuickCommand: vi.fn(),
       handleCancel: vi.fn(() => false),
+      cancelSmokeMarkerThrow: vi.fn(() => false),
     };
 
     mockSettingsModal = {
@@ -304,6 +305,17 @@ describe('PlayerController', () => {
       callbacks.onAirSupportMenu();
 
       expect(mockCommandInputManager.toggleRadioMenu).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels an armed smoke marker when the player swaps weapon slots', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+      playerController.setInventoryManager(mockInventoryManager);
+
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      callbacks.onWeaponSlotChange(WeaponSlot.PRIMARY);
+
+      expect(mockCommandInputManager.cancelSmokeMarkerThrow).toHaveBeenCalledTimes(1);
+      expect(mockInventoryManager.setCurrentSlot).toHaveBeenCalledWith(WeaponSlot.PRIMARY);
     });
 
     it('lets command input consume escape before pointer unlock logic runs', () => {

@@ -419,6 +419,13 @@ than trying to explain it with HUD text.
 - Controller/model tests cover category trees and option intents; Playwright
   clicks prove outer ring hit targets.
 
+2026-07-01 hotfix supersession: owner playtest rejected the extra
+fire-support target-method step. Current implementation is direct mission
+selection: `Fire Support -> mission` arms that mission's targeting smoke marker,
+closes the radial, and cancels on weapon swap. Do not restore `Use Current
+Smoke Mark`, `Throw Smoke Marker`, or reticle/grid as a second/third-ring
+selection without fresh owner approval.
+
 ## 6. Smoke mark should be a real hold-to-throw mechanic
 
 Owner note: "mark with smoke" should become a proper thing: hold down to see a
@@ -493,6 +500,11 @@ physical marker, not throw-charged, and not reusable by future guidance logic.
   preview.
 - Automated tests cover charge-to-velocity, landing/settle lifecycle, and mark
   record creation; human playtest signs off on throw feel.
+
+2026-07-01 hotfix supersession: the supported radio sequence is now one click
+shorter. Selecting a specific fire-support mission equips a mission-specific
+smoke marker immediately; the separate radio -> smoke -> radio target-method
+loop above remains historical analysis, not the current UX contract.
 
 ## Recommended Work Split
 
