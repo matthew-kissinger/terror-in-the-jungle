@@ -142,6 +142,50 @@ describe('HelicopterHUD', () => {
     expect(hud.element.querySelector('[data-ref="weaponAmmoEl"]')?.textContent).toBe('7');
   });
 
+  describe('LOW-ammo state (driven by a real ammo/capacity ratio)', () => {
+    // The css mock returns class names verbatim, so the LOW marker class is
+    // 'ammoLow'. We assert the state, not any specific colour value.
+    const weaponLow = () =>
+      (hud.element.querySelector('[data-ref="weaponAmmoEl"]') as HTMLElement).classList.contains('ammoLow');
+    const crewLow = () =>
+      (hud.element.querySelector('[data-ref="crewBeltEl"]') as HTMLElement).classList.contains('ammoLow');
+
+    it('does not flag LOW while ammo is comfortably above the threshold', () => {
+      hud.setWeaponStatus('M134 Minigun', 3500, 4000);
+      expect(weaponLow()).toBe(false);
+    });
+
+    it('flags LOW once remaining ammo drops under a fifth of capacity', () => {
+      hud.setWeaponStatus('M134 Minigun', 600, 4000); // 15% remaining
+      expect(weaponLow()).toBe(true);
+    });
+
+    it('flags LOW when the weapon runs dry', () => {
+      hud.setWeaponStatus('Rocket Pod', 0, 14);
+      expect(weaponLow()).toBe(true);
+    });
+
+    it('clears LOW again on a full rearm', () => {
+      hud.setWeaponStatus('M134 Minigun', 200, 4000);
+      expect(weaponLow()).toBe(true);
+      hud.setWeaponStatus('M134 Minigun', 4000, 4000);
+      expect(weaponLow()).toBe(false);
+    });
+
+    it('drives the door-gun crew belt readout from the same ratio', () => {
+      hud.setAircraftRole('gunship');
+      hud.setWeaponStatus('M60 Door Gun', 40, 500); // 8% of the belt left
+      expect(crewLow()).toBe(true);
+    });
+
+    it('never flags LOW when no capacity is reported (legacy 2-arg callers)', () => {
+      // Callers that only push name + ammo leave capacity unknown; the LOW state
+      // must stay off rather than guess a threshold.
+      hud.setWeaponStatus('M134 Minigun', 1);
+      expect(weaponLow()).toBe(false);
+    });
+  });
+
   it('shows the current damage percent and bar width', () => {
     hud.setDamage(42);
     expect(hud.element.querySelector('[data-ref="damageValue"]')?.textContent).toBe('42%');

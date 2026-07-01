@@ -628,8 +628,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.setHelicopterAircraftRole(role);
   }
 
-  setHelicopterWeaponStatus(name: string, ammo: number): void {
-    this.elements.setHelicopterWeaponStatus(name, ammo);
+  setHelicopterWeaponStatus(name: string, ammo: number, maxAmmo?: number): void {
+    this.elements.setHelicopterWeaponStatus(name, ammo, maxAmmo);
   }
 
   setHelicopterDamage(healthPercent: number): void {

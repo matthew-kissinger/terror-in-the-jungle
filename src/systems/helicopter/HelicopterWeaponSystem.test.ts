@@ -247,9 +247,11 @@ describe('HelicopterWeaponSystem', () => {
       expect(hud.addKillToFeed).toHaveBeenCalled();
     });
 
-    it('should push weapon status to HUD each update', () => {
+    it('should push weapon status (name, ammo, capacity) to HUD each update', () => {
       ws.update(0.016, HELI_ID, pos, quat, false, false);
-      expect(hud.setHelicopterWeaponStatus).toHaveBeenCalledWith('M134 Minigun', 4000);
+      // Capacity is threaded alongside the count so the HUD can flag LOW ammo as
+      // a real remaining/capacity ratio (M134 starts full at 4000/4000).
+      expect(hud.setHelicopterWeaponStatus).toHaveBeenCalledWith('M134 Minigun', 4000, 4000);
     });
 
     it('should stop firing when ammo depleted', () => {
