@@ -21,16 +21,29 @@ import * as THREE from 'three';
 // Each test that exercises bank loading installs a fake on `audioLoader.load`.
 vi.mock('three', async () => {
   const actual = await vi.importActual<typeof import('three')>('three');
-  class MockAudioListener {
+  class MockAudioListener extends actual.Object3D {
     context = { state: 'running', resume: vi.fn() };
     setMasterVolume = vi.fn();
     getMasterVolume = vi.fn().mockReturnValue(1);
   }
   class MockAudioLoader { load = vi.fn(); }
+  class MockAudio extends actual.Object3D {
+    setBuffer = vi.fn();
+    setVolume = vi.fn();
+    setPlaybackRate = vi.fn();
+    play = vi.fn();
+  }
+  class MockPositionalAudio extends MockAudio {
+    setRefDistance = vi.fn();
+    setMaxDistance = vi.fn();
+    setRolloffFactor = vi.fn();
+  }
   return {
     ...actual,
     AudioListener: MockAudioListener as unknown as typeof actual.AudioListener,
     AudioLoader: MockAudioLoader as unknown as typeof actual.AudioLoader,
+    Audio: MockAudio as unknown as typeof actual.Audio,
+    PositionalAudio: MockPositionalAudio as unknown as typeof actual.PositionalAudio,
   };
 });
 
@@ -82,14 +95,32 @@ vi.mock('./RadioStationSystem', () => ({
 vi.mock('../../utils/DeviceDetector', () => ({
   shouldUseTouchControls: vi.fn().mockReturnValue(false),
 }));
+const gameEventBusMock = vi.hoisted(() => {
+  const subscriptions: Array<{ type: string; callback: (event: any) => void }> = [];
+  return {
+    subscriptions,
+    subscribe: vi.fn((type: string, callback: (event: any) => void) => {
+      subscriptions.push({ type, callback });
+      return vi.fn();
+    }),
+  };
+});
 vi.mock('../../core/GameEventBus', () => ({
-  GameEventBus: { subscribe: vi.fn().mockReturnValue(() => {}) },
+  GameEventBus: { subscribe: gameEventBusMock.subscribe },
 }));
 vi.mock('../../core/StartupTelemetry', () => ({
   markStartup: vi.fn(),
 }));
 
 import { AudioManager } from './AudioManager';
+import { Faction } from '../combat/types';
+import { SOUNDSCAPE_CONFIG } from '../../config/soundscape';
+import { AUDIO_VARIANT_SETS, SOUND_CONFIGS } from '../../config/audio';
+
+beforeEach(() => {
+  gameEventBusMock.subscriptions.length = 0;
+  gameEventBusMock.subscribe.mockClear();
+});
 
 const WB_STATE = {
   invulnerable: false, infiniteAmmo: false, noClip: false, oneShotKills: false,
@@ -159,10 +190,11 @@ describe('AudioManager — SFX bank decode deferred beyond critical path', () =>
   type PendingLoad = { path: string; resolve: (buf: AudioBuffer) => void };
   let pendingLoads: PendingLoad[];
 
-  const BOOT_CRITICAL_PATHS = new Set([
-    'assets/audio/ambient/jungle-day.ogg',
-    'assets/audio/ambient/jungle-night.ogg',
-  ]);
+  const BOOT_CRITICAL_PATHS = new Set(
+    SOUNDSCAPE_CONFIG.enabled
+      ? [SOUNDSCAPE_CONFIG.dayBed.path, SOUNDSCAPE_CONFIG.nightBed.path]
+      : [],
+  );
 
   beforeEach(() => {
     pendingLoads = [];
@@ -203,17 +235,19 @@ describe('AudioManager — SFX bank decode deferred beyond critical path', () =>
 
     const initPromise = manager.init();
 
-    // Synchronously, only the boot-critical loads have been enqueued —
-    // init() is awaiting Promise.all on those and has not yet scheduled
-    // the background SFX bank.
-    expect(pendingLoads.length).toBe(BOOT_CRITICAL_PATHS.size);
-    expect(pendingLoads.every((l) => BOOT_CRITICAL_PATHS.has(l.path))).toBe(true);
+    if (BOOT_CRITICAL_PATHS.size > 0) {
+      // Synchronously, only the boot-critical loads have been enqueued —
+      // init() is awaiting Promise.all on those and has not yet scheduled
+      // the background SFX bank.
+      expect(pendingLoads.length).toBe(BOOT_CRITICAL_PATHS.size);
+      expect(pendingLoads.every((l) => BOOT_CRITICAL_PATHS.has(l.path))).toBe(true);
 
-    // Resolve ONLY the boot-critical (ambient) loads. If init() awaited
-    // the full bank, this would not be enough to let it resolve.
-    resolveBootCriticalLoads();
+      // Resolve ONLY the boot-critical (ambient) loads. If init() awaited
+      // the full bank, this would not be enough to let it resolve.
+      resolveBootCriticalLoads();
+    }
 
-    await initPromise; // must resolve before SFX loads are even enqueued
+    await initPromise;
 
     // The background SFX decode is in flight after init() resolves.
     expect(pendingLoads.length).toBeGreaterThan(0);
@@ -312,5 +346,110 @@ describe('AudioManager — radio music routes through the radio system', () => {
     manager.update(0.016);
     expect(radioSpies.update).toHaveBeenCalled();
     expect(radioSpies.getActiveMusicBed).toHaveBeenCalled();
+  });
+});
+
+describe('AudioManager — zone capture audio proximity', () => {
+  let scene: THREE.Scene;
+  let camera: THREE.Camera;
+
+  beforeEach(() => {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera();
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).document = (globalThis as any).document ?? {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+  });
+
+  function zoneCaptureSubscription(): (event: {
+    zoneId: string;
+    zoneName: string;
+    faction: Faction;
+    position: THREE.Vector3;
+    radius: number;
+  }) => void {
+    const subscription = gameEventBusMock.subscriptions.find((s) => s.type === 'zone_captured');
+    expect(subscription).toBeDefined();
+    return subscription!.callback;
+  }
+
+  it('plays capture audio from the objective position when the player is near the objective', async () => {
+    camera.position.set(16, 1.6, 0);
+    const manager = new AudioManager(scene, camera);
+    const playSpy = vi.spyOn(manager, 'playVariantSet').mockImplementation(() => {});
+
+    await manager.init();
+    const position = new THREE.Vector3(0, 0, 0);
+    zoneCaptureSubscription()({
+      zoneId: 'alpha',
+      zoneName: 'Alpha',
+      faction: Faction.US,
+      position,
+      radius: 18,
+    });
+
+    expect(playSpy).toHaveBeenCalledWith('zoneCapturedLocal', position, 0.6);
+  });
+
+  it('does not play capture audio for distant objective captures', async () => {
+    camera.position.set(200, 1.6, 0);
+    const manager = new AudioManager(scene, camera);
+    const playSpy = vi.spyOn(manager, 'play').mockImplementation(() => {});
+
+    await manager.init();
+    zoneCaptureSubscription()({
+      zoneId: 'bravo',
+      zoneName: 'Bravo',
+      faction: Faction.US,
+      position: new THREE.Vector3(0, 0, 0),
+      radius: 18,
+    });
+
+    expect(playSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('AudioManager — approved objective/capture variant pools', () => {
+  let scene: THREE.Scene;
+  let camera: THREE.Camera;
+
+  beforeEach(() => {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera();
+    (globalThis as any).window = (globalThis as any).window ?? {};
+    (globalThis as any).document = (globalThis as any).document ?? {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('promotes exactly five local objective and capture variants', () => {
+    expect(AUDIO_VARIANT_SETS.objectiveCompleteLocal).toHaveLength(5);
+    expect(AUDIO_VARIANT_SETS.zoneCapturedLocal).toHaveLength(5);
+    for (const key of AUDIO_VARIANT_SETS.objectiveCompleteLocal) {
+      expect(SOUND_CONFIGS[key]?.path).toMatch(/^assets\/optimized\/objectiveCompleteLocal\d{2}\.ogg$/);
+    }
+    for (const key of AUDIO_VARIANT_SETS.zoneCapturedLocal) {
+      expect(SOUND_CONFIGS[key]?.path).toMatch(/^assets\/optimized\/zoneCapturedLocal\d{2}\.ogg$/);
+      expect(SOUND_CONFIGS[key]?.path).not.toContain('capture-confirmation-alt-v2.ogg');
+    }
+  });
+
+  it('plays a variant set without immediately repeating the prior selected clip', () => {
+    const manager = new AudioManager(scene, camera);
+    const playSpy = vi.spyOn(manager, 'play').mockImplementation(() => {});
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    manager.playVariantSet('zoneCapturedLocal', new THREE.Vector3(1, 0, 2), 0.5);
+    manager.playVariantSet('zoneCapturedLocal', new THREE.Vector3(1, 0, 2), 0.5);
+
+    expect(playSpy).toHaveBeenNthCalledWith(1, 'zoneCapturedLocal01', expect.any(THREE.Vector3), 0.5);
+    expect(playSpy).toHaveBeenNthCalledWith(2, 'zoneCapturedLocal02', expect.any(THREE.Vector3), 0.5);
   });
 });

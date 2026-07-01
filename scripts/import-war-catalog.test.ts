@@ -24,9 +24,10 @@ import {
   warAssetCatalog,
   type WarAssetEntry,
 } from '../src/systems/assets/modelPaths';
-import { classForward, normalizeAxis, stripRedundantRootYaw, type GlbJson } from './import-war-catalog';
+import { classForward, emitCatalog, mergeCatalogEntries, normalizeAxis, stripRedundantRootYaw, type GlbJson } from './import-war-catalog';
 
-const MODELS_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'models');
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const MODELS_ROOT = join(REPO_ROOT, 'public', 'models');
 
 const COMPONENT_BYTES: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
 const TYPE_COMPONENTS: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
@@ -226,6 +227,7 @@ describe('modelPaths re-export keeps the legacy registry contract', () => {
     expect(StructureModels.BARBED_WIRE).toBe('structures/barbed-wire-fence.glb');
     expect(BuildingModels.FRENCH_VILLA).toBe('buildings/french-villa.glb');
     expect(PropModels.WOODEN_BARREL).toBe('props/wooden-barrel.glb');
+    expect(PropModels.FIELD_RADIO_VIEWMODEL).toBe('props/kiln-radio-2026-07/field-radio-viewmodel.glb');
   });
 
   it('exposes every catalogued path constant as an existing catalog slug', () => {
@@ -235,6 +237,59 @@ describe('modelPaths re-export keeps the legacy registry contract', () => {
         expect(match, `no catalog entry for path ${path}`).toBeTruthy();
       }
     }
+  });
+});
+
+describe('single-asset catalog append imports', () => {
+  function catalogEntry(overrides: Record<string, unknown>) {
+    return {
+      slug: 'supply-crate',
+      class: 'structures',
+      path: 'structures/supply-crate.glb',
+      forward: 'pos-z',
+      dims: [1, 1, 1],
+      tris: 1,
+      sizeKB: 1,
+      materials: 1,
+      minY: 0,
+      budgetStatus: 'PASS',
+      action: 'replace',
+      ...overrides,
+    };
+  }
+
+  it('merges an imported prop without dropping existing catalog entries', () => {
+    const merged = mergeCatalogEntries(
+      [catalogEntry({ slug: 'supply-crate' })] as any,
+      [catalogEntry({
+        slug: 'field-radio-viewmodel',
+        class: 'props',
+        path: 'props/kiln-radio-2026-07/field-radio-viewmodel.glb',
+        action: 'new',
+      })] as any,
+    );
+    expect(merged.map((e) => e.slug).sort()).toEqual(['field-radio-viewmodel', 'supply-crate']);
+
+    const emitted = emitCatalog(merged as any, 'kiln radio viewmodel 2026-07');
+    expect(emitted).toContain("SUPPLY_CRATE: 'structures/supply-crate.glb'");
+    expect(emitted).toContain("FIELD_RADIO_VIEWMODEL: 'props/kiln-radio-2026-07/field-radio-viewmodel.glb'");
+    expect(emitted).toContain('Source batch: kiln radio viewmodel 2026-07.');
+  });
+
+  it('records the imported Kiln radio as a prop with Kiln 2026-07 provenance', () => {
+    const radio = entry('field-radio-viewmodel');
+    expect(radio.class).toBe('props');
+    expect(radio.path).toBe('props/kiln-radio-2026-07/field-radio-viewmodel.glb');
+    expect(radio.budgetStatus).toBe('PASS');
+    expect(entry('supply-crate').path).toBe('structures/supply-crate.glb');
+
+    const provenance = JSON.parse(
+      readFileSync(join(REPO_ROOT, 'docs', 'asset-provenance', 'kiln-radio-2026-07', 'field-radio-viewmodel.provenance.json'), 'utf-8'),
+    ) as { sourceBatch: string; model: string; handEdit: string };
+    expect(provenance.sourceBatch).toBe('kiln radio viewmodel 2026-07');
+    expect(provenance.sourceBatch).not.toContain('repaint');
+    expect(provenance.model).toBe('google:gemini-3.5-flash');
+    expect(provenance.handEdit).toContain('TIJ Radio Viewmodel Drab');
   });
 });
 

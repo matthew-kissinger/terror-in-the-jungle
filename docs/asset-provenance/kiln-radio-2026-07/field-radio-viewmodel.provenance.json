@@ -1,0 +1,16 @@
+{
+  "slug": "field-radio-viewmodel",
+  "class": "props",
+  "action": "new",
+  "tijTarget": "props/kiln-radio-2026-07/field-radio-viewmodel.glb",
+  "provider": "google",
+  "model": "google:gemini-3.5-flash",
+  "sourceTimestamp": "2026-07-01T11:32:13.782Z",
+  "sourcePrompt": "Game-ready first-person viewmodel prop for a serious tactical Vietnam War jungle combat browser game: a compact late-1960s field radio control box inspired by AN/PRC-25 / PRC-77 gear, scaled to be held up in front of the player's chest while calling fire support. Device only, no human hands.\n\nReadable silhouette: squat rectangular olive-drab metal body with rounded protective corner guards, raised front control face, large black tuning dial, two smaller volume/channel knobs, push-to-talk handset clipped on the left side, short coiled handset cable, collapsible whip antenna folded partly back, rugged battery seam at the bottom, khaki canvas shoulder strap loops, small metal screws and jack collars. Include a tiny muted glass meter/lens but no modern digital display.\n\nViewmodel requirements: front face should read clearly from a first-person camera; make controls chunky, attached, and easy to recognize at small scale. Keep the profile compact enough to sit in the lower-center/left of the screen without blocking the reticle. Center pivot, clean hard-surface low-poly GLB, no floating parts, no thin text meshes, no readable words, no logos, no US insignia, no decals that are just labels. Palette should stay within olive drab, dark rubber/Bakelite, worn steel, khaki canvas, dull brass, dust-tan edge wear, and muted meter glass. Weathered but not cartoonish.",
+  "handEdit": "Kiln radio viewmodel candidate bc351ff7-5d44-4474-a232-daf347f0ef1c; TIJ Radio Viewmodel Drab palette.",
+  "appliedNormalization": "+X forward -> +Z forward",
+  "graftedJoints": [],
+  "budgetStatus": "PASS",
+  "budgetReasons": [],
+  "sourceBatch": "kiln radio viewmodel 2026-07"
+}

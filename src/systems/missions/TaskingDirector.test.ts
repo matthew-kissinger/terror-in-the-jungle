@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { TaskingDirector } from './TaskingDirector';
 import { WarEventEmitter } from '../strategy/WarEventEmitter';
@@ -83,6 +83,10 @@ function fakeCard() {
 /** A ticket system double. Phase gates derivation/clear. */
 function fakeTickets(phase: string = 'COMBAT') {
   return { getGameState: () => ({ phase }) } as any;
+}
+
+function fakeAudio() {
+  return { playVariantSet: vi.fn() };
 }
 
 function makeDirector(opts: {
@@ -211,6 +215,42 @@ describe('TaskingDirector — opt-in transitions and reward', () => {
     expect(recorder.rewards).toHaveLength(1);
     expect(recorder.rewards[0].type).toBe('capture');
     expect(recorder.rewards[0].points).toBeGreaterThan(0);
+  });
+
+  it('plays local objective-complete audio only when the player is near the objective', () => {
+    const audio = fakeAudio();
+    const { director, tick, dispatch } = makeDirector({
+      zones: [zone({ name: 'NEAR', x: 20, z: 0, owner: Faction.NVA, state: ZoneState.OPFOR_CONTROLLED })],
+    });
+    director.setAudioManager(audio as any);
+    tick();
+    director.acceptOffer();
+
+    dispatch([
+      { type: 'zone_captured', zoneId: 'near', zoneName: 'NEAR', faction: Faction.US, timestamp: 0 },
+    ]);
+
+    expect(audio.playVariantSet).toHaveBeenCalledWith(
+      'objectiveCompleteLocal',
+      expect.any(THREE.Vector3),
+      expect.any(Number),
+    );
+  });
+
+  it('does not play objective-complete audio for distant task completion', () => {
+    const audio = fakeAudio();
+    const { director, tick, dispatch } = makeDirector({
+      zones: [zone({ name: 'DISTANT', x: 200, z: 0, owner: Faction.NVA, state: ZoneState.OPFOR_CONTROLLED })],
+    });
+    director.setAudioManager(audio as any);
+    tick();
+    director.acceptOffer();
+
+    dispatch([
+      { type: 'zone_captured', zoneId: 'distant', zoneName: 'DISTANT', faction: Faction.US, timestamp: 0 },
+    ]);
+
+    expect(audio.playVariantSet).not.toHaveBeenCalled();
   });
 
   it('fails the active DEFEND task without reward when the zone is lost', () => {

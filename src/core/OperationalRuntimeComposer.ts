@@ -178,6 +178,7 @@ function wireStrategyRuntime(runtime: OperationalRuntimeGroups['strategyRuntime'
   runtime.taskingDirector.setZoneQuery(runtime.zoneManager);
   runtime.taskingDirector.setTicketSystem(runtime.ticketSystem);
   runtime.taskingDirector.setTaskCard(runtime.hudSystem.getTaskCard());
+  runtime.taskingDirector.setAudioManager?.(runtime.audioManager);
 
   runtime.gameModeManager.setWarSimulator(runtime.warSimulator);
   runtime.minimapSystem.setWarSimulator(runtime.warSimulator);

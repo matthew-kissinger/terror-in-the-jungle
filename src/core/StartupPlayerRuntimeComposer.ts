@@ -27,38 +27,7 @@ import type {
   VehicleMarkerEntry,
 } from '../ui/compass/CompassVehicleMarkers';
 
-type StartupPlayerRuntimeRefs = Pick<
-  SystemKeyToType,
-  | 'audioManager'
-  | 'cameraShakeSystem'
-  | 'combatantSystem'
-  | 'commandInputManager'
-  | 'compassSystem'
-  | 'firstPersonWeapon'
-  | 'footstepAudioSystem'
-  | 'fullMapSystem'
-  | 'gameModeManager'
-  | 'grenadeSystem'
-  | 'helicopterModel'
-  | 'helipadSystem'
-  | 'hudSystem'
-  | 'inventoryManager'
-  | 'loadoutService'
-  | 'm2hbEmplacementSystem'
-  | 'minimapSystem'
-  | 'mortarSystem'
-  | 'playerController'
-  | 'playerHealthSystem'
-  | 'playerRespawnManager'
-  | 'playerSquadController'
-  | 'playerSuppressionSystem'
-  | 'sandbagSystem'
-  | 'terrainSystem'
-  | 'ticketSystem'
-  | 'vehicleManager'
-  | 'warSimulator'
-  | 'zoneManager'
->;
+type StartupPlayerRuntimeRefs = SystemKeyToType;
 
 interface StartupPlayerRuntimeGroups {
   playerRuntime: Pick<
@@ -72,6 +41,7 @@ interface StartupPlayerRuntimeGroups {
     | 'fullMapSystem'
     | 'gameModeManager'
     | 'grenadeSystem'
+    | 'heldEquipmentViewmodelSystem'
     | 'helicopterModel'
     | 'hudSystem'
     | 'inventoryManager'
@@ -84,6 +54,7 @@ interface StartupPlayerRuntimeGroups {
     | 'playerSquadController'
     | 'playerSuppressionSystem'
     | 'sandbagSystem'
+    | 'smokeMarkerSystem'
     | 'terrainSystem'
     | 'ticketSystem'
     | 'vehicleManager'
@@ -152,6 +123,7 @@ export function createStartupPlayerRuntimeGroups(
       fullMapSystem: refs.fullMapSystem,
       gameModeManager: refs.gameModeManager,
       grenadeSystem: refs.grenadeSystem,
+      heldEquipmentViewmodelSystem: refs.heldEquipmentViewmodelSystem,
       helicopterModel: refs.helicopterModel,
       hudSystem: refs.hudSystem,
       inventoryManager: refs.inventoryManager,
@@ -164,6 +136,7 @@ export function createStartupPlayerRuntimeGroups(
       playerSquadController: refs.playerSquadController,
       playerSuppressionSystem: refs.playerSuppressionSystem,
       sandbagSystem: refs.sandbagSystem,
+      smokeMarkerSystem: refs.smokeMarkerSystem,
       terrainSystem: refs.terrainSystem,
       ticketSystem: refs.ticketSystem,
       vehicleManager: refs.vehicleManager,
@@ -227,6 +200,7 @@ function wirePlayerRuntime(
     fullMapSystem,
     gameModeManager,
     grenadeSystem,
+    heldEquipmentViewmodelSystem,
     helicopterModel,
     hudSystem,
     inventoryManager,
@@ -239,6 +213,7 @@ function wirePlayerRuntime(
     playerSquadController,
     playerSuppressionSystem,
     sandbagSystem,
+    smokeMarkerSystem,
     terrainSystem,
     ticketSystem,
     vehicleManager,
@@ -255,6 +230,7 @@ function wirePlayerRuntime(
     renderer: options.renderer,
     inventoryManager,
     grenadeSystem,
+    smokeMarkerSystem,
     mortarSystem,
     sandbagSystem,
     cameraShakeSystem,
@@ -340,6 +316,8 @@ function wirePlayerRuntime(
   firstPersonWeapon.setInventoryManager(inventoryManager);
   firstPersonWeapon.setAudioManager(audioManager);
   firstPersonWeapon.setGrenadeSystem(grenadeSystem);
+  smokeMarkerSystem?.setTerrainSystem(terrainSystem);
+  commandInputManager.configureHeldEquipment?.({ firstPersonWeapon, heldEquipment: heldEquipmentViewmodelSystem, smokeMarkerSystem });
 
   footstepAudioSystem.setTerrainSystem(terrainSystem);
 

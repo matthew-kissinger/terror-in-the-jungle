@@ -133,6 +133,7 @@
     "assets:bake-static-impostors": "npx tsx scripts/bake-static-impostor-atlases.ts",
     "assets:bleed-vegetation-atlases": "npx tsx scripts/bleed-vegetation-atlas-alpha.ts",
     "assets:generate-npc-crops": "npx tsx scripts/generate-pixel-forge-npc-tile-crops.ts",
+    "audio:fal:generate": "npx tsx scripts/generate-fal-audio.ts",
     "ui:matrix": "npx tsx scripts/ui-device-matrix.ts",
     "test": "vitest",
     "test:run": "vitest run",

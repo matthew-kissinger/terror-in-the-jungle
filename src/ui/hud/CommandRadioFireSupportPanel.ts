@@ -19,8 +19,8 @@ interface FireSupportRowRefs {
   status: HTMLSpanElement;
 }
 
-// Pull the fire-support + markings rows from the ONE shared radio model so this
-// panel and the revived dial render the same catalog (no duplicated lists).
+// Pull fire-support rows from the ONE shared radio model so this panel and the
+// revived dial render the same catalog (no duplicated lists).
 function fireSupportOptions(): Extract<RadioOption, { kind: 'fire-support' }>[] {
   const category = buildRadioCategories().find((c): c is RadioCategory => c.id === 'fire-support');
   return (category?.options ?? []).filter(
@@ -28,36 +28,26 @@ function fireSupportOptions(): Extract<RadioOption, { kind: 'fire-support' }>[] 
   );
 }
 
-function markingOptions(): Extract<RadioOption, { kind: 'marking' }>[] {
-  const category = buildRadioCategories().find((c): c is RadioCategory => c.id === 'markings');
-  return (category?.options ?? []).filter(
-    (o): o is Extract<RadioOption, { kind: 'marking' }> => o.kind === 'marking',
-  );
-}
-
 /**
- * FIRE SUPPORT section of the unified radio menu: the smoke/WP/grid mark toggle
- * plus the seven call-in assets, each with a plain label and a live cooldown.
+ * FIRE SUPPORT section of the unified command overlay: the call-in assets,
+ * each with a plain label and a live cooldown.
  * Pure presentation — selecting an asset fires `onAssetSelected`; the owner
  * (`CommandInputManager`) drives the real `AirSupportManager.requestSupport`
  * path. Extracted from `CommandModeOverlay` to keep that file within budget.
  *
- * It consumes the shared `RadioDialModel` for its catalog + cooldown resolution
- * so this legacy panel and the revived dial never drift apart.
+ * Smoke/WP/grid is no longer a top-level peer control here. The revived radio
+ * dial owns the target-method drilldown (`Use Smoke`, `Throw Smoke`,
+ * `Reticle/Grid`) so this legacy panel cannot reintroduce the vague Mark IA.
  */
 export class CommandRadioFireSupportPanel {
   static readonly STYLE_ID = 'command-radio-fire-support-styles';
 
   private readonly element: HTMLDivElement;
   private readonly readyValue: HTMLSpanElement;
-  private readonly markingButtons = new Map<AirSupportTargetMarking, HTMLButtonElement>();
   private readonly rows = new Map<AirSupportRadioAssetId, FireSupportRowRefs>();
   private readonly assetOptions = fireSupportOptions();
-  private readonly markings = markingOptions();
   private cooldowns: AirSupportRadioCooldowns = {};
-  private selectedMarking: AirSupportTargetMarking = 'smoke';
   private onAssetSelected?: (assetId: AirSupportRadioAssetId) => void;
-  private onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
 
   constructor() {
     this.element = document.createElement('div');
@@ -79,23 +69,8 @@ export class CommandRadioFireSupportPanel {
 
     const sub = document.createElement('span');
     sub.className = 'command-radio-fire__sub';
-    sub.textContent = 'Radio (T) — pick a mark, then call a strike where you look.';
+    sub.textContent = 'Radio (T) — call where you look, or use the radial to throw/use smoke.';
     this.element.appendChild(sub);
-
-    const markingRow = document.createElement('div');
-    markingRow.className = 'command-radio-fire__marks';
-    for (const marking of this.markings) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'command-radio-fire__mark';
-      button.dataset.radioMarking = marking.marking;
-      button.textContent = marking.label;
-      button.title = marking.detail;
-      button.addEventListener('click', () => this.onMarkingSelected?.(marking.marking));
-      this.markingButtons.set(marking.marking, button);
-      markingRow.appendChild(button);
-    }
-    this.element.appendChild(markingRow);
 
     const list = document.createElement('div');
     list.className = 'command-radio-fire__list';
@@ -119,7 +94,6 @@ export class CommandRadioFireSupportPanel {
     onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
   }): void {
     this.onAssetSelected = callbacks.onAssetSelected;
-    this.onMarkingSelected = callbacks.onMarkingSelected;
   }
 
   setCooldowns(cooldowns: AirSupportRadioCooldowns): void {
@@ -127,9 +101,9 @@ export class CommandRadioFireSupportPanel {
     this.render();
   }
 
-  setSelectedMarking(marking: AirSupportTargetMarking): void {
-    this.selectedMarking = marking;
-    this.render();
+  setSelectedMarking(_marking: AirSupportTargetMarking): void {
+    // Kept for the legacy CommandModeOverlay callback surface. Target method
+    // selection now lives in the radio radial drilldown.
   }
 
   dispose(): void {
@@ -183,13 +157,6 @@ export class CommandRadioFireSupportPanel {
       refs.button.classList.toggle('command-radio-fire__row--cooling', coolingDown);
     }
     this.readyValue.textContent = `${ready}/${this.assetOptions.length} ready`;
-
-    for (const marking of this.markings) {
-      this.markingButtons.get(marking.marking)?.setAttribute(
-        'aria-pressed',
-        marking.marking === this.selectedMarking ? 'true' : 'false'
-      );
-    }
   }
 
   private injectStyles(): void {

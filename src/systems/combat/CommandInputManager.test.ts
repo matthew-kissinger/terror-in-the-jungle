@@ -200,7 +200,7 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('keeps marking selections sticky on the dial without issuing a squad command', () => {
+  it('drills fire support into target methods without issuing a squad command', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -216,11 +216,13 @@ describe('CommandInputManager', () => {
 
     manager.toggleRadioMenu();
     const dial = visibleDialog()!;
-    drillCategory(dial, 'markings');
-    clickSector(dial, 'position_only');
+    drillCategory(dial, 'fire-support');
+    clickSector(dial, 'ac47_orbit');
 
-    // Marking is a sticky toggle — the dial stays open and no squad order fires.
+    // Fire support now drills into target methods before any strike is armed.
     expect(visibleDialog()).not.toBeNull();
+    expect(dial.querySelector('[data-radio-option="ac47_orbit:reticle-grid"]')).toBeTruthy();
+    expect(dial.querySelector('[data-radio-option="ac47_orbit:throw-smoke-marker"]')).toBeTruthy();
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
 
@@ -254,9 +256,10 @@ describe('CommandInputManager', () => {
     const dial = visibleDialog()!;
     drillCategory(dial, 'fire-support');
     clickSector(dial, 'ac47_orbit');
+    clickSector(dial, 'ac47_orbit:reticle-grid');
 
-    // Selecting an asset no longer fires immediately: it closes the dial and
-    // enters DESIGNATE (re-aimable). The strike only goes out on confirm.
+    // Choosing the reticle/grid target method closes the dial and enters
+    // DESIGNATE (re-aimable). The strike only goes out on confirm.
     expect(requestSupport).not.toHaveBeenCalled();
     expect(visibleDialog()).toBeNull();
 

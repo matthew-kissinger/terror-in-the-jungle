@@ -18,6 +18,13 @@ export class PlayerCombatController {
     const isGameActive = this.deps.ticketSystem ? this.deps.ticketSystem.isGameActive() : true;
     if (!isGameActive) return;
 
+    if (this.deps.smokeMarkerSystem?.isEquippedForThrow()) {
+      if (this.deps.smokeMarkerSystem.beginCharge()) {
+        this.deps.hudSystem?.showGrenadePowerMeter();
+      }
+      return;
+    }
+
     if (playerState.isInHelicopter && this.deps.helicopterModel && playerState.helicopterId) {
       this.deps.helicopterModel.startFiring(playerState.helicopterId);
       return;
@@ -51,6 +58,12 @@ export class PlayerCombatController {
   }
 
   endFire(playerState: PlayerState, currentWeaponMode: WeaponSlot): void {
+    if (this.deps.smokeMarkerSystem?.isHandlingInput()) {
+      this.deps.smokeMarkerSystem.releaseThrow();
+      this.deps.hudSystem?.hideGrenadePowerMeter();
+      return;
+    }
+
     if (playerState.isInHelicopter && this.deps.helicopterModel && playerState.helicopterId) {
       this.deps.helicopterModel.stopFiring(playerState.helicopterId);
       return;
@@ -130,6 +143,12 @@ export class PlayerCombatController {
     camera: THREE.Camera,
     _input: PlayerInput,
   ): void {
+    if (this.deps.smokeMarkerSystem?.isCharging()) {
+      const aimingState = this.deps.smokeMarkerSystem.getAimingState();
+      this.deps.hudSystem?.updateGrenadePower(aimingState.power);
+      return;
+    }
+
     const equipmentAction = this.deps.inventoryManager?.getEquipmentActionForSlot(currentWeaponMode) ?? null;
     if ((currentWeaponMode === WeaponSlot.SANDBAG || equipmentAction === 'sandbag') && this.deps.sandbagSystem) {
       this.deps.sandbagSystem.updatePreviewPosition(camera);

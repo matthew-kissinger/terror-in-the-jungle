@@ -11,6 +11,7 @@ import { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
+import { HeldEquipmentViewmodelSystem } from '../systems/player/HeldEquipmentViewmodelSystem';
 import { ZoneManager } from '../systems/world/ZoneManager';
 import { HUDSystem } from '../ui/hud/HUDSystem';
 import { TicketSystem } from '../systems/world/TicketSystem';
@@ -28,6 +29,7 @@ import { PlayerSquadController } from '../systems/combat/PlayerSquadController';
 import { CommandInputManager } from '../systems/combat/CommandInputManager';
 import { InventoryManager } from '../systems/player/InventoryManager';
 import { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
+import { SmokeMarkerSystem } from '../systems/weapons/SmokeMarkerSystem';
 import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
@@ -155,6 +157,7 @@ export class SystemInitializer {
 
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
+    refs.heldEquipmentViewmodelSystem = new HeldEquipmentViewmodelSystem();
     refs.zoneManager = new ZoneManager(scene);
     refs.zoneCaptureEffects = new ZoneCaptureEffects(scene);
     refs.ticketSystem = new TicketSystem();
@@ -227,6 +230,7 @@ export class SystemInitializer {
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
     refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.terrainSystem);
+    refs.smokeMarkerSystem = new SmokeMarkerSystem(scene, camera, refs.terrainSystem);
     refs.mortarSystem = new MortarSystem(scene, camera, refs.terrainSystem);
     refs.sandbagSystem = new SandbagSystem(scene, camera, refs.terrainSystem);
     refs.cameraShakeSystem = new CameraShakeSystem();
@@ -262,6 +266,7 @@ export class SystemInitializer {
       refs.atmosphereSystem,
       refs.playerController,
       refs.firstPersonWeapon,
+      refs.heldEquipmentViewmodelSystem,
       refs.combatantSystem,
       refs.zoneManager,
       refs.zoneCaptureEffects,
@@ -281,6 +286,7 @@ export class SystemInitializer {
       refs.commandInputManager,
       refs.inventoryManager,
       refs.grenadeSystem,
+      refs.smokeMarkerSystem,
       refs.mortarSystem,
       refs.sandbagSystem,
       refs.cameraShakeSystem,

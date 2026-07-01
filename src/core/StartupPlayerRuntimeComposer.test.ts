@@ -38,6 +38,7 @@ function createRefs() {
       ]),
     },
     commandInputManager: {
+      configureHeldEquipment: vi.fn(),
       mountTo: vi.fn(),
       setCombatantSystem: vi.fn(),
       setGameModeManager: vi.fn(),
@@ -71,6 +72,7 @@ function createRefs() {
     },
     gameModeManager: {},
     grenadeSystem: {},
+    heldEquipmentViewmodelSystem: {},
     helicopterModel: {},
     helipadSystem: {},
     hudSystem: {
@@ -162,6 +164,9 @@ function createRefs() {
       setPlayerController: vi.fn(),
     },
     sandbagSystem: {},
+    smokeMarkerSystem: {
+      setTerrainSystem: vi.fn(),
+    },
     terrainSystem: {},
     ticketSystem: {},
     vehicleManager: {
@@ -204,6 +209,12 @@ describe('StartupPlayerRuntimeComposer', () => {
     expect(refs.hudSystem.setGrenadeSystem).toHaveBeenCalledWith(refs.grenadeSystem);
     expect(refs.hudSystem.setMortarSystem).toHaveBeenCalledWith(refs.mortarSystem);
     expect(refs.firstPersonWeapon.setStatsTracker).toHaveBeenCalledWith(statsTracker);
+    expect(refs.smokeMarkerSystem.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);
+    expect(refs.commandInputManager.configureHeldEquipment).toHaveBeenCalledWith({
+      firstPersonWeapon: refs.firstPersonWeapon,
+      heldEquipment: refs.heldEquipmentViewmodelSystem,
+      smokeMarkerSystem: refs.smokeMarkerSystem,
+    });
     expect(refs.playerRespawnManager.setLoadoutService).toHaveBeenCalledWith(refs.loadoutService);
     expect(refs.playerRespawnManager.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.inventoryManager.setLoadout).toHaveBeenCalledWith(currentLoadout);

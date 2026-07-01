@@ -10,6 +10,7 @@ import type { WarSimulator } from '../strategy/WarSimulator';
 import type { TicketSystem } from '../world/TicketSystem';
 import type { WarEvent } from '../strategy/types';
 import type { HudTaskCard, TaskCardView } from '../../ui/hud/HudTaskCard';
+import type { AudioManager } from '../audio/AudioManager';
 
 /**
  * TaskingDirector — an opt-in "what should I do next" loop for A Shau.
@@ -71,6 +72,8 @@ const DEFEND_REWARD = 150;
 const BAND_MULTIPLIER: Record<TaskValueBand, number> = { low: 1, med: 1.5, high: 2 };
 const BLEED_MED = 0.5;
 const BLEED_HIGH = 1.0;
+const OBJECTIVE_COMPLETE_AUDIO_NEAR_MARGIN_M = 8;
+const OBJECTIVE_COMPLETE_AUDIO_VOLUME = 0.72;
 
 interface ActiveTask {
   readonly candidate: TaskCandidate;
@@ -82,6 +85,7 @@ export class TaskingDirector implements GameSystem {
   private warSimulator: WarSimulator | null = null;
   private ticketSystem: TicketSystem | null = null;
   private card: HudTaskCard | null = null;
+  private audioManager: Pick<AudioManager, 'playVariantSet'> | null = null;
 
   private playerAlliance: Alliance = Alliance.BLUFOR;
   private playerX = 0;
@@ -156,6 +160,10 @@ export class TaskingDirector implements GameSystem {
       onClear: () => this.clearActive('cleared'),
     });
     this.render();
+  }
+
+  setAudioManager(audioManager: Pick<AudioManager, 'playVariantSet'>): void {
+    this.audioManager = audioManager;
   }
 
   setPlayerAlliance(alliance: Alliance): void {
@@ -318,6 +326,7 @@ export class TaskingDirector implements GameSystem {
     if (!this.active) return;
     const task = this.active.candidate;
     this.dispatchReward(task);
+    this.playCompletionAudioIfNear(task);
     this.card?.showCompleted(task);
     this.active = null;
     this.deriveAccumulatorS = 0;
@@ -345,6 +354,17 @@ export class TaskingDirector implements GameSystem {
     const base = task.kind === 'capture' ? CAPTURE_REWARD : DEFEND_REWARD;
     const popupType: 'capture' | 'defend' = task.kind === 'capture' ? 'capture' : 'defend';
     this.card.dispatchReward(popupType, base, BAND_MULTIPLIER[task.band]);
+  }
+
+  private playCompletionAudioIfNear(task: TaskCandidate): void {
+    if (!this.audioManager || !this.zoneQuery) return;
+    const zone = this.zoneQuery.getZoneById(task.zoneId);
+    if (!zone) return;
+    const dx = Number(zone.position.x) - this.playerX;
+    const dz = Number(zone.position.z) - this.playerZ;
+    const audibleRadius = Math.max(0, zone.radius) + OBJECTIVE_COMPLETE_AUDIO_NEAR_MARGIN_M;
+    if (Math.hypot(dx, dz) > audibleRadius) return;
+    this.audioManager.playVariantSet('objectiveCompleteLocal', zone.position, OBJECTIVE_COMPLETE_AUDIO_VOLUME);
   }
 
   // -- Timers --

@@ -208,10 +208,11 @@ sheet) on a dedicated HUD slot + a headless `RadioStationSystem` (3 Kevin MacLeo
 CC-BY tracks, lazy, DEFAULT-OFF) wired to the dial (P4b); day/night
 `SoundscapeDirector` replacing the permanent loop; device-aware tasking-director
 card; and a terrain-tower fix (impostor card height clamped — the ~100m "towers"
-were inflated GLB billboard cards, NOT terrain). NOT deployed (deploy is MANUAL —
-owner ships after the walk). Owner feel-walks + the post default-on flip (behind a
-MAIN-worktree combat120 p99 neutrality proof) are queued in
-[PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
+were inflated GLB billboard cards, NOT terrain). Folded into the July 1
+production-review release with the soundscape default-off and radio IA follow-up
+recorded in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). Owner feel-walks + the post
+default-on flip (behind a MAIN-worktree combat120 p99 neutrality proof) remain
+queued. No active cycle.
 
 **Prior campaign — [CAMPAIGN_2026-06-28-field-readiness.md](CAMPAIGN_2026-06-28-field-readiness.md)**
 (6 phases, `auto-advance: yes`, `posture: autonomous-loop`; scaffolded 2026-06-28
@@ -226,9 +227,9 @@ CLOSED 2026-06-28 (#441-#443, perf A/B PASS, playtest-deferred); Phase 5
 no perf gate — UI/deploy, playtest-deferred); Phase 6
 (`cycle-2026-06-28-ashau-purpose-and-missions`) CLOSED 2026-06-29 (#451-#455, perf
 A/B PASS R1 −5.6% / R2 +0.6%, playtest-deferred). **CAMPAIGN COMPLETE** — all 6
-phases closed; 31 PRs (#425-#455) merged, zero fence changes. NOT deployed (deploy
-is MANUAL — owner ships after the morning walk). The owner-walk deferrals for all 6
-phases are queued in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
+phases closed; 31 PRs (#425-#455) merged, zero fence changes. Folded into the
+July 1 production-review release; owner-walk deferrals for all 6 phases remain
+queued in [PLAYTEST_PENDING](PLAYTEST_PENDING.md). No active cycle.
 
 Prior campaigns (engineering closed; owner walks pending in
 [PLAYTEST_PENDING](PLAYTEST_PENDING.md)) — both 2026-06-09 `/goal` campaigns completed

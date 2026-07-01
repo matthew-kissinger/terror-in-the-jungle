@@ -93,6 +93,7 @@ export class SoundscapeDirector {
   /** Start the persistent beds. Idempotent. */
   start(): void {
     if (this.isPlaying) return;
+    if (!this.config.enabled) return;
     this.isPlaying = true;
 
     this.dayWeight = this.sampleTargetDayWeight();

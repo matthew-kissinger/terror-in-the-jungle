@@ -52,6 +52,7 @@ describe('RadioStationSystem', () => {
   let factory: () => THREE.Audio;
   let loadCalls: string[];
   let loadTrack: (path: string) => Promise<AudioBuffer>;
+  let alternateStation: typeof RADIO_STATIONS[number];
 
   beforeEach(() => {
     created = [];
@@ -66,6 +67,7 @@ describe('RadioStationSystem', () => {
       loadCalls.push(path);
       return Promise.resolve({ path } as unknown as AudioBuffer);
     };
+    alternateStation = RADIO_STATIONS[RADIO_STATIONS.length - 1];
     localStorage.removeItem(LAST_STATION_STORAGE_KEY);
   });
 
@@ -113,7 +115,7 @@ describe('RadioStationSystem', () => {
     const firstVolBefore = first.volume;
     expect(firstVolBefore).toBeGreaterThan(0);
 
-    await radio.tuneTo(RADIO_STATIONS[2].id);
+    await radio.tuneTo(alternateStation.id);
     await flush();
 
     // A second voice is now rising from silence.
@@ -124,13 +126,13 @@ describe('RadioStationSystem', () => {
     // outgoing still audible (eased, not snapped).
     radio.update(0.1);
     expect(second.volume).toBeGreaterThan(0);
-    expect(second.volume).toBeLessThan(RADIO_STATIONS[2].trim);
+    expect(second.volume).toBeLessThan(alternateStation.trim);
     expect(first.volume).toBeGreaterThan(0);
 
     // Given enough time the crossfade completes and the old voice is silenced.
     for (let i = 0; i < 40; i++) radio.update(0.1);
     expect(first.isPlaying).toBe(false);
-    expect(second.volume).toBeCloseTo(RADIO_STATIONS[2].trim, 5);
+    expect(second.volume).toBeCloseTo(alternateStation.trim, 5);
   });
 
   it('holds at most 2 decoded buffers after tuning across every station', async () => {
@@ -168,12 +170,12 @@ describe('RadioStationSystem', () => {
     const radio = makeSystem();
     radio.setEnabled(true);
     await flush();
-    await radio.tuneTo(RADIO_STATIONS[2].id);
+    await radio.tuneTo(alternateStation.id);
     await flush();
 
     // A fresh system (new session) preselects the persisted station.
     const next = makeSystem();
-    expect(next.getSelectedStationId()).toBe(RADIO_STATIONS[2].id);
+    expect(next.getSelectedStationId()).toBe(alternateStation.id);
   });
 
   it('silences the music voices when disabled again', async () => {

@@ -9,6 +9,7 @@ import type { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBil
 import type { AtmosphereSystem } from '../systems/environment/AtmosphereSystem';
 import type { WeatherSystem } from '../systems/environment/WeatherSystem';
 import type { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
+import type { HeldEquipmentViewmodelSystem } from '../systems/player/HeldEquipmentViewmodelSystem';
 import type { ZoneManager } from '../systems/world/ZoneManager';
 import type { HUDSystem } from '../ui/hud/HUDSystem';
 import type { TicketSystem } from '../systems/world/TicketSystem';
@@ -25,6 +26,7 @@ import type { PlayerSquadController } from '../systems/combat/PlayerSquadControl
 import type { CommandInputManager } from '../systems/combat/CommandInputManager';
 import type { InventoryManager } from '../systems/player/InventoryManager';
 import type { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
+import type { SmokeMarkerSystem } from '../systems/weapons/SmokeMarkerSystem';
 import type { MortarSystem } from '../systems/weapons/MortarSystem';
 import type { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
@@ -62,6 +64,7 @@ export interface SystemKeyToType {
   atmosphereSystem: AtmosphereSystem;
   weatherSystem: WeatherSystem;
   firstPersonWeapon: FirstPersonWeapon;
+  heldEquipmentViewmodelSystem: HeldEquipmentViewmodelSystem;
   zoneManager: ZoneManager;
   hudSystem: HUDSystem;
   ticketSystem: TicketSystem;
@@ -78,6 +81,7 @@ export interface SystemKeyToType {
   commandInputManager: CommandInputManager;
   inventoryManager: InventoryManager;
   grenadeSystem: GrenadeSystem;
+  smokeMarkerSystem: SmokeMarkerSystem;
   mortarSystem: MortarSystem;
   sandbagSystem: SandbagSystem;
   cameraShakeSystem: CameraShakeSystem;
@@ -153,6 +157,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'atmosphereSystem',
   'weatherSystem',
   'firstPersonWeapon',
+  'heldEquipmentViewmodelSystem',
   'zoneManager',
   'hudSystem',
   'ticketSystem',
@@ -169,6 +174,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'commandInputManager',
   'inventoryManager',
   'grenadeSystem',
+  'smokeMarkerSystem',
   'mortarSystem',
   'sandbagSystem',
   'cameraShakeSystem',

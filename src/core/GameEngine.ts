@@ -34,6 +34,7 @@ import { objectPool } from '../utils/ObjectPoolManager';
 import { resetHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { InputContextManager } from '../systems/input/InputContextManager';
+import { HeldEquipmentViewmodelSystem } from '../systems/player/HeldEquipmentViewmodelSystem';
 
 // Import split modules
 import * as Init from './GameEngineInit';
@@ -71,6 +72,7 @@ export class GameEngine {
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
   public readonly startupFlow = new StartupFlowController();
+  private heldEquipmentViewmodelSystem?: HeldEquipmentViewmodelSystem;
 
   // State (Public for split module access)
   public clock = new THREE.Timer();
@@ -469,6 +471,17 @@ export class GameEngine {
 
       const currentAutoClear = renderer.autoClear;
       renderer.autoClear = false;
+
+      const heldEquipment = this.heldEquipmentViewmodelSystem ??=
+        (this.systemManager.getSystems?.() ?? []).find((system): system is HeldEquipmentViewmodelSystem =>
+          system instanceof HeldEquipmentViewmodelSystem
+        );
+      if (heldEquipment?.canRenderOverlay()) {
+        const equipmentScene = heldEquipment.getOverlayScene();
+        const equipmentCamera = heldEquipment.getOverlayCamera();
+        renderer.clearDepth();
+        renderer.render(equipmentScene, equipmentCamera);
+      }
 
       if (
         this.systemManager.grenadeSystem

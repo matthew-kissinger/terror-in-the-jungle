@@ -34,8 +34,22 @@ const _launcherStartPos = new THREE.Vector3()
 const _launcherVelocity = new THREE.Vector3()
 
 const PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE = 1.35
+const PLAYER_TRACER_OVERLAY_NDC_LIMIT = 1.15
 const PLAYER_BARREL_FALLBACK_RIGHT = 0.18
 const PLAYER_BARREL_FALLBACK_UP = -0.14
+
+export type ShotOriginProjectionMode = 'overlay-muzzle' | 'ads-camera' | 'hip-camera'
+
+export interface ShotOriginDiagnostics {
+  weaponType: ShotCommand['weaponType']
+  isADS: boolean
+  projectionMode: ShotOriginProjectionMode
+  damageRayOrigin: THREE.Vector3
+  damageRayDirection: THREE.Vector3
+  visualTracerStart: THREE.Vector3
+  visualTracerEnd: THREE.Vector3
+  overlayMuzzleNdc: THREE.Vector3 | null
+}
 
 /**
  * Handles weapon firing execution. Uses command pattern to avoid temporal coupling.
@@ -58,6 +72,20 @@ export class WeaponFiring {
   private overlayScene: THREE.Scene
   private overlayCamera?: THREE.Camera
   private grenadeSystem?: GrenadeSystem
+  private readonly lastShotOriginDiagnostics: ShotOriginDiagnostics = {
+    weaponType: 'rifle',
+    isADS: false,
+    projectionMode: 'hip-camera',
+    damageRayOrigin: new THREE.Vector3(),
+    damageRayDirection: new THREE.Vector3(),
+    visualTracerStart: new THREE.Vector3(),
+    visualTracerEnd: new THREE.Vector3(),
+    overlayMuzzleNdc: null,
+  }
+  private hasLastShotOriginDiagnostics = false
+  private lastTracerProjectionMode: ShotOriginProjectionMode = 'hip-camera'
+  private readonly overlayMuzzleNdcForDiagnostics = new THREE.Vector3()
+  private hasLastOverlayMuzzleNdc = false
 
   constructor(
     camera: THREE.Camera,
@@ -229,6 +257,7 @@ export class WeaponFiring {
   private spawnBarrelAlignedTracer(command: ShotCommand, result: ShotResult): void {
     this.resolveTracerStart(_barrelOrigin, command.isADS)
     this.resolveAimPoint(command, _aimPoint, result.hitPoint)
+    _tracerEnd.copy(_aimPoint)
 
     _barrelDirection.subVectors(_aimPoint, _barrelOrigin)
     if (_barrelDirection.lengthSq() <= 0.0001) {
@@ -258,6 +287,7 @@ export class WeaponFiring {
       }
       this.tracerPool.spawn(_barrelOrigin, _tracerEnd, 120)
     }
+    this.recordShotOriginDiagnostics(command)
   }
 
   private resolveAimPoint(
@@ -275,6 +305,8 @@ export class WeaponFiring {
   private resolveTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3 {
     this.camera.getWorldPosition(_cameraPos)
     this.camera.getWorldDirection(_forward)
+    this.lastTracerProjectionMode = isADS ? 'ads-camera' : 'hip-camera'
+    this.hasLastOverlayMuzzleNdc = false
 
     if (this.muzzleRef && this.overlayCamera) {
       this.camera.updateMatrixWorld(true)
@@ -282,11 +314,17 @@ export class WeaponFiring {
       this.muzzleRef.updateWorldMatrix(true, false)
       this.muzzleRef.getWorldPosition(_muzzlePos)
       _overlayMuzzleNdc.copy(_muzzlePos).project(this.overlayCamera)
+      this.overlayMuzzleNdcForDiagnostics.copy(_overlayMuzzleNdc)
+      this.hasLastOverlayMuzzleNdc = true
+      if (!isUsableOverlayMuzzleProjection(_overlayMuzzleNdc)) {
+        return this.resolveCameraBasisTracerStart(target, isADS)
+      }
       _muzzleRayPoint
         .set(_overlayMuzzleNdc.x, _overlayMuzzleNdc.y, 0.5)
         .unproject(this.camera)
       _barrelDirection.subVectors(_muzzleRayPoint, _cameraPos)
       if (_barrelDirection.lengthSq() > 0.0001) {
+        this.lastTracerProjectionMode = 'overlay-muzzle'
         return target.copy(_cameraPos).addScaledVector(
           _barrelDirection.normalize(),
           PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE
@@ -294,12 +332,18 @@ export class WeaponFiring {
       }
     }
 
+    return this.resolveCameraBasisTracerStart(target, isADS)
+  }
+
+  private resolveCameraBasisTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3 {
     if (isADS) {
       // ADS: barrel is centered on screen, use camera origin with small forward offset
+      this.lastTracerProjectionMode = 'ads-camera'
       return target.copy(_cameraPos).addScaledVector(_forward, PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE)
     }
 
     this.camera.getWorldQuaternion(_cameraQuat)
+    this.lastTracerProjectionMode = 'hip-camera'
 
     // Hip-fire: camera-relative offset to approximate barrel position.
     // Avoids NDC projection which can clamp to screen edges during recoil,
@@ -312,7 +356,43 @@ export class WeaponFiring {
       .addScaledVector(_forward, PLAYER_TRACER_FORWARD_PRESENTATION_DISTANCE)
   }
 
+  private recordShotOriginDiagnostics(command: ShotCommand): void {
+    this.lastShotOriginDiagnostics.weaponType = command.weaponType
+    this.lastShotOriginDiagnostics.isADS = command.isADS
+    this.lastShotOriginDiagnostics.projectionMode = this.lastTracerProjectionMode
+    this.lastShotOriginDiagnostics.damageRayOrigin.copy(command.ray.origin)
+    this.lastShotOriginDiagnostics.damageRayDirection.copy(command.ray.direction)
+    this.lastShotOriginDiagnostics.visualTracerStart.copy(_barrelOrigin)
+    this.lastShotOriginDiagnostics.visualTracerEnd.copy(_tracerEnd)
+    this.lastShotOriginDiagnostics.overlayMuzzleNdc = this.hasLastOverlayMuzzleNdc
+      ? this.overlayMuzzleNdcForDiagnostics
+      : null
+    this.hasLastShotOriginDiagnostics = true
+  }
+
+  getLastShotOriginDiagnostics(): ShotOriginDiagnostics | null {
+    if (!this.hasLastShotOriginDiagnostics) return null
+    return {
+      weaponType: this.lastShotOriginDiagnostics.weaponType,
+      isADS: this.lastShotOriginDiagnostics.isADS,
+      projectionMode: this.lastShotOriginDiagnostics.projectionMode,
+      damageRayOrigin: this.lastShotOriginDiagnostics.damageRayOrigin.clone(),
+      damageRayDirection: this.lastShotOriginDiagnostics.damageRayDirection.clone(),
+      visualTracerStart: this.lastShotOriginDiagnostics.visualTracerStart.clone(),
+      visualTracerEnd: this.lastShotOriginDiagnostics.visualTracerEnd.clone(),
+      overlayMuzzleNdc: this.lastShotOriginDiagnostics.overlayMuzzleNdc?.clone() ?? null,
+    }
+  }
+
   getGunCore(): GunplayCore {
     return this.gunCore
   }
+}
+
+function isUsableOverlayMuzzleProjection(ndc: THREE.Vector3): boolean {
+  return Number.isFinite(ndc.x)
+    && Number.isFinite(ndc.y)
+    && Number.isFinite(ndc.z)
+    && Math.abs(ndc.x) <= PLAYER_TRACER_OVERLAY_NDC_LIMIT
+    && Math.abs(ndc.y) <= PLAYER_TRACER_OVERLAY_NDC_LIMIT
 }

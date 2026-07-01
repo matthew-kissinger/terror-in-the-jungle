@@ -9,10 +9,9 @@
  * catalogs into a uniform category → option tree so the two views render the
  * same data and the controller issues the same intents:
  *
- *   - FIRE SUPPORT ← `AIR_SUPPORT_RADIO_ASSETS` (+ `radioAssetToSupportType`)
+ *   - FIRE SUPPORT ← `AIR_SUPPORT_RADIO_ASSETS` (+ target-mode drilldown)
  *   - SQUAD        ← `SQUAD_QUICK_COMMAND_OPTIONS`
- *   - MARKINGS     ← `AIR_SUPPORT_TARGET_MARKINGS`
- *   - STATIONS     ← `RADIO_STATIONS` (always-available; routed to RadioStationSystem)
+ *   - SIGNALS      ← `RADIO_STATIONS` (always-available; routed to RadioStationSystem)
  *
  * The model is pure data + helpers (no DOM, no THREE). Cooldown state is fed in
  * by the controller and resolved by support TYPE, so two radio assets that
@@ -22,7 +21,6 @@
 
 import {
   AIR_SUPPORT_RADIO_ASSETS,
-  AIR_SUPPORT_TARGET_MARKINGS,
   getCooldownRemaining,
   radioAssetToSupportType,
   type AirSupportRadioAssetId,
@@ -33,8 +31,10 @@ import { SQUAD_QUICK_COMMAND_OPTIONS } from '../../../systems/combat/SquadComman
 import type { SquadCommand } from '../../../systems/combat/types';
 import { RADIO_STATIONS } from '../../../config/radioStations';
 
-/** The four always-present categories on the dial (inner ring on desktop). */
-export type RadioCategoryId = 'fire-support' | 'squad' | 'markings' | 'stations';
+/** The three always-present categories on the dial (inner ring on desktop). */
+export type RadioCategoryId = 'fire-support' | 'squad' | 'signals';
+
+export type FireSupportTargetMode = 'current-smoke' | 'throw-smoke-marker' | 'reticle-grid';
 
 /**
  * A leaf option on an outer ring / drill list. The discriminated `kind`
@@ -49,19 +49,20 @@ export type RadioOption =
       assetId: AirSupportRadioAssetId;
     }
   | {
+      kind: 'fire-support-target';
+      id: string;
+      label: string;
+      detail: string;
+      targetMode: FireSupportTargetMode;
+      assetId: AirSupportRadioAssetId;
+    }
+  | {
       kind: 'squad';
       id: string;
       label: string;
       detail: string;
       slot: number;
       command: SquadCommand;
-    }
-  | {
-      kind: 'marking';
-      id: string;
-      label: string;
-      detail: string;
-      marking: AirSupportTargetMarking;
     }
   | {
       kind: 'station';
@@ -86,16 +87,21 @@ export interface RadioCategory {
  * directly — they all funnel through the controller.
  */
 export type RadioIntent =
-  | { kind: 'fire-support'; assetId: AirSupportRadioAssetId; marking: AirSupportTargetMarking }
+  | {
+      kind: 'fire-support';
+      assetId: AirSupportRadioAssetId;
+      marking: AirSupportTargetMarking;
+      targetMode: Exclude<FireSupportTargetMode, 'throw-smoke-marker'>;
+    }
+  | { kind: 'throw-smoke-marker'; assetId: AirSupportRadioAssetId }
   | { kind: 'squad'; slot: number; command: SquadCommand }
-  | { kind: 'marking'; marking: AirSupportTargetMarking }
   | { kind: 'station'; stationId: string };
 
 function buildFireSupportCategory(): RadioCategory {
   return {
     id: 'fire-support',
     label: 'Fire Support',
-    hint: 'Call a strike where you look.',
+    hint: 'Choose aircraft, then target method.',
     options: AIR_SUPPORT_RADIO_ASSETS.map((asset) => ({
       kind: 'fire-support' as const,
       id: asset.id,
@@ -122,25 +128,10 @@ function buildSquadCategory(): RadioCategory {
   };
 }
 
-function buildMarkingsCategory(): RadioCategory {
+function buildSignalsCategory(): RadioCategory {
   return {
-    id: 'markings',
-    label: 'Mark',
-    hint: 'Pick how the next strike is marked.',
-    options: AIR_SUPPORT_TARGET_MARKINGS.map((marking) => ({
-      kind: 'marking' as const,
-      id: marking.id,
-      label: marking.shortLabel,
-      detail: marking.label,
-      marking: marking.id,
-    })),
-  };
-}
-
-function buildStationsCategory(): RadioCategory {
-  return {
-    id: 'stations',
-    label: 'Stations',
+    id: 'signals',
+    label: 'Signals',
     hint: 'Tune the field radio.',
     options: RADIO_STATIONS.map((station) => ({
       kind: 'station' as const,
@@ -161,8 +152,36 @@ export function buildRadioCategories(): RadioCategory[] {
   return [
     buildFireSupportCategory(),
     buildSquadCategory(),
-    buildMarkingsCategory(),
-    buildStationsCategory(),
+    buildSignalsCategory(),
+  ];
+}
+
+export function buildFireSupportTargetOptions(assetId: AirSupportRadioAssetId): RadioOption[] {
+  return [
+    {
+      kind: 'fire-support-target',
+      id: `${assetId}:current-smoke`,
+      label: 'Use Smoke',
+      detail: 'Use the active smoke marker.',
+      targetMode: 'current-smoke',
+      assetId,
+    },
+    {
+      kind: 'fire-support-target',
+      id: `${assetId}:throw-smoke-marker`,
+      label: 'Throw Smoke',
+      detail: 'Equip a smoke marker canister.',
+      targetMode: 'throw-smoke-marker',
+      assetId,
+    },
+    {
+      kind: 'fire-support-target',
+      id: `${assetId}:reticle-grid`,
+      label: 'Reticle/Grid',
+      detail: 'Designate where you look.',
+      targetMode: 'reticle-grid',
+      assetId,
+    },
   ];
 }
 
@@ -175,7 +194,7 @@ export function radioOptionCooldown(
   option: RadioOption,
   cooldowns: AirSupportRadioCooldowns,
 ): number {
-  if (option.kind !== 'fire-support') return 0;
+  if (option.kind !== 'fire-support' && option.kind !== 'fire-support-target') return 0;
   const type = radioAssetToSupportType[option.assetId];
   if (!type) return getCooldownRemaining(cooldowns, option.assetId);
   // Resolve by type: take the max remaining across every asset of this type so

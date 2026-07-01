@@ -638,15 +638,13 @@ export class HelicopterModel implements GameSystem {
         this.healthSystem.updateHUD(id);
       }
 
-      // Door gunner AI only matters for the piloted helicopter
-      if (isPiloted) {
-        this.doorGunner.update(deltaTime, id, helicopter.position, helicopter.quaternion, state.isGrounded);
-      }
+      // Player-controlled helicopters route every weapon stream through
+      // HelicopterWeaponSystem. The legacy door-gunner AI is kept isolated so
+      // it cannot emit a second damage/tracer path from a separate origin.
     }
 
     // Tick weapon effects once per frame
     this.weaponSystem.updateEffects(deltaTime);
-    this.doorGunner.updateEffects(deltaTime);
   }
 
   private updateHelicopterRenderVisibility(

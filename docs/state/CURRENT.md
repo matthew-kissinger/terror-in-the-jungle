@@ -1,6 +1,24 @@
 # Current State
 
-Last aligned: 2026-06-17 local / 2026-06-18 UTC: the latest harness checkpoint `77523bafac8fa744f1a0d72e715aec1f17603301` closes the remaining position-only nearest-OPFOR route cooldown gap by deriving the combatant id from the route identity key, and by cooling down `nearest_opfor` as well as `current_target` when a route stops making progress. It is on `master`, exact-head CI/deploy passed, and live production proof passed at `artifacts/perf/2026-06-18T02-03-11-394Z/projekt-143-live-release-proof/release-proof.json`. This follows Open Frontier EARS artifact `artifacts/perf/2026-06-18T01-38-06-039Z`, which stayed diagnostic-only: HUD vitals were visible and pressure-ready eventually passed, but the measured window underfired (`9/30` engine shots), failed sustained-contact and rAF dropped-frame gates, and ended on a failed `nearest_opfor` route. Focused proof is `node --check scripts/perf-active-driver.cjs`, `perf-active-driver.test.js`, `check-dropped-frame-ears.test.ts`, targeted ESLint, `npm run validate:fast`, and `npm run build`. The preceding stabilization checkpoints share one dense terrain fire-profile helper between AI LOS and CombatantCombat fire/preview blocking, cool down no-lock `combat_approach_unavailable` route targets, and treat missing current-target telemetry as unknown liveness rather than live. This is a shipped stabilization/evidence pipeline, not a dropped-frame completion claim. Runtime completion is not claimed until reboot/quiet-machine Open Frontier + A Shau EARS captures and owner playtest pass. Fable gated-systems readout and CI release-signal housekeeping proof from 2026-06-14 remain current; NOTE - all basin/level-depth water claims below are SUPERSEDED: hydrology + all water were stripped to first principles on 2026-06-09 and watercraft are dormant pending a future water rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING registry)
+Last aligned: 2026-07-01 local. The July 1 owner-playtest follow-up batch is
+code-complete and queued for production owner review: 3D deploy markers now have
+in-air labels + legend, ambient/static soundscape layers are default-off, the
+approved fal.ai objective/capture clips are promoted as local variant pools,
+objective audio is source-local instead of global, the radio IA is
+Fire Support/Squad/Signals with smoke-target drilldown, the Kiln field radio is
+imported through the war-asset catalog, the radio/smoke marker are held
+first-person equipment, throwable smoke creates a target mark, helicopter
+player-airframe effects have one firing owner, and infantry shot-origin
+diagnostics/tracer convergence are instrumented. Local proof: `npm run
+validate:fast`, `npm run build`, and `npm run check:asset-gallery -- --only
+field-radio-viewmodel`. Production owner acceptance remains open in
+[PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md). Previous dropped-frame
+completion is still not claimed until reboot/quiet-machine Open Frontier +
+A Shau EARS captures and owner playtest pass. NOTE - all basin/level-depth
+water claims below are SUPERSEDED: hydrology + all water were stripped to first
+principles on 2026-06-09 and watercraft are dormant pending a future water
+rework; owner visual/feel acceptance remains open across the PLAYTEST_PENDING
+registry.
 
 Top-level current-truth snapshot for the repo. Authoritative status lives in
 the registries below; this file is the short narrative pointer, not a second
@@ -26,13 +44,14 @@ That qualifier is mandatory in any public-facing claim about scale until
 Phase F lands. See [docs/ROADMAP.md](../ROADMAP.md) for the canonical sentence
 and phase summary.
 
-## Current focus (2026-06-17)
+## Current focus (2026-07-01)
 
 The most recent shipped work, newest first:
 
 - **2026-06-29 — cinematic field pass campaign** (`CAMPAIGN_2026-06-29-cinematic-field-pass`,
-  9 PRs #457-#465, autonomous-loop, **NOT deployed**): a visual + audio + map + HUD
-  pass merged to `master` behind safe defaults. P0 restored the `combat120` perf
+  9 PRs #457-#465, autonomous-loop, folded into the July 1 production-review
+  release): a visual + audio + map + HUD pass merged to `master` behind safe
+  defaults. P0 restored the `combat120` perf
   baseline + a shared `src/core/tsl/` node lib + the non-fenced
   `TerrainSystem.getBakedHeightmap()`. Shipped: a TSL post-stack (filmic grade +
   tier-gated bloom + atmospheric depth) **DEFAULT-OFF** behind

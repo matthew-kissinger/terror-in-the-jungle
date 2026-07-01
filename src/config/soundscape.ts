@@ -6,15 +6,17 @@
  *
  * Replaces the old two-clip `jungle1`/`jungle2` sequencer. The director keeps
  * two persistent looping beds (day + night) and crossfades between them based
- * on the sun elevation reported by `ISkyRuntime`. Wildlife one-shots are fired
- * from a small pool at randomized intervals on top of the active bed.
+ * on the sun elevation reported by `ISkyRuntime`.
  *
  * Asset note (cycle-2026-06-29-soundscape-loop-replacement): the shipped `.ogg`
  * files under `public/assets/audio/ambient/` are FIRST-PARTY placeholder beds
  * synthesized for this cycle (the cited Freesound CC-BY/CC0 beds could not be
- * fetched without account credentials). Production-quality field recordings are
- * an owner-sourcing follow-up; the architecture here is bed-agnostic, so
- * swapping the files needs no code change. See
+ * fetched without account credentials). The random one-shot layer is disabled
+ * after the 2026-07-01 owner playtest rejected the ambient/static pass; new
+ * cues must come through the fal.ai local-review workflow before promotion.
+ * Production-quality field recordings remain an owner-sourcing follow-up; the
+ * architecture here is bed-agnostic, so swapping the files needs no code
+ * change. See
  * `docs/asset-provenance/audio-2026-06/`.
  */
 
@@ -40,6 +42,8 @@ export interface SoundscapeOneShotConfig {
 }
 
 export interface SoundscapeConfig {
+  /** Runtime gate for the whole background soundscape. */
+  enabled: boolean;
   dayBed: SoundscapeBedConfig;
   nightBed: SoundscapeBedConfig;
   oneShots: SoundscapeOneShotConfig[];
@@ -53,13 +57,14 @@ export interface SoundscapeConfig {
   crossfadeHalfWidth: number;
   /** Per-second crossfade easing rate toward the sun-driven target weight. */
   crossfadeRatePerSecond: number;
-  /** Minimum seconds between wildlife one-shots. */
+  /** Minimum seconds between ambient one-shots. Inactive when `oneShots` is empty. */
   oneShotMinIntervalSeconds: number;
-  /** Maximum seconds between wildlife one-shots. */
+  /** Maximum seconds between ambient one-shots. Inactive when `oneShots` is empty. */
   oneShotMaxIntervalSeconds: number;
 }
 
 export const SOUNDSCAPE_CONFIG: SoundscapeConfig = {
+  enabled: false,
   dayBed: {
     key: 'ambientDay',
     path: 'assets/audio/ambient/jungle-day.ogg',
@@ -70,10 +75,7 @@ export const SOUNDSCAPE_CONFIG: SoundscapeConfig = {
     path: 'assets/audio/ambient/jungle-night.ogg',
     baseVolume: 0.28,
   },
-  oneShots: [
-    { key: 'wildlifeBird', path: 'assets/audio/ambient/wildlife-bird.ogg', baseVolume: 0.4, partOf: 'day' },
-    { key: 'wildlifeCall', path: 'assets/audio/ambient/wildlife-call.ogg', baseVolume: 0.35, partOf: 'any' },
-  ],
+  oneShots: [],
   dayNightMidElevation: 0.0,
   crossfadeHalfWidth: 0.12,
   crossfadeRatePerSecond: 0.5,
@@ -83,5 +85,6 @@ export const SOUNDSCAPE_CONFIG: SoundscapeConfig = {
 
 /** Asset keys the soundscape needs decoded before `start()` can mix. */
 export function soundscapeBedKeys(config: SoundscapeConfig = SOUNDSCAPE_CONFIG): string[] {
+  if (!config.enabled) return [];
   return [config.dayBed.key, config.nightBed.key];
 }

@@ -9,6 +9,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  buildFireSupportTargetOptions,
   buildRadioCategories,
   formatRadioCooldown,
   isRadioOptionReady,
@@ -25,12 +26,9 @@ function optionsOf(categoryId: string): RadioOption[] {
 }
 
 describe('RadioDialModel', () => {
-  it('always exposes the four channels including the always-available stations', () => {
+  it('always exposes the three inner channels with stations under Signals', () => {
     const ids = buildRadioCategories().map((c) => c.id);
-    expect(ids).toContain('fire-support');
-    expect(ids).toContain('squad');
-    expect(ids).toContain('markings');
-    expect(ids).toContain('stations');
+    expect(ids).toEqual(['fire-support', 'squad', 'signals']);
   });
 
   it('composes fire support from the air-support catalog without duplicating it', () => {
@@ -50,11 +48,26 @@ describe('RadioDialModel', () => {
   });
 
   it('composes stations from the radio-station catalog', () => {
-    const stations = optionsOf('stations');
+    const stations = optionsOf('signals');
     expect(stations).toHaveLength(RADIO_STATIONS.length);
     for (const station of RADIO_STATIONS) {
       expect(stations.some((o) => o.kind === 'station' && o.stationId === station.id)).toBe(true);
     }
+  });
+
+  it('builds the fire-support target drilldown for current smoke, throw smoke, and reticle/grid', () => {
+    const asset = AIR_SUPPORT_RADIO_ASSETS[0];
+    const targets = buildFireSupportTargetOptions(asset.id);
+    expect(targets.map((option) => option.kind)).toEqual([
+      'fire-support-target',
+      'fire-support-target',
+      'fire-support-target',
+    ]);
+    expect(targets.map((option) => option.kind === 'fire-support-target' ? option.targetMode : '')).toEqual([
+      'current-smoke',
+      'throw-smoke-marker',
+      'reticle-grid',
+    ]);
   });
 
   it('greys assets that share a sortie type together when one is cooling down', () => {
@@ -81,7 +94,7 @@ describe('RadioDialModel', () => {
 
   it('never cools down non-fire-support options', () => {
     const squad = optionsOf('squad')[0];
-    const station = optionsOf('stations')[0];
+    const station = optionsOf('signals')[0];
     expect(radioOptionCooldown(squad, { a1_napalm: 99 })).toBe(0);
     expect(radioOptionCooldown(station, { a1_napalm: 99 })).toBe(0);
     expect(isRadioOptionReady(squad, { a1_napalm: 99 })).toBe(true);

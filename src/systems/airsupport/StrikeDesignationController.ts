@@ -58,6 +58,7 @@ export class StrikeDesignationController {
   private gate: StrikeGateResult = { status: 'no_ground', canCommit: false, requiresOverride: false };
   private overrideArmed = false;
   private overrideElapsed = 0;
+  private fixedTarget?: THREE.Vector3;
 
   private readonly target = new THREE.Vector3();
   private readonly approach = new THREE.Vector3();
@@ -113,9 +114,22 @@ export class StrikeDesignationController {
     this.assetId = assetId;
     this.supportType = supportType;
     this.marking = marking;
+    this.fixedTarget = undefined;
     this.overrideArmed = false;
     this.overrideElapsed = 0;
     this.ensureMarker();
+    this.recompute();
+    return 'designating';
+  }
+
+  beginAtTarget(
+    assetId: AirSupportRadioAssetId,
+    marking: AirSupportTargetMarking,
+    target: THREE.Vector3,
+  ): 'designating' | 'rejected' | 'unwired' {
+    const outcome = this.begin(assetId, marking);
+    if (outcome !== 'designating') return outcome;
+    this.fixedTarget = target.clone();
     this.recompute();
     return 'designating';
   }
@@ -174,9 +188,12 @@ export class StrikeDesignationController {
   }
 
   private recompute(): void {
-    if (!this.pickProvider || !this.supportType) return;
+    if (!this.supportType) return;
 
-    const pick = this.pickProvider(this.target);
+    const pick = this.fixedTarget
+      ? (this.target.copy(this.fixedTarget), { ok: true, hasGround: true })
+      : this.pickProvider?.(this.target);
+    if (!pick) return;
     const origin = this.origin();
     const distance = horizontalDistanceXZ(origin.x, origin.z, this.target.x, this.target.z);
 
@@ -267,6 +284,7 @@ export class StrikeDesignationController {
     this.active = false;
     this.assetId = undefined;
     this.supportType = undefined;
+    this.fixedTarget = undefined;
     this.overrideArmed = false;
     this.overrideElapsed = 0;
     this.marker?.hide();

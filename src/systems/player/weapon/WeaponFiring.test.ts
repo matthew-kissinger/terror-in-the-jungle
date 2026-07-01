@@ -359,6 +359,32 @@ describe('WeaponFiring', () => {
         expect.objectContaining({ x: 0, y: 0, z: -10 }),
         120
       )
+      const diagnostics = weaponFiring.getLastShotOriginDiagnostics()
+      expect(diagnostics?.projectionMode).toBe('overlay-muzzle')
+      expect(diagnostics?.damageRayOrigin).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }))
+      expect(diagnostics?.visualTracerStart.x).toBeCloseTo(expectedTracerStart.x, 2)
+    })
+
+    it('falls back from unusable overlay muzzle projections instead of drawing a stray origin', () => {
+      const muzzleRef = new THREE.Object3D()
+      weaponFiring.setMuzzleRef(muzzleRef)
+
+      vi.spyOn(muzzleRef, 'getWorldPosition').mockImplementation((target) => {
+        target.set(9, -0.2, -0.72)
+        return target
+      })
+
+      weaponFiring.executeShot(command)
+
+      const diagnostics = weaponFiring.getLastShotOriginDiagnostics()
+      expect(diagnostics?.projectionMode).toBe('hip-camera')
+      expect(diagnostics?.overlayMuzzleNdc?.x).toBeGreaterThan(1.15)
+      expect(diagnostics?.damageRayOrigin).toEqual(expect.objectContaining({ x: 0, y: 0, z: 0 }))
+      expect(tracerPool.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({ x: expect.closeTo(0.18, 3), y: expect.closeTo(-0.14, 3) }),
+        expect.objectContaining({ x: 0, y: 0, z: -10 }),
+        120
+      )
     })
 
     it('resolves hip-fire tracer start from the camera basis without extra axis normalizations', () => {

@@ -140,7 +140,7 @@ export class RadioBottomSheet {
     this.listEl.replaceChildren();
     const hint = document.createElement('p');
     hint.className = styles.hint;
-    hint.textContent = 'Pick a channel above: fire support, squad orders, target mark, or radio stations.';
+    hint.textContent = 'Pick a channel above: fire support, squad orders, or signals.';
     this.listEl.appendChild(hint);
   }
 
@@ -148,34 +148,9 @@ export class RadioBottomSheet {
     if (!this.controller) return;
     this.listEl.replaceChildren();
 
-    if (category.id === 'markings') {
-      this.listEl.appendChild(this.buildSegmentedMarking(category));
-      return;
-    }
-
     for (const option of category.options) {
       this.listEl.appendChild(this.buildOptionRow(option));
     }
-  }
-
-  private buildSegmentedMarking(category: RadioCategory): HTMLElement {
-    const group = document.createElement('div');
-    group.className = styles.segmented;
-    group.setAttribute('role', 'group');
-    const active = this.controller?.getSelectedMarking();
-    for (const option of category.options) {
-      if (option.kind !== 'marking') continue;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = styles.segment;
-      button.textContent = option.label;
-      button.title = option.detail;
-      button.dataset.radioMarking = option.marking;
-      button.setAttribute('aria-pressed', option.marking === active ? 'true' : 'false');
-      button.addEventListener('click', () => this.controller?.selectOption(option));
-      group.appendChild(button);
-    }
-    return group;
   }
 
   private buildOptionRow(option: RadioOption): HTMLElement {
@@ -214,6 +189,11 @@ export class RadioBottomSheet {
     if (option.kind === 'fire-support') {
       const remaining = radioOptionCooldown(option, this.controller?.getCooldowns() ?? {});
       return remaining > 0 ? formatRadioCooldown(remaining) : 'READY';
+    }
+    if (option.kind === 'fire-support-target') {
+      const remaining = radioOptionCooldown(option, this.controller?.getCooldowns() ?? {});
+      if (remaining > 0) return formatRadioCooldown(remaining);
+      return this.controller?.isOptionEnabled(option) ? 'SELECT' : 'NO SMOKE';
     }
     if (option.kind === 'station') {
       return option.stationId === this.controller?.getSelectedStationId() ? 'TUNED' : 'TUNE';

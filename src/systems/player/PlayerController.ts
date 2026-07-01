@@ -988,13 +988,13 @@ export class PlayerController implements GameSystem {
       hudSystem: dependencies.hudSystem,
       inventoryManager: dependencies.inventoryManager,
       grenadeSystem: dependencies.grenadeSystem,
+      smokeMarkerSystem: dependencies.smokeMarkerSystem,
       mortarSystem: dependencies.mortarSystem,
       sandbagSystem: dependencies.sandbagSystem,
       ticketSystem: dependencies.ticketSystem,
     });
     if (dependencies.fixedWingModel) {
       this.fixedWingModel = dependencies.fixedWingModel;
-
       this.cameraController.setFixedWingModel(dependencies.fixedWingModel);
     }
     this.configureVehicleController({

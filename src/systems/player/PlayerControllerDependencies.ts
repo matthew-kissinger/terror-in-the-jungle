@@ -9,6 +9,7 @@ import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { InventoryManager } from './InventoryManager';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
+import type { SmokeMarkerSystem } from '../weapons/SmokeMarkerSystem';
 import type { MortarSystem } from '../weapons/MortarSystem';
 import type { SandbagSystem } from '../weapons/SandbagSystem';
 import type { CameraShakeSystem } from '../effects/CameraShakeSystem';
@@ -27,6 +28,7 @@ export interface PlayerCombatControllerDependencies {
   hudSystem?: HUDSystem;
   inventoryManager?: InventoryManager;
   grenadeSystem?: GrenadeSystem;
+  smokeMarkerSystem?: SmokeMarkerSystem;
   mortarSystem?: MortarSystem;
   sandbagSystem?: SandbagSystem;
   ticketSystem?: TicketSystem;
@@ -51,6 +53,7 @@ export interface PlayerControllerDependencies {
   renderer?: IGameRenderer;
   inventoryManager: InventoryManager;
   grenadeSystem: GrenadeSystem;
+  smokeMarkerSystem?: SmokeMarkerSystem;
   mortarSystem: MortarSystem;
   sandbagSystem: SandbagSystem;
   cameraShakeSystem: CameraShakeSystem;

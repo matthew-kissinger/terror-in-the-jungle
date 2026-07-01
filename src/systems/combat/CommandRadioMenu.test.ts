@@ -6,9 +6,8 @@
 
 // Behaviour tests for the revived radio dial (cycle-2026-06-29-radio-dial-revival):
 // T opens ONE catalog-driven surface listing every fire-support call-in, every
-// squad order, the target marks, AND the radio stations. We assert what the
-// player can reach and what selecting a sector does — squad orders and fire
-// support still issue through the same paths the legacy menu used — not the DOM
+// squad order, fire-support target methods, and the radio stations. We assert
+// what the player can reach and what selecting a sector does — not the DOM
 // shape of any single view.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,8 +19,8 @@ import { getQuickCommandOption, SQUAD_QUICK_COMMAND_OPTIONS } from './SquadComma
 import { ViewportManager } from '../../ui/design/responsive';
 import {
   AIR_SUPPORT_RADIO_ASSETS,
-  AIR_SUPPORT_TARGET_MARKINGS,
 } from '../airsupport/AirSupportRadioCatalog';
+import { RADIO_STATIONS } from '../../config/radioStations';
 
 if (typeof globalThis.ResizeObserver === 'undefined') {
   globalThis.ResizeObserver = class {
@@ -111,12 +110,32 @@ describe('revived radio dial', () => {
     layout.dispose();
   });
 
-  it('offers the smoke / WP / grid mark modes', () => {
+  it('drills fire-support assets into smoke and reticle target methods', () => {
     const { manager } = openDial();
-    const dial = focusCategory('markings');
+    const dial = focusCategory('fire-support');
+    const asset = AIR_SUPPORT_RADIO_ASSETS[0];
 
-    for (const marking of AIR_SUPPORT_TARGET_MARKINGS) {
-      expect(dial.querySelector(`[data-radio-option="${marking.id}"]`)).toBeTruthy();
+    dial.querySelector<HTMLElement>(`[data-radio-option="${asset.id}"]`)?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
+
+    expect(dial.querySelector(`[data-radio-option="${asset.id}:current-smoke"]`)).toBeTruthy();
+    expect(dial.querySelector(`[data-radio-option="${asset.id}:throw-smoke-marker"]`)).toBeTruthy();
+    expect(dial.querySelector(`[data-radio-option="${asset.id}:reticle-grid"]`)).toBeTruthy();
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('moves station tuning under Signals', () => {
+    const { manager } = openDial();
+    const dial = focusCategory('signals');
+
+    for (const station of RADIO_STATIONS) {
+      expect(
+        dial.querySelector(`[data-radio-option="${station.id}"]`),
+        `missing station sector for ${station.id}`,
+      ).toBeTruthy();
     }
 
     manager.dispose();
@@ -159,9 +178,12 @@ describe('revived radio dial', () => {
     dial.querySelector<HTMLElement>('[data-radio-option="cobra_rocket_run"]')?.dispatchEvent(
       new MouseEvent('click', { bubbles: true }),
     );
+    dial.querySelector<HTMLElement>('[data-radio-option="cobra_rocket_run:reticle-grid"]')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true }),
+    );
 
-    // Selecting a sector no longer fires immediately: it closes the dial and
-    // enters DESIGNATE (re-aimable). The strike only goes out on confirm.
+    // Selecting the reticle/grid target method closes the dial and enters
+    // DESIGNATE (re-aimable). The strike only goes out on confirm.
     expect(requestSupport).not.toHaveBeenCalled();
     expect(visibleDial()).toBeNull();
 

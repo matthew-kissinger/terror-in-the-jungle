@@ -35,8 +35,8 @@ describe('RadioBottomSheet', () => {
     return sheet.getElement().querySelector<HTMLButtonElement>(`[data-radio-category="${categoryId}"]`);
   }
 
-  it('shows the four channels as chips when opened', () => {
-    for (const id of ['fire-support', 'squad', 'markings', 'stations']) {
+  it('shows the three inner channels as chips when opened', () => {
+    for (const id of ['fire-support', 'squad', 'signals']) {
       expect(chip(id), `missing chip ${id}`).toBeTruthy();
     }
   });
@@ -47,9 +47,11 @@ describe('RadioBottomSheet', () => {
     expect(rows.length).toBeGreaterThan(0);
   });
 
-  it('issues an intent when a fire-support row is tapped', () => {
+  it('issues an intent after tapping a fire-support asset and target row', () => {
     chip('fire-support')?.click();
     sheet.getElement().querySelector<HTMLButtonElement>('[data-radio-option]')?.click();
+    const targetRows = Array.from(sheet.getElement().querySelectorAll<HTMLButtonElement>('[data-radio-option]'));
+    targetRows.find((row) => row.textContent?.includes('Reticle/Grid'))?.click();
     expect(intents).toHaveLength(1);
     expect(intents[0].kind).toBe('fire-support');
   });

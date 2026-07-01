@@ -24,6 +24,7 @@
 
 import type { AirSupportRadioCooldowns, AirSupportTargetMarking } from '../../../systems/airsupport/AirSupportRadioCatalog';
 import {
+  buildFireSupportTargetOptions,
   buildRadioCategories,
   isRadioOptionReady,
   type RadioCategory,
@@ -31,13 +32,14 @@ import {
   type RadioIntent,
   type RadioOption,
 } from './RadioDialModel';
+import { getAirSupportRadioAsset, type AirSupportRadioAssetId } from '../../../systems/airsupport/AirSupportRadioCatalog';
 
 /** Whether selecting an option dismisses the dial (one-shot) or keeps it open. */
 function intentClosesDial(intent: RadioIntent): boolean {
   // Markings and stations are sticky toggles — the player often flips between
   // them — so they keep the dial open. Squad orders and fire-support call-ins
   // are one-shot actions that dismiss it.
-  return intent.kind === 'fire-support' || intent.kind === 'squad';
+  return intent.kind === 'fire-support' || intent.kind === 'throw-smoke-marker' || intent.kind === 'squad';
 }
 
 export class RadioDialController {
@@ -47,6 +49,8 @@ export class RadioDialController {
   private selectedMarking: AirSupportTargetMarking = 'smoke';
   private selectedStationId: string | null = null;
   private squadAvailable = true;
+  private hasSmokeMark = false;
+  private pendingFireSupportAssetId: AirSupportRadioAssetId | null = null;
 
   private onIntent?: (intent: RadioIntent, closesDial: boolean) => void;
   private readonly changeListeners = new Set<() => void>();
@@ -71,6 +75,15 @@ export class RadioDialController {
 
   getFocusedCategory(): RadioCategory | null {
     if (!this.focusedCategory) return null;
+    if (this.focusedCategory === 'fire-support' && this.pendingFireSupportAssetId) {
+      const asset = getAirSupportRadioAsset(this.pendingFireSupportAssetId);
+      return {
+        id: 'fire-support',
+        label: asset.label,
+        hint: 'Choose how this mission is marked.',
+        options: buildFireSupportTargetOptions(this.pendingFireSupportAssetId),
+      };
+    }
     return this.categories.find((c) => c.id === this.focusedCategory) ?? null;
   }
 
@@ -89,6 +102,7 @@ export class RadioDialController {
   /** Reset to the top (category) level — call when the dial opens. */
   reset(): void {
     this.focusedCategory = null;
+    this.pendingFireSupportAssetId = null;
     this.emitChange();
   }
 
@@ -101,6 +115,11 @@ export class RadioDialController {
 
   /** Drill back out to the category level. */
   clearFocus(): void {
+    if (this.pendingFireSupportAssetId) {
+      this.pendingFireSupportAssetId = null;
+      this.emitChange();
+      return;
+    }
     if (this.focusedCategory === null) return;
     this.focusedCategory = null;
     this.emitChange();
@@ -128,9 +147,17 @@ export class RadioDialController {
     this.emitChange();
   }
 
+  setHasSmokeMark(available: boolean): void {
+    if (this.hasSmokeMark === available) return;
+    this.hasSmokeMark = available;
+    this.emitChange();
+  }
+
   isOptionEnabled(option: RadioOption): boolean {
     if (option.kind === 'squad') return this.squadAvailable;
+    if (option.kind === 'fire-support-target' && option.targetMode === 'current-smoke') return this.hasSmokeMark;
     if (option.kind === 'fire-support') return isRadioOptionReady(option, this.cooldowns);
+    if (option.kind === 'fire-support-target') return isRadioOptionReady(option, this.cooldowns);
     return true;
   }
 
@@ -141,11 +168,15 @@ export class RadioDialController {
    */
   selectOption(option: RadioOption): void {
     if (!this.isOptionEnabled(option)) return;
+    if (option.kind === 'fire-support') {
+      this.focusedCategory = 'fire-support';
+      this.pendingFireSupportAssetId = option.assetId;
+      this.emitChange();
+      return;
+    }
 
     const intent = this.resolveIntent(option);
-    if (intent.kind === 'marking') {
-      this.selectedMarking = intent.marking;
-    } else if (intent.kind === 'station') {
+    if (intent.kind === 'station') {
       this.selectedStationId = intent.stationId;
     }
 
@@ -157,11 +188,13 @@ export class RadioDialController {
   private resolveIntent(option: RadioOption): RadioIntent {
     switch (option.kind) {
       case 'fire-support':
-        return { kind: 'fire-support', assetId: option.assetId, marking: this.selectedMarking };
+        return { kind: 'fire-support', assetId: option.assetId, marking: this.selectedMarking, targetMode: 'reticle-grid' };
+      case 'fire-support-target':
+        return option.targetMode === 'throw-smoke-marker'
+          ? { kind: 'throw-smoke-marker', assetId: option.assetId }
+          : { kind: 'fire-support', assetId: option.assetId, marking: this.selectedMarking, targetMode: option.targetMode };
       case 'squad':
         return { kind: 'squad', slot: option.slot, command: option.command };
-      case 'marking':
-        return { kind: 'marking', marking: option.marking };
       case 'station':
         return { kind: 'station', stationId: option.stationId };
     }

@@ -39,7 +39,15 @@ export interface TopoMarkerInstance {
   /** Pillar height in display units. */
   height: number;
   kind: 'capture' | 'spawn';
+  owner: MarkerOwner;
   isHomeBase: boolean;
+  label: string;
+}
+
+export interface TopoMarkerLegendItem {
+  key: MarkerOwner | 'spawn';
+  label: string;
+  color: [number, number, number];
 }
 
 const OWNER_COLORS: Record<MarkerOwner, [number, number, number]> = {
@@ -51,9 +59,32 @@ const OWNER_COLORS: Record<MarkerOwner, [number, number, number]> = {
 
 const SPAWN_COLOR: [number, number, number] = [0.49, 0.6, 0.35];
 
+const OWNER_LABELS: Record<MarkerOwner, string> = {
+  blufor: 'BLUFOR',
+  opfor: 'OPFOR',
+  contested: 'CONTESTED',
+  neutral: 'NEUTRAL',
+};
+
 /** Owner → RGB triple in [0,1]. Pure. */
 export function markerColorFor(owner: MarkerOwner): [number, number, number] {
   return OWNER_COLORS[owner];
+}
+
+export function markerLabelFor(input: Pick<TopoMarkerInput, 'name' | 'kind' | 'owner' | 'isHomeBase'>): string {
+  if (input.kind === 'spawn') return `SPAWN - ${input.name}`;
+  const role = input.isHomeBase ? 'HQ' : 'OBJ';
+  return `${OWNER_LABELS[input.owner]} ${role} - ${input.name}`;
+}
+
+export function buildMarkerLegend(): TopoMarkerLegendItem[] {
+  return [
+    { key: 'blufor', label: 'BLUFOR objective', color: OWNER_COLORS.blufor },
+    { key: 'opfor', label: 'OPFOR objective', color: OWNER_COLORS.opfor },
+    { key: 'contested', label: 'Contested objective', color: OWNER_COLORS.contested },
+    { key: 'neutral', label: 'Neutral objective', color: OWNER_COLORS.neutral },
+    { key: 'spawn', label: 'Insertion spawn', color: SPAWN_COLOR },
+  ];
 }
 
 /**
@@ -99,7 +130,9 @@ export function buildMarkerInstances(
       color,
       height,
       kind: input.kind,
+      owner: input.owner,
       isHomeBase: input.isHomeBase ?? false,
+      label: markerLabelFor(input),
     };
   });
 }
@@ -111,7 +144,9 @@ export function buildMarkerInstances(
  */
 export class OrbitalTopoMarkers {
   readonly group = new THREE.Group();
+  private readonly labelGroup = new THREE.Group();
   private instanced: THREE.InstancedMesh | null = null;
+  private labelSprites: THREE.Sprite[] = [];
   private instances: TopoMarkerInstance[] = [];
   private readonly displaySize: number;
   private readonly worldSize: number;
@@ -130,6 +165,7 @@ export class OrbitalTopoMarkers {
     this.displaySize = opts.displaySize;
     this.verticalScale = opts.verticalScale;
     this.minHeight = opts.minHeight;
+    this.group.add(this.labelGroup);
   }
 
   /** Rebuild markers from inputs; `heightAt(worldX, worldZ)` gives terrain Y. */
@@ -163,6 +199,7 @@ export class OrbitalTopoMarkers {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     this.instanced = mesh;
     this.group.add(mesh);
+    this.rebuildLabels(inputs, heightAt);
   }
 
   /** Resolve a raycast hit on the marker mesh to the marker id/name it struck. */
@@ -185,9 +222,69 @@ export class OrbitalTopoMarkers {
     this.instanced.geometry.dispose();
     (this.instanced.material as THREE.Material).dispose();
     this.instanced = null;
+    this.disposeLabels();
   }
 
   dispose(): void {
     this.disposeMesh();
   }
+
+  private rebuildLabels(inputs: readonly TopoMarkerInput[], heightAt: (worldX: number, worldZ: number) => number): void {
+    this.disposeLabels();
+    const labelLift = this.displaySize * 0.015;
+    for (let i = 0; i < this.instances.length; i++) {
+      const inst = this.instances[i];
+      const terrainY = (heightAt(inputs[i].worldX, inputs[i].worldZ) - this.minHeight) * this.verticalScale;
+      const sprite = makeTextSprite(inst.label, inst.color);
+      sprite.position.set(inst.x, terrainY + inst.height + labelLift, inst.z);
+      sprite.scale.set(this.displaySize * 0.12, this.displaySize * 0.03, 1);
+      this.labelGroup.add(sprite);
+      this.labelSprites.push(sprite);
+    }
+
+    const legend = buildMarkerLegend();
+    const legendX = -this.displaySize * 0.46;
+    const legendZ = -this.displaySize * 0.46;
+    const legendY = this.displaySize * 0.18;
+    for (let i = 0; i < legend.length; i++) {
+      const item = legend[i];
+      const sprite = makeTextSprite(item.label, item.color);
+      sprite.position.set(legendX, legendY + i * this.displaySize * 0.018, legendZ);
+      sprite.scale.set(this.displaySize * 0.14, this.displaySize * 0.028, 1);
+      this.labelGroup.add(sprite);
+      this.labelSprites.push(sprite);
+    }
+  }
+
+  private disposeLabels(): void {
+    for (const sprite of this.labelSprites) {
+      this.labelGroup.remove(sprite);
+      const material = sprite.material as THREE.SpriteMaterial;
+      material.map?.dispose();
+      material.dispose();
+    }
+    this.labelSprites = [];
+  }
+}
+
+function makeTextSprite(text: string, color: [number, number, number]): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(10, 10, 8, 0.72)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = `rgb(${Math.round(color[0] * 255)}, ${Math.round(color[1] * 255)}, ${Math.round(color[2] * 255)})`;
+    ctx.fillRect(0, 0, 28, canvas.height);
+    ctx.fillStyle = '#f4eedb';
+    ctx.font = '600 34px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text.toUpperCase(), 46, canvas.height / 2, canvas.width - 56);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+  return new THREE.Sprite(material);
 }

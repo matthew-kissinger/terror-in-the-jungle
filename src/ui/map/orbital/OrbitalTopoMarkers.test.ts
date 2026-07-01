@@ -3,7 +3,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  buildMarkerLegend,
   markerColorFor,
+  markerLabelFor,
   worldToDisplay,
   buildMarkerInstances,
   type TopoMarkerInput,
@@ -54,5 +56,38 @@ describe('orbital topo markers', () => {
       100,
     );
     expect(after[0].color).not.toEqual(before[0].color);
+  });
+
+  it('builds readable in-world marker labels from owner, kind, and role', () => {
+    expect(markerLabelFor({
+      name: 'Hill 402',
+      kind: 'capture',
+      owner: 'opfor',
+      isHomeBase: false,
+    })).toBe('OPFOR OBJ - Hill 402');
+    expect(markerLabelFor({
+      name: 'LZ Albany',
+      kind: 'spawn',
+      owner: 'neutral',
+    })).toBe('SPAWN - LZ Albany');
+
+    const instances = buildMarkerInstances([
+      { id: 'a', name: 'Hill 402', worldX: 0, worldZ: 0, kind: 'capture', owner: 'opfor' },
+    ], 200, 100);
+    expect(instances[0].label).toBe('OPFOR OBJ - Hill 402');
+    expect(instances[0].owner).toBe('opfor');
+    expect(instances[0].kind).toBe('capture');
+  });
+
+  it('composes a compact legend so map colors are not the only interpretation path', () => {
+    const legend = buildMarkerLegend();
+    expect(legend.map((item) => item.label)).toEqual([
+      'BLUFOR objective',
+      'OPFOR objective',
+      'Contested objective',
+      'Neutral objective',
+      'Insertion spawn',
+    ]);
+    expect(legend.find((item) => item.key === 'spawn')?.color).toEqual([0.49, 0.6, 0.35]);
   });
 });

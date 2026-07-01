@@ -5,6 +5,14 @@ import * as THREE from 'three';
 import { createEventBus } from '@game-field-kits/event-bus';
 import type { Faction } from '../systems/combat/types';
 
+export interface TargetMark {
+  id: string;
+  kind: 'smoke-marker';
+  position: THREE.Vector3;
+  createdAt: number;
+  source: 'player';
+}
+
 /**
  * Typed game event definitions. Each key maps to a payload type.
  */
@@ -26,6 +34,8 @@ interface GameEvents extends Record<string, unknown> {
   air_support_inbound: { type: string; targetPosition: THREE.Vector3; eta: number };
   air_support_active: { type: string; missionId: string };
   air_support_complete: { type: string; missionId: string };
+  target_mark_set: { mark: TargetMark };
+  target_mark_cleared: { markId: string };
   mode_load_progress: { phase: string; progress: number; label: string };
   /**
    * Phase F materialization tier transition: fires when a combatant's render

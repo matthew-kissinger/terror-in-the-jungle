@@ -1,6 +1,10 @@
 # Recent Cycle Outcomes
 
-Last verified: 2026-06-01 (added the optimal-development arc entry; prior refresh 2026-05-28 under `doc-consolidation-and-refs`. For cycles after 2026-05-13 see the closed campaign manifests under [docs/archive/](../archive/) and [docs/DIRECTIVES.md](../DIRECTIVES.md).)
+Last verified: 2026-07-01 (added the owner-playtest follow-up implementation
+entry; prior refresh 2026-06-01 under `optimal-development arc`. For cycle
+truth after 2026-05-13 see the closed campaign manifests under
+[docs/archive/](../archive/), [docs/DIRECTIVES.md](../DIRECTIVES.md), and
+[docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).)
 
 Recent cycles, summarized. Companion docs:
 
@@ -10,6 +14,38 @@ Recent cycles, summarized. Companion docs:
 
 For older cycle outcomes, browse `docs/cycles/` or
 `docs/tasks/archive/<cycle-id>/`.
+
+---
+
+## cycle-2026-07-01-owner-playtest-followups (production-review release)
+
+Owner playtest notes from July 1 were mapped to code ownership and implemented
+as a production-review batch:
+
+- 3D deploy map marker labels + compact legend, so spawn/faction meaning is not
+  color-only.
+- Approved fal.ai objective/capture clips promoted as local variant pools;
+  rejected sharp `capture-confirmation-alt-v2.ogg` from the 11:50 review folder
+  excluded and replaced by the softer later candidate.
+- Default ambient/static/music background disabled; radio stations remain
+  opt-in and no static/noise-bed station ships by default.
+- Objective completion audio plays locally near the objective source, not as a
+  global radio/UI stinger.
+- Radio IA rebuilt to Fire Support / Squad / Signals, with stations under
+  Signals and smoke target choices as a Fire Support drilldown.
+- Kiln field-radio viewmodel imported through the war-asset catalog append/merge
+  path with dedicated 2026-07 provenance.
+- First-person held equipment modes added for radio and smoke marker; the radio
+  suppresses the firearm while raised.
+- Throwable smoke marker added with hold-to-charge arc, visible canister,
+  bounce/bobble/settle, smoke emission, and target-mark events.
+- Helicopter player-airframe firing/effects ownership consolidated, and
+  infantry shot-origin diagnostics/tracer convergence added.
+
+Local gates passed before production deployment: `npm run validate:fast`,
+`npm run build`, and `npm run check:asset-gallery -- --only
+field-radio-viewmodel`. Human PROD review remains the acceptance gate; the
+walk list is in [PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
 
 ---
 

@@ -4,14 +4,15 @@
 /**
  * Behavior tests for `SoundscapeDirector`. These assert observable mix
  * behavior (which bed is louder, that the crossfade eases rather than snaps,
- * that the master scalar silences the mix, that one-shots fire) rather than
- * any tuning constant or internal state name.
+ * that the master scalar silences the mix, that disabled one-shots stay silent)
+ * rather than any tuning constant or internal state name.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { SoundscapeDirector } from './SoundscapeDirector';
 import { SOUNDSCAPE_CONFIG } from '../../config/soundscape';
+import type { SoundscapeConfig } from '../../config/soundscape';
 
 interface FakeAudio {
   setBuffer: ReturnType<typeof vi.fn>;
@@ -54,6 +55,11 @@ function makeSky(sunY: { value: number }): ISkyRuntime {
   };
 }
 
+const TEST_SOUNDSCAPE_CONFIG: SoundscapeConfig = {
+  ...SOUNDSCAPE_CONFIG,
+  enabled: true,
+};
+
 describe('SoundscapeDirector', () => {
   let created: FakeAudio[];
   let buffers: Map<string, AudioBuffer>;
@@ -68,9 +74,9 @@ describe('SoundscapeDirector', () => {
     };
     buffers = new Map<string, AudioBuffer>();
     // All soundscape keys decode to a non-null buffer.
-    buffers.set(SOUNDSCAPE_CONFIG.dayBed.key, {} as AudioBuffer);
-    buffers.set(SOUNDSCAPE_CONFIG.nightBed.key, {} as AudioBuffer);
-    for (const o of SOUNDSCAPE_CONFIG.oneShots) buffers.set(o.key, {} as AudioBuffer);
+    buffers.set(TEST_SOUNDSCAPE_CONFIG.dayBed.key, {} as AudioBuffer);
+    buffers.set(TEST_SOUNDSCAPE_CONFIG.nightBed.key, {} as AudioBuffer);
+    for (const o of TEST_SOUNDSCAPE_CONFIG.oneShots) buffers.set(o.key, {} as AudioBuffer);
   });
 
   afterEach(() => {
@@ -82,7 +88,7 @@ describe('SoundscapeDirector', () => {
     beds: () => { day: FakeAudio; night: FakeAudio };
   } {
     const listener = {} as THREE.AudioListener;
-    const director = new SoundscapeDirector(listener, buffers, SOUNDSCAPE_CONFIG, factory);
+    const director = new SoundscapeDirector(listener, buffers, TEST_SOUNDSCAPE_CONFIG, factory);
     if (sky) director.setSkyRuntime(sky);
     // After start() the first two created audios are the day + night beds.
     const beds = () => ({ day: created[0], night: created[1] });
@@ -172,20 +178,16 @@ describe('SoundscapeDirector', () => {
     expect(dayHandle?.gainBeforeDuck).toBeCloseTo(day.volume, 6);
   });
 
-  it('fires a wildlife one-shot once its interval elapses', () => {
+  it('does not fire ambient one-shots when the config has none', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0); // deterministic: min interval, first cue
     const { director } = makeDirector(makeSky({ value: 0.8 }));
     director.start();
     const beforeCount = created.length;
 
     // Advance well past the configured maximum interval.
-    director.update(SOUNDSCAPE_CONFIG.oneShotMaxIntervalSeconds + 1);
+    director.update(TEST_SOUNDSCAPE_CONFIG.oneShotMaxIntervalSeconds + 1);
 
-    // A pooled one-shot voice was created and played.
-    expect(created.length).toBeGreaterThan(beforeCount);
-    const oneShot = created[created.length - 1];
-    expect(oneShot.play).toHaveBeenCalled();
-    expect(oneShot.setLoop).toHaveBeenCalledWith(false);
+    expect(created.length).toBe(beforeCount);
   });
 
   it('stops all beds on stop()', () => {
@@ -200,10 +202,19 @@ describe('SoundscapeDirector', () => {
   it('is a no-op when started without decoded buffers', () => {
     const empty = new Map<string, AudioBuffer>();
     const listener = {} as THREE.AudioListener;
-    const director = new SoundscapeDirector(listener, empty, SOUNDSCAPE_CONFIG, factory);
+    const director = new SoundscapeDirector(listener, empty, TEST_SOUNDSCAPE_CONFIG, factory);
     director.start();
     director.update(0.016);
     // No beds could be created, but the director must not throw and reports none.
     expect(director.getActiveBeds().length).toBe(0);
+  });
+
+  it('does not start the owner-rejected default background layer', () => {
+    const listener = {} as THREE.AudioListener;
+    const director = new SoundscapeDirector(listener, buffers, SOUNDSCAPE_CONFIG, factory);
+    director.start();
+    director.update(60);
+    expect(created.length).toBe(0);
+    expect(director.getActiveBeds()).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { SOUND_CONFIGS, SoundConfig } from '../../config/audio';
+import { AUDIO_VARIANT_SETS, SoundConfig, SOUND_CONFIGS, type AudioVariantSetId } from '../../config/audio';
 import { SOUNDSCAPE_CONFIG, soundscapeBedKeys } from '../../config/soundscape';
 import type { ISkyRuntime } from '../../types/SystemInterfaces';
 import { AudioPoolManager } from './AudioPoolManager';
@@ -17,14 +17,23 @@ import { GameEventBus } from '../../core/GameEventBus';
 import { getWorldBuilderState } from '../../dev/worldBuilder/WorldBuilderConsole';
 import { markStartup } from '../../core/StartupTelemetry';
 
+const ZONE_CAPTURE_AUDIO_NEAR_MARGIN_M = 8;
+const ZONE_CAPTURE_AUDIO_VOLUME = 0.6;
+
 // The soundscape beds + one-shots are not in SOUND_CONFIGS; assemble a
 // combined config map so the loader can decode them alongside the SFX bank.
 const SOUNDSCAPE_SOUND_CONFIGS: Record<string, SoundConfig> = {
-  [SOUNDSCAPE_CONFIG.dayBed.key]: { path: SOUNDSCAPE_CONFIG.dayBed.path, loop: true },
-  [SOUNDSCAPE_CONFIG.nightBed.key]: { path: SOUNDSCAPE_CONFIG.nightBed.path, loop: true },
-  ...Object.fromEntries(
-    SOUNDSCAPE_CONFIG.oneShots.map((o) => [o.key, { path: o.path } as SoundConfig]),
-  ),
+  ...(SOUNDSCAPE_CONFIG.enabled
+    ? {
+        [SOUNDSCAPE_CONFIG.dayBed.key]: { path: SOUNDSCAPE_CONFIG.dayBed.path, loop: true },
+        [SOUNDSCAPE_CONFIG.nightBed.key]: { path: SOUNDSCAPE_CONFIG.nightBed.path, loop: true },
+      }
+    : {}),
+  ...(SOUNDSCAPE_CONFIG.enabled
+    ? Object.fromEntries(
+        SOUNDSCAPE_CONFIG.oneShots.map((o) => [o.key, { path: o.path } as SoundConfig]),
+      )
+    : {}),
 };
 
 // Boot-critical sounds are awaited by `init()` so the ambient layer can
@@ -63,12 +72,14 @@ export class AudioManager implements GameSystem {
     private static loggedOptionalMissing: Set<string> = new Set();
     private hitFeedbackMissingLogged = false;
     private eventUnsubscribes: (() => void)[] = [];
+    private readonly lastVariantBySet = new Map<AudioVariantSetId, string>();
 
     // Background SFX decode tracking. `init()` returns once the boot-critical
     // ambient bank is decoded; the SFX bank decodes in parallel and lets
     // first playable frame land sooner. `whenSfxReady()` is the test seam.
     private backgroundDecodePromise: Promise<void> | null = null;
     private sfxPoolsInitialized = false;
+    private readonly zoneCaptureListenerPosition = new THREE.Vector3();
     // WorldBuilder ambient-mute tracker (dev-only, gated by Vite DCE in
     // retail). When the flag toggles we apply 0 or 1 to ambient volume once
     // per transition rather than every frame, so user/scene volume edits
@@ -144,9 +155,7 @@ export class AudioManager implements GameSystem {
         // events that lack a direct audio path today, and as migration targets
         // for the direct-call paths once dual-emit is validated.
         this.eventUnsubscribes.push(
-            GameEventBus.subscribe('zone_captured', (_e) => {
-                this.play('zoneCaptured', undefined, 0.6);
-            }),
+            GameEventBus.subscribe('zone_captured', (e) => this.playZoneCaptureIfNearby(e.position, e.radius)),
         );
 
         // Kick off SFX decode in the background. We DO NOT await this — the
@@ -402,6 +411,27 @@ export class AudioManager implements GameSystem {
             sound.setVolume((config?.volume || 1.0) * volume);
             sound.play();
         }
+    }
+
+    playVariantSet(setId: AudioVariantSetId, position?: THREE.Vector3, volume = 1.0): void {
+        const variants = AUDIO_VARIANT_SETS[setId] as readonly string[];
+        if (variants.length === 0) return;
+
+        let index = Math.floor(Math.random() * variants.length);
+        if (variants.length > 1 && variants[index] === this.lastVariantBySet.get(setId)) {
+            index = (index + 1) % variants.length;
+        }
+
+        const soundName = variants[index];
+        this.lastVariantBySet.set(setId, soundName);
+        this.play(soundName, position, volume);
+    }
+
+    private playZoneCaptureIfNearby(position: THREE.Vector3, radius: number): void {
+        this.camera.getWorldPosition(this.zoneCaptureListenerPosition);
+        const audibleRadius = Math.max(0, radius) + ZONE_CAPTURE_AUDIO_NEAR_MARGIN_M;
+        if (this.zoneCaptureListenerPosition.distanceTo(position) > audibleRadius) return;
+        this.playVariantSet('zoneCapturedLocal', position, ZONE_CAPTURE_AUDIO_VOLUME);
     }
 
     playDistantCombat(volume: number): void {

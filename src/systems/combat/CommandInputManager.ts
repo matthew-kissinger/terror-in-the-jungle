@@ -31,6 +31,7 @@ import type { IZoneQuery, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { CombatantSystem } from './CombatantSystem';
 import type { GameModeManager } from '../world/GameModeManager';
 import type { PlayerController } from '../player/PlayerController';
+import { CommandHeldEquipmentBridge, type CommandHeldEquipmentConfig } from './CommandHeldEquipmentBridge';
 
 export class CommandInputManager implements GameSystem {
   private static readonly MAP_UPDATE_INTERVAL = 1 / 20;
@@ -38,9 +39,6 @@ export class CommandInputManager implements GameSystem {
   private readonly playerSquadController: PlayerSquadController;
   private readonly commandModeOverlay: CommandModeOverlay;
   private readonly airSupportRadioMenu: AirSupportRadioMenu;
-  // Revived radial dial (cycle-2026-06-29-radio-dial-revival): ONE controller
-  // drives two presentations (desktop wheel, touch sheet) chosen by input mode.
-  // It reuses the same squad / air-support / station paths as the legacy menus.
   private readonly radioDial: RadioDialPresenter;
   private readonly radioSlotOpenHandler: () => void;
   private dialVisible = false;
@@ -51,6 +49,7 @@ export class CommandInputManager implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private gameModeManager?: GameModeManager;
   private playerController?: PlayerController;
+  private readonly heldEquipmentBridge = new CommandHeldEquipmentBridge();
   private airSupportManager?: AirSupportManager;
   private terrainSystem?: ITerrainRuntime;
   private inputMode: InputMode = 'keyboardMouse';
@@ -107,12 +106,9 @@ export class CommandInputManager implements GameSystem {
       onIntent: (intent, closesDial) => this.handleDialIntent(intent, closesDial),
       onCloseRequested: () => this.closeRadioDial(),
     });
-    // The Radio HUD slot (built by HUDElements) broadcasts a DOM event on click;
-    // listen for it so a slot tap opens the dial exactly like the KeyT path.
     this.radioSlotOpenHandler = () => this.toggleRadioDial();
     document.addEventListener(RADIO_SLOT_OPEN_EVENT, this.radioSlotOpenHandler);
 
-    // Designate re-uses this manager's camera->ground pick + a friendly count.
     this.strikeDesignation.setPickProvider(
       (out) => ({ ok: this.resolveCameraGroundPick(out), hasGround: this.radioTargetHasGround }),
       () => this.radioOrigin,
@@ -144,8 +140,6 @@ export class CommandInputManager implements GameSystem {
   }
 
   update(deltaTime: number): void {
-    // Live cooldown counters tick while any fire-support surface is open (the
-    // unified command overlay, the detailed radio menu, or the revived dial).
     if (this.radioVisible || this.overlayVisible || this.dialVisible) {
       this.radioCooldownAccumulator += deltaTime;
       if (this.radioCooldownAccumulator >= 0.1) {
@@ -154,7 +148,6 @@ export class CommandInputManager implements GameSystem {
       }
     }
 
-    // DESIGNATE owns the frame while placing a strike (re-aimable view-ray track).
     if (this.strikeDesignation.isActive()) {
       this.strikeDesignation.update(deltaTime);
       return;
@@ -210,6 +203,7 @@ export class CommandInputManager implements GameSystem {
       this.dialVisible = false;
       this.closeOverlayTouchPassThrough();
     }
+    this.heldEquipmentBridge.restore();
     this.commandModeOverlay.unmount();
     this.airSupportRadioMenu.unmount();
     this.radioDial.unmount();
@@ -230,19 +224,14 @@ export class CommandInputManager implements GameSystem {
     this.layout = layout;
     this.commandModeOverlay.mount(document.body);
     this.airSupportRadioMenu.mount(document.body);
-    // Both dial presentations live at body level alongside the legacy menus;
-    // only the input-mode-appropriate one is shown when the dial opens.
     this.radioDial.mount(document.body);
-    // DESIGNATE banner/reticle sits at body level too.
     this.strikeDesignation.mount(document.body);
   }
 
-  /** Route STATIONS selections to the headless RadioStationSystem (P3d wiring). */
   setStationTuner(onTune: (stationId: string) => void): void {
     this.onStationTune = onTune;
   }
 
-  /** Reflect the persisted/selected station so the dial pre-highlights it. */
   setSelectedStation(stationId: string | null): void {
     this.radioDial.setSelectedStationId(stationId);
   }
@@ -275,6 +264,10 @@ export class CommandInputManager implements GameSystem {
     this.playerController = playerController;
   }
 
+  configureHeldEquipment(config: CommandHeldEquipmentConfig): void {
+    this.heldEquipmentBridge.configure(config);
+  }
+
   setAirSupportManager(airSupportManager: AirSupportManager): void {
     this.airSupportManager = airSupportManager;
     this.strikeDesignation.setAirSupportManager(airSupportManager);
@@ -291,7 +284,6 @@ export class CommandInputManager implements GameSystem {
     this.strikeDesignation.setScene(scene);
   }
 
-  /** LMB / pad-A: confirm an armed strike. Returns true if it consumed the input. */
   handleStrikeConfirm(): boolean {
     return this.strikeDesignation.confirm();
   }
@@ -332,6 +324,9 @@ export class CommandInputManager implements GameSystem {
   }
 
   handleCancel(): boolean {
+    if (this.heldEquipmentBridge.cancelSmokeMarkerThrow()) {
+      return true;
+    }
     if (this.strikeDesignation.cancel()) {
       return true;
     }
@@ -365,6 +360,9 @@ export class CommandInputManager implements GameSystem {
   }
 
   handleGamepadCancel(): boolean {
+    if (this.heldEquipmentBridge.cancelSmokeMarkerThrow()) {
+      return true;
+    }
     if (this.strikeDesignation.cancel()) {
       return true;
     }
@@ -383,17 +381,10 @@ export class CommandInputManager implements GameSystem {
     return true;
   }
 
-  /**
-   * `T` (and the Radio HUD slot) open the revived radio dial: ONE catalog-driven
-   * surface listing fire support, squad orders, target marks, AND radio stations.
-   * Desktop sees the radial wheel; touch sees the bottom-sheet. Squad orders and
-   * fire-support call-ins issue through the same paths the legacy menus used.
-   */
   toggleRadioMenu(): void {
     this.toggleRadioDial();
   }
 
-  /** Open/close the radio dial (shared by `KeyT` and the Radio HUD slot click). */
   toggleRadioDial(): void {
     if (this.dialVisible) {
       this.closeRadioDial();
@@ -414,17 +405,15 @@ export class CommandInputManager implements GameSystem {
     this.radioDial.setSelectedMarking(marking);
   }
 
-  // ── Revived radio dial (cycle-2026-06-29-radio-dial-revival) ─────────────
-
   private openRadioDial(): void {
     if (this.overlayVisible) this.closeOverlay(false);
     if (this.radioVisible) this.closeRadioMenu(false);
+    this.heldEquipmentBridge.show('radio');
     this.dialVisible = true;
     this.radioCooldownAccumulator = 0;
-    // Seed the call-in target + cooldown bars + active mark / squad availability
-    // the instant the dial opens, then reset its drill to the category level.
     this.resolveRadioTarget();
     this.feedRadioCooldowns();
+    this.radioDial.setHasSmokeMark(this.heldEquipmentBridge.hasActiveSmokeMark());
     this.radioDial.setTouchMode(this.inputMode === 'touch');
     this.radioDial.open({
       marking: this.selectedMarking,
@@ -439,20 +428,16 @@ export class CommandInputManager implements GameSystem {
     this.dialVisible = false;
     this.radioDial.close();
     this.closeOverlayTouchPassThrough();
+    if (!this.heldEquipmentBridge.isSmokeMarkerHandlingInput()) {
+      this.heldEquipmentBridge.restore();
+    }
     if (relockPointer) this.inputManager?.relockPointer?.();
     this.emitVisibility();
   }
 
-  /**
-   * Resolve a dial intent to the same real paths the legacy menus drive. Squad
-   * orders → `PlayerSquadController` (look-to-mark for placement orders); fire
-   * support → `AirSupportManager.requestSupport`; marks stay local; stations →
-   * the headless `RadioStationSystem` tuner.
-   */
   private handleDialIntent(intent: RadioIntent, closesDial: boolean): void {
     if (intent.kind === 'squad') {
       if (requiresCommandTarget(intent.command)) {
-        // Placement orders ping where the player looks (no map in the dial).
         if (this.resolveCameraGroundPick(this.radioTarget)) {
           this.playerSquadController.issueCommandAtPosition(intent.command, this.radioTarget);
         }
@@ -461,9 +446,26 @@ export class CommandInputManager implements GameSystem {
       }
     } else if (intent.kind === 'fire-support') {
       this.selectedMarking = intent.marking;
-      this.beginStrikeDesignation(intent.assetId, intent.marking);
-    } else if (intent.kind === 'marking') {
-      this.setSelectedMarking(intent.marking);
+      if (intent.targetMode === 'current-smoke') {
+        const mark = this.heldEquipmentBridge.getActiveSmokeMark();
+        if (mark) this.beginStrikeDesignation(intent.assetId, intent.marking, mark.position);
+        else {
+          const asset = getAirSupportRadioAsset(intent.assetId);
+          this.airSupportRadioMenu.setState({ selectedAssetId: intent.assetId, statusText: `${asset.label} needs a smoke marker` });
+        }
+      } else {
+        this.beginStrikeDesignation(intent.assetId, intent.marking);
+      }
+    } else if (intent.kind === 'throw-smoke-marker') {
+      if (this.heldEquipmentBridge.beginSmokeMarkerThrow()) {
+        if (this.dialVisible) {
+          this.dialVisible = false;
+          this.radioDial.close();
+          this.closeOverlayTouchPassThrough();
+        }
+        this.inputManager?.relockPointer?.();
+        this.emitVisibility();
+      }
     } else if (intent.kind === 'station') {
       this.onStationTune?.(intent.stationId);
     }
@@ -478,8 +480,6 @@ export class CommandInputManager implements GameSystem {
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
     this.radioCooldownAccumulator = 0;
-    // Snapshot the call-in target (where the player looks) and seed the
-    // fire-support cooldown bars + active mark the instant the radio opens.
     this.resolveRadioTarget();
     this.feedRadioCooldowns();
     this.commandModeOverlay.setSelectedMarking(this.selectedMarking);
@@ -508,8 +508,6 @@ export class CommandInputManager implements GameSystem {
     }
     this.radioVisible = true;
     this.radioCooldownAccumulator = 0;
-    // Snapshot the call-in target (where the player is looking) and current
-    // asset cooldowns the instant the radio opens.
     this.resolveRadioTarget();
     this.feedRadioCooldowns();
     this.inputManager?.unlockPointer?.();
@@ -529,7 +527,6 @@ export class CommandInputManager implements GameSystem {
     this.emitVisibility();
   }
 
-  /** Let squad / tactical map receive touches above body-level touch controls (see TouchControls.beginModalOverlays). */
   private openOverlayTouchPassThrough(): void {
     this.inputManager?.getTouchControls()?.beginModalOverlays();
   }
@@ -597,18 +594,18 @@ export class CommandInputManager implements GameSystem {
     }
   }
 
-  /**
-   * Enter the DESIGNATE step (dial/overlay/menu all route here): close the open
-   * surface (relock the pointer to aim) and hand off to the designation
-   * controller; the strike fires on confirm, not on select. A cooling-down or
-   * unwired asset leaves a status echo and does not enter designate.
-   */
-  private beginStrikeDesignation(assetId: AirSupportRadioAssetId, marking: AirSupportTargetMarking): void {
+  private beginStrikeDesignation(
+    assetId: AirSupportRadioAssetId,
+    marking: AirSupportTargetMarking,
+    fixedTarget?: THREE.Vector3
+  ): void {
     if (this.dialVisible) this.closeRadioDial();
     else if (this.radioVisible) this.closeRadioMenu();
     else if (this.overlayVisible) this.closeOverlay();
 
-    const outcome = this.strikeDesignation.begin(assetId, marking);
+    const outcome = fixedTarget
+      ? this.strikeDesignation.beginAtTarget(assetId, marking, fixedTarget)
+      : this.strikeDesignation.begin(assetId, marking);
     if (outcome !== 'designating') {
       const asset = getAirSupportRadioAsset(assetId);
       const supportType = radioAssetToSupportType[assetId];
@@ -622,28 +619,14 @@ export class CommandInputManager implements GameSystem {
     }
   }
 
-  /**
-   * Snapshot the call-in target by marching the player's view ray to the
-   * terrain surface. Falls back to a fixed distance ahead when the player is
-   * looking above the horizon. No-op (target invalid) without a player camera.
-   */
   private resolveRadioTarget(): void {
     this.radioTargetValid = this.resolveCameraGroundPick(this.radioTarget);
   }
 
-  /**
-   * March the player's view ray to the terrain surface and write the hit into
-   * `out`. Returns false only when there is no player camera; falls back to a
-   * fixed distance ahead (still returns true) when the player looks above the
-   * horizon. Shared by the air-support call-in and squad look-to-mark commands.
-   */
   private resolveCameraGroundPick(out: THREE.Vector3): boolean {
     if (!this.playerController) return false;
 
     const camera = this.playerController.getCamera();
-    // The unified radio seeds a call-in target whenever it opens; a camera that
-    // cannot report a world position (e.g. before spawn) leaves the target
-    // unresolved rather than throwing.
     if (typeof camera?.getWorldPosition !== 'function') return false;
     camera.getWorldPosition(this.radioOrigin);
     camera.getWorldDirection(this.radioDir);
@@ -665,7 +648,6 @@ export class CommandInputManager implements GameSystem {
       }
     }
 
-    // Looking above the horizon: fall back to a fixed point ahead, flagged off-ground.
     const horiz = Math.hypot(this.radioDir.x, this.radioDir.z) || 1;
     const fx = this.radioOrigin.x + (this.radioDir.x / horiz) * 200;
     const fz = this.radioOrigin.z + (this.radioDir.z / horiz) * 200;

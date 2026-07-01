@@ -12,8 +12,9 @@
 > `master` — P0-P6 + P4b (radio-station wiring) + PX (terrain-spike). 9 PRs
 > #457-#465, ZERO fence changes, combat120 baseline restored, full suite 7238
 > green. Visual post-stack + orbital topo ship DEFAULT-OFF/opt-in; the post
-> default-on flip is deferred behind a MAIN-worktree combat120 p99 proof. NOT
-> deployed (deploy is MANUAL). Owner feel-walks queued in PLAYTEST_PENDING.md.
+> default-on flip is deferred behind a MAIN-worktree combat120 p99 proof. Folded
+> into the July 1 production-review release; owner feel-walks queued in
+> PLAYTEST_PENDING.md.
 >
 > **Owner-gated open questions resolved to defaults at kickoff** (autonomous run,
 > revisit in owner walk): post default-on uses the full evidence-matrix gate then

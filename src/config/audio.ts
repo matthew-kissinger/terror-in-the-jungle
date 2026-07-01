@@ -16,6 +16,25 @@ export const AUDIO_POOL_SIZES = {
   explosion: 8
 } as const;
 
+export const AUDIO_VARIANT_SETS = {
+  objectiveCompleteLocal: [
+    'objectiveCompleteLocal01',
+    'objectiveCompleteLocal02',
+    'objectiveCompleteLocal03',
+    'objectiveCompleteLocal04',
+    'objectiveCompleteLocal05',
+  ],
+  zoneCapturedLocal: [
+    'zoneCapturedLocal01',
+    'zoneCapturedLocal02',
+    'zoneCapturedLocal03',
+    'zoneCapturedLocal04',
+    'zoneCapturedLocal05',
+  ],
+} as const;
+
+export type AudioVariantSetId = keyof typeof AUDIO_VARIANT_SETS;
+
 export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   playerGunshot: {
     path: 'assets/optimized/playerGunshot.wav',
@@ -148,5 +167,75 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   zoneCaptured: {
     path: 'assets/optimized/zoneCaptured.ogg',
     volume: 0.6
+  },
+  objectiveCompleteLocal01: {
+    path: 'assets/optimized/objectiveCompleteLocal01.ogg',
+    volume: 0.62,
+    refDistance: 8,
+    maxDistance: 42,
+    rolloffFactor: 1.4
+  },
+  objectiveCompleteLocal02: {
+    path: 'assets/optimized/objectiveCompleteLocal02.ogg',
+    volume: 0.62,
+    refDistance: 8,
+    maxDistance: 42,
+    rolloffFactor: 1.4
+  },
+  objectiveCompleteLocal03: {
+    path: 'assets/optimized/objectiveCompleteLocal03.ogg',
+    volume: 0.62,
+    refDistance: 8,
+    maxDistance: 42,
+    rolloffFactor: 1.4
+  },
+  objectiveCompleteLocal04: {
+    path: 'assets/optimized/objectiveCompleteLocal04.ogg',
+    volume: 0.62,
+    refDistance: 8,
+    maxDistance: 42,
+    rolloffFactor: 1.4
+  },
+  objectiveCompleteLocal05: {
+    path: 'assets/optimized/objectiveCompleteLocal05.ogg',
+    volume: 0.62,
+    refDistance: 8,
+    maxDistance: 42,
+    rolloffFactor: 1.4
+  },
+  zoneCapturedLocal01: {
+    path: 'assets/optimized/zoneCapturedLocal01.ogg',
+    volume: 0.58,
+    refDistance: 10,
+    maxDistance: 48,
+    rolloffFactor: 1.35
+  },
+  zoneCapturedLocal02: {
+    path: 'assets/optimized/zoneCapturedLocal02.ogg',
+    volume: 0.58,
+    refDistance: 10,
+    maxDistance: 48,
+    rolloffFactor: 1.35
+  },
+  zoneCapturedLocal03: {
+    path: 'assets/optimized/zoneCapturedLocal03.ogg',
+    volume: 0.58,
+    refDistance: 10,
+    maxDistance: 48,
+    rolloffFactor: 1.35
+  },
+  zoneCapturedLocal04: {
+    path: 'assets/optimized/zoneCapturedLocal04.ogg',
+    volume: 0.58,
+    refDistance: 10,
+    maxDistance: 48,
+    rolloffFactor: 1.35
+  },
+  zoneCapturedLocal05: {
+    path: 'assets/optimized/zoneCapturedLocal05.ogg',
+    volume: 0.58,
+    refDistance: 10,
+    maxDistance: 48,
+    rolloffFactor: 1.35
   }
 };

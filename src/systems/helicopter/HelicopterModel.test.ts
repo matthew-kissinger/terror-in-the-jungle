@@ -17,7 +17,9 @@ const { mocks } = vi.hoisted(() => ({
     physics: null as any,
     animation: null as any,
     audio: null as any,
-    interaction: null as any
+    interaction: null as any,
+    weapon: null as any,
+    doorGunner: null as any,
   }
 }));
 
@@ -145,8 +147,15 @@ vi.mock('./HelicopterWeaponSystem', () => ({
     updateEffects = vi.fn();
     getWeaponStatus = vi.fn().mockReturnValue(null);
     getWeaponCount = vi.fn().mockReturnValue(0);
+    getCrewWeaponCount = vi.fn().mockReturnValue(0);
+    setPlayerCrewing = vi.fn();
+    getPlayerDoorGunStatus = vi.fn().mockReturnValue(null);
+    firePlayerDoorGun = vi.fn();
     dispose = vi.fn();
     disposeAll = vi.fn();
+    constructor() {
+      mocks.weapon = this;
+    }
   }
 }));
 
@@ -159,6 +168,9 @@ vi.mock('./HelicopterDoorGunner', () => ({
     updateEffects = vi.fn();
     dispose = vi.fn();
     disposeAll = vi.fn();
+    constructor() {
+      mocks.doorGunner = this;
+    }
   }
 }));
 
@@ -189,6 +201,8 @@ describe('HelicopterModel', () => {
     mocks.animation = null;
     mocks.audio = null;
     mocks.interaction = null;
+    mocks.weapon = null;
+    mocks.doorGunner = null;
 
     model = new HelicopterModel(scene);
 
@@ -388,6 +402,21 @@ describe('HelicopterModel', () => {
       expect(mocks.physics.setEngineActive).toHaveBeenCalledWith(true);
       expect(mocks.physics.update).toHaveBeenCalled();
       expect(mockPlayerController.updatePlayerPosition).toHaveBeenCalled();
+    });
+
+    it('keeps the piloted helicopter firing authority on the weapon system only', async () => {
+      model.createHelicopterWhenReady();
+      await flushPromises();
+      model.setPlayerController(mockPlayerController);
+      vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(true);
+      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue(HELI_ID);
+
+      model.update(0.16);
+
+      expect(mocks.weapon.update).toHaveBeenCalled();
+      expect(mocks.weapon.updateEffects).toHaveBeenCalled();
+      expect(mocks.doorGunner.update).not.toHaveBeenCalled();
+      expect(mocks.doorGunner.updateEffects).not.toHaveBeenCalled();
     });
 
     it('continues ticking a grounded unoccupied helicopter until rotors stop', async () => {

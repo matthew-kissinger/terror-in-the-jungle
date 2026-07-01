@@ -15,7 +15,9 @@
  * and re-encoded to Opus stereo ~80 kbps. Full attribution is in
  * `THIRD-PARTY-ASSETS.md` and `docs/asset-provenance/audio-2026-06/`. Swapping a
  * station for a different license-clean track needs no code change beyond this
- * file — keep the same `.ogg` path or update it here.
+ * file — keep the same `.ogg` path or update it here. The former "Green Static"
+ * ambient-drone station was removed after the 2026-07-01 owner playtest; do not
+ * reintroduce static/noise-bed stations without explicit owner approval.
  */
 
 export interface RadioStationConfig {
@@ -45,13 +47,6 @@ export const RADIO_STATIONS: ReadonlyArray<RadioStationConfig> = [
     description: 'Driving martial score — Five Armies (Kevin MacLeod)',
     path: 'assets/audio/music/station-five-armies.ogg',
     trim: 0.8,
-  },
-  {
-    id: 'green-static',
-    label: 'Green Static',
-    description: 'Ambient drone — Ossuary 6: Air (Kevin MacLeod)',
-    path: 'assets/audio/music/station-ossuary-air.ogg',
-    trim: 1.0,
   },
 ];
 

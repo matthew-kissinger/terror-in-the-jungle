@@ -8,8 +8,8 @@
 > gates, and PLAYTEST_PENDING deferral are the safety net)
 > **Concurrency cap:** 5
 > **Status:** **COMPLETE (2026-06-29) — all 6 phases closed, 31 PRs #425-#455
-> merged, zero fence changes, NOT deployed (deploy is MANUAL). Owner walks
-> queued in `docs/PLAYTEST_PENDING.md`.**
+> merged, zero fence changes. Folded into the July 1 production-review release;
+> owner walks remain queued in `docs/PLAYTEST_PENDING.md`.**
 >
 > **Progress:**
 > ✅ 1 control-discoverability (#425-#428, playtest-deferred) ·
@@ -20,8 +20,8 @@
 > ✅ 6 ashau-purpose-and-missions (#451-#455, perf A/B PASS R1 −5.6% / R2 +0.6%, playtest-deferred)
 >
 > **CAMPAIGN COMPLETE 2026-06-29** — all 6 phases closed, 31 PRs (#425-#455)
-> merged, zero fence changes. NOT deployed (deploy is MANUAL). Owner-walk
-> deferrals for all 6 phases queued in `docs/PLAYTEST_PENDING.md`.
+> merged, zero fence changes. Folded into the July 1 production-review release.
+> Owner-walk deferrals for all 6 phases queued in `docs/PLAYTEST_PENDING.md`.
 
 Source: the 2026-06-28 owner playtest (voice transcript + a 5-agent codebase
 triage). The dominant finding: **~40% of the owner's complaints are
