@@ -39,6 +39,7 @@ vi.mock('../input/InputManager', () => ({
     unlockPointer = vi.fn();
     relockPointer = vi.fn();
     onInputModeChange = vi.fn(() => () => {});
+    getGamepadManager = vi.fn().mockReturnValue(null);
   },
 }));
 vi.mock('./PlayerMovement');
@@ -1073,6 +1074,38 @@ describe('PlayerController', () => {
         playerController.applyExplosionShake(new THREE.Vector3(0, 0, 0), 50)
       ).not.toThrow();
       expect(() => playerController.applyRecoilShake()).not.toThrow();
+    });
+  });
+
+  describe('applyExplosionShake gamepad rumble', () => {
+    it('rumbles the gamepad, scaled by proximity, on a nearby explosion', () => {
+      const mockGamepadManager = { rumble: vi.fn() };
+      (playerController['input'].getGamepadManager as any).mockReturnValue(mockGamepadManager);
+      playerController['playerState'].position.set(0, 0, 0);
+
+      playerController.applyExplosionShake(new THREE.Vector3(5, 0, 0), 10);
+
+      expect(mockGamepadManager.rumble).toHaveBeenCalledTimes(1);
+      const [strong, weak, durationMs] = mockGamepadManager.rumble.mock.calls[0];
+      expect(strong).toBeGreaterThan(0);
+      expect(weak).toBeGreaterThan(0);
+      expect(durationMs).toBeGreaterThan(0);
+    });
+
+    it('does not rumble when the explosion is outside maxRadius', () => {
+      const mockGamepadManager = { rumble: vi.fn() };
+      (playerController['input'].getGamepadManager as any).mockReturnValue(mockGamepadManager);
+      playerController['playerState'].position.set(0, 0, 0);
+
+      playerController.applyExplosionShake(new THREE.Vector3(20, 0, 0), 10);
+
+      expect(mockGamepadManager.rumble).not.toHaveBeenCalled();
+    });
+
+    it('does not throw when no gamepad is connected', () => {
+      expect(() =>
+        playerController.applyExplosionShake(new THREE.Vector3(1, 0, 0), 10)
+      ).not.toThrow();
     });
   });
 });

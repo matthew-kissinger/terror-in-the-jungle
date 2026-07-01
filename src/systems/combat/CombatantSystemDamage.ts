@@ -16,6 +16,7 @@ import { spatialGridManager } from './SpatialGridManager';
 import type { IVehicle } from '../vehicle/IVehicle';
 import { Tank, type TankDamageType } from '../vehicle/Tank';
 import type { AudioManager } from '../audio/AudioManager';
+import type { PlayerStatsTracker } from '../player/PlayerStatsTracker';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
@@ -55,6 +56,7 @@ export class CombatantSystemDamage {
   private vehicleDamageQuery?: VehicleExplosionDamageQuery;
   private lastPlayerHitFeedbackAt = 0;
   private playerFaction: Faction = Faction.US;
+  private playerStatsTracker?: PlayerStatsTracker;
 
   constructor(
     private combatants: Map<string, Combatant>,
@@ -81,6 +83,10 @@ export class CombatantSystemDamage {
 
   setPlayerFaction(faction: Faction): void {
     this.playerFaction = faction;
+  }
+
+  setPlayerStatsTracker(tracker: PlayerStatsTracker): void {
+    this.playerStatsTracker = tracker;
   }
 
   setVehicleDamageQuery(query: VehicleExplosionDamageQuery | null): void {
@@ -221,7 +227,7 @@ export class CombatantSystemDamage {
     });
 
     if (playerAttributed) {
-      this.showPlayerExplosionFeedback(playerKills, bestNonKillHit);
+      this.showPlayerExplosionFeedback(playerKills, bestNonKillHit, weaponType);
     }
 
     const hudSystem = this.hudSystem;
@@ -293,6 +299,7 @@ export class CombatantSystemDamage {
   private showPlayerExplosionFeedback(
     kills: ExplosionHitFeedback[],
     bestNonKillHit: ExplosionHitFeedback | null,
+    weaponType: string,
   ): void {
     const hudSystem = this.hudSystem;
     if (!hudSystem) return;
@@ -306,6 +313,11 @@ export class CombatantSystemDamage {
         // score popup. This is what wires explosive / air-strike kills into the
         // scoreboard. Explosions carry no headshot, so isHeadshot = false.
         hudSystem.addKill(false);
+        // 'grenade' covers both thrown frags and the M79 launcher (the only
+        // callers that leave weaponType at its default); mortar/air-support
+        // kills route through the same addKill above but stay out of this
+        // sub-stat, matching the "Grenade Expert" award's intent.
+        if (weaponType === 'grenade') this.playerStatsTracker?.addGrenadeKill();
       }
       this.audioManager?.playHitFeedback('kill');
       this.lastPlayerHitFeedbackAt = performance.now();

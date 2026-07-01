@@ -213,6 +213,9 @@ function wireCombatRuntime(
     runtime.combatantSystem.setAudioManager(runtime.audioManager);
     runtime.combatantSystem.setPlayerSuppressionSystem(runtime.playerSuppressionSystem);
   }
+  // Lets player explosive/air-strike kills credit the same PlayerStatsTracker
+  // instance the scoreboard/HUD read from (grenade-kill sub-stat).
+  runtime.combatantSystem.setPlayerStatsTracker(runtime.hudSystem.getStatsTracker());
 
   const combatantCombat = runtime.combatantSystem.combatantCombat;
   if (combatantCombat) {

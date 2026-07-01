@@ -13,6 +13,7 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
+import type { PlayerStatsTracker } from '../player/PlayerStatsTracker';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
@@ -99,13 +100,11 @@ export class CombatantSystem implements GameSystem {
   private damageHandler: CombatantSystemDamage;
   private updateHelpers: CombatantSystemUpdate;
 
-  // Effects pools
   private tracerPool: TracerPool;
   private muzzleFlashSystem: MuzzleFlashSystem;
   public readonly impactEffectsPool: ImpactEffectsPool;
   public readonly explosionEffectsPool: ExplosionEffectsPool;
 
-  // Combatant management
   public readonly combatants: Map<string, Combatant> = new Map();
   private playerPosition = new THREE.Vector3();
   private autonomousSpawningEnabled = true;
@@ -115,7 +114,6 @@ export class CombatantSystem implements GameSystem {
   private readonly COMBAT_AI_USER_TIMING_MIN_MS = 0.25;
   private readonly COMBAT_AI_USER_TIMING_METHOD_LIMIT = 10;
 
-  // Player squad
   public shouldCreatePlayerSquad = false;
   public playerSquadId?: string;
 
@@ -517,7 +515,6 @@ export class CombatantSystem implements GameSystem {
     return snapshot;
   }
 
-  // Public API
   handlePlayerShot(
     ray: THREE.Ray,
     damageCalculator: (distance: number, isHeadshot: boolean) => number,
@@ -676,6 +673,10 @@ export class CombatantSystem implements GameSystem {
     this.combatantAI.setPlayerFaction(faction);
     this.spawnManager.setPlayerFaction(faction);
     this.damageHandler.setPlayerFaction(faction);
+  }
+
+  setPlayerStatsTracker(tracker: PlayerStatsTracker): void {
+    this.damageHandler.setPlayerStatsTracker(tracker);
   }
 
   setPlayerSuppressionSystem(system: PlayerSuppressionSystem): void {

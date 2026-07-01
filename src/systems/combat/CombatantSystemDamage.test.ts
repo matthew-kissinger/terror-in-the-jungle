@@ -136,6 +136,31 @@ describe('CombatantSystemDamage', () => {
       expect(hud.addKill).toHaveBeenCalledTimes(3);
     });
 
+    it("credits the grenade-kill sub-stat when the kill's weaponType is 'grenade' (default)", () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      const statsTracker = { addGrenadeKill: vi.fn() };
+      damage.setPlayerStatsTracker(statsTracker as never);
+      addEnemy('e1', 10, 0.5);
+
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
+
+      expect(statsTracker.addGrenadeKill).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not credit the grenade-kill sub-stat for non-grenade explosive kills (mortar, air support)', () => {
+      const hud = makeHud();
+      damage.setHUDSystem(hud as never);
+      const statsTracker = { addGrenadeKill: vi.fn() };
+      damage.setPlayerStatsTracker(statsTracker as never);
+      addEnemy('e1', 10, 0.5);
+
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER', 'mortar');
+
+      expect(hud.addKill).toHaveBeenCalledTimes(1);
+      expect(statsTracker.addGrenadeKill).not.toHaveBeenCalled();
+    });
+
     it('shows no player feedback for an explosion the player did not cause', () => {
       const hud = makeHud();
       damage.setHUDSystem(hud as never);

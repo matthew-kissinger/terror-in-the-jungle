@@ -50,6 +50,7 @@ function createRefs() {
       setGameModeManager: vi.fn(),
       setHUDSystem: vi.fn(),
       setPlayerHealthSystem: vi.fn(),
+      setPlayerStatsTracker: vi.fn(),
       setPlayerSuppressionSystem: vi.fn(),
       setTerrainSystem: vi.fn(),
       setTicketSystem: vi.fn(),
@@ -80,7 +81,7 @@ function createRefs() {
       setPlayerController: vi.fn(),
       setTicketSystem: vi.fn(),
     },
-    hudSystem: {},
+    hudSystem: { getStatsTracker: vi.fn(() => ({ id: 'stats-tracker' })) },
     influenceMapSystem: {},
     inventoryManager: {},
     minimapSystem: {},
@@ -164,6 +165,7 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.combatantSystem.setHUDSystem).toHaveBeenCalledWith(refs.hudSystem);
     expect(refs.combatantSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
     expect(refs.combatantSystem.setPlayerSuppressionSystem).toHaveBeenCalledWith(refs.playerSuppressionSystem);
+    expect(refs.combatantSystem.setPlayerStatsTracker).toHaveBeenCalledWith(refs.hudSystem.getStatsTracker());
     expect(refs.combatantSystem.combatantCombat.setSandbagSystem).toHaveBeenCalledWith(refs.sandbagSystem);
     expect(refs.combatantSystem.combatantAI.setSandbagSystem).toHaveBeenCalledWith(refs.sandbagSystem);
     expect(refs.combatantSystem.combatantAI.setZoneManager).toHaveBeenCalledWith(refs.zoneManager);

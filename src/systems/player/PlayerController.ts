@@ -98,7 +98,6 @@ export class PlayerController implements GameSystem {
   private spectatorCandidateProvider?: () => SpectatorCandidate[];
   private spectatorClickHandler?: (e: MouseEvent) => void;
 
-  // New modules
   private input: InputManager;
   private movement: PlayerMovement;
   private cameraController: PlayerCamera;
@@ -661,8 +660,6 @@ export class PlayerController implements GameSystem {
     return spawnPos;
   }
 
-  // Public API methods
-
   private isStabilizationBypassReason(reason: string): boolean {
     return reason.startsWith('startup')
       || reason.startsWith('respawn')
@@ -784,7 +781,11 @@ export class PlayerController implements GameSystem {
   reloadWeapon(): void { this.actionReload(); }
   applyScreenShake(intensity: number, duration: number = 0.2): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shake(intensity, duration); }
   applyDamageShake(damageAmount: number): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromDamage(damageAmount); }
-  applyExplosionShake(explosionPos: THREE.Vector3, maxRadius: number): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromExplosion(explosionPos, this.playerState.position, maxRadius); }
+  applyExplosionShake(explosionPos: THREE.Vector3, maxRadius: number): void {
+    if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromExplosion(explosionPos, this.playerState.position, maxRadius);
+    const rumbleFalloff = 1 - explosionPos.distanceTo(this.playerState.position) / maxRadius;
+    if (rumbleFalloff > 0) this.input.getGamepadManager()?.rumble(0.6 * rumbleFalloff, 0.35 * rumbleFalloff, 220);
+  }
   applyRecoilShake(): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromRecoil(); }
   getPosition(target?: THREE.Vector3): THREE.Vector3 {
     return (target ?? new THREE.Vector3()).copy(this.playerState.position);
@@ -1042,7 +1043,6 @@ export class PlayerController implements GameSystem {
     this.vehicleController.configure(dependencies);
   }
 
-  // Dependency setters
   setTerrainSystem(terrainSystem: ITerrainRuntime): void { this.terrainSystem = terrainSystem; this.movement.setTerrainSystem(terrainSystem); }
   setWorldSize(worldSize: number): void { this.movement.setWorldSize(worldSize); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
