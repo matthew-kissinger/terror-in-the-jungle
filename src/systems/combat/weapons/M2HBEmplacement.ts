@@ -7,6 +7,7 @@ import type { IAudioManager } from '../../../types/SystemInterfaces';
 import { Emplacement } from '../../vehicle/Emplacement';
 import type { EmplacementPlayerAdapter } from '../../vehicle/EmplacementPlayerAdapter';
 import type { CombatantSystem } from '../CombatantSystem';
+import type { Combatant } from '../types';
 import { TracerPool } from '../../effects/TracerPool';
 import { Logger } from '../../../utils/Logger';
 import { M2HBWeapon, M2HB_STATS } from './M2HBWeapon';
@@ -137,17 +138,22 @@ export class M2HBEmplacementSystem implements GameSystem {
   }
 
   /**
-   * NPC-fire entry point. Callers (the `emplacement-npc-gunner`
-   * sibling task) invoke this with an explicit world-space origin +
+   * NPC-fire entry point. Callers (the NPC-gunner mounted route via
+   * `NpcM2HBAdapter`) invoke this with an explicit world-space origin +
    * aim direction. If the weapon cycled a round the system spawns
    * tracer / impact / audio effects against the registered
    * combatantSystem and returns true.
+   *
+   * `gunner` is the live crewing combatant. When supplied the raycast is
+   * attributed to that combatant (its faction filters friend-foe, its kills
+   * are credited, `npc_killed` fires) rather than the PLAYER proxy — so an
+   * NPC tripod kill never inflates the player's kill count / streak / feed.
    */
-  tryFire(vehicleId: string, origin: THREE.Vector3, aimDir: THREE.Vector3): boolean {
+  tryFire(vehicleId: string, origin: THREE.Vector3, aimDir: THREE.Vector3, gunner?: Combatant): boolean {
     const binding = this.bindings.get(vehicleId);
     if (!binding) return false;
     if (!binding.weapon.tryFire()) return false;
-    this.executeShot(binding, origin, aimDir);
+    this.executeShot(binding, origin, aimDir, gunner);
     return true;
   }
 
@@ -198,7 +204,7 @@ export class M2HBEmplacementSystem implements GameSystem {
     binding.hadOccupantLastTick = hasOccupant;
   }
 
-  private executeShot(binding: M2HBBinding, origin: THREE.Vector3, aimDir: THREE.Vector3): void {
+  private executeShot(binding: M2HBBinding, origin: THREE.Vector3, aimDir: THREE.Vector3, gunner?: Combatant): void {
     const ray = _scratchShotRay;
     ray.origin.copy(origin);
     ray.direction.copy(aimDir).normalize();
@@ -206,7 +212,10 @@ export class M2HBEmplacementSystem implements GameSystem {
     let hitNormal: THREE.Vector3 | null = null;
 
     if (this.combatantSystem) {
-      const result = this.combatantSystem.handlePlayerShot(ray, resolveM2HBDamage, 'rifle');
+      // NPC gunner: thread the crewing combatant so the kill is attributed to
+      // it (not PLAYER) and friend-foe filters on its faction. Player fire
+      // (gunner undefined) keeps the default US player attribution.
+      const result = this.combatantSystem.handlePlayerShot(ray, resolveM2HBDamage, 'rifle', gunner?.faction, gunner);
       if (result.hit) {
         hitPoint = result.point;
         hitNormal = _scratchHitNormal.copy(ray.direction).negate();

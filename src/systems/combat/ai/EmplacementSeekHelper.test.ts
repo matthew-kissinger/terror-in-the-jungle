@@ -339,22 +339,25 @@ describe('buildEmplacementContext: candidate selection', () => {
     expect(ctx?.threatInCone).toBe(false)
   })
 
-  it('throws when the resolver returns undefined for a known candidate', () => {
-    // Hard-fail behaviour replaces the old synthetic-cone fallback. A
-    // candidate the query returns but the resolver doesn't recognise is
-    // a wiring contract violation (the per-vehicle M2HB binding is
-    // missing) — must not silently degrade to "never mounts".
+  it('soft-fails (skips, no throw) when the resolver returns undefined for a known candidate', () => {
+    // A candidate the query returns but the resolver doesn't recognise is a
+    // wiring bug (missing per-vehicle M2HB binding). It must NOT crash the
+    // combat tick: the builder logs once and returns null so the unit falls
+    // back to the normal engage ladder — a mis-registered tripod cannot take
+    // down every NPC's frame.
     const self = makeCombatant('c', Faction.US, new THREE.Vector3())
     const emp = makeFakeEmplacement('us_1', new THREE.Vector3(2, 0, 0), Faction.US)
     const query = makeFakeQuery([emp])
-    expect(() =>
-      buildEmplacementContext(
+    let result: ReturnType<typeof buildEmplacementContext> | undefined
+    expect(() => {
+      result = buildEmplacementContext(
         self,
         new THREE.Vector3(20, 0, 0),
         query,
         () => undefined,
-      ),
-    ).toThrow(/no weapon binding/)
+      )
+    }).not.toThrow()
+    expect(result).toBeNull()
   })
 
   it('accepts an ARVN candidate for a US combatant (alliance, not faction)', () => {

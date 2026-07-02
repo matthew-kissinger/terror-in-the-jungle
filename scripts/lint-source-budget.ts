@@ -112,7 +112,15 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau); +25 LOC: time-sliced prebaked import wiring + load telemetry (ashau-load-freeze, 2026-06-10)', loc: 833, methods: 24 },
   'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files; +181 LOC dropped-frame war-state telemetry and stabilization probes', loc: 969, methods: 36 },
   'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
-  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +12 LOC: per-frame stepper hook for the shared NPC tank cannon, scaled-dt signature per combat-review (npc-tank-cannon-wiring, 2026-06-09)', loc: 1004, methods: 44 },
+  // Snapshot raised 1004 → 1072 (npc-m2hb-gunners, F5 activation, 2026-07-02):
+  // three thin forwarding setters onto the private engage handler
+  // (setEmplacementQuery / setEmplacementWeaponResolver / setNpcVehicleBoarding),
+  // the mounted emplacement-gunner route wiring (setEmplacementGunnerRoute +
+  // two fields), and the IN_VEHICLE emplacement-gunner branch. Mirrors the
+  // existing setTankGunnerRoute wiring; the route body itself lives in the new
+  // EmplacementAIGunnerRoute helper (not this file). In-cycle ratchet re-base
+  // sanctioned by the task brief; split target unchanged.
+  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +12 LOC: per-frame stepper hook for the shared NPC tank cannon (npc-tank-cannon-wiring); +68 LOC: NPC emplacement-gunner forwarding setters + mounted route wiring + IN_VEHICLE branch (npc-m2hb-gunners, 2026-07-02)', loc: 1072, methods: 44 },
   // Admitted 2026-06-09 (npc-tank-cannon-wiring review fix): the prod
   // composition point absorbed seated-weapon lifecycle (tank cannon + M2HB),
   // HUD panel hosts (m2hb-gun-experience), and the NPC tank-gunner wire +
