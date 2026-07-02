@@ -43,8 +43,8 @@ deliberately omitted — `napalmFireSystem`/`zoneCaptureEffects` set the precede
 (no getter when the system is only reached via `refs`), and adding one would push
 the grandfathered `SystemManager.ts` method count past its budget snapshot.
 
-Deleted `src/systems/weapons/WeaponPickupSystem.ts` + its test (dormant prototype,
-own 3-weapon enum, placeholder swap, zero production callers).
+Deleted `WeaponPickupSystem.ts` + its test from `src/systems/weapons/` (dormant
+prototype, own 3-weapon enum, placeholder swap, zero production callers).
 
 ## Files touched
 
@@ -54,7 +54,7 @@ own 3-weapon enum, placeholder swap, zero production callers).
 - `src/systems/player/FirstPersonWeapon.ts` — `resupplyCurrentWeaponMagazine()`
 - `src/core/SystemRegistry.ts`, `SystemInitializer.ts`, `SystemUpdater.ts`,
   `SystemUpdateSchedule.ts`, `GameplayRuntimeComposer.ts` (+ its test) — registration/wiring
-- **DELETED** `src/systems/weapons/WeaponPickupSystem.ts`, `WeaponPickupSystem.test.ts`
+- **DELETED** `WeaponPickupSystem.ts` + `WeaponPickupSystem.test.ts` (were under `src/systems/weapons/`)
 
 ## Non-goals / notes
 
