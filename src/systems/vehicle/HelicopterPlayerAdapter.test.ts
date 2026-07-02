@@ -346,6 +346,24 @@ describe('HelicopterPlayerAdapter', () => {
       expect(renderer.setCrosshairMode).toHaveBeenLastCalledWith('helicopter_gunship');
     });
 
+    it('re-pushes the HUD vehicle context with the live seat on each door-gun swap', () => {
+      // The stale-legend bug: the toggle never re-pushed the context, so the HUD
+      // read `SEAT: PILOT` + flight binds while manning the gun. The adapter must
+      // push a fresh context carrying the new seat so the legend can name it.
+      const { ctx } = boardGunship();
+      const setVehicleContext = ctx.hudSystem!.setVehicleContext as ReturnType<typeof vi.fn>;
+      const lastSeat = () => setVehicleContext.mock.calls.at(-1)?.[0]?.seat;
+
+      // Boarded into the pilot seat.
+      expect(lastSeat()).toBe('pilot');
+
+      adapter.toggleDoorGunSeat();
+      expect(lastSeat()).toBe('door-gun');
+
+      adapter.toggleDoorGunSeat();
+      expect(lastSeat()).toBe('pilot');
+    });
+
     it('is a no-op on an aircraft with no door gun', () => {
       const noGunModel = createMockHelicopterModel({ hasDoorGun: false, role: 'transport' });
       adapter = new HelicopterPlayerAdapter(noGunModel as any);

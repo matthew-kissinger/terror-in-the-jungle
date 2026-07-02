@@ -334,12 +334,16 @@ describe('VehicleActionBar', () => {
     expect(onUp).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the controls hint when crewing a ground vehicle', () => {
+  it('renders no keyboard-bind controls hint on the touch bar', () => {
+    // The old TANK_CONTROLS_HINT ('F board / exit / seat - W/S drive ...') put
+    // keyboard binds on a keyboard-less surface. It is gone entirely; per-vehicle
+    // touch-verb strings arrive in the hint-table follow-on.
     bar.setVehicleContext({
       kind: 'car',
       role: 'pilot',
       hudVariant: 'groundVehicle',
       weaponCount: 1,
+      secondSeat: true,
       capabilities: {
         canExit: true,
         canFirePrimary: true,
@@ -352,13 +356,59 @@ describe('VehicleActionBar', () => {
       },
     });
 
-    const hint = document.querySelector('[aria-label="vehicle controls hint"]') as HTMLDivElement;
-    expect(hint).toBeTruthy();
-    expect(hint.style.display).not.toBe('none');
-    expect(hint.textContent).toContain('F board / exit / seat');
+    expect(document.querySelector('[aria-label="vehicle controls hint"]')).toBeNull();
+    expect(document.getElementById('vehicle-action-bar')!.textContent).not.toContain('W/S drive');
   });
 
-  it('hides the controls hint for flight contexts', () => {
+  it('shows the SEAT button for a two-seat tank and routes it to the seat-swap callback', () => {
+    const onSeatSwap = vi.fn();
+    bar.setCallbacks({ onSeatSwap });
+    bar.setVehicleContext({
+      kind: 'car',
+      role: 'pilot',
+      hudVariant: 'groundVehicle',
+      weaponCount: 0,
+      secondSeat: true,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: false,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    const seatBtn = document.querySelector('[aria-label="SEAT"]') as HTMLDivElement;
+    expect(seatBtn.style.display).toBe('flex');
+    seatBtn.dispatchEvent(pointerEvent('pointerdown'));
+    expect(onSeatSwap).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the SEAT button for the armed door-gun gunship', () => {
+    bar.setVehicleContext({
+      kind: 'helicopter',
+      role: 'gunship',
+      hudVariant: 'flight',
+      weaponCount: 2,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: true,
+        canCycleWeapons: true,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    expect((document.querySelector('[aria-label="SEAT"]') as HTMLDivElement).style.display).toBe('flex');
+  });
+
+  it('hides the SEAT button for single-seat craft (jeep, transport heli)', () => {
     bar.setVehicleContext({
       kind: 'helicopter',
       role: 'transport',
@@ -375,9 +425,26 @@ describe('VehicleActionBar', () => {
         canOpenCommand: true,
       },
     });
+    expect((document.querySelector('[aria-label="SEAT"]') as HTMLDivElement).style.display).toBe('none');
 
-    const hint = document.querySelector('[aria-label="vehicle controls hint"]') as HTMLDivElement;
-    expect(hint.style.display).toBe('none');
+    // A jeep: single seat, no swap.
+    bar.setVehicleContext({
+      kind: 'car',
+      role: 'driver',
+      hudVariant: 'groundVehicle',
+      weaponCount: 0,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: false,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+    expect((document.querySelector('[aria-label="SEAT"]') as HTMLDivElement).style.display).toBe('none');
   });
 
   it('dispose removes the component', () => {

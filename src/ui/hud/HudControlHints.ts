@@ -38,7 +38,7 @@ import type { ActorMode, VehicleUIContext } from '../layout/types';
  * which surfaced dead hints (a plane pilot saw `G: Deploy squad`, which never
  * fires in a fixed wing) and mislabeled `Space`.
  */
-export type ControlHintContext = 'foot' | 'groundVehicle' | 'helicopter' | 'fixedWing';
+export type ControlHintContext = 'foot' | 'groundVehicle' | 'turret' | 'helicopter' | 'fixedWing';
 
 /**
  * The seat the player currently occupies in a multi-crew / armed craft, plus
@@ -111,11 +111,27 @@ const CONTEXT_BINDS: Record<ControlHintContext, ContextLegend> = {
       { keys: 'LMB', action: 'Fire (if armed)' },
       { keys: 'RMB', action: 'Free look' },
       // E exits any seated ground/tracked vehicle (mirrors the aircraft exit
-      // key); F swaps the driver<->gunner seat on craft with a second seat
-      // (tank). They are split because on a two-seat tank F always swaps, so
-      // a conflated "F: exit / swap" left the dismount unreachable.
+      // key). `F` swaps the driver<->gunner seat ONLY on a two-seat tank, so
+      // the swap cue is NOT a static row here (it would be a lie on a jeep or
+      // boat) — it is surfaced by the seat block's `F: swap seat` cue, which is
+      // gated on the context's `secondSeat` flag.
       { keys: 'E', action: 'Exit vehicle' },
-      { keys: 'F', action: 'Swap seat' },
+      { keys: 'T', action: 'Air support radio' },
+      { keys: 'TAB', action: 'Scoreboard' },
+    ],
+  },
+  turret: {
+    // The gunner's-eye legend for a manned turret / tripod (M2HB emplacement,
+    // tank gunner station). The gun is mouse-aimed and LMB-fired; there is no
+    // chassis to drive, so the throttle/steer/free-look rows the ground-vehicle
+    // bucket carries are dead here. `E` releases the station (the tank gunner
+    // dismounts; the M2HB gunner steps off the tripod). Seat-swap on a two-seat
+    // tank is surfaced by the seat block's `F: swap seat` cue, not a static row.
+    title: 'TURRET',
+    hints: [
+      { keys: 'Mouse', action: 'Aim' },
+      { keys: 'LMB', action: 'Fire' },
+      { keys: 'E', action: 'Exit' },
       { keys: 'T', action: 'Air support radio' },
       { keys: 'TAB', action: 'Scoreboard' },
     ],
@@ -289,9 +305,11 @@ export class HudControlHints {
    * Switch the legend by the actor mode the player is in. Helicopters and
    * fixed-wing planes each get their own flight binds (a rotary craft
    * altitude-locks and cycles gun/rockets; a plane has flight assist and no
-   * altitude lock); ground vehicles and turrets share the ground-vehicle binds;
-   * everything else is on-foot. Lets callers pass their existing `ActorMode`
-   * without mapping it themselves.
+   * altitude lock); a driven ground vehicle gets the chassis binds; a manned
+   * turret / tripod (M2HB emplacement, tank gunner) gets the gunner binds —
+   * NOT the chassis binds, which have no throttle/steer/free-look meaning at a
+   * gun station; everything else is on-foot. Lets callers pass their existing
+   * `ActorMode` without mapping it themselves.
    */
   setContextForActor(actor: ActorMode): void {
     this.setContext(HudControlHints.actorToContext(actor));
@@ -305,8 +323,9 @@ export class HudControlHints {
       case 'plane':
         return 'fixedWing';
       case 'car':
-      case 'turret':
         return 'groundVehicle';
+      case 'turret':
+        return 'turret';
       default:
         return 'foot';
     }
@@ -341,10 +360,12 @@ export class HudControlHints {
    * and the seat-swap rule stay in one place rather than drifting at call
    * sites — the same way `actorToContext` owns the actor mapping.
    *
-   * Seat-swap detection keys on the stable `role` values the vehicle adapters
-   * already emit: the tank crews `pilot` (driver hatch) and `gunner`, both of
-   * which swap with `F`; a gunship helicopter swaps the pilot seat with its
-   * door gun; a jeep `driver` and the transport/attack helicopters do not.
+   * Seat-swap detection keys on the additive `secondSeat` flag the two-seat
+   * tank driver/gunner contexts set (NOT the `role` string alone — a single-seat
+   * M2HB emplacement and a direct-boarded tank gunner share `role: 'gunner'`,
+   * and a boat pilot shares `role: 'pilot'`, but `F` dismounts them); a gunship
+   * helicopter swaps the pilot seat with its door gun (keyed on `role`); a jeep
+   * `driver` and the transport/attack helicopters do not swap at all.
    */
   static seatHintFromContext(context: VehicleUIContext | null): SeatHint | null {
     if (!context) return null;
@@ -361,15 +382,22 @@ export class HudControlHints {
         label: 'PILOT',
         hasSecondSeat: false,
         armed,
-        note: 'RMB: broadside gun cam',
+        // Only the broadside gunship (AC-47) has a gun camera on RMB; a plain
+        // strike plane (A-1 / F-4) has no RMB action, so gate the note on the
+        // view toggle to mirror the `broadsideView` gate one line below.
+        note: context.viewToggle ? 'RMB: broadside gun cam' : undefined,
         // A viewToggle is present only on broadside-capable airframes (AC-47) —
         // gate the dynamic `V` legend row on it so other planes don't show it.
         broadsideView: !!context.viewToggle,
       };
     }
 
-    // Tank: driver hatch (`pilot`) <-> gunner station, both swap with F.
-    if (role === 'pilot' || role === 'gunner') {
+    // Tank: driver hatch (`pilot`) <-> gunner station, both swap with F — but
+    // ONLY when the context reports a second seat. The single-seat M2HB
+    // emplacement and a direct-boarded tank gunner also report `role: 'gunner'`,
+    // and a boat pilot reports `role: 'pilot'`; on those, `F` dismounts rather
+    // than swaps, so a `F: swap seat` cue would be a lie that strands the player.
+    if ((role === 'pilot' || role === 'gunner') && context.secondSeat) {
       return {
         label: role === 'gunner' ? 'GUNNER' : 'DRIVER',
         hasSecondSeat: true,
@@ -377,13 +405,17 @@ export class HudControlHints {
       };
     }
 
-    // Door-gun gunship: the player flies as pilot and swaps to the door gun.
+    // Door-gun gunship: the player flies as pilot and swaps to the door gun,
+    // or crews the door gun and swaps back to the pilot seat. The adapter
+    // re-pushes the context with `seat` set on each toggle so the legend names
+    // the live station.
     if (context.kind === 'helicopter' && role === 'gunship') {
+      const atDoorGun = context.seat === 'door-gun';
       return {
-        label: 'PILOT',
+        label: atDoorGun ? 'DOOR GUN' : 'PILOT',
         hasSecondSeat: true,
         armed,
-        note: 'F swaps to door gun',
+        note: atDoorGun ? 'F: back to pilot' : 'F swaps to door gun',
       };
     }
 

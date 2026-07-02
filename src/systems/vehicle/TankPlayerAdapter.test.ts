@@ -173,9 +173,12 @@ describe('TankPlayerAdapter', () => {
       expect(ctx.cameraController.saveInfantryAngles).toHaveBeenCalled();
       // Any leftover flight bookkeeping cleared.
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('none');
-      // HUD knows we are in a ground vehicle (tank reuses the bucket for now).
+      // HUD knows we are in a ground vehicle (tank reuses the bucket for now)
+      // and that this is a two-seat crew (`F` swaps driver<->gunner). The
+      // secondSeat flag is what gates the swap cue + touch SEAT button; a jeep
+      // or boat pilot must NOT carry it.
       expect(ctx.hudSystem!.setVehicleContext).toHaveBeenCalledWith(
-        expect.objectContaining({ hudVariant: 'groundVehicle', role: 'pilot' }),
+        expect.objectContaining({ hudVariant: 'groundVehicle', role: 'pilot', secondSeat: true }),
       );
     });
 
@@ -533,6 +536,8 @@ describe('TankPlayerAdapter', () => {
       const lastCtx = calls[calls.length - 1][0];
       expect(lastCtx.weaponCount).toBeGreaterThan(0);
       expect(lastCtx.capabilities.canFirePrimary).toBe(true);
+      // Still a two-seat crew from the gunner station: `F` swaps back to driver.
+      expect(lastCtx.secondSeat).toBe(true);
       expect(adapter.getCrewSeat()).toBe('gunner');
     });
   });

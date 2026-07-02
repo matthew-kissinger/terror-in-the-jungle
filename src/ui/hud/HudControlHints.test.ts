@@ -75,7 +75,7 @@ describe('HudControlHints', () => {
     hints.dispose();
   });
 
-  it('lists ground-vehicle binds — including seat swap and armed fire — in a ground vehicle', () => {
+  it('lists driving and exit binds in a ground vehicle, without a static swap-seat row', () => {
     const hints = new HudControlHints();
     hints.mount(host);
 
@@ -83,13 +83,34 @@ describe('HudControlHints', () => {
 
     const rows = legendRows(host).join(' | ');
     expect(rows).toContain('Throttle');
-    // Exit and seat-swap are surfaced as distinct binds: E exits, F swaps —
-    // a conflated single bind hid the dismount on a two-seat tank.
+    // E exits any ground vehicle.
     expect(rows).toContain('Exit vehicle');
-    expect(rows).toContain('Swap seat');
     expect(rows.toLowerCase()).toContain('fire');
+    // `F` only swaps on a two-seat tank, so the static legend carries no
+    // `Swap seat` row — a jeep or boat would show a dead hint. The seat-swap
+    // cue is surfaced by the seat block (gated on the context's secondSeat).
+    expect(rows).not.toContain('Swap seat');
     // On-foot-only binds should not bleed into the vehicle legend.
     expect(legendText(host)).not.toContain('Board vehicle');
+    hints.dispose();
+  });
+
+  it('lists gunner binds — aim, fire, exit — in a turret, with no throttle/steer/free-look', () => {
+    const hints = new HudControlHints();
+    hints.mount(host);
+
+    hints.setContext('turret');
+
+    const rows = legendRows(host).join(' | ');
+    // A manned turret (M2HB tripod / tank gunner) aims with the mouse and fires
+    // on LMB; it has no chassis, so the driving + free-look binds the ground
+    // vehicle bucket carries are dead here and must not appear.
+    expect(rows.toLowerCase()).toContain('aim');
+    expect(rows.toLowerCase()).toContain('fire');
+    expect(rows).toContain('Exit');
+    expect(rows).not.toContain('Throttle');
+    expect(rows).not.toContain('Steer');
+    expect(rows).not.toContain('Free look');
     hints.dispose();
   });
 
@@ -238,13 +259,27 @@ describe('HudControlHints — seat / fire cues', () => {
   let hints: HudControlHints;
 
   // Realistic VehicleUIContexts mirroring the adapters' createX UI contexts.
+  // The two-seat tank crews carry `secondSeat: true` (TankPlayerAdapter); the
+  // single-seat M2HB emplacement and direct-boarded tank gunner do NOT.
   const tankDriver: VehicleUIContext = {
     kind: 'car', role: 'pilot', hudVariant: 'groundVehicle', weaponCount: 0,
+    secondSeat: true,
     capabilities: caps({ canFreeLook: true }),
   };
   const tankGunner: VehicleUIContext = {
     kind: 'turret', role: 'gunner', hudVariant: 'turret', weaponCount: 1,
+    secondSeat: true,
     capabilities: caps({ canFirePrimary: true }),
+  };
+  // A standalone M2HB / emplacement gunner: same `role: 'gunner'`, one station.
+  const emplacementGunner: VehicleUIContext = {
+    kind: 'turret', role: 'gunner', hudVariant: 'turret', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
+  };
+  // A boat pilot: `role: 'pilot'` like the tank driver but a single seat.
+  const boatPilot: VehicleUIContext = {
+    kind: 'car', role: 'pilot', hudVariant: 'groundVehicle', weaponCount: 0,
+    capabilities: caps({ canFreeLook: true }),
   };
   const jeepDriver: VehicleUIContext = {
     kind: 'car', role: 'driver', hudVariant: 'groundVehicle', weaponCount: 0,
@@ -252,6 +287,11 @@ describe('HudControlHints — seat / fire cues', () => {
   };
   const gunshipHeli: VehicleUIContext = {
     kind: 'helicopter', role: 'gunship', hudVariant: 'flight', weaponCount: 2,
+    capabilities: caps({ canFirePrimary: true }),
+  };
+  const gunshipHeliAtDoorGun: VehicleUIContext = {
+    kind: 'helicopter', role: 'gunship', hudVariant: 'flight', weaponCount: 2,
+    seat: 'door-gun',
     capabilities: caps({ canFirePrimary: true }),
   };
   const transportHeli: VehicleUIContext = {
@@ -262,6 +302,11 @@ describe('HudControlHints — seat / fire cues', () => {
     kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
     capabilities: caps({ canFirePrimary: true }),
     viewToggle: { inactiveLabel: 'SIDE', activeLabel: 'CHASE', active: false },
+  };
+  // A strike plane (A-1 / F-4): armed, no broadside view toggle.
+  const strikePlane: VehicleUIContext = {
+    kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
   };
 
   beforeEach(() => {
@@ -325,6 +370,51 @@ describe('HudControlHints — seat / fire cues', () => {
     expect(text).toContain('LMB: fire');
     expect(text.toLowerCase()).toContain('broadside');
     expect(text).not.toContain('F: swap seat');
+  });
+
+  it('does not show a swap-seat cue for a single-seat M2HB gunner (F dismounts, not swaps)', () => {
+    // The standalone emplacement gunner shares role 'gunner' with the tank
+    // gunner, but has one station: `F` dismounts. A `F: swap seat` cue would be
+    // a lie — following it strands the player (F falls through to exit).
+    hints.setSeatHint(HudControlHints.seatHintFromContext(emplacementGunner));
+
+    const text = seatText(host);
+    expect(text).toContain('GUNNER');
+    expect(text).toContain('LMB: fire'); // still armed
+    expect(text).not.toContain('F: swap seat');
+  });
+
+  it('does not show a swap-seat cue for a single-seat boat pilot', () => {
+    // A boat pilot reports role 'pilot' like the tank driver but is single-seat.
+    hints.setSeatHint(HudControlHints.seatHintFromContext(boatPilot));
+    // No weapon, no second seat: nothing to teach.
+    expect(seatText(host)).toBe('');
+  });
+
+  it('shows a strike plane (A-1 / F-4) pilot the fire cue but no broadside gun-cam note', () => {
+    // Only the AC-47 broadside gunship responds to RMB; a plain strike plane has
+    // no RMB action, so the gun-cam note must not appear.
+    hints.setSeatHint(HudControlHints.seatHintFromContext(strikePlane));
+
+    const text = seatText(host);
+    expect(text).toContain('PILOT');
+    expect(text).toContain('LMB: fire');
+    expect(text.toLowerCase()).not.toContain('broadside');
+    expect(text.toLowerCase()).not.toContain('gun cam');
+  });
+
+  it('relabels the gunship seat to DOOR GUN with a back-to-pilot cue after a door-gun swap', () => {
+    // The adapter re-pushes the context with seat:'door-gun' on the swap. The
+    // stale `SEAT: PILOT / F swaps to door gun` was the bug — the legend must
+    // now name the door gun and offer the way back.
+    hints.setSeatHint(HudControlHints.seatHintFromContext(gunshipHeli));
+    expect(seatText(host)).toContain('PILOT');
+
+    hints.setSeatHint(HudControlHints.seatHintFromContext(gunshipHeliAtDoorGun));
+    const text = seatText(host);
+    expect(text.toUpperCase()).toContain('DOOR GUN');
+    expect(text).not.toContain('SEAT: PILOT');
+    expect(text.toLowerCase()).toContain('back to pilot');
   });
 
   it('shows a single-seat transport helicopter pilot no fire or swap cue', () => {
@@ -408,9 +498,11 @@ describe('HudControlHints.actorToContext', () => {
     expect(HudControlHints.actorToContext('plane')).toBe('fixedWing');
   });
 
-  it('maps ground actors and infantry as before', () => {
+  it('maps a driven car to the ground-vehicle bucket and a manned turret to its own', () => {
     expect(HudControlHints.actorToContext('car')).toBe('groundVehicle');
-    expect(HudControlHints.actorToContext('turret')).toBe('groundVehicle');
+    // A turret / tripod gets the gunner legend, NOT the chassis legend — the
+    // ground-vehicle throttle/steer/free-look binds are dead at a gun station.
+    expect(HudControlHints.actorToContext('turret')).toBe('turret');
     expect(HudControlHints.actorToContext('infantry')).toBe('foot');
   });
 });

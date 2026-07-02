@@ -88,6 +88,22 @@ export interface VehicleUIContext {
    * panels for the variant and the wrong-variant panel never mounts.
    */
   heliPanels?: HeliPanelDescriptor;
+  /**
+   * This station has a second crew seat swappable with `F` (tank driver <->
+   * gunner). Drives the `F: swap seat` legend cue and the touch SEAT button.
+   * Set ONLY by the two-seat tank driver/gunner contexts — a single-seat M2HB
+   * emplacement, a direct-boarded tank gunner, and boat pilots all report a
+   * stable `role` but no second seat, so following `F` on them dismounts rather
+   * than swaps. Additive + optional so every other context reads it as absent.
+   */
+  secondSeat?: boolean;
+  /**
+   * The seat the player currently crews on a craft that swaps stations without
+   * an enter/exit (the door-gun gunship: `'pilot'` <-> `'door-gun'`). Lets the
+   * HUD name the live station after a swap that pushes a fresh context.
+   * Additive + optional so contexts that never re-push on swap omit it.
+   */
+  seat?: string;
 }
 
 /**
