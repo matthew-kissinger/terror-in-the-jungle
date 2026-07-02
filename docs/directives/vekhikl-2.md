@@ -14,5 +14,5 @@ Code-complete: cycle-vekhikl-2-stationary-weapons 2026-05-17
 - [x] M2HB emplacements spawnable on Open Frontier US base + A Shau NVA bunker overlook (#238 system wiring).
 - [x] Player mounts via IVehicle seat-occupant surface and PlayerVehicleAdapter pattern (#233 + #234); mouse drives barrel yaw/pitch within cone limits.
 - [x] LMB fires at ~575 RPM with tracer every 5th round; 250-round belt; reload triggers on dismount (#237).
-- [x] NPC squad-AI gunners mount unoccupied friendly-faction emplacements and engage enemies inside the field-of-fire cone via the orderBoard scan (#236).
+- [~] NPC squad-AI gunners mount unoccupied friendly-faction emplacements and engage enemies inside the field-of-fire cone via the orderBoard scan (#236). **AI-layer complete; production wire + mounted-fire tick pending** (activation queued: `task/npc-m2hb-gunners`). The AI order/seek layer (`EmplacementSeekHelper` + `AIStateEngage` orderBoard scan) exists, but `createNpcM2HBAdapter` is referenced only from tests/comments — not constructed at a prod composition point — so an NPC does not yet actually crew + fire an M2HB in a live match.
 - [ ] Owner playtest walk (mount, aim, fire, reload, NPC-gunner observation) — deferred to PLAYTEST_PENDING.
