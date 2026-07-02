@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import type { TargetMark } from '../../core/GameEventBus';
 import type { FirstPersonWeapon } from '../player/FirstPersonWeapon';
 import type { HeldEquipmentMode, HeldEquipmentViewmodelSystem } from '../player/HeldEquipmentViewmodelSystem';
 import type { SmokeMarkerSystem, SmokeMarkerThrowModeEndReason } from '../weapons/SmokeMarkerSystem';
@@ -60,14 +59,6 @@ export class CommandHeldEquipmentBridge {
 
   isSmokeMarkerHandlingInput(): boolean {
     return this.smokeMarkerSystem?.isHandlingInput() ?? false;
-  }
-
-  hasActiveSmokeMark(): boolean {
-    return Boolean(this.smokeMarkerSystem?.getActiveMark());
-  }
-
-  getActiveSmokeMark(): TargetMark | null {
-    return this.smokeMarkerSystem?.getActiveMark() ?? null;
   }
 
   clearActiveSmokeMark(): void {

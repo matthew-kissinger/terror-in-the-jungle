@@ -4,8 +4,7 @@
 import {
   getCooldownRemaining,
   type AirSupportRadioAssetId,
-  type AirSupportRadioCooldowns,
-  type AirSupportTargetMarking
+  type AirSupportRadioCooldowns
 } from '../../systems/airsupport/AirSupportRadioCatalog';
 import {
   buildRadioCategories,
@@ -35,9 +34,11 @@ function fireSupportOptions(): Extract<RadioOption, { kind: 'fire-support' }>[] 
  * (`CommandInputManager`) drives the real `AirSupportManager.requestSupport`
  * path. Extracted from `CommandModeOverlay` to keep that file within budget.
  *
- * Smoke/WP/grid is no longer a top-level peer control here. The revived radio
- * dial owns direct mission selection; picking a fire-support asset arms that
- * mission's smoke marker and closes the dial.
+ * Smoke/WP/grid is no longer a top-level peer control here. Picking an asset in
+ * THIS overlay panel opens the reticle designate flow directly (aim on ground,
+ * LMB to call). The separate radio dial's fire-support path instead arms a
+ * thrown smoke marker — the two entry points differ, so the copy below matches
+ * this panel's actual wiring.
  */
 export class CommandRadioFireSupportPanel {
   static readonly STYLE_ID = 'command-radio-fire-support-styles';
@@ -69,7 +70,7 @@ export class CommandRadioFireSupportPanel {
 
     const sub = document.createElement('span');
     sub.className = 'command-radio-fire__sub';
-    sub.textContent = 'Radio (T) - choose a sortie to arm its smoke marker.';
+    sub.textContent = 'Choose a sortie, then aim on the ground and call it in.';
     this.element.appendChild(sub);
 
     const list = document.createElement('div');
@@ -91,7 +92,6 @@ export class CommandRadioFireSupportPanel {
 
   setCallbacks(callbacks: {
     onAssetSelected?: (assetId: AirSupportRadioAssetId) => void;
-    onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
   }): void {
     this.onAssetSelected = callbacks.onAssetSelected;
   }
@@ -99,11 +99,6 @@ export class CommandRadioFireSupportPanel {
   setCooldowns(cooldowns: AirSupportRadioCooldowns): void {
     this.cooldowns = cooldowns;
     this.render();
-  }
-
-  setSelectedMarking(_marking: AirSupportTargetMarking): void {
-    // Kept for the legacy CommandModeOverlay callback surface. Target method
-    // selection now lives in the radio radial drilldown.
   }
 
   dispose(): void {

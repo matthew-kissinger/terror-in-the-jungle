@@ -79,7 +79,11 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // +5 LOC for the `onHelicopterDoorGunToggle` input-callback wiring that routes
   // the in-flight F key to the door-gun seat swap. Within-cycle ratchet re-base;
   // R3 split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1222, methods: 111 },
+  // Snapshot raised 1222 → 1227 (radio-smoke-hardening, cycle-2026-07-02-greenlight-followthrough):
+  // +5 LOC routing the radio smoke-marker cancel through the single slot-change
+  // funnel + ground-vehicle suppression, plus abortRadioTargeting on death. R3
+  // split target unchanged; orchestrator to note in docs/CARRY_OVERS.md.
+  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1227, methods: 111 },
   // Snapshot raised 995 → 1073 LOC (dropped-frame-perf-harness,
   // 2026-06-15/16): frame/presentation/dropped-frame telemetry export surfaces.
   'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files; +78 LOC for frame/presentation dropped-frame telemetry', loc: 1073, methods: 41 },

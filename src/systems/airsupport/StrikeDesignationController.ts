@@ -42,7 +42,10 @@ const OVERRIDE_TIMEOUT = 2.0; // seconds the danger-close override stays armed
  * needs a second confirm (override). Abort spends no cooldown.
  */
 export class StrikeDesignationController {
+  private static readonly UNAVAILABLE_FLASH_MS = 2200;
+
   private readonly banner = new FireMissionBanner();
+  private unavailableFlashTimer: ReturnType<typeof setTimeout> | null = null;
   private marker?: StrikeTargetMarker;
   private scene?: THREE.Scene;
   private terrainHeightAt?: (x: number, z: number) => number;
@@ -115,6 +118,7 @@ export class StrikeDesignationController {
       return 'rejected';
     }
 
+    this.clearUnavailableFlash();
     this.active = true;
     this.assetId = assetId;
     this.supportType = supportType;
@@ -182,9 +186,17 @@ export class StrikeDesignationController {
 
   dispose(): void {
     this.finish();
+    this.clearUnavailableFlash();
     this.marker?.dispose();
     this.marker = undefined;
     this.banner.dispose();
+  }
+
+  private clearUnavailableFlash(): void {
+    if (this.unavailableFlashTimer !== null) {
+      clearTimeout(this.unavailableFlashTimer);
+      this.unavailableFlashTimer = null;
+    }
   }
 
   private ensureMarker(): void {
@@ -251,14 +263,52 @@ export class StrikeDesignationController {
       default: statusLabel = 'NO GROUND'; statusKind = 'invalid'; break;
     }
 
-    const hint = this.fixedTarget
-      ? (this.gate.status === 'danger_close'
-        ? '[LMB] call smoke (danger close)   [Esc] abort'
-        : '[LMB] call on smoke   [Esc] abort')
-      : (this.gate.status === 'danger_close'
-        ? '[LMB] mark (danger close)   [Esc] back'
-        : '[LMB] mark   [Esc] back');
+    const hint = this.designateHint();
     this.banner.showDesignate({ asset: label, statusLabel, statusKind, hint });
+  }
+
+  /**
+   * The bottom-line action hint. Out-of-range is a dead LMB (confirm consumes
+   * the click but never fires), so the hint tells the player to close distance
+   * instead of promising a mark that will not happen.
+   */
+  private designateHint(): string {
+    if (this.gate.status === 'out_of_range') {
+      return this.fixedTarget
+        ? 'TOO FAR — move closer   [Esc] abort'
+        : 'TOO FAR — move closer   [Esc] back';
+    }
+    if (this.fixedTarget) {
+      return this.gate.status === 'danger_close'
+        ? '[LMB] call smoke (danger close)   [Esc] abort'
+        : '[LMB] call on smoke   [Esc] abort';
+    }
+    return this.gate.status === 'danger_close'
+      ? '[LMB] mark (danger close)   [Esc] back'
+      : '[LMB] mark   [Esc] back';
+  }
+
+  /**
+   * Brief, self-clearing banner flash when a call-in was rejected before it
+   * could designate (a same-type mission is still cooling down). This is the
+   * ONLY visible surface for the rejection — the old radio menu echo was never
+   * rendered.
+   */
+  flashUnavailable(assetLabel: string, remainingSeconds: number): void {
+    if (this.active) return; // never stomp a live designation
+    if (this.unavailableFlashTimer !== null) {
+      clearTimeout(this.unavailableFlashTimer);
+    }
+    this.banner.showDesignate({
+      asset: assetLabel.toUpperCase(),
+      statusLabel: `UNAVAILABLE (${Math.max(0, Math.ceil(remainingSeconds))}s)`,
+      statusKind: 'invalid',
+      hint: 'Cooling down — try again shortly',
+    });
+    this.unavailableFlashTimer = setTimeout(() => {
+      this.unavailableFlashTimer = null;
+      if (!this.active) this.banner.hide();
+    }, StrikeDesignationController.UNAVAILABLE_FLASH_MS);
   }
 
   private commit(): void {
@@ -280,9 +330,13 @@ export class StrikeDesignationController {
       marking: this.marking,
     });
 
-    if (accepted && this.marking !== 'position_only') {
-      // Instant on-target mark so the player sees where they painted before the
-      // aircraft arrives (white smoke / brighter willie-pete reuse the pool).
+    // Instant on-target mark so the player sees where they painted before the
+    // aircraft arrives. A smoke-marker fixed target already spawned its own
+    // cloud when the canister settled, so painting a second one here would
+    // double it up — skip the commit-time cloud in that case. Reticle / overlay
+    // designations have no canister, so this is their only smoke.
+    const fromSmokeMarkerTarget = this.fixedTarget !== undefined;
+    if (accepted && this.marking !== 'position_only' && !fromSmokeMarkerTarget) {
       spawnSmokeCloud(this.target);
     }
 

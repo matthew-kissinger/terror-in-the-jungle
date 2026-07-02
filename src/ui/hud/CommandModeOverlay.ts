@@ -11,8 +11,7 @@ import {
 } from '../../systems/combat/SquadCommandPresentation';
 import type {
   AirSupportRadioAssetId,
-  AirSupportRadioCooldowns,
-  AirSupportTargetMarking
+  AirSupportRadioCooldowns
 } from '../../systems/airsupport/AirSupportRadioCatalog';
 import { CommandRadioFireSupportPanel } from './CommandRadioFireSupportPanel';
 import { CommandTacticalMap, type CommandTacticalMapRenderState } from './CommandTacticalMap';
@@ -71,7 +70,6 @@ export class CommandModeOverlay implements LayoutComponent {
   private onMapPointSelected?: (position: THREE.Vector3) => void;
   private onSquadSelected?: (squadId: string) => void;
   private onFireSupportSelected?: (assetId: AirSupportRadioAssetId) => void;
-  private onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
   private backdropPointerId: number | null = null;
 
   constructor() {
@@ -162,11 +160,10 @@ export class CommandModeOverlay implements LayoutComponent {
     sidebar.className = 'command-mode-overlay__sidebar';
     body.appendChild(sidebar);
 
-    // ── FIRE SUPPORT section: the 7 call-in assets + smoke/WP/grid mark. ──
+    // ── FIRE SUPPORT section: the 7 call-in assets (marking is always smoke). ──
     this.fireSupportPanel = new CommandRadioFireSupportPanel();
     this.fireSupportPanel.setCallbacks({
       onAssetSelected: (assetId) => this.onFireSupportSelected?.(assetId),
-      onMarkingSelected: (marking) => this.onMarkingSelected?.(marking)
     });
     sidebar.appendChild(this.fireSupportPanel.getElement());
 
@@ -221,7 +218,6 @@ export class CommandModeOverlay implements LayoutComponent {
     onMapPointSelected?: (position: THREE.Vector3) => void;
     onSquadSelected?: (squadId: string) => void;
     onFireSupportSelected?: (assetId: AirSupportRadioAssetId) => void;
-    onMarkingSelected?: (marking: AirSupportTargetMarking) => void;
   }): void {
     this.onQuickCommandSelected = callbacks.onQuickCommandSelected;
     this.onCloseRequested = callbacks.onCloseRequested;
@@ -229,7 +225,6 @@ export class CommandModeOverlay implements LayoutComponent {
     this.onMapPointSelected = callbacks.onMapPointSelected;
     this.onSquadSelected = callbacks.onSquadSelected;
     this.onFireSupportSelected = callbacks.onFireSupportSelected;
-    this.onMarkingSelected = callbacks.onMarkingSelected;
   }
 
   setInputMode(inputMode: InputMode): void {
@@ -252,10 +247,6 @@ export class CommandModeOverlay implements LayoutComponent {
 
   setFireSupportCooldowns(cooldowns: AirSupportRadioCooldowns): void {
     this.fireSupportPanel.setCooldowns(cooldowns);
-  }
-
-  setSelectedMarking(marking: AirSupportTargetMarking): void {
-    this.fireSupportPanel.setSelectedMarking(marking);
   }
 
   setMapState(state: CommandTacticalMapRenderState): void {

@@ -235,6 +235,46 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
+  it('cancels an armed smoke marker and aborts designation on abortRadioTargeting (death)', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    const smoke = createSmokeMarkerStub();
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+    manager.setAirSupportManager({ requestSupport: vi.fn(() => true), getCooldownRemaining: vi.fn(() => 0) } as any);
+    manager.setTerrainSystem({ getHeightAt: () => 0 } as any);
+    manager.setPlayerController(lookDownController());
+    manager.configureHeldEquipment({
+      firstPersonWeapon: createWeaponVisibilityStub(true) as any,
+      heldEquipment: { setMode: vi.fn() } as any,
+      smokeMarkerSystem: smoke.system as any,
+    });
+
+    // Arm a smoke marker throw, then die.
+    manager.toggleRadioMenu();
+    const dial = visibleDialog()!;
+    drillCategory(dial, 'fire-support');
+    clickSector(dial, 'a1_napalm');
+    expect(document.body.textContent).toContain('SMOKE MARKER ARMED');
+
+    manager.abortRadioTargeting();
+
+    expect(smoke.system.cancelThrowMode).toHaveBeenCalledTimes(1);
+    // The armed prompt is gone after death.
+    expect(document.body.querySelector<HTMLElement>('[aria-live="polite"]')?.getAttribute('aria-hidden')).toBe('true');
+
+    manager.dispose();
+    layout.dispose();
+  });
+
   it('arms smoke marker equipment with a visible prompt without calling support', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);

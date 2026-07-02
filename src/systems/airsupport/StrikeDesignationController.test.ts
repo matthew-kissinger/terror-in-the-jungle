@@ -8,6 +8,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { StrikeDesignationController } from './StrikeDesignationController';
 import { Faction } from '../combat/types';
+import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
+
+vi.mock('../effects/SmokeCloudSystem', () => ({
+  spawnSmokeCloud: vi.fn(),
+}));
+
+const spawnSmokeCloudMock = vi.mocked(spawnSmokeCloud);
 
 function makeManager(cooldown = 0) {
   return {
@@ -47,6 +54,7 @@ function makeController(opts: {
 describe('StrikeDesignationController', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    spawnSmokeCloudMock.mockClear();
   });
 
   it('arms designate for a ready asset', () => {
@@ -134,5 +142,55 @@ describe('StrikeDesignationController', () => {
     const { controller } = makeController();
     expect(controller.cancel()).toBe(false);
     expect(controller.confirm()).toBe(false);
+  });
+
+  it('tells the player to close distance when the mark is out of range', () => {
+    // Well beyond ac47_orbit range: the hint must not promise a mark that a
+    // dead LMB will never place.
+    const { controller } = makeController({ target: new THREE.Vector3(3000, 0, 0) });
+    controller.begin('ac47_orbit', 'smoke');
+
+    expect(document.body.textContent).toContain('TOO FAR — move closer');
+    expect(document.body.textContent).not.toContain('[LMB] mark');
+  });
+
+  it('paints a single smoke cloud for a reticle designation on commit', () => {
+    const { controller } = makeController({ target: new THREE.Vector3(120, 0, 0) });
+    controller.begin('ac47_orbit', 'smoke');
+    controller.confirm();
+
+    // Reticle designations have no canister, so the commit cloud is their only
+    // smoke.
+    expect(spawnSmokeCloudMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT double the smoke cloud when the target came from a settled smoke marker', () => {
+    const { controller } = makeController({ target: new THREE.Vector3(120, 0, 0) });
+    // beginAtTarget is the smoke-marker fixed-target path; the canister already
+    // spawned its own cloud when it settled, so the commit must not add another.
+    controller.beginAtTarget('ac47_orbit', 'smoke', new THREE.Vector3(120, 0, 0));
+    controller.confirm();
+
+    expect(spawnSmokeCloudMock).not.toHaveBeenCalled();
+  });
+
+  it('flashes a visible UNAVAILABLE banner when a call-in is rejected while cooling down', () => {
+    const { controller } = makeController({ manager: makeManager(42) });
+
+    controller.flashUnavailable('AC-47 Orbit', 42);
+
+    expect(document.body.textContent).toContain('UNAVAILABLE (42s)');
+    expect(controller.isActive()).toBe(false);
+  });
+
+  it('does not let an UNAVAILABLE flash stomp a live designation', () => {
+    const { controller } = makeController();
+    controller.begin('ac47_orbit', 'smoke');
+
+    controller.flashUnavailable('A-1 Napalm', 30);
+
+    // The live designation banner still owns the surface.
+    expect(document.body.textContent).not.toContain('UNAVAILABLE');
+    expect(controller.isActive()).toBe(true);
   });
 });

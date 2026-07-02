@@ -18,7 +18,6 @@ import {
 import type { AirSupportManager } from '../airsupport/AirSupportManager';
 import { StrikeDesignationController } from '../airsupport/StrikeDesignationController';
 import { CommandModeOverlay } from '../../ui/hud/CommandModeOverlay';
-import { AirSupportRadioMenu } from '../../ui/hud/AirSupportRadioMenu';
 import { RadioDialPresenter } from '../../ui/hud/radio/RadioDialPresenter';
 import { RADIO_SLOT_OPEN_EVENT } from '../../ui/hud/radio/RadioHotbarSlot';
 import type { RadioIntent } from '../../ui/hud/radio/RadioDialModel';
@@ -39,7 +38,6 @@ export class CommandInputManager implements GameSystem {
 
   private readonly playerSquadController: PlayerSquadController;
   private readonly commandModeOverlay: CommandModeOverlay;
-  private readonly airSupportRadioMenu: AirSupportRadioMenu;
   private readonly radioDial: RadioDialPresenter;
   private readonly smokeMarkerFlow: CommandSmokeMarkerFlow;
   private readonly radioSlotOpenHandler: () => void;
@@ -63,7 +61,6 @@ export class CommandInputManager implements GameSystem {
     commandPosition: undefined
   };
   private overlayVisible = false;
-  private selectedMarking: AirSupportTargetMarking = 'smoke';
   private pendingPlacementCommand: SquadCommand | null = null;
   private mapUpdateAccumulator = 0;
   private readonly mapDirection = new THREE.Vector3();
@@ -83,21 +80,13 @@ export class CommandInputManager implements GameSystem {
   constructor(playerSquadController: PlayerSquadController) {
     this.playerSquadController = playerSquadController;
     this.commandModeOverlay = new CommandModeOverlay();
-    this.airSupportRadioMenu = new AirSupportRadioMenu();
     this.commandModeOverlay.setCallbacks({
       onQuickCommandSelected: (slot) => this.handleOverlayCommandSelection(slot),
       onMapPointSelected: (position) => this.applyPlacementCommand(position),
       onSquadSelected: (squadId) => this.handleSquadSelection(squadId),
       onCloseRequested: () => this.closeOverlay(),
       onRadioRequested: () => this.openRadioDial(),
-      onFireSupportSelected: (assetId) => this.beginStrikeDesignation(assetId, this.selectedMarking),
-      onMarkingSelected: (marking) => this.setSelectedMarking(marking)
-    });
-    this.airSupportRadioMenu.setCallbacks({
-      onAssetSelected: (selection) => {
-        this.selectedMarking = selection.targetMarking;
-        this.beginStrikeDesignation(selection.assetId, selection.targetMarking);
-      }
+      onFireSupportSelected: (assetId) => this.beginStrikeDesignation(assetId, 'smoke'),
     });
 
     this.radioDial = new RadioDialPresenter();
@@ -109,7 +98,6 @@ export class CommandInputManager implements GameSystem {
     document.addEventListener(RADIO_SLOT_OPEN_EVENT, this.radioSlotOpenHandler);
     this.smokeMarkerFlow = new CommandSmokeMarkerFlow({
       beginStrikeOnSmoke: (assetId, mark) => this.beginStrikeDesignation(assetId, 'smoke', mark.position, true),
-      setSmokeMarkAvailable: (available) => this.radioDial.setHasSmokeMark(available),
       consumeActiveSmokeMark: () => this.heldEquipmentBridge.clearActiveSmokeMark(),
       emitVisibility: () => this.emitVisibility(),
     });
@@ -206,13 +194,11 @@ export class CommandInputManager implements GameSystem {
     }
     this.heldEquipmentBridge.restore();
     this.commandModeOverlay.unmount();
-    this.airSupportRadioMenu.unmount();
     this.radioDial.unmount();
     this.smokeMarkerFlow.unmount();
     this.strikeDesignation.unmount();
     this.layout = undefined;
     this.commandModeOverlay.dispose();
-    this.airSupportRadioMenu.dispose();
     this.radioDial.dispose();
     this.smokeMarkerFlow.dispose();
     this.strikeDesignation.dispose();
@@ -222,12 +208,10 @@ export class CommandInputManager implements GameSystem {
     if (this.layout === layout) return;
 
     this.commandModeOverlay.unmount();
-    this.airSupportRadioMenu.unmount();
     this.radioDial.unmount();
     this.smokeMarkerFlow.unmount();
     this.layout = layout;
     this.commandModeOverlay.mount(document.body);
-    this.airSupportRadioMenu.mount(document.body);
     this.radioDial.mount(document.body);
     this.smokeMarkerFlow.mount(document.body);
     this.strikeDesignation.mount(document.body);
@@ -403,7 +387,6 @@ export class CommandInputManager implements GameSystem {
   }
 
   setRadioCooldowns(cooldowns: AirSupportRadioCooldowns): void {
-    this.airSupportRadioMenu.setCooldowns(cooldowns);
     this.commandModeOverlay.setFireSupportCooldowns(cooldowns);
     this.radioDial.setCooldowns(cooldowns);
   }
@@ -412,10 +395,21 @@ export class CommandInputManager implements GameSystem {
     return this.heldEquipmentBridge.cancelSmokeMarkerThrow();
   }
 
-  private setSelectedMarking(marking: AirSupportTargetMarking): void {
-    this.selectedMarking = marking;
-    this.commandModeOverlay.setSelectedMarking(marking);
-    this.radioDial.setSelectedMarking(marking);
+  /**
+   * Force-clear every radio targeting surface at once: cancel an armed smoke
+   * marker throw AND abort an in-flight strike designation. Called on player
+   * death so the prompt / fire-mission banner never linger through a respawn.
+   */
+  abortRadioTargeting(): void {
+    this.heldEquipmentBridge.cancelSmokeMarkerThrow();
+    // Also clear an airborne "MARKER OUT" mission: cancelling the in-hand throw
+    // is a no-op once the canister has left the hand, so drop the pending flow
+    // and hide the prompt directly, then abort any live designation.
+    this.smokeMarkerFlow.forceClearPending();
+    if (this.strikeDesignation.cancel()) {
+      this.smokeMarkerFlow.cancelPendingStrikeCommit();
+    }
+    this.emitVisibility();
   }
 
   private openRadioDial(): void {
@@ -425,10 +419,10 @@ export class CommandInputManager implements GameSystem {
     this.dialVisible = true;
     this.radioCooldownAccumulator = 0;
     this.feedRadioCooldowns();
-    this.radioDial.setHasSmokeMark(this.heldEquipmentBridge.hasActiveSmokeMark());
     this.radioDial.setTouchMode(this.inputMode === 'touch');
+    // Marking is always 'smoke' now (the tri-marking selector is deleted).
     this.radioDial.open({
-      marking: this.selectedMarking,
+      marking: 'smoke',
       squadAvailable: this.latestSquadState.hasSquad,
     });
     this.inputManager?.unlockPointer?.();
@@ -481,7 +475,6 @@ export class CommandInputManager implements GameSystem {
     this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
     this.radioCooldownAccumulator = 0;
     this.feedRadioCooldowns();
-    this.commandModeOverlay.setSelectedMarking(this.selectedMarking);
     this.inputManager?.unlockPointer?.();
     this.openOverlayTouchPassThrough();
     this.commandModeOverlay.setVisible(true);
@@ -581,16 +574,16 @@ export class CommandInputManager implements GameSystem {
       ? this.strikeDesignation.beginAtTarget(assetId, marking, fixedTarget)
       : this.strikeDesignation.begin(assetId, marking);
     this.smokeMarkerFlow.setConsumeActiveSmokeOnCommit(outcome === 'designating' && consumeActiveSmokeOnCommit);
-    if (outcome !== 'designating') {
+    if (outcome === 'rejected') {
+      // A same-type mission is still cooling down — surface a visible flash on
+      // the fire-mission banner (the old AirSupportRadioMenu echo was never
+      // rendered anywhere).
       const asset = getAirSupportRadioAsset(assetId);
       const supportType = radioAssetToSupportType[assetId];
       const remaining = supportType
         ? Math.ceil(this.airSupportManager?.getCooldownRemaining(supportType) ?? 0)
         : 0;
-      const status = outcome === 'rejected'
-        ? `${asset.label} unavailable (${remaining}s)`
-        : `${asset.label} selected`;
-      this.airSupportRadioMenu.setState({ selectedAssetId: assetId, statusText: status });
+      this.strikeDesignation.flashUnavailable(asset.label, remaining);
     }
   }
 
