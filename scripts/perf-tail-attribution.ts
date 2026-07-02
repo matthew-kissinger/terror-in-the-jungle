@@ -209,6 +209,15 @@ export type TailAttribution = {
     flankCoverSearchCapSkips?: number;
   };
   combatVsOther: {
+    /**
+     * Where the frame-level Combat-vs-non-combat split was measured. `systemTop`
+     * = window.perf runtime EMAs (steady-state). `loop-frame-lastMs` = the
+     * slowest loopFrameBreakdown entry's per-system `lastMs` values, used only
+     * when systemTop is empty (the default capture does not set the
+     * diagnostics-class flags that populate it). The fallback is a single worst
+     * frame, NOT an EMA — do not read it with steady-state semantics.
+     */
+    source: 'systemTop' | 'loop-frame-lastMs';
     topSystem: string | null;
     topSystemMs: number;
     combatSystemMs: number;
@@ -1040,12 +1049,42 @@ export function computeTailAttribution(
         name: normalizeSystemName(String(s.name ?? 'unknown')),
       }))
     : [];
-  const topSystemEntry = systemTop[0] ?? null;
   const combatEntry =
     systemTop.find((s) => s.name === 'Combat') ??
     systemTop.find((s) => s.name.toLowerCase().includes('combat')) ??
     null;
-  const combatSystemMs = combatEntry ? Number(combatEntry.emaMs) : 0;
+  const loopFrameBreakdown = summarizeLoopFrameBreakdown(tail.loopFrameBreakdown);
+  // Fallback: the default capture never sets the diagnostics-class flags that
+  // populate `systemTop` (window.perf runtime EMAs), so it is empty in every
+  // routine run — which makes the frame-level split report "Combat 0.0ms (0%)"
+  // and dump 100% into residual even when the same tail frame's
+  // loopFrameBreakdown clearly shows Combat as the dominant SystemUpdater cost.
+  // When systemTop is empty, decompose using the slowest loop-frame's per-system
+  // timings instead. Those are single-worst-frame `lastMs` values, NOT EMAs, so
+  // the split is tagged `source: 'loop-frame-lastMs'` and must not be read with
+  // the same steady-state semantics as the systemTop path.
+  const loopSystemTimings =
+    systemTop.length === 0 ? loopFrameBreakdown?.topSystemTimings ?? [] : [];
+  const usingLoopFallback = loopSystemTimings.length > 0;
+  const loopCombatEntry =
+    loopSystemTimings.find((s) => normalizeSystemName(s.name) === 'Combat') ??
+    loopSystemTimings.find((s) => s.name.toLowerCase().includes('combat')) ??
+    null;
+  const topSystemEntry = usingLoopFallback
+    ? loopSystemTimings[0]
+      ? { name: normalizeSystemName(loopSystemTimings[0].name), emaMs: loopSystemTimings[0].lastMs }
+      : null
+    : systemTop[0] ?? null;
+  const combatVsOtherSource: 'systemTop' | 'loop-frame-lastMs' = usingLoopFallback
+    ? 'loop-frame-lastMs'
+    : 'systemTop';
+  const combatSystemMs = usingLoopFallback
+    ? loopCombatEntry
+      ? Number(loopCombatEntry.lastMs)
+      : 0
+    : combatEntry
+      ? Number(combatEntry.emaMs)
+      : 0;
   // Frame cost: prefer the explicit p99/max frame; else sum the system EMAs.
   const frameMs = Number(
     tail.p99FrameMs ??
@@ -1089,7 +1128,6 @@ export function computeTailAttribution(
         .map((s) => `${s.name} ${s.ms.toFixed(1)}ms (${pct(s.ms)})`)
         .join(', ')
     : 'none in top sampled systems';
-  const loopFrameBreakdown = summarizeLoopFrameBreakdown(tail.loopFrameBreakdown);
   const renderSubmissionContext = summarizeRenderSubmissionContext(tail, options);
   const sceneAttributionContext = summarizeSceneAttributionContext(tail, options);
   const presentationGapContext = summarizePresentationGapContext(tail, options);
@@ -1227,7 +1265,8 @@ export function computeTailAttribution(
     `Tail frame ~${frameMs.toFixed(1)}ms @ frame ${tail.frameCount}: ` +
     `cover-search ${totalCoverMs.toFixed(3)}ms (${pct(totalCoverMs)}) - ` +
     `${coverDominatesTail ? 'COVER IS A FACTOR' : 'cover is NOT the driver'}; ` +
-    `Combat system ${combatSystemMs.toFixed(1)}ms (${pct(combatSystemMs)}), ` +
+    `Combat system ${combatSystemMs.toFixed(1)}ms (${pct(combatSystemMs)})` +
+    `${usingLoopFallback ? ' [loop-frame-lastMs fallback: systemTop empty, worst-frame lastMs not EMA]' : ''}, ` +
     `non-combat/residual ${otherMs.toFixed(1)}ms (${pct(otherMs)}), ` +
     `top non-combat sampled: ${topNonCombatSummary}, ` +
     `unassigned residual ${sampledSystemResidualMs.toFixed(1)}ms (${pct(sampledSystemResidualMs)}); ` +
@@ -1270,6 +1309,7 @@ export function computeTailAttribution(
           : undefined,
     },
     combatVsOther: {
+      source: combatVsOtherSource,
       topSystem: topSystemEntry ? topSystemEntry.name : null,
       topSystemMs: topSystemEntry ? Number(topSystemEntry.emaMs) : 0,
       combatSystemMs,

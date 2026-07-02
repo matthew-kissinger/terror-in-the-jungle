@@ -58,15 +58,24 @@ tracks are lazy-loaded only when the player tunes to a station.
 
 ## What shipped — genuine CC BY 4.0 tracks (Kevin MacLeod, incompetech.com)
 
-Three Opus stereo `.ogg` tracks under `public/assets/audio/music/`:
+Two Opus stereo `.ogg` tracks currently ship under `public/assets/audio/music/`
+(a third was removed — see the note below the table):
 
 | File | Station | Title / Author | License |
 |------|---------|----------------|---------|
 | `station-volatile-reaction.ogg` | Firebase (tense combat) | "Volatile Reaction" — Kevin MacLeod | **CC BY 4.0** |
 | `station-five-armies.ogg` | Thunder (martial score) | "Five Armies" — Kevin MacLeod | **CC BY 4.0** |
-| `station-ossuary-air.ogg` | Green Static (ambient drone) | "Ossuary 6 - Air" — Kevin MacLeod | **CC BY 4.0** |
+| ~~`station-ossuary-air.ogg`~~ (removed) | Green Static (ambient drone) | "Ossuary 6 - Air" — Kevin MacLeod | **CC BY 4.0** |
 
-All are stereo, Opus ~80 kbps (within the 64-96 kbps band), 2.5-4 min.
+**Removal note:** the "Green Static" ambient station was removed after the
+2026-07-01 owner playtest, and its `station-ossuary-air.ogg` track was deleted
+from the deploy artifact in `task/small-truth-fixes` (campaign
+greenlight-followthrough; git history is the resurrection path). CC-BY
+attribution attaches to distribution, so with the track no longer shipped its
+attribution bullet in `THIRD-PARTY-ASSETS.md` was retired. This provenance
+record is retained for history.
+
+The two live tracks are stereo, Opus ~80 kbps (within the 64-96 kbps band), 2.5-4 min.
 
 These are **real third-party CC-BY tracks**, not placeholders. They were fetched
 directly from `incompetech.com` (HTTP 200, no credentials) and re-encoded to
@@ -79,7 +88,8 @@ files in this directory.
 
 - "Volatile Reaction" by Kevin MacLeod (incompetech.com) — CC BY 4.0.
 - "Five Armies" by Kevin MacLeod (incompetech.com) — CC BY 4.0.
-- "Ossuary 6 - Air" by Kevin MacLeod (incompetech.com) — CC BY 4.0.
+- ~~"Ossuary 6 - Air" by Kevin MacLeod~~ — removed from distribution (see removal
+  note above); attribution retired since the track no longer ships.
 
 License text: https://creativecommons.org/licenses/by/4.0/
 

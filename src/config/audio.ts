@@ -162,12 +162,10 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     maxDistance: 400,
     rolloffFactor: 1.0
   },
-  // Zone capture confirmation sting. CC0, see
-  // docs/asset-provenance/audio-2026-06/zone-captured-sting.provenance.json.
-  zoneCaptured: {
-    path: 'assets/optimized/zoneCaptured.ogg',
-    volume: 0.6
-  },
+  // Note: the single `zoneCaptured` sting was removed here — the zone_captured
+  // handler plays the positional `zoneCapturedLocal` variant pool (see
+  // AudioManager). The old sting file is kept on disk as rollback insurance;
+  // provenance in docs/asset-provenance/audio-2026-06/zone-captured-sting.provenance.json.
   objectiveCompleteLocal01: {
     path: 'assets/optimized/objectiveCompleteLocal01.ogg',
     volume: 0.62,

@@ -665,6 +665,57 @@ describe('computeTailAttribution', () => {
     expect(a.conclusion).toContain('COVER IS A FACTOR');
   });
 
+  it('splits Combat-vs-other from the loop-frame worst frame when systemTop is empty', () => {
+    // The default capture never sets the diagnostics-class flags that populate
+    // window.perf `systemTop`, so it arrives empty. Previously the split then
+    // reported "Combat 0.0ms (0%)" and 100% residual even though the same tail
+    // frame's loopFrameBreakdown showed Combat as the dominant SystemUpdater
+    // cost. The fallback must recover the Combat figure from the worst loop
+    // frame and label it as a lastMs (not EMA) measurement.
+    const noSystemTop: TailAttributionSample = {
+      ts: '2026-07-02T00:00:00.000Z',
+      frameCount: 6000,
+      p99FrameMs: 44.0,
+      maxFrameMs: 48.0,
+      combatBreakdown: { totalMs: 20, aiUpdateMs: 10 },
+      loopFrameBreakdown: [
+        {
+          frameCount: 6000,
+          timestampDeltaMs: 44,
+          callbackDurationMs: 42,
+          segmentTotalMs: 30,
+          unmeasuredCallbackMs: 12,
+          segments: { 'Simulation.updateSystems': 20 },
+          systemTimings: [
+            { name: 'Combat', lastMs: 42.1, emaMs: 18, budgetMs: 8, overBudget: true },
+            { name: 'Player', lastMs: 6.0, emaMs: 4, budgetMs: 4, overBudget: true },
+          ],
+        },
+      ],
+    };
+
+    const a = computeTailAttribution([noSystemTop])!;
+
+    // Combat is recovered from the worst loop frame's lastMs, not reported as 0.
+    expect(a.combatVsOther.source).toBe('loop-frame-lastMs');
+    expect(a.combatVsOther.combatSystemMs).toBeCloseTo(42.1, 5);
+    expect(a.combatVsOther.topSystem).toBe('Combat');
+    // The conclusion string names the fallback so a reader knows the semantics.
+    expect(a.conclusion).toContain('Combat system 42.1ms');
+    expect(a.conclusion).toContain('loop-frame-lastMs fallback');
+    // Combat > half the ~44ms frame -> the verdict flips to Combat-dominates.
+    expect(a.combatDominatesTail).toBe(true);
+  });
+
+  it('keeps the systemTop (EMA) split when window.perf runtime samples are present', () => {
+    // Guard against the fallback silently taking over a capture that DID carry
+    // systemTop: the EMA-based split must still win, and be labeled as such.
+    const a = computeTailAttribution([tailSample()])!;
+    expect(a.combatVsOther.source).toBe('systemTop');
+    expect(a.combatVsOther.combatSystemMs).toBe(18.0);
+    expect(a.conclusion).not.toContain('loop-frame-lastMs fallback');
+  });
+
   it('falls back to maxFrameMs then avgFrameMs when p99 is absent', () => {
     const noP99: TailAttributionSample = {
       ts: 't',
