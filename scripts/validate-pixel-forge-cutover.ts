@@ -21,7 +21,10 @@ const oldRuntimeTokens = [
   'elephantGrass',
   'areca',
   'mangrove',
-  'banyan',
+  // NOTE: no bare 'banyan' token — 'banyan' is a legitimate gen-2 species id
+  // (VietnamVegetationSpecies.ts, vegetation-library banyan-large/-standard,
+  // banyan-bark textures) shipped since #415. The retired old-runtime asset
+  // is still caught by 'TwisterBanyan' above and TwisterBanyan.webp below.
   'us-walk-',
   'vc-walk-',
   'nva-walk-',
