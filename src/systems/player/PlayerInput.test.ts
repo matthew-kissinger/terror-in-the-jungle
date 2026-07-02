@@ -269,6 +269,8 @@ describe('PlayerInput', () => {
         onSandbagRotateRight: vi.fn(),
         onRallyPointPlace: vi.fn(),
         onToggleMortarCamera: vi.fn(),
+        onToggleAltitudeLock: vi.fn(),
+        onUseBandage: vi.fn(),
         onMouseDown: vi.fn(),
         onMouseUp: vi.fn(),
         onWeaponSlotChange: vi.fn()
@@ -413,6 +415,35 @@ describe('PlayerInput', () => {
     it('should trigger onToggleMortarCamera when KeyM is pressed', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM' }));
       expect(callbacks.onToggleMortarCamera).toHaveBeenCalled();
+    });
+
+    it('routes KeyH to the bandage action when on foot', () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+
+      expect(callbacks.onUseBandage).toHaveBeenCalledTimes(1);
+      expect(callbacks.onToggleAltitudeLock).not.toHaveBeenCalled();
+    });
+
+    it('routes KeyH to helicopter altitude-lock (not bandage) while flying a heli', () => {
+      playerInput.setInHelicopter(true);
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+
+      expect(callbacks.onToggleAltitudeLock).toHaveBeenCalledTimes(1);
+      expect(callbacks.onUseBandage).not.toHaveBeenCalled();
+    });
+
+    it('does not fire the bandage action from a fixed-wing aircraft', () => {
+      playerInput.setFlightVehicleMode('plane');
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+
+      expect(callbacks.onUseBandage).not.toHaveBeenCalled();
+    });
+
+    it('does not fire the bandage action in sandbag mode', () => {
+      playerInput.setCurrentWeaponMode(WeaponSlot.SANDBAG);
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH' }));
+
+      expect(callbacks.onUseBandage).not.toHaveBeenCalled();
     });
 
     describe('F-key boarding router', () => {

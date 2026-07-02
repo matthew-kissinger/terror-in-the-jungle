@@ -392,6 +392,42 @@ describe('InventoryManager', () => {
     });
   });
 
+  describe('Bandages (active healing)', () => {
+    beforeEach(async () => {
+      await inventoryManager.init();
+    });
+
+    it('starts with three bandages available', () => {
+      expect(inventoryManager.getState().bandages).toBe(3);
+    });
+
+    it('decrements the count when a bandage is used', () => {
+      expect(inventoryManager.useBandage()).toBe(true);
+      expect(inventoryManager.getState().bandages).toBe(2);
+    });
+
+    it('refuses to use a bandage once the supply is empty', () => {
+      inventoryManager.useBandage();
+      inventoryManager.useBandage();
+      inventoryManager.useBandage();
+
+      expect(inventoryManager.getState().bandages).toBe(0);
+      expect(inventoryManager.useBandage()).toBe(false);
+      expect(inventoryManager.getState().bandages).toBe(0);
+    });
+
+    it('notifies inventory change with the current bandage count on use', () => {
+      const inventoryChangeCallback = vi.fn();
+      inventoryManager.onInventoryChange(inventoryChangeCallback);
+
+      inventoryManager.useBandage();
+
+      expect(inventoryChangeCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ bandages: 2 })
+      );
+    });
+  });
+
   describe('Reset Inventory', () => {
     beforeEach(async () => {
       await inventoryManager.init();
@@ -402,6 +438,7 @@ describe('InventoryManager', () => {
       inventoryManager.useGrenade();
       inventoryManager.useMortarRound();
       inventoryManager.useSandbag();
+      inventoryManager.useBandage();
 
       // Switch slot
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1' }));
@@ -412,6 +449,7 @@ describe('InventoryManager', () => {
       expect(state.grenades).toBe(3);
       expect(state.mortarRounds).toBe(3);
       expect(state.sandbags).toBe(5);
+      expect(state.bandages).toBe(3);
       expect(state.currentSlot).toBe(WeaponSlot.PRIMARY);
     });
 
@@ -440,7 +478,9 @@ describe('InventoryManager', () => {
         mortarRounds: 3,
         maxMortarRounds: 3,
         sandbags: 5,
-        maxSandbags: 5
+        maxSandbags: 5,
+        bandages: 3,
+        maxBandages: 3
       });
     });
 

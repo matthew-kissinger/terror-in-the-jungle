@@ -148,6 +148,9 @@ describe('PlayerController', () => {
       }),
       hasMortarKit: vi.fn(() => true),
       hasSandbagKit: vi.fn(() => true),
+      onInventoryChange: vi.fn(),
+      useBandage: vi.fn(() => true),
+      getState: vi.fn(() => ({ bandages: 3 })),
     } as any;
 
     mockGrenadeSystem = {
@@ -387,6 +390,60 @@ describe('PlayerController', () => {
 
       expect(mockSettingsModal.hide).toHaveBeenCalledTimes(1);
       expect(fullMapSystem.toggleVisibility).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Bandage healing (active-heal action)', () => {
+    let mockHealth: any;
+
+    beforeEach(() => {
+      mockHealth = {
+        heal: vi.fn(() => 50),
+        updateBandageDisplay: vi.fn(),
+        flashHealFeedback: vi.fn(),
+      };
+      playerController.setInventoryManager(mockInventoryManager);
+      playerController.setPlayerHealthSystem(mockHealth);
+    });
+
+    const fireBandage = () => {
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      callbacks.onUseBandage();
+    };
+
+    it('heals and consumes a bandage when the heal actually restored HP', () => {
+      fireBandage();
+
+      expect(mockHealth.heal).toHaveBeenCalledWith(50);
+      expect(mockInventoryManager.useBandage).toHaveBeenCalledTimes(1);
+      expect(mockHealth.flashHealFeedback).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT consume a bandage when the heal was a no-op (full health)', () => {
+      mockHealth.heal.mockReturnValue(0);
+
+      fireBandage();
+
+      expect(mockInventoryManager.useBandage).not.toHaveBeenCalled();
+      expect(mockHealth.flashHealFeedback).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when no bandages remain', () => {
+      (mockInventoryManager.getState as any).mockReturnValue({ bandages: 0 });
+
+      fireBandage();
+
+      expect(mockHealth.heal).not.toHaveBeenCalled();
+      expect(mockInventoryManager.useBandage).not.toHaveBeenCalled();
+    });
+
+    it('is suppressed while seated in a vehicle (never fights heli altitude-lock)', () => {
+      playerController['infantryEquipmentSuppressedByVehicle'] = true;
+
+      fireBandage();
+
+      expect(mockHealth.heal).not.toHaveBeenCalled();
+      expect(mockInventoryManager.useBandage).not.toHaveBeenCalled();
     });
   });
 

@@ -52,11 +52,21 @@ interface SettingsModalController {
   }): void;
 }
 
+// Bandage (active-heal) surface the controller needs from PlayerHealthSystem.
+interface PlayerHealSurface {
+  heal(amount: number): number;
+  updateBandageDisplay(count: number): void;
+  flashHealFeedback(): void;
+}
+
 // ── Player physics defaults ──
 const PLAYER_WALK_SPEED = 10;
 const PLAYER_RUN_SPEED = 20;
 const PLAYER_JUMP_FORCE = 12;
 const PLAYER_GRAVITY = -25;
+
+// HP restored per bandage (owner decision F3, healing MVP): 1/3 of the 150 max.
+const BANDAGE_HEAL_AMOUNT = 50;
 
 export class PlayerController implements GameSystem {
   private static readonly SPAWN_STABILIZATION_MS = 2500;
@@ -71,6 +81,9 @@ export class PlayerController implements GameSystem {
   private ticketSystem?: TicketSystem;
   private gameRenderer?: IGameRenderer;
   private inventoryManager?: InventoryManager;
+  // Narrow structural handle for the bandage (active-heal) path — avoids a type
+  // import cycle (PlayerHealthSystem already imports PlayerController).
+  private playerHealthSystem?: PlayerHealSurface;
   private grenadeSystem?: GrenadeSystem;
   private mortarSystem?: MortarSystem;
   private sandbagSystem?: SandbagSystem;
@@ -296,6 +309,7 @@ export class PlayerController implements GameSystem {
         }
       },
       onAirSupportMenu: () => this.handleAirSupportRequest(),
+      onUseBandage: () => this.handleUseBandage(),
       onSquadCommand: () => this.commandInputManager?.toggleCommandMode(),
       onSquadQuickCommand: (slot: number) => this.commandInputManager?.issueQuickCommand(slot),
       onMenuOpen: () => this.handleMenuOpen(),
@@ -380,6 +394,24 @@ export class PlayerController implements GameSystem {
 
   private handleTouchGrenadeSwitch(): void {
     this.combatController.toggleGrenadeSlot();
+  }
+
+  /**
+   * Bandage (active-heal) `H` action. Heals FIRST, consumes a bandage only if it
+   * restored HP — a press at full health (heal returns 0) keeps the bandage.
+   * Suppressed in any vehicle so `H` never fights heli altitude-lock.
+   */
+  private handleUseBandage(): void {
+    if (this.isInfantryEquipmentSuppressedForVehicle()) return;
+    if (!this.inventoryManager || !this.playerHealthSystem) return;
+    if (this.inventoryManager.getState().bandages <= 0) return;
+
+    const restored = this.playerHealthSystem.heal(BANDAGE_HEAL_AMOUNT);
+    if (restored <= 0) return; // Full HP (or dead) — no heal applied, keep the bandage.
+
+    this.inventoryManager.useBandage();
+    this.playerHealthSystem.flashHealFeedback();
+    this.playerHealthSystem.updateBandageDisplay(this.inventoryManager.getState().bandages);
   }
 
   private handleMenuPause(overlay: 'pause' | 'settings' = 'settings'): void {
@@ -1148,8 +1180,20 @@ export class PlayerController implements GameSystem {
     this.inventoryManager = inventoryManager;
     inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
     inventoryManager.onLoadoutChange(() => this.syncLoadoutHud());
+    // Keep the bandage pip in sync — init, use, and respawn all fire this.
+    inventoryManager.onInventoryChange(state =>
+      this.playerHealthSystem?.updateBandageDisplay(state.bandages)
+    );
     this.configureCombatController({ inventoryManager });
     this.syncLoadoutHud();
+    this.playerHealthSystem?.updateBandageDisplay(inventoryManager.getState().bandages);
+  }
+  /** Health write + bandage-HUD surface for the bandage (active-heal) `H` action. */
+  setPlayerHealthSystem(playerHealthSystem: PlayerHealSurface): void {
+    this.playerHealthSystem = playerHealthSystem;
+    if (this.inventoryManager) {
+      playerHealthSystem.updateBandageDisplay(this.inventoryManager.getState().bandages);
+    }
   }
   setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; this.configureCombatController({ grenadeSystem }); }
   setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; this.configureCombatController({ mortarSystem }); }
