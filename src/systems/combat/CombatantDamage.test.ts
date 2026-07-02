@@ -6,7 +6,6 @@ import * as THREE from 'three';
 import { CombatantDamage } from './CombatantDamage';
 import { Combatant, CombatantState, Faction, Squad } from './types';
 import { createTestCombatant } from '../../test-utils';
-import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
@@ -16,7 +15,6 @@ import { IHUDSystem } from '../../types/SystemInterfaces';
 import { spatialGridManager } from './SpatialGridManager';
 import { KillAssistTracker } from './KillAssistTracker';
 
-const mockPlayerHealthSystem: PlayerHealthSystem = { takeDamage: vi.fn() } as any;
 const mockTicketSystem: TicketSystem = { onCombatantDeath: vi.fn() } as any;
 const mockAudioManager: AudioManager = { playDeathSound: vi.fn() } as any;
 const mockHUDSystem: IHUDSystem = {
@@ -68,7 +66,6 @@ describe('CombatantDamage', () => {
 
   beforeEach(() => {
     combatantDamage = new CombatantDamage();
-    combatantDamage.setPlayerHealthSystem(mockPlayerHealthSystem);
     combatantDamage.setTicketSystem(mockTicketSystem);
     combatantDamage.setAudioManager(mockAudioManager);
     combatantDamage.setHUDSystem(mockHUDSystem);
