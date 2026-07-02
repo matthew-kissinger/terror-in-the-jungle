@@ -344,11 +344,24 @@ export class CombatantSystemDamage {
     const playerHealthSystem = this.playerHealthSystem;
     if (!playerHealthSystem || radius <= 0 || maxDamage <= 0) return;
 
-    // Friendly-fire exclusion mirrors the NPC/vehicle paths: ordnance that
-    // supplies a shooter faction allied with the player never hits the player.
-    // Player-thrown frags / own air support omit shooterFaction, so the player
-    // can still catch their own blast (that is the 0.75x self-damage case).
-    if (shooterFaction !== undefined && isAlly(this.playerFaction, shooterFaction)) return;
+    // The player's OWN ordnance always reaches the player (that is the core of
+    // owner decision F1: an own frag at your feet / a danger-close own Arclight
+    // must be able to hurt you). Every player-attributed explosive threads the
+    // player's own faction as `shooterFaction` (frag → grenade.ownerFaction,
+    // air support → mission.requesterFaction, both US), so we must NOT run the
+    // friendly-fire exclusion for `attackerId === 'PLAYER'` — otherwise
+    // isAlly(US, US) would suppress every own-ordnance self-hit.
+    //
+    // For NON-player ordnance the friendly-fire exclusion mirrors the
+    // NPC/vehicle paths: shooter faction allied with the player (e.g. an ARVN
+    // NPC's shell) never hits the player; enemy ordnance (NVA tank cannon,
+    // isAlly(US, NVA) === false) still lands at 1.0x.
+    const isOwnOrdnance = attackerId === 'PLAYER';
+    if (!isOwnOrdnance
+      && shooterFaction !== undefined
+      && isAlly(this.playerFaction, shooterFaction)) {
+      return;
+    }
 
     const playerPosition = this.playerPositionSource?.();
     if (!playerPosition) return;
@@ -357,7 +370,7 @@ export class CombatantSystemDamage {
     if (distanceSq > radius * radius) return;
 
     const distance = Math.sqrt(distanceSq);
-    const scale = attackerId === 'PLAYER' ? PLAYER_SELF_EXPLOSION_SCALE : 1.0;
+    const scale = isOwnOrdnance ? PLAYER_SELF_EXPLOSION_SCALE : 1.0;
     const damage = maxDamage * (1.0 - distance / radius) * scale;
     if (damage <= 0) return;
 

@@ -26,8 +26,12 @@ enemy ordnance 1.0x, the player's own ordnance 0.75x, spawn protection respected
    curve to the player, scaled by `PLAYER_SELF_EXPLOSION_SCALE = 0.75` when the attacker is
    the player (`attackerId === 'PLAYER'`), else 1.0. Route through `takeDamage(amount, blast,
    playerPos)` so indicators, shake, spawn protection, and death handling engage.
-3. Skip the player when `shooterFaction` is allied with the player (friendly-fire exclusion,
-   mirrors NPC/vehicle paths). Player-thrown/own-air-support omit `shooterFaction` → self-hit.
+3. The player's OWN ordnance (`attackerId === 'PLAYER'`) ALWAYS reaches the player at 0.75x —
+   every player source threads the player's own faction as `shooterFaction` (frag →
+   `grenade.ownerFaction`, air support → `mission.requesterFaction`, both US), so the
+   friendly-fire exclusion must NOT run for `'PLAYER'`. For non-player attackers, skip the
+   player when `shooterFaction` is allied with them (mirrors NPC/vehicle paths): enemy NVA
+   ordnance still lands 1.0x, allied ARVN ordnance is excluded.
 4. Emit the typed `player_killed` event with source attribution on a lethal blast.
 
 ## Non-goals

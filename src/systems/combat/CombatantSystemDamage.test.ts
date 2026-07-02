@@ -408,9 +408,25 @@ describe('CombatantSystemDamage', () => {
     it("scales the player's own frag by 0.75 with distance falloff", () => {
       const health = makePlayerHealth();
       wirePlayer(health, new THREE.Vector3(5, 0, 0)); // half-radius from a radius-10 blast
-      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+      // Mirror the PRODUCTION call signature: GrenadeEffects passes the player's
+      // OWN faction (grenade.ownerFaction === US) as shooterFaction alongside the
+      // 'PLAYER' attribution. The self-hit must survive that friendly-alliance
+      // param — omitting it here would let the test pass while the feature is
+      // dead in production (the F1 regression the reviewer caught).
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER', 'grenade', Faction.US);
 
       // NPC-equivalent at the same spot: 40 * (1 - 5/10) = 20. Own scale 0.75 → 15.
+      expect(health.takeDamage).toHaveBeenCalledTimes(1);
+      expect(health.takeDamage.mock.calls[0][0]).toBeCloseTo(20 * PLAYER_SELF_EXPLOSION_SCALE, 5);
+    });
+
+    it("hurts the player from an own frag even without an explicit shooterFaction (player mortar path)", () => {
+      // MortarRoundManager omits shooterFaction; the own-ordnance self-hit must
+      // still fire off the 'PLAYER' attribution alone.
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(5, 0, 0));
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER', 'mortar');
+
       expect(health.takeDamage).toHaveBeenCalledTimes(1);
       expect(health.takeDamage.mock.calls[0][0]).toBeCloseTo(20 * PLAYER_SELF_EXPLOSION_SCALE, 5);
     });
@@ -454,7 +470,10 @@ describe('CombatantSystemDamage', () => {
     it('respects spawn protection (takeDamage swallows the hit)', () => {
       const health = makePlayerHealth({ spawnProtected: true });
       wirePlayer(health, new THREE.Vector3(0, 0, 0));
-      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER');
+      // Own frag with the production signature (shooterFaction === US): the blast
+      // must still reach takeDamage (where spawn protection lives) rather than be
+      // suppressed by the friendly-fire exclusion.
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER', 'grenade', Faction.US);
 
       // The blast still routes through takeDamage (that is where protection
       // lives) but the player takes no health loss and does not die.
@@ -490,8 +509,12 @@ describe('CombatantSystemDamage', () => {
       try {
         const health = makePlayerHealth({ health: 50 });
         wirePlayer(health, new THREE.Vector3(0, 0, 0));
-        // Player-called strike at own feet: 200 * 0.75 = 150 > 50 HP.
-        damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 30, 200, 'PLAYER', 'arclight');
+        // Player-called strike at own feet: 200 * 0.75 = 150 > 50 HP. Mirror the
+        // PRODUCTION signature: AirSupportManager threads mission.requesterFaction
+        // (hard-set to US for player strikes) as shooterFaction. The danger-close
+        // own-Arclight must be lethal DESPITE isAlly(US, US) — this is the exact
+        // case the reviewer flagged as dead-on-arrival before the fix.
+        damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 30, 200, 'PLAYER', 'arclight', Faction.US);
         GameEventBus.flush();
 
         expect(events).toHaveLength(1);
