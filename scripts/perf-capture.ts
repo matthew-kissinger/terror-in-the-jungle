@@ -5376,7 +5376,19 @@ async function runCapture(): Promise<void> {
     : null;
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
   const rendererMode = parseStringFlag('renderer', '').trim();
-  const gpuTimingQueryEnabled = gpuTiming && rendererMode.toLowerCase() === 'webgl';
+  // GPU timing now has two runtime paths (GPUTimingTelemetry fallback ladder):
+  // WebGL2 EXT_disjoint_timer_query (explicit --renderer webgl) AND WebGPU
+  // timestamp-query (default/webgpu-family, the production backend). Inject
+  // &gpuTiming=1 for either; the runtime self-detects the path and reports
+  // `available: false` cleanly when the device lacks the feature.
+  const rendererModeLower = rendererMode.toLowerCase();
+  const isWebGpuTimingMode =
+    rendererModeLower === '' ||
+    rendererModeLower === 'webgpu' ||
+    rendererModeLower === 'webgpu-strict' ||
+    rendererModeLower === 'strict';
+  const gpuTimingQueryEnabled =
+    gpuTiming && (rendererModeLower === 'webgl' || isWebGpuTimingMode);
   // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-server
   // (or --reuse-dev-server for back-compat) when iterating locally.
   const reuseServer = parseBooleanFlag('reuse-server', parseBooleanFlag('reuse-dev-server', false));
@@ -5416,7 +5428,7 @@ async function runCapture(): Promise<void> {
     logStep('Weather-state override is diagnostic-only and dropped-frame EARS will reject this artifact for completion.');
   }
   if (gpuTiming && !gpuTimingQueryEnabled) {
-    logStep('GPU timing requested, but not injected because the runtime GPU query path only supports explicit --renderer webgl captures.');
+    logStep(`GPU timing requested, but not injected: renderer mode '${rendererMode || 'default'}' has no supported GPU query path (use --renderer webgl for WebGL2, or default/webgpu for the WebGPU timestamp-query path).`);
   }
 
   let server: ServerHandle | null = null;
