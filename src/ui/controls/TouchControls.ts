@@ -48,6 +48,10 @@ interface TouchControlCallbacks {
   onScoreboardTap?: () => void;
   onEnterExitVehicle?: () => void;
   onEnterExitHelicopter?: () => void;
+  /** Unconditional dismount for the touch EXIT button (never a seat swap). */
+  onExplicitVehicleExit?: () => void;
+  /** Crew-station swap for the touch SEAT button (tank / gunship door gun). */
+  onSeatSwap?: () => void;
   onSandbagRotateLeft: () => void;
   onSandbagRotateRight: () => void;
   onRallyPointPlace: () => void;
@@ -173,7 +177,15 @@ export class TouchControls {
 
     // Wire vehicle action bar
     this.vehicleActionBar.setCallbacks({
-      onExitVehicle: () => (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter ?? (() => {}))(),
+      // EXIT routes to the explicit-exit path, NOT the F-key board/seat-swap
+      // wrapper: on a two-seat tank that wrapper swaps seats forever and the
+      // dismount is unreachable on touch. Fall back to the enter/exit handlers
+      // when no explicit-exit callback is wired (headless / older hosts).
+      onExitVehicle: () =>
+        (callbacks.onExplicitVehicleExit
+          ?? callbacks.onEnterExitVehicle
+          ?? callbacks.onEnterExitHelicopter
+          ?? (() => {}))(),
       onVehicleFireStart: () => callbacks.onVehicleFireStart?.(),
       onVehicleFireStop: () => callbacks.onVehicleFireStop?.(),
       onToggleFlightAssist: () => (callbacks.onToggleFlightAssist ?? callbacks.onToggleAutoHover)?.(),
@@ -185,6 +197,7 @@ export class TouchControls {
       onSquadCommand: () => callbacks.onSquadCommand?.(),
       onHelicopterWeaponCycle: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
       onViewToggle: () => callbacks.onFixedWingViewToggle?.(),
+      onSeatSwap: () => callbacks.onSeatSwap?.(),
     });
   }
 

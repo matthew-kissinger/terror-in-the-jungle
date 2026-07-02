@@ -500,7 +500,10 @@ describe('PlayerInput', () => {
         expect(onEnterExitVehicle).toHaveBeenCalledTimes(1);
       });
 
-      it('mirrors the boarding priority on touch vehicle interaction', () => {
+      it('mirrors the boarding priority on the touch interaction (board) button', () => {
+        // The interaction/board button legitimately swaps seats first — that is
+        // correct for the board key. The EXIT button is a separate path (below)
+        // that must NOT swap.
         playerInput.dispose();
         vi.mocked(shouldUseTouchControls).mockReturnValue(true);
         playerInput = new PlayerInput();
@@ -513,6 +516,50 @@ describe('PlayerInput', () => {
 
         expect(onBoardNearestVehicle).toHaveBeenCalledTimes(1);
         expect(onEnterExitVehicle).not.toHaveBeenCalled();
+      });
+
+      it('routes the touch EXIT button to the explicit-exit callback, bypassing seat-swap', () => {
+        // The severe touch trap: EXIT used to route through the seat-swap-first
+        // wrapper, so in a two-seat tank it swapped seats forever and dismount
+        // was impossible. The explicit-exit path must never consult seat-swap.
+        playerInput.dispose();
+        vi.mocked(shouldUseTouchControls).mockReturnValue(true);
+        playerInput = new PlayerInput();
+        const onVehicleSeatSwap = vi.fn(() => true);
+        const onExplicitVehicleExit = vi.fn();
+        playerInput.setCallbacks({ onVehicleSeatSwap, onExplicitVehicleExit });
+        const touchCallbacks = touchControlsInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        touchCallbacks.onExplicitVehicleExit();
+
+        expect(onExplicitVehicleExit).toHaveBeenCalledTimes(1);
+        expect(onVehicleSeatSwap).not.toHaveBeenCalled();
+      });
+
+      it('routes the touch SEAT button to seat-swap first, falling back to the door gun', () => {
+        playerInput.dispose();
+        vi.mocked(shouldUseTouchControls).mockReturnValue(true);
+        playerInput = new PlayerInput();
+        const touchGetCallbacks = () => touchControlsInstances[0].setCallbacks.mock.calls.at(-1)?.[0];
+
+        // Ground seat-swap consumes (tank driver<->gunner): door gun not touched.
+        const onVehicleSeatSwap = vi.fn(() => true);
+        const onHelicopterDoorGunToggle = vi.fn();
+        playerInput.setCallbacks({ onVehicleSeatSwap, onHelicopterDoorGunToggle });
+        touchGetCallbacks().onSeatSwap();
+        expect(onVehicleSeatSwap).toHaveBeenCalledTimes(1);
+        expect(onHelicopterDoorGunToggle).not.toHaveBeenCalled();
+
+        // Ground swap declines (helicopter): fall through to the door-gun toggle.
+        const onVehicleSeatSwap2 = vi.fn(() => false);
+        const onHelicopterDoorGunToggle2 = vi.fn();
+        playerInput.setCallbacks({
+          onVehicleSeatSwap: onVehicleSeatSwap2,
+          onHelicopterDoorGunToggle: onHelicopterDoorGunToggle2,
+        });
+        touchGetCallbacks().onSeatSwap();
+        expect(onVehicleSeatSwap2).toHaveBeenCalledTimes(1);
+        expect(onHelicopterDoorGunToggle2).toHaveBeenCalledTimes(1);
       });
 
       it('routes touch vehicle view toggle to the fixed-wing callback', () => {

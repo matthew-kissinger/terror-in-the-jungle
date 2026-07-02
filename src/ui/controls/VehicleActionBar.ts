@@ -10,6 +10,7 @@
  * - FIRE (red) - vehicle weapon fire (attack/gunship only)
  * - WPN (green) - cycle cockpit weapons (attack/gunship only)
  * - VIEW (green) - context view toggle (AC-47 side/chase)
+ * - SEAT (green) - swap crew station (tank driver<->gunner, gunship pilot<->door gun)
  * - MAP / CMD (green) - full map / squad command (touch parity with infantry action column)
  * - STAB (green) - toggle auto-hover stabilization
  * - LOOK (green) - hold-to-look free camera
@@ -19,7 +20,6 @@ import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
 import type { VehicleUIContext } from '../layout/types';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
-import { TANK_CONTROLS_HINT } from '../loadout/LoadoutTypes';
 
 interface VehicleActionCallbacks {
   onExitVehicle?: () => void;
@@ -33,15 +33,16 @@ interface VehicleActionCallbacks {
   onSquadCommand?: () => void;
   onHelicopterWeaponCycle?: (index: number) => void;
   onViewToggle?: () => void;
+  onSeatSwap?: () => void;
 }
 
 export class VehicleActionBar extends UIComponent {
   private callbacks: VehicleActionCallbacks = {};
-  private controlsHint!: HTMLDivElement;
   private exitBtn!: HTMLDivElement;
   private fireBtn!: HTMLDivElement;
   private wpnBtn!: HTMLDivElement;
   private viewBtn!: HTMLDivElement;
+  private seatBtn!: HTMLDivElement;
   private mapBtn!: HTMLDivElement;
   private cmdBtn!: HTMLDivElement;
   private hoverBtn!: HTMLDivElement;
@@ -57,11 +58,6 @@ export class VehicleActionBar extends UIComponent {
     this.root.id = 'vehicle-action-bar';
     this.root.style.display = 'none';
 
-    // Brief "how to use" line shown when crewing a ground vehicle (tank):
-    // enter/exit, seat-swap, and fire keys. Hidden for other vehicle kinds.
-    this.controlsHint = this.createControlsHint();
-    this.controlsHint.style.display = 'none';
-
     this.exitBtn = this.createButton('EXIT', styles.vehicleExitBtn);
     this.fireBtn = this.createButton('FIRE', styles.vehicleFireBtn);
     this.fireBtn.style.display = 'none';
@@ -69,6 +65,12 @@ export class VehicleActionBar extends UIComponent {
     this.wpnBtn.style.display = 'none';
     this.viewBtn = this.createButton('VIEW', styles.vehicleBtn);
     this.viewBtn.style.display = 'none';
+    // SEAT swaps crew stations on craft that carry a second one (tank
+    // driver<->gunner, gunship pilot<->door gun). Hidden by default; shown from
+    // the context. Without it the door gun is unreachable on touch and the tank
+    // gunner seat could only be taken on keyboard.
+    this.seatBtn = this.createButton('SEAT', styles.vehicleBtn);
+    this.seatBtn.style.display = 'none';
     this.mapBtn = this.createButton('MAP', styles.vehicleBtn);
     this.cmdBtn = this.createButton('CMD', styles.vehicleBtn);
     this.hoverBtn = this.createButton('STAB', styles.vehicleBtn);
@@ -79,16 +81,17 @@ export class VehicleActionBar extends UIComponent {
     this.fireBtn.dataset.action = 'fire';
     this.wpnBtn.dataset.action = 'weapon';
     this.viewBtn.dataset.action = 'view';
+    this.seatBtn.dataset.action = 'seat';
     this.mapBtn.dataset.action = 'map';
     this.cmdBtn.dataset.action = 'command';
     this.hoverBtn.dataset.action = 'hover';
     this.lookBtn.dataset.action = 'look';
 
-    this.root.appendChild(this.controlsHint);
     this.root.appendChild(this.exitBtn);
     this.root.appendChild(this.fireBtn);
     this.root.appendChild(this.wpnBtn);
     this.root.appendChild(this.viewBtn);
+    this.root.appendChild(this.seatBtn);
     this.root.appendChild(this.mapBtn);
     this.root.appendChild(this.cmdBtn);
     this.root.appendChild(this.hoverBtn);
@@ -136,6 +139,12 @@ export class VehicleActionBar extends UIComponent {
       e.preventDefault();
       e.stopPropagation();
       this.callbacks.onViewToggle?.();
+    }, { passive: false });
+
+    this.listen(this.seatBtn, 'pointerdown', (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.callbacks.onSeatSwap?.();
     }, { passive: false });
 
     this.listen(this.mapBtn, 'pointerdown', (e: PointerEvent) => {
@@ -190,13 +199,12 @@ export class VehicleActionBar extends UIComponent {
     this.fireBtn.classList.remove(styles.pressed);
 
     const capabilities = context?.capabilities;
-    // Brief controls hint only while crewing a ground vehicle (tank).
-    this.controlsHint.style.display = context?.hudVariant === 'groundVehicle' ? 'block' : 'none';
     this.exitBtn.style.display = capabilities?.canExit ? 'flex' : 'none';
     this.fireBtn.style.display = capabilities?.canFirePrimary ? 'flex' : 'none';
     this.wpnBtn.style.display = capabilities?.canCycleWeapons ? 'flex' : 'none';
     this.viewBtn.style.display = context?.viewToggle ? 'flex' : 'none';
     this.applyViewToggleLabel(context);
+    this.seatBtn.style.display = this.hasSeatSwap(context) ? 'flex' : 'none';
     this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
     this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
     this.hoverBtn.style.display = capabilities?.canStabilize ? 'flex' : 'none';
@@ -263,13 +271,15 @@ export class VehicleActionBar extends UIComponent {
     return btn;
   }
 
-  private createControlsHint(): HTMLDivElement {
-    const hint = document.createElement('div');
-    hint.className = styles.vehicleControlsHint;
-    hint.dataset.role = 'controls-hint';
-    hint.setAttribute('aria-label', 'vehicle controls hint');
-    hint.textContent = TANK_CONTROLS_HINT;
-    return hint;
+  /**
+   * Whether the current craft can swap crew stations from the SEAT button: the
+   * two-seat tank (driver <-> gunner, flagged by `secondSeat`) or the armed
+   * door-gun gunship (pilot <-> door gun, keyed on the helicopter gunship role).
+   */
+  private hasSeatSwap(context: VehicleUIContext | null): boolean {
+    if (!context) return false;
+    if (context.secondSeat) return true;
+    return context.kind === 'helicopter' && context.role === 'gunship';
   }
 
   private applyStabilizerLabel(context: VehicleUIContext | null): void {

@@ -89,7 +89,10 @@ function rocketCueAngleToPixels(angleRad: number): number {
   return Math.min(ROCKET_CUE_MAX_OFFSET_PX, Math.max(0, px));
 }
 
-function createHelicopterUIContext(role: 'transport' | 'attack' | 'gunship'): VehicleUIContext {
+function createHelicopterUIContext(
+  role: 'transport' | 'attack' | 'gunship',
+  seat: 'pilot' | 'door-gun' = 'pilot',
+): VehicleUIContext {
   const armed = role === 'attack' || role === 'gunship';
   const descriptor = heliHudVariantDescriptor(role);
   return {
@@ -97,6 +100,10 @@ function createHelicopterUIContext(role: 'transport' | 'attack' | 'gunship'): Ve
     role,
     hudVariant: 'flight',
     weaponCount: armed ? 2 : 0,
+    // The live crew station. The gunship swaps pilot <-> door gun with `F`
+    // without an enter/exit, so the adapter re-pushes the context with the new
+    // seat on each toggle and the HUD legend names the current station.
+    seat,
     // Per-variant HUD panel descriptor carried on the context so the HUD mounts
     // exactly the right panels for this airframe variant (transport: none;
     // gunship: door-gun crew panel; attack: pilot weapon panel).
@@ -153,6 +160,11 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
   // Captured on enter so swap-seat / update (no transition ctx) can still drive
   // the crosshair and read the door-gun base role.
   private gameRenderer: IGameRenderer | undefined;
+  // Captured on enter (same pattern as gameRenderer) so `toggleDoorGunSeat` —
+  // which runs without a transition context — can re-push the vehicle UI
+  // context with the new seat, keeping the HUD legend's seat label and cue in
+  // step with the door-gun swap instead of leaving a stale `SEAT: PILOT`.
+  private hudSystem: IHUDSystem | undefined;
   private aircraftRole: 'transport' | 'attack' | 'gunship' = 'transport';
 
   constructor(helicopterModel: IHelicopterModel) {
@@ -176,13 +188,14 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     ctx.cameraController.setFlightMouseControlEnabled(true);
 
     const hudSystem = ctx.hudSystem as IHUDSystem | undefined;
+    this.hudSystem = hudSystem;
     hudSystem?.showHelicopterMouseIndicator();
     hudSystem?.updateHelicopterMouseMode(getFlightMouseControlEnabled(ctx.cameraController));
     hudSystem?.showHelicopterInstruments();
 
     const role = this.helicopterModel.getAircraftRole(ctx.vehicleId);
     this.aircraftRole = role;
-    hudSystem?.setVehicleContext?.(createHelicopterUIContext(role));
+    hudSystem?.setVehicleContext?.(createHelicopterUIContext(role, 'pilot'));
     hudSystem?.setHelicopterAircraftRole(role);
 
     // Re-acquire pointer lock for mouse flight controls
@@ -222,6 +235,7 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     pushTraverseStop(ctx.gameRenderer, null);
 
     this.gameRenderer = undefined;
+    this.hudSystem = undefined;
     this.activeHelicopterId = null;
     this.resetControlState();
   }
@@ -325,6 +339,9 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
       this.lockedCollective = this.helicopterControls.collective || HELI_AUTOHOVER_TARGET;
       this.setDoorGunCrewing(heliId, true);
       setCrosshairMode(this.gameRenderer, 'door_gun');
+      // Re-push the vehicle context with the new seat so the HUD legend reads
+      // `SEAT: DOOR GUN` + `F: back to pilot` instead of the stale pilot state.
+      this.pushSeatContext('door-gun');
       return 'door_gun';
     }
 
@@ -332,7 +349,19 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     setCrosshairMode(this.gameRenderer, this.pilotCrosshairMode());
     // Clear any lit arc-stop tick so it never lingers under the pilot reticle.
     pushTraverseStop(this.gameRenderer, null);
+    // Back to the pilot legend + flight binds.
+    this.pushSeatContext('pilot');
     return 'pilot';
+  }
+
+  /**
+   * Re-push the vehicle UI context with the live crew station so the HUD
+   * legend's seat label + cue track a door-gun swap that has no enter/exit.
+   * Uses the cached `hudSystem` captured on enter (no transition context in a
+   * mid-flight swap), mirroring how `gameRenderer` is cached for the crosshair.
+   */
+  private pushSeatContext(seat: 'pilot' | 'door-gun'): void {
+    this.hudSystem?.setVehicleContext?.(createHelicopterUIContext(this.aircraftRole, seat));
   }
 
   /** The seat the player currently crews while aboard. */

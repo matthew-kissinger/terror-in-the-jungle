@@ -19,6 +19,8 @@ export interface InputCallbacks {
   onScoreboardTap?: () => void;
   onEnterExitVehicle?: () => void;
   onEnterExitHelicopter?: () => void;
+  /** Unconditional dismount (touch EXIT) — never a seat swap. */
+  onExplicitVehicleExit?: () => void;
   onToggleFlightAssist?: () => void;
   onToggleAutoHover?: () => void;
   onToggleAltitudeLock?: () => void;
@@ -169,6 +171,9 @@ export class PlayerInput {
             (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
           }
         },
+        // Touch EXIT dismounts (never a seat swap); SEAT swaps stations (tank first, else heli door gun).
+        onExplicitVehicleExit: () => (callbacks.onExplicitVehicleExit ?? callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.(),
+        onSeatSwap: () => void (callbacks.onVehicleSeatSwap?.() || callbacks.onHelicopterDoorGunToggle?.()),
         onSandbagRotateLeft: () => callbacks.onSandbagRotateLeft?.(),
         onSandbagRotateRight: () => callbacks.onSandbagRotateRight?.(),
         onRallyPointPlace: () => callbacks.onRallyPointPlace?.(),
@@ -189,8 +194,7 @@ export class PlayerInput {
         onJump: () => callbacks.onJump?.(),
         onReload: () => callbacks.onReload?.(),
         onInteract: () => {
-          // Mirror F-key priority: swap a swappable active vehicle first,
-          // then board/exit nearest, then fall back to the existing handler.
+          // Mirror F-key priority: seat-swap, then board/exit, then fallback.
           const consumed = this.consumeVehicleBoardOrSeatSwap(callbacks);
           if (!consumed) {
             (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
@@ -552,9 +556,7 @@ export class PlayerInput {
         this.callbacks.onToggleAltitudeLock?.();
       }
 
-      // Swap between the pilot seat and the door gun with F (the ground-vehicle
-      // seat-swap key; the in-flight F handler above is gated off, so this is
-      // the heli door-gun route). A no-op on aircraft without a door gun.
+      // F swaps the pilot seat with the door gun (no-op without a door gun).
       if (event.code === 'KeyF') {
         this.callbacks.onHelicopterDoorGunToggle?.();
       }
@@ -605,9 +607,7 @@ export class PlayerInput {
       this.callbacks.onDeployMortar?.();
     }
 
-    // F key — when seated in a swappable vehicle, change seats first; otherwise
-    // board/exit the nearest vehicle and fall back to mortar fire when not consumed.
-    // (Skipped entirely while seated in a flight vehicle.)
+    // F key (non-flight): seat-swap if swappable, else board/exit, else mortar.
     if (!this.isInFlightVehicle() && event.code === 'KeyF') {
       const consumed = this.consumeVehicleBoardOrSeatSwap();
       if (!consumed) {

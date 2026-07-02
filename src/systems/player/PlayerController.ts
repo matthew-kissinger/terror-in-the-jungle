@@ -234,6 +234,8 @@ export class PlayerController implements GameSystem {
         if (this.commandInputManager?.handleSecondarySelect()) return;
         this.handleEnterExitHelicopter();
       },
+      // Touch EXIT: dismount, never seat-swap (aircraft path handles the case ground exit no-ops).
+      onExplicitVehicleExit: () => void (this.handleExitVehicle() || this.handleEnterExitHelicopter()),
       onBoardNearestVehicle: () => this.handleBoardNearestVehicle(),
       onVehicleSeatSwap: () => this.handleVehicleSeatSwap(),
       onToggleFlightAssist: () => {
@@ -484,10 +486,8 @@ export class PlayerController implements GameSystem {
   }
 
   /**
-   * Explicit exit for the boarding factory. Used by callers that
-   * already know the player is seated and want to dismount without
-   * routing through the F-key context check. Returns `true` if the
-   * session controller ran the adapter's exit hook.
+   * Explicit exit for the boarding factory — dismount without the F-key context
+   * check (used by the touch EXIT button). True when the adapter's exit ran.
    */
   handleExitVehicle(): boolean {
     const exited = this.playerVehicleAdapterFactory?.tryExit() ?? false;

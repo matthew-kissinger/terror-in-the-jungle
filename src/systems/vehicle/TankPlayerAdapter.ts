@@ -75,6 +75,7 @@ function createPilotUIContext(): VehicleUIContext {
     role: 'pilot',
     hudVariant: 'groundVehicle',
     weaponCount: 0,
+    secondSeat: true, // two-seat M48: `F` swaps driver<->gunner (HUD cue + touch SEAT)
     capabilities: {
       canExit: true,
       canFirePrimary: false,
@@ -100,6 +101,7 @@ function createGunnerUIContext(zoomed: boolean): VehicleUIContext {
     hudVariant: 'turret',
     weaponCount: 1,
     sightMagnification: zoomed ? SIGHT_MAG_ZOOM : SIGHT_MAG_1X,
+    secondSeat: true, // gunner swaps back to the driver with `F` (see driver ctx)
     capabilities: {
       canExit: true,
       canFirePrimary: true,
@@ -138,11 +140,8 @@ const _scratchDir = new THREE.Vector3();
  * Input mapping:
  *   Driver:  W/S throttle, A/D turn, Space brake.
  *   Gunner:  Mouse XY -> turret yaw/pitch slew (turret clamps), LMB/Space fire.
- *   F  -> driver<->gunner seat-swap (`swapSeat`), the M48 has two crew seats.
- *   E  -> board (on foot) / exit (seated). Distinct from F so the swap never
- *         shadows the dismount: with two seats, F always swaps, so exit must
- *         live on its own key (the bug that stranded the player in the tank
- *         unless they hit Escape).
+ *   F  -> driver<->gunner seat-swap (`swapSeat`); E -> board/exit. Split so the
+ *         swap never shadows the dismount (see `swapSeat` for the rationale).
  *
  * The cannon launcher is injected post-construction via `setCannonSystem`
  * because the boarding factory builds the adapter from the Tank alone; the
