@@ -6,6 +6,11 @@
 > **Brief:** [`healing-and-looting-scope.md`](../tasks/archive/cycle-2026-06-28-ashau-purpose-and-missions/healing-and-looting-scope.md) (archived at cycle close)
 > **Status:** DESIGN ONLY — greenfield. No code ships this campaign. A future
 > cycle acts on this doc.
+> **Update (2026-07-02):** acted on by campaign greenlight-followthrough —
+> healing MVP shipped via task/healing-mvp and loot Option L1 shipped via
+> task/loot-resupply-drops, which DELETED the dormant `WeaponPickupSystem`
+> prototype (replaced by `LootResupplySystem`). Code references below are
+> historical.
 
 ## TL;DR
 

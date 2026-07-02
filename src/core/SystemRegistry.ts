@@ -37,6 +37,7 @@ import type { NapalmFireSystem } from '../systems/effects/NapalmFireSystem';
 import type { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import type { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import type { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
+import type { LootResupplySystem } from '../systems/weapons/LootResupplySystem';
 import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 
 import type { LoadoutService } from '../systems/player/LoadoutService';
@@ -92,6 +93,7 @@ export interface SystemKeyToType {
   zoneCaptureEffects: ZoneCaptureEffects;
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
+  lootResupplySystem: LootResupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
   loadoutService: LoadoutService;
   warSimulator: WarSimulator;
@@ -185,6 +187,7 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'zoneCaptureEffects',
   'influenceMapSystem',
   'ammoSupplySystem',
+  'lootResupplySystem',
   'footstepAudioSystem',
   'loadoutService',
   'warSimulator',

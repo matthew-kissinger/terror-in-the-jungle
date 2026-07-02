@@ -20,6 +20,7 @@ type GameplayRuntimeRefs = Pick<
   | 'hudSystem'
   | 'influenceMapSystem'
   | 'inventoryManager'
+  | 'lootResupplySystem'
   | 'minimapSystem'
   | 'mortarSystem'
   | 'playerController'
@@ -88,6 +89,7 @@ interface GameplayRuntimeGroups {
     | 'hudSystem'
     | 'influenceMapSystem'
     | 'inventoryManager'
+    | 'lootResupplySystem'
     | 'minimapSystem'
     | 'playerController'
     | 'playerRespawnManager'
@@ -161,6 +163,7 @@ export function createGameplayRuntimeGroups(
       hudSystem: refs.hudSystem,
       influenceMapSystem: refs.influenceMapSystem,
       inventoryManager: refs.inventoryManager,
+      lootResupplySystem: refs.lootResupplySystem,
       minimapSystem: refs.minimapSystem,
       playerController: refs.playerController,
       playerRespawnManager: refs.playerRespawnManager,
@@ -325,6 +328,17 @@ function wireGameModeRuntime(runtime: GameplayRuntimeGroups['gameModeRuntime']):
   runtime.ammoSupplySystem.setZoneManager(runtime.zoneManager);
   runtime.ammoSupplySystem.setInventoryManager(runtime.inventoryManager);
   runtime.ammoSupplySystem.setFirstPersonWeapon(runtime.firstPersonWeapon);
+
+  // L1 loot resupply drops (owner decision F4). The system self-subscribes to
+  // `npc_killed` in its init(); here we hand it the concrete dependencies it
+  // needs to grant resupply and gate pickup to on-foot. The seated predicate
+  // keeps `E` pickup mutually exclusive with the universal `E` vehicle-exit.
+  runtime.lootResupplySystem.setPlayerController(runtime.playerController);
+  runtime.lootResupplySystem.setSeatedPredicate(() => runtime.playerController.isInAnyVehicle());
+  runtime.lootResupplySystem.setInventoryManager(runtime.inventoryManager);
+  runtime.lootResupplySystem.setFirstPersonWeapon(runtime.firstPersonWeapon);
+  runtime.lootResupplySystem.setHUDSystem(runtime.hudSystem);
+  runtime.lootResupplySystem.setTerrain(runtime.terrainSystem);
 }
 
 function wireEnvironmentRuntime(

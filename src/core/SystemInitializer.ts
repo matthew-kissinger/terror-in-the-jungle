@@ -41,6 +41,7 @@ import { NapalmFireSystem, setNapalmFireSystem } from '../systems/effects/Napalm
 import { ZoneCaptureEffects } from '../systems/effects/ZoneCaptureEffects';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
+import { LootResupplySystem } from '../systems/weapons/LootResupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 import { WildlifeSystem } from '../systems/wildlife/WildlifeSystem';
@@ -243,6 +244,7 @@ export class SystemInitializer {
     refs.napalmFireSystem = new NapalmFireSystem(scene, camera);
     setNapalmFireSystem(refs.napalmFireSystem);
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
+    refs.lootResupplySystem = new LootResupplySystem(scene);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
 
     refs.loadoutService = new LoadoutService();
@@ -296,6 +298,7 @@ export class SystemInitializer {
       refs.napalmFireSystem,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
+      refs.lootResupplySystem,
       refs.warSimulator,
       refs.strategicFeedback,
       refs.taskingDirector,

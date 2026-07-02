@@ -67,6 +67,23 @@ export class AmmoManager {
     this.zoneManager = zoneManager;
   }
 
+  /**
+   * Add rounds to the reserve, clamped to `maxReserve`. Used by loot resupply
+   * drops to top up the current weapon without touching the loaded magazine.
+   * Returns the number of rounds actually added (0 if already full). Fires
+   * `onAmmoChange` only when the reserve moves so the HUD stays in sync.
+   */
+  addReserveAmmo(rounds: number): number {
+    if (rounds <= 0) return 0;
+    const before = this.state.reserveAmmo;
+    this.state.reserveAmmo = Math.min(this.state.maxReserve, before + rounds);
+    const added = this.state.reserveAmmo - before;
+    if (added > 0) {
+      this.onAmmoChange?.(this.state);
+    }
+    return added;
+  }
+
   canFire(): boolean {
     return this.state.currentMagazine > 0 && !this.state.isReloading;
   }

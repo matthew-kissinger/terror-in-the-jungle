@@ -555,6 +555,17 @@ export class FirstPersonWeapon implements GameSystem {
     return this.ammo.getAmmoState()
   }
 
+  /**
+   * Grant one magazine of reserve ammo to the CURRENTLY-equipped weapon,
+   * routed through the same {@link AmmoManager} the reload/resupply paths use.
+   * Used by loot resupply drops. Returns the number of rounds actually added
+   * (0 if the reserve was already full).
+   */
+  resupplyCurrentWeaponMagazine(): number {
+    const manager = this.ammo.getCurrentAmmoManager()
+    return manager.addReserveAmmo(manager.getState().maxMagazine)
+  }
+
   // Update weapon references after switch
   private updateWeaponReferences(): void {
     this.animations.setPumpGripRef(this.rigManager.getPumpGripRef())
