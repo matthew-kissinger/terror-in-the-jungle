@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { applyRigPresetTrim, type RigPresetTrim } from './LightingRigPresetTrim';
+import { sunElevationGate } from './SunElevationGate';
 
 /**
  * Unified lighting rig — Phase 0 prototype (cycle `cycle-2026-06-09-lighting-rig-spike`,
@@ -90,6 +91,25 @@ export const LightingRigConfig = {
    * to the legacy CPU-side scene-light/fog authority. See the type doc above.
    */
   enabled: true,
+  /**
+   * Sun-elevation radiance gate, default ON (`sun-elevation-light-gating`, owner
+   * sign-off = the lighting-truth-and-shadows manifest per AGENTS.md U3).
+   *
+   * When ON, the direct-sun radiance is multiplied by {@link sunElevationGate}
+   * so sunlight DIES at/below the geometric horizon and rolls off smoothly
+   * through the civil-twilight band — killing the "light goes through the terrain
+   * depending on where the sun is" symptom for EVERY rig consumer at once
+   * (terrain scene lights, foliage, static impostors, NPC sprites all read the
+   * one gated `sunRadiance`). The night floor (`ambientRadiance`) is untouched,
+   * so a gated-dark night stays readable.
+   *
+   * Flip to `false` (e.g. `window.__lightingRig.sunElevationGate = false`) to
+   * restore the previous behavior EXACTLY — the ungated backend sun radiance,
+   * including the faint sub-horizon moon crossfade the backend emits. Independent
+   * of `enabled`: the gate only shapes the rig `sunRadiance`, which the OFF
+   * (legacy) path does not consume, so on `enabled = false` this flag is inert.
+   */
+  sunElevationGate: true,
 };
 
 /**
@@ -115,6 +135,15 @@ export function publishLightingRigConfig(): void {
 /** True when the prototype rig path is active. Read each frame by the rig binding update. */
 export function isLightingRigEnabled(): boolean {
   return LightingRigConfig.enabled;
+}
+
+/**
+ * True when the sun-elevation radiance gate is active. Read each frame by
+ * `deriveLightingRigState`; flip `LightingRigConfig.sunElevationGate = false`
+ * (kill-switch) to restore the ungated backend sun radiance exactly.
+ */
+export function isSunElevationGateEnabled(): boolean {
+  return LightingRigConfig.sunElevationGate;
 }
 
 /**
@@ -316,9 +345,21 @@ export function deriveLightingRigState(
   out.sunElevation = Math.asin(THREE.MathUtils.clamp(out.sunDirection.y, -1, 1));
 
   // Direct sun/moon radiance, uncompressed. `getSun` already crossfades to the
-  // cool moon color below the horizon (HosekWilkieSkyBackend), so the rig sun
-  // term naturally falls off with elevation without a channel ceiling.
+  // cool moon color below the horizon (HosekWilkieSkyBackend), but it never dies:
+  // sub-horizon it still emitted a usable term, so a sun behind a ridge (or fully
+  // set) kept lighting sun-facing slopes and foliage ("light goes through the
+  // terrain"). Multiply by the shared sun-elevation gate so the direct term DIES
+  // at/below the geometric horizon and rolls off smoothly through civil twilight.
+  // One curve applied here at the rig level, so every consumer (terrain scene
+  // lights via rigSceneLightRadiance, foliage/impostor/NPC bindings) inherits the
+  // identical rolloff. The gate only scales magnitude — the backend's own dawn
+  // reddening is preserved. Kill-switch (`sunElevationGate = false`) skips it and
+  // restores the ungated radiance exactly. The night floor (`ambientRadiance`,
+  // below) is untouched, so gated-dark nights stay readable.
   backend.getSun(out.sunRadiance);
+  if (isSunElevationGateEnabled()) {
+    out.sunRadiance.multiplyScalar(sunElevationGate(out.sunElevation));
+  }
 
   // Upper / lower hemisphere irradiance from the same physical backend, uncompressed.
   backend.getZenith(out.skyIrradiance);

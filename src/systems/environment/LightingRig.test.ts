@@ -10,6 +10,7 @@ import {
   createRigSceneLightRadiance,
   deriveLightingRigState,
   isLightingRigEnabled,
+  isSunElevationGateEnabled,
   lightingRigBindings,
   rigExposureForElevation,
   rigSceneLightRadiance,
@@ -18,6 +19,7 @@ import {
   RIG_TRIM_INTENSITY_MAX,
   RIG_TRIM_TINT_MAX,
 } from './LightingRigPresetTrim';
+import { SUN_GATE_FULL_RAD } from './SunElevationGate';
 
 /**
  * Behavior tests for the Phase 0 unified lighting rig (cycle
@@ -385,5 +387,108 @@ describe('LightingRig scenario trim shapes the rig path within bounds', () => {
     expect(trimmed.fogColor.b).toBeLessThan(baseline.fogColor.b);
     // The published binding mirrors the trimmed fog color (single fog authority).
     expect(lightingRigBindings.fogColor.value.r).toBeCloseTo(trimmed.fogColor.r, 5);
+  });
+});
+
+describe('LightingRig sun-elevation gate kills direct sun below the horizon', () => {
+  beforeEach(() => {
+    LightingRigConfig.enabled = false;
+    LightingRigConfig.sunElevationGate = true;
+  });
+  afterEach(() => {
+    // Restore production defaults (both flags ON).
+    LightingRigConfig.enabled = true;
+    LightingRigConfig.sunElevationGate = true;
+  });
+
+  it('defaults ON so production gates the sun by elevation', () => {
+    expect(isSunElevationGateEnabled()).toBe(true);
+  });
+
+  it('zeroes the direct sun radiance the whole scene reads once the sun is below the horizon', () => {
+    // The owner symptom: the backend emitted a usable sub-horizon sun term, so a
+    // set sun still lit the scene. With the gate ON, a sun below the horizon must
+    // contribute NO direct radiance — every consumer (terrain scene lights,
+    // foliage, impostors) reads this one gated `sunRadiance`, so it dies for all.
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [0.4, 0.5, 0.7], horizon: [0.3, 0.3, 0.35] });
+
+    deriveLightingRigState(backend, new THREE.Vector3(0.3, -0.2, 0).normalize(), 1, state);
+    expect(state.sunRadiance.r).toBe(0);
+    expect(state.sunRadiance.g).toBe(0);
+    expect(state.sunRadiance.b).toBe(0);
+    // The shared binding the materials read reflects the same gated value.
+    expect(lightingRigBindings.sunRadiance.value.r).toBe(0);
+
+    // And the scene-light projection (terrain/GLB direct sun) is gated too.
+    const lights = createRigSceneLightRadiance();
+    rigSceneLightRadiance(state, { ambient: 1, directional: 2, hemisphere: 0.8 }, lights);
+    expect(lights.sunColor.r).toBe(0);
+  });
+
+  it('leaves a sun well above the horizon at full radiance (daytime look unchanged)', () => {
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [1, 1, 1], horizon: [1, 1, 1] });
+    // Sun comfortably clear of the twilight band.
+    const highSunDir = new THREE.Vector3(0, Math.sin(SUN_GATE_FULL_RAD + 0.5), Math.cos(SUN_GATE_FULL_RAD + 0.5));
+    deriveLightingRigState(backend, highSunDir, 1, state);
+    // Gate == 1 above the band: the backend radiance passes through untouched.
+    expect(state.sunRadiance.r).toBeCloseTo(2.0, 5);
+    expect(state.sunRadiance.g).toBeCloseTo(1.6, 5);
+  });
+
+  it('rolls off, not pops: a grazing sun in the band is dimmer than a high sun but non-zero', () => {
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [1, 1, 1], horizon: [1, 1, 1] });
+
+    const grazingElev = SUN_GATE_FULL_RAD * 0.5;
+    deriveLightingRigState(backend, new THREE.Vector3(0, Math.sin(grazingElev), Math.cos(grazingElev)), 1, state);
+    const grazing = state.sunRadiance.r;
+
+    deriveLightingRigState(backend, new THREE.Vector3(0, Math.sin(SUN_GATE_FULL_RAD + 0.5), Math.cos(SUN_GATE_FULL_RAD + 0.5)), 1, state);
+    const high = state.sunRadiance.r;
+
+    expect(grazing).toBeGreaterThan(0);
+    expect(grazing).toBeLessThan(high);
+  });
+
+  it('kill-switch OFF restores the ungated backend sun radiance below the horizon exactly', () => {
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [1, 1, 1], horizon: [1, 1, 1] });
+    const belowHorizon = new THREE.Vector3(0.3, -0.2, 0).normalize();
+
+    // Gate OFF: the sub-horizon backend radiance passes through as before.
+    LightingRigConfig.sunElevationGate = false;
+    deriveLightingRigState(backend, belowHorizon, 1, state);
+    expect(state.sunRadiance.r).toBeCloseTo(2.0, 5);
+  });
+
+  it('does not touch the night ambient floor — gated-dark night stays readable', () => {
+    // The gate only scales the DIRECT sun term; the ambient night floor is a
+    // separate authority and must remain non-zero below the horizon so the scene
+    // is dark-but-readable rather than pure black.
+    const state = createLightingRigState();
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [0.02, 0.025, 0.04], horizon: [0.02, 0.02, 0.025] });
+    deriveLightingRigState(backend, new THREE.Vector3(0.1, -0.25, 0).normalize(), 1, state);
+    expect(state.sunRadiance.r).toBe(0);
+    expect(state.ambientRadiance.g).toBeGreaterThan(0);
+  });
+
+  it('does not change the exposure curve (weather intensity ownership untouched)', () => {
+    // Regression pin: the gate shapes only `sunRadiance`. Exposure (the base TOD
+    // curve × scenario intensity trim) must be identical gate-ON vs gate-OFF, so
+    // weather's `.intensity` authority and the exposure policy are unaffected.
+    const backend = makeBackend({ sun: [2.0, 1.6, 1.2], zenith: [1, 1, 1], horizon: [1, 1, 1] });
+    const sunDir = new THREE.Vector3(0, 0.3, 0.95).normalize();
+
+    const gated = createLightingRigState();
+    LightingRigConfig.sunElevationGate = true;
+    deriveLightingRigState(backend, sunDir, 1, gated);
+
+    const ungated = createLightingRigState();
+    LightingRigConfig.sunElevationGate = false;
+    deriveLightingRigState(backend, sunDir, 1, ungated);
+
+    expect(gated.exposure).toBeCloseTo(ungated.exposure, 10);
   });
 });

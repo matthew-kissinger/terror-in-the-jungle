@@ -634,7 +634,7 @@ function createTerrainColorNode(uniforms: TerrainUniforms, context = createTerra
   finalColor = tslMix(finalColor, canopyColor.mul(0.78), visualEdgeMask.mul(0.92));
   const farCanopyFogMask = farCanopyTint.mul(tslReference('float', uniforms.farCanopyTintFogStrength));
   finalColor = tslMix(finalColor, tslReference('color', uniforms.farCanopyTintColor).mul(0.86), farCanopyFogMask);
-  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.28, 0.36, 0.44)), lowSunOcclusion);
+  finalColor = tslMix(finalColor, finalColor.mul(tslVec3(0.16, 0.23, 0.33)), lowSunOcclusion); // deeper shadow floor: occlusion attenuates DIRECT sun term (sun-elevation-light-gating)
   // Rig is the only path (`legacy-path-deletion`): the colorNode emits RAW albedo,
   // and the rig-driven PBR scene lights (sun/sky/ground/ambient from
   // `rigSceneLightRadiance`) light it exactly once. The legacy night-stabilizer

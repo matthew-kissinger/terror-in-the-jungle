@@ -32,6 +32,11 @@ import {
 import type { VegetationAlphaCrop, VegetationAtlasProfile } from '../../../config/vegetationTypes';
 import type { GPUVegetationConfig } from './BillboardTypes';
 import { lightingRigBindings } from '../../environment/LightingRig';
+import {
+  SUN_CARD_FADE_FLOOR,
+  SUN_CARD_FADE_HI,
+  SUN_CARD_FADE_LO,
+} from '../../environment/SunElevationGate';
 
 /**
  * Wrapped-Lambert terminator softening for the unlit families (memo §2c,
@@ -43,37 +48,25 @@ import { lightingRigBindings } from '../../environment/LightingRig';
 export const RIG_WRAP = 0.5;
 
 /**
- * Foliage low-sun direct-term attenuation (rig path, billboard-rig-migration).
+ * Foliage low-sun direct-term attenuation (rig path). Rebased onto the shared
+ * {@link SunElevationGate} module (`sun-elevation-light-gating`): the card-normal
+ * low-sun fade now lives beside the rig sun-elevation gate as ONE coordinated
+ * low-sun source, and these names re-export the shared constants so the two
+ * importers (StaticImpostorMaterial, CombatantMeshFactory) keep a single value.
  *
  * Foliage cards have no true sloped normals and no horizon ray-march, so the
- * up-biased card normal `(0,1,0)` over-catches the low warm sun: with the rig
- * ON, Phase 1 measured 17h foliage 0.180 vs terrain 0.054 — an OVERSHOOT, not
- * the legacy clamp. Terrain suppresses that low sun two ways the foliage card
- * cannot: true sloped normals turn away from a grazing sun, and
- * `terrainLowSunOcclusionMask` fades the direct term via
- * `1 - smoothstep(0.22, 0.52, lightDir.y)` (horizon occlusion strongest near the
- * horizon).
- *
- * We mirror terrain's driver directly: fade the foliage DIRECT sun term over the
- * SAME `[0.22, 0.52]` `sunDirection.y` band terrain's horizon occlusion uses
- * (`sunDirection.y == sin elevation`), so the foliage grazing-sun response is
- * suppressed on the same schedule terrain's. A floor keeps a residual direct
- * contribution at dusk: terrain retains dusk brightness, and a hard fade-to-zero
- * would crash foliage below terrain near the horizon.
- *
- * NOTE (measurement, not faked): the `cycle` TOD harness's fixed `foliage`
- * sample region samples bare down-valley terrain in the A Shau fixture — there
- * are no billboard cards in that screen band (verified by cropping the swept
- * PNGs + a `rigLit * 0.05` no-op probe that left the `foliage` luminance
- * unchanged). So the harness `foliage corrVsTerrain` / `rangeRatio` numbers are
- * terrain-vs-terrain and no billboard-side change can move them. This attenuation
- * is therefore tuned to the rig's measured per-TOD direct/hemi radiance (probe),
- * mirroring terrain's documented occlusion band, rather than to an unobservable
- * sweep metric. See the PR body for the full evidence + tables.
+ * up-biased card normal `(0,1,0)` over-catches the low warm sun (Phase 1: 17h
+ * foliage 0.180 vs terrain 0.054 — an OVERSHOOT). The rig sun-elevation gate now
+ * kills the direct radiance at/below the horizon for terrain AND cards together;
+ * this supplemental fade corrects the card-normal overshoot in the grazing band
+ * ABOVE the gate, over the SAME `sunDirection.y` band terrain's horizon occlusion
+ * uses, so foliage tracks terrain instead of diverging. A floor keeps a residual
+ * dusk contribution so cards do not crash below terrain. See
+ * `SunElevationGate.sunCardLowSunFade` for the shared curve + full rationale.
  */
-export const RIG_LOW_SUN_FADE_LO = 0.22;
-export const RIG_LOW_SUN_FADE_HI = 0.52;
-export const RIG_LOW_SUN_FADE_FLOOR = 0.35;
+export const RIG_LOW_SUN_FADE_LO = SUN_CARD_FADE_LO;
+export const RIG_LOW_SUN_FADE_HI = SUN_CARD_FADE_HI;
+export const RIG_LOW_SUN_FADE_FLOOR = SUN_CARD_FADE_FLOOR;
 
 /**
  * Hemisphere-fill sky weight for the up-facing card. The wrapped-Lambert form
