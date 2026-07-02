@@ -122,6 +122,7 @@ const GRANDFATHER: ReadonlySet<string> = new Set<string>([
   "docs/COMBAT.md::missing_code_path::src/systems/strategy/AbstractCombatResolver",
   "docs/REARCHITECTURE.md::missing_code_path::scripts/perf-active-driver.js",
   "docs/directives/webgpu-migration-10.md::missing_package_script::check:hydrology-bakes",
+  "docs/rearch/AIR_SUPPORT_RADIO_SPIKE_2026-06-03.md::missing_code_path::src/ui/hud/AirSupportRadioMenu.ts",
   "docs/rearch/ENGINE_TRAJECTORY_2026-04-23.md::missing_code_path::src/engine/determinism",
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_ALIGNMENT_2026-05-16.md::missing_markdown_link::../tasks/cycle-2026-05-16-mobile-webgpu-and-sky-recovery.md",
   "docs/rearch/MOBILE_WEBGPU_AND_SKY_SPIKE_2026-05-16/cycle-close-validation.md::missing_markdown_link::../../tasks/cycle-mobile-webgl2-fallback-fix.md",

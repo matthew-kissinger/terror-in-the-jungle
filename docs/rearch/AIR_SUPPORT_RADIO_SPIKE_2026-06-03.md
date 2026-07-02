@@ -1,6 +1,9 @@
 # Air-Support Call-In Radio — Spike (SVYAZ-3)
 
 Spike date: 2026-06-03. Investigation + design memo, NOT implementation.
+Status note (2026-07-02): `AirSupportRadioMenu` was deleted by task/radio-smoke-hardening —
+it was never rendered in production; the shipped flow is the radio dial + smoke marker.
+Code references below are historical.
 Directive: **SVYAZ-3 — Air-support call-in radio** (`docs/DIRECTIVES.md:22`).
 Success criteria: *Radio menu + target marking + asset selection + per-asset cooldown + NPC-pilot fulfillment.*
 First slice landed: `665b0c5` (radio shell + asset list).
