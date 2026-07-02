@@ -36,11 +36,11 @@ export class TitleScreen extends UIComponent {
     this.root.innerHTML = `
       <div class="${styles.content}">
         <section class="${styles.heroPanel}">
-          <span class="fj-paperclip" aria-hidden="true"></span>
+          <span class="${styles.paperclip}" aria-hidden="true"></span>
           <p class="${styles.eyebrow}">RECON FIELD BOOK &middot; No. 4</p>
           <h1 class="${styles.title}">TERROR IN THE JUNGLE</h1>
           <div class="${styles.tagline}">
-            <span class="fj-stamp" aria-hidden="true">CLASSIFIED</span>
+            <span class="${styles.stamp}" aria-hidden="true">CLASSIFIED</span>
             <span class="${styles.taglineText}">A SHAU VALLEY <span class="${styles.year}">1968</span></span>
           </div>
 

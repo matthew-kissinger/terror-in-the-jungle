@@ -93,4 +93,59 @@ export default [
       "no-console": "off",
     },
   },
+  {
+    // FREEZE RULE (styling-consolidation, 2026-07-02).
+    // Ban NEW runtime style injection under src/ui/**. New UI styling must go
+    // through CSS Modules (*.module.css) — see the ~34-file pattern in
+    // src/ui/screens & src/ui/engine and docs/FIELD_JOURNAL_UI.md. The
+    // remaining runtime injectors are grandfathered in the allowlist block
+    // below (a future cycle migrates them). If you are adding a genuinely new
+    // one, migrate to a CSS Module instead; do NOT add to the allowlist.
+    files: ["src/ui/**/*.ts"],
+    ignores: ["src/ui/**/*.test.ts", "src/ui/**/*.spec.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.object.name='document'][callee.property.name='createElement'] > Literal.arguments[value='style']",
+          message:
+            "Do not inject <style> at runtime under src/ui/** — use a CSS Module (*.module.css). See the freeze-rule comment in eslint.config.js.",
+        },
+      ],
+    },
+  },
+  {
+    // Allowlist for the freeze rule above: files that still legitimately inject
+    // <style> at runtime and have not yet been migrated to CSS Modules. Two
+    // groups: (a) the design-token mirror + DOM-builder/HUD injectors slated
+    // for a future migration cycle; (b) files owned by sibling tasks in this
+    // cycle (do not touch here). Do NOT grow this list — new UI styling is
+    // CSS Modules only.
+    files: [
+      // (a) grandfathered runtime injectors — future migration cycle
+      "src/ui/design/styles.ts",
+      "src/ui/hud/HUDStyles.ts",
+      "src/ui/hud/HudTaskCard.ts",
+      "src/ui/hud/HudSituationReadout.ts",
+      "src/ui/hud/CommandModeOverlay.ts",
+      "src/ui/hud/CommandTacticalMap.ts",
+      "src/ui/hud/CommandRadioFireSupportPanel.ts",
+      "src/ui/hud/WeaponSwitchFeedback.ts",
+      "src/ui/hud/UnifiedWeaponBar.ts",
+      "src/ui/hud/ScorePopupSystem.ts",
+      "src/ui/hud/HitMarkerFeedback.ts",
+      "src/ui/hud/DamageNumberSystem.ts",
+      "src/ui/hud/ZoneCaptureNotification.ts",
+      "src/ui/layout/HUDLayout.ts",
+      "src/ui/map/FullMapSystem.ts",
+      "src/ui/minimap/MinimapDOMBuilder.ts",
+      "src/ui/compass/CompassDOMBuilder.ts",
+      // (b) owned by sibling tasks this cycle — do not touch
+      "src/ui/hud/HudControlHints.ts",
+    ],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
 ];
