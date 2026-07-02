@@ -394,6 +394,36 @@ describe('TouchControls', () => {
     expect(onFixedWingViewToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('routes the vehicle action-bar BOMB tap to the fixed-wing bomb-release callback', () => {
+    // Closes the #488 deferred leg: the touch BOMB button reaches the piloted
+    // strike plane. TouchControls forwards the action-bar's onBombRelease to the
+    // host's onFixedWingBombRelease, which PlayerController routes to the adapter.
+    const controls = new TouchControls();
+    const onFixedWingBombRelease = vi.fn();
+    controls.setCallbacks({
+      onFireStart: vi.fn(),
+      onFireStop: vi.fn(),
+      onJump: vi.fn(),
+      onReload: vi.fn(),
+      onGrenade: vi.fn(),
+      onSprintStart: vi.fn(),
+      onSprintStop: vi.fn(),
+      onWeaponSelect: vi.fn(),
+      onADSToggle: vi.fn(),
+      onSandbagRotateLeft: vi.fn(),
+      onSandbagRotateRight: vi.fn(),
+      onRallyPointPlace: vi.fn(),
+      onFixedWingBombRelease,
+    });
+
+    const vehicleCallbacks = vehicleActionBarInstances[0].setCallbacks.mock.calls[0][0] as {
+      onBombRelease: () => void;
+    };
+    vehicleCallbacks.onBombRelease();
+
+    expect(onFixedWingBombRelease).toHaveBeenCalledTimes(1);
+  });
+
   it('presentation vehicle context toggles the vehicle action bar', () => {
     const controls = new TouchControls();
     controls.show();

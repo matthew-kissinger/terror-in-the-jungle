@@ -3,6 +3,7 @@
 
 import { colors, fontStack } from '../design/tokens';
 import type { ActorMode, VehicleUIContext } from '../layout/types';
+import { deriveVehicleClass, vehicleHintEntry } from './vehicleHintTable';
 
 /**
  * HudControlHints — persistent, context-sensitive control legend.
@@ -373,6 +374,11 @@ export class HudControlHints {
 
     const role = context.role;
     const armed = context.capabilities.canFirePrimary;
+    // Resolve the craft archetype once (adapter-set `vehicleClass`, else derived
+    // from the legacy kind/role fields) so the seat-swap decision reads from the
+    // single table rather than re-deriving the swap rule inline per branch.
+    const vehicleClass = deriveVehicleClass(context);
+    const canSwapStations = vehicleHintEntry(vehicleClass)?.seatRule.canSwapStations ?? false;
 
     // AC-47 broadside gunship (fixed wing): the player IS the pilot; the
     // broadside battery fires on LMB once airborne and RMB is its gun camera.
@@ -399,11 +405,17 @@ export class HudControlHints {
     }
 
     // Tank: driver hatch (`pilot`) <-> gunner station, both swap with F — but
-    // ONLY when the context reports a second seat. The single-seat M2HB
-    // emplacement and a direct-boarded tank gunner also report `role: 'gunner'`,
-    // and a boat pilot reports `role: 'pilot'`; on those, `F` dismounts rather
-    // than swaps, so a `F: swap seat` cue would be a lie that strands the player.
-    if ((role === 'pilot' || role === 'gunner') && context.secondSeat) {
+    // ONLY when the class table says the station swaps (the `tank` class) AND the
+    // context actually reports a second seat. The single-seat M2HB emplacement
+    // and a direct-boarded tank gunner also report `role: 'gunner'`, and a boat
+    // pilot reports `role: 'pilot'`; those resolve to non-swapping classes, so
+    // `F` dismounts rather than swaps — no `F: swap seat` lie.
+    if (
+      (role === 'pilot' || role === 'gunner')
+      && canSwapStations
+      && context.secondSeat
+      && context.kind !== 'helicopter'
+    ) {
       return {
         label: role === 'gunner' ? 'GUNNER' : 'DRIVER',
         hasSecondSeat: true,
@@ -414,8 +426,9 @@ export class HudControlHints {
     // Door-gun gunship: the player flies as pilot and swaps to the door gun,
     // or crews the door gun and swaps back to the pilot seat. The adapter
     // re-pushes the context with `seat` set on each toggle so the legend names
-    // the live station.
-    if (context.kind === 'helicopter' && role === 'gunship') {
+    // the live station. The `heli-gunship` class is the only rotary class that
+    // swaps stations.
+    if (context.kind === 'helicopter' && canSwapStations) {
       const atDoorGun = context.seat === 'door-gun';
       return {
         label: atDoorGun ? 'DOOR GUN' : 'PILOT',

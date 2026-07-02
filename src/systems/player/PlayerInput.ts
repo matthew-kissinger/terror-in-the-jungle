@@ -53,6 +53,7 @@ export interface InputCallbacks {
   onHelicopterWeaponSwitch?: (index: number) => void;
   onHelicopterDoorGunToggle?: () => void;
   onFixedWingViewToggle?: () => void;
+  onFixedWingBombRelease?: () => void; // touch BOMB button: release one dropped bomb (A-1 / F-4)
   onAirSupportMenu?: () => void;
   onMenuOpen?: () => void;
   /** Use a bandage (active heal). On-foot only; `H` in a heli is altitude-lock. */
@@ -167,11 +168,9 @@ export class PlayerInput {
           }
         },
         onScoreboardTap: () => callbacks.onScoreboardTap?.(),
+        // F-key priority: seat-swap / board, then fall back to enter/exit.
         onEnterExitVehicle: () => {
-          const consumed = this.consumeVehicleBoardOrSeatSwap(callbacks);
-          if (!consumed) {
-            (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
-          }
+          if (!this.consumeVehicleBoardOrSeatSwap(callbacks)) (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.();
         },
         // Touch EXIT dismounts (never a seat swap); SEAT swaps stations (tank first, else heli door gun).
         onExplicitVehicleExit: () => (callbacks.onExplicitVehicleExit ?? callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.(),
@@ -187,6 +186,7 @@ export class PlayerInput {
         onVehicleFireStop: () => callbacks.onMouseUp?.(0),
         onHelicopterWeaponSwitch: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
         onFixedWingViewToggle: () => callbacks.onFixedWingViewToggle?.(),
+        onFixedWingBombRelease: () => callbacks.onFixedWingBombRelease?.(),
       });
     }
 

@@ -49,6 +49,7 @@ function createEmplacementUIContext(): VehicleUIContext {
   return {
     kind: 'turret',
     role: 'gunner',
+    vehicleClass: 'emplacement',
     hudVariant: 'turret',
     weaponCount: 1,
     capabilities: {

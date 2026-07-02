@@ -326,6 +326,38 @@ describe('FixedWingPlayerAdapter', () => {
     });
   });
 
+  describe('touch BOMB release (releaseBombFromTouch — #488 deferred leg)', () => {
+    it('is a safe no-op before boarding (no bomb store bound)', () => {
+      // The touch entry point must never throw when no sortie is active.
+      expect(() => adapter.releaseBombFromTouch()).not.toThrow();
+    });
+
+    it('routes a touch tap through the airborne bomb controller for a bombed A-1', () => {
+      // The A-1 carries a dropped-bomb load; airborne (mock flight data reports
+      // flightState 'airborne'), a touch tap releases one bomb through the shared
+      // projectile sink. Grounded gating lives in the controller and is exercised
+      // in FixedWingBombing.test.ts.
+      const spawnProjectile = vi.fn();
+      const bombingAdapter = new FixedWingPlayerAdapter(fwModel as any, {
+        grenadeSystem: { spawnProjectile } as any,
+      });
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'fw_bomb');
+      // Velocity read the bomb runtime performs on release.
+      (fwModel as any).getAircraftVelocityTo = vi.fn((_id: string, out: THREE.Vector3) => {
+        out.set(0, 0, -60);
+        return true;
+      });
+      bombingAdapter.onEnter(ctx);
+
+      bombingAdapter.releaseBombFromTouch();
+
+      // The bomb left the rack through the shared grenade-primitive sink — proof
+      // the touch entry point reaches the real release path, not a dead stub.
+      expect(spawnProjectile).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('stability assist (auto-level)', () => {
     it('resetControlState turns auto-level off', () => {
       adapter.toggleAutoLevel();

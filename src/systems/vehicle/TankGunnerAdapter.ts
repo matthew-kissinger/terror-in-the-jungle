@@ -55,6 +55,10 @@ function createTankGunnerUIContext(zoomed: boolean): VehicleUIContext {
   return {
     kind: 'turret',
     role: 'gunner',
+    // Direct-boarded solo gunner: one armed turret station, `F` dismounts (no
+    // second seat). Hint-wise identical to the M2HB tripod, so it reports the
+    // `emplacement` class — no swap cue, gunner legend, mouse-aim + LMB fire.
+    vehicleClass: 'emplacement',
     hudVariant: 'turret',
     weaponCount: 1,
     sightMagnification: zoomed ? SIGHT_MAG_ZOOM : SIGHT_MAG_1X,

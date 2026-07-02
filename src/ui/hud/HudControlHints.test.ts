@@ -525,3 +525,68 @@ describe('HudControlHints.actorToContext', () => {
     expect(HudControlHints.actorToContext('infantry')).toBe('foot');
   });
 });
+
+describe('HudControlHints — seat cues from the adapter-set vehicleClass', () => {
+  // The real adapters now stamp `vehicleClass` on their contexts; the seat cues
+  // must resolve identically via the explicit class, not just the legacy
+  // kind/role derivation. These pin the class path directly.
+  let host: HTMLDivElement;
+  let hints: HudControlHints;
+
+  const seatText = (h: HTMLElement): string => {
+    const seat = h.querySelector('.hud-control-hints__seat') as HTMLElement | null;
+    if (!seat || seat.style.display === 'none') return '';
+    return seat.textContent ?? '';
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    hints = new HudControlHints();
+    hints.mount(host);
+  });
+
+  afterEach(() => {
+    hints.dispose();
+    host.remove();
+    document.querySelectorAll('.hud-control-hints').forEach((el) => el.remove());
+  });
+
+  it('keeps the tank gunner swap cue when the class is the explicit `tank` (turret kind)', () => {
+    // A tank gunner reports kind:'turret' but class:'tank' with a second seat.
+    // The explicit class must keep the swap cue that the kind alone would drop.
+    hints.setSeatHint(HudControlHints.seatHintFromContext({
+      kind: 'turret', role: 'gunner', vehicleClass: 'tank', hudVariant: 'turret',
+      weaponCount: 1, secondSeat: true, capabilities: caps({ canFirePrimary: true }),
+    }));
+    const text = seatText(host);
+    expect(text).toContain('GUNNER');
+    expect(text).toContain('F: swap seat');
+  });
+
+  it('drops the swap cue for the `emplacement` class even with a gunner role', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext({
+      kind: 'turret', role: 'gunner', vehicleClass: 'emplacement', hudVariant: 'turret',
+      weaponCount: 1, capabilities: caps({ canFirePrimary: true }),
+    }));
+    const text = seatText(host);
+    expect(text).toContain('GUNNER');
+    expect(text).not.toContain('F: swap seat');
+  });
+
+  it('gives the `plane-broadside` class the gun-cam note and the `plane` class the bomb note', () => {
+    hints.setSeatHint(HudControlHints.seatHintFromContext({
+      kind: 'plane', role: 'gunship', vehicleClass: 'plane-broadside', hudVariant: 'flight',
+      weaponCount: 1, capabilities: caps({ canFirePrimary: true }),
+      viewToggle: { inactiveLabel: 'SIDE', activeLabel: 'CHASE', active: false },
+    }));
+    expect(seatText(host).toLowerCase()).toContain('broadside');
+
+    hints.setSeatHint(HudControlHints.seatHintFromContext({
+      kind: 'plane', role: 'pilot', vehicleClass: 'plane', hudVariant: 'flight',
+      weaponCount: 1, capabilities: caps({ canFirePrimary: true }), bombsAvailable: true,
+    }));
+    expect(seatText(host).toLowerCase()).toContain('drop bomb');
+  });
+});

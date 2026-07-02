@@ -1015,6 +1015,30 @@ describe('PlayerController', () => {
       expect(playerController.handleVehicleSeatSwap()).toBe(false);
       expect(mockFactory.trySwapSeat).not.toHaveBeenCalled();
     });
+
+    it('routes the touch BOMB callback to the fixed-wing adapter only while piloting a plane', () => {
+      // The #488 deferred leg: PlayerInput -> PlayerController -> adapter. The
+      // input callback must reach releaseBombFromTouch when the player is in a
+      // fixed wing, and stay a no-op for any other actor (the adapter owns the
+      // airborne / bomb-remaining gating from there).
+      const releaseBombFromTouch = vi.fn();
+      playerController['fixedWingAdapter'] = { releaseBombFromTouch } as any;
+      const session = playerController['vehicleStateManager'];
+      const typeSpy = vi.spyOn(session, 'getVehicleType');
+
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      expect(typeof callbacks.onFixedWingBombRelease).toBe('function');
+
+      // On foot / in a ground vehicle: the release must NOT reach the adapter.
+      typeSpy.mockReturnValue('ground');
+      callbacks.onFixedWingBombRelease();
+      expect(releaseBombFromTouch).not.toHaveBeenCalled();
+
+      // Piloting a fixed wing: the tap reaches the adapter's touch entry point.
+      typeSpy.mockReturnValue('fixed_wing');
+      callbacks.onFixedWingBombRelease();
+      expect(releaseBombFromTouch).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Controls', () => {

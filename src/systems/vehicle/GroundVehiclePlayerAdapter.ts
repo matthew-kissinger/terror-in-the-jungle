@@ -66,6 +66,11 @@ function createGroundUIContext(): VehicleUIContext {
   return {
     kind: 'car',
     role: 'driver',
+    // Wheeled ground vehicles (jeep / cargo truck / wheeled APC) share the
+    // single driven-chassis legend + touch verbs; the adapter serves all three
+    // and cannot cheaply tell them apart, so it reports the representative
+    // `jeep` class. All three map to the same table entry, so nothing is lost.
+    vehicleClass: 'jeep',
     hudVariant: 'groundVehicle',
     weaponCount: 0,
     capabilities: {
