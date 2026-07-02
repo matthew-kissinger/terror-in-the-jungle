@@ -30,10 +30,10 @@ started, the cycle is `INCOMPLETE` per the rule in
 
 | ID | Title | Opened | Cycles open | Owning subsystem | Blocking? | Notes |
 |----|-------|--------|------------:|------------------|-----------|-------|
-| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 27 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** **2026-06-01: the combat-side p99 lever — NPC convergence terrain-stall cost + oscillation — shipped via `task/combat-convergence-stall-fix` (contour re-score cache, serve-stale-on-throttle, hold dispersal, opt-in stagger); frame-time certification is what the quiet-machine refresh still owes. See [docs/state/perf-trust.md](state/perf-trust.md) 2026-06-01 update.** **2026-06-02: `perf-baselines.json` was removed from the repo; with no tracked baseline `perf:compare` prints raw latest-capture metrics and does not gate (the CI perf step is advisory). "Refresh" now means re-establishing a baseline via `perf:update-baseline` if/when the owner re-queues — this item stays open as the frame-time-certification gap, not a file-refresh task.** |
+| STABILIZAT-1 | combat120 baseline refresh blocked (measurement trust WARN) | cycle-2026-04-21-stabilization-reset | 27 | perf-harness | yes (blocks all baseline updates) | Refresh on a quiet machine after Phase 0 lint installs; pair with the artifact-prune CI. **Cycle #10 perf-analyst noted CI runs at measurement_trust=warn (GPU runner starvation; WebGL CONTEXT_LOST + WebGPU→WebGL2 fallback mid-capture); absolute p99 numbers untrustworthy until refresh. Expedite cycle #13.** **2026-06-01: the combat-side p99 lever — NPC convergence terrain-stall cost + oscillation — shipped via `task/combat-convergence-stall-fix` (contour re-score cache, serve-stale-on-throttle, hold dispersal, opt-in stagger); frame-time certification is what the quiet-machine refresh still owes. See [docs/state/perf-trust.md](state/perf-trust.md) 2026-06-01 update.** **2026-06-02: `perf-baselines.json` was removed from the repo; with no tracked baseline `perf:compare` prints raw latest-capture metrics and does not gate (the CI perf step is advisory).** **2026-06-29 UPDATE: `perf-baselines.json` was RESTORED (`62778b27`) with PLACEHOLDER combat120 thresholds (p99 pass 38.41), so `perf:compare` gates against them again. "Refresh" is therefore no longer a file-refresh task — it is quiet-machine certification: an authoritative combat120 capture from the MAIN worktree (`perf:capture:combat120` + `perf:update-baseline -- combat120`) on a genuinely idle machine to replace the placeholders. The 2026-07-01 attempt FAILED for real (`artifacts/perf/2026-07-01T02-04-46-082Z`, `quietMachineAttested:false`). Per campaign manifest P2, the criterion is re-baselined to the quiet-box p99 ≤38.5 ms band. This stays open as the frame-time-certification gap.** |
 | KB-LOAD residual | Pixel Forge candidate import (vegetation) deferred behind owner visual acceptance | cycle-2026-05-08-stabilizat-2-closeout | 24 | assets | no | Strategic Reserve. Reopen only with explicit "go". |
-| KB-STARTUP-1 | Mode-start terrain surface bake production hardening | 2026-05-13 mode-startup spike | 20 | terrain / engine-init / perf-harness | yes (branch merge) | `task/mode-startup-terrain-spike` proves the stall is terrain CPU bake, not Recast/WASM cache. Needs Open Frontier + A Shau visual review of the coarse visual-margin source-delta cache before production acceptance. |
 | cloudflare-stabilization-followups | Web Analytics token provisioned but not verified live | cycle-2026-05-10-zone-manager-decoupling | 22 | release / cloudflare | no | Code-side subfindings are fixed and deployed in the 2026-05-10 release-stewardship pass: PostCSS resolves to 8.5.14, `_headers` has HSTS/CSP/Permissions-Policy, `robots.txt` + meta description exist, and unused preload hints are removed. Remaining action is the Pages dashboard Web Analytics toggle + live beacon verification; Cloudflare API access in this session returned authentication error 10000. |
+| tod-coherence-foliage-fail | `check:tod-coherence` foliage-coherence FAIL (master-state, non-regression) | cycle-2026-06-29-cinematic-field-pass | 1 | renderer / vegetation | no | Standing `check:tod-coherence` foliage FAIL at corr 0.810 / rangeRatio 2.735 — the known foliage clamp-band signature (foliage does not fully track terrain lighting across the TOD cycle). Cinematic-field-pass Phase 6 (P6) proved it is NOT a cinematic-pass regression; it is pre-existing master-state. Non-blocking (deploy gates green; the failing check is the tod-coherence advisory, not a release gate). Candidate for a future renderer/vegetation visual pass. Only surviving prior record was `docs/archive/BACKLOG_RECENTLY_COMPLETED_2026-07-01.md` (lines 57-59); this row makes the CURRENT.md "tracked as a carry-over" claim true. |
 
 ## Parked
 
@@ -44,10 +44,40 @@ the cycle that re-opens it.
 
 | ID | Title | Parked | Origin | Reason | Reactivate when |
 |----|-------|--------|--------|--------|-----------------|
-| AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | 2026-05-12 vision-pivot park | cycle-2026-04-21-stabilization-reset (7 cycles open at park) | Helicopter / fixed-wing polish. Not vision-critical under the 2026-05-12 directions (WebGPU experimental + driveable land vehicles). Anchor at `Airframe` ground rolling. | Phase 4 F5 close-out resumes, or a fixed-wing-feature cycle opens. |
 | AVIATSIYA-3 | Helicopter parity audit: HelicopterVehicleAdapter vs HelicopterPlayerAdapter | 2026-05-12 vision-pivot park | cycle-2026-04-22-heap-and-polish (7 cycles open at park) | Audit memo exists at `docs/rearch/helicopter-parity-audit.md`; work is documented, not actioned. Not vision-critical under the 2026-05-12 directions. | Phase 4 F5 close-out resumes, or the helicopter-adapter cluster is touched again. |
 
 History log:
+
+- 2026-07-02 — registry-truth-sweep reconciliation (CAMPAIGN_2026-07-02-greenlight-followthrough,
+  forks Q20 + registry housekeeping): two moves, no Active-count change from
+  these two (Active stayed at the count reached after the tod-coherence add).
+  (1) **AVIATSIYA-2 unparked → Closed**: the AC-47 low-pitch single-bounce was
+  actually FIXED on master 2026-06-04 (`768d7717`, lift-margin-scaled liftoff
+  impulse in `src/systems/vehicle/airframe/Airframe.ts`, guard test
+  `Airframe.groundRolling.test.ts`; peak liftoff vy 4.51→0.19). The parked row
+  predated the fix; owner feel-walk is already tracked at PLAYTEST_PENDING.md.
+  Cite `768d7717` (the actual fix commit), NOT `5251e391` — that was merely the
+  master tip / same-timestamp SVYAZ-4 commit when the DIRECTIVES row prose was
+  written. (2) **KB-STARTUP-1 (20 cycles, red-flagged) → Closed**: superseded by
+  the 2026-06-10 StampSpatialIndex fix (`778bf4d2`), which root-caused and fixed
+  the exact "terrain CPU bake, not Recast/WASM cache" stall the spike identified
+  (per-sample all-stamps loop over ~1,364 A Shau stamps: sync-cpu-heights
+  47.2s→68ms, worker surface bake 15.7s→95ms, zero longtasks ≥300ms). The
+  spike's remaining acceptance criterion (Open Frontier + A Shau visual review
+  of the coarse "visual-margin source-delta cache") is moot: that cache was the
+  spike branch's WORKAROUND for the slow bake, and the bake was instead fixed
+  directly, so no approximation ships. The `task/mode-startup-terrain-spike`
+  branch no longer exists on origin (verified) and is obsolete — owner may
+  delete any stale local copy. See DIRECTIVES.md KB-STARTUP-1 row + memo
+  `docs/directives/kb-startup-1.md`.
+
+- 2026-07-02 — registry-truth-sweep open (CAMPAIGN_2026-07-02-greenlight-followthrough):
+  `tod-coherence-foliage-fail` opened as an Active row (owning subsystem
+  renderer/vegetation; non-blocking) so the standing `check:tod-coherence`
+  foliage FAIL (corr 0.810 / rangeRatio 2.735, master-state per the
+  cinematic-field-pass P6 proof) has a real carry-over record — the only prior
+  record was `docs/archive/BACKLOG_RECENTLY_COMPLETED_2026-07-01.md`. This makes
+  the CURRENT.md "tracked as a carry-over" claim true. Active count stays ≤12.
 
 - 2026-07-01 — bookkeeping reconciliation (doc-drift-remediation): AVIATSIYA-1 /
   DEFEKT-5 closed (stale entry, superseded by the 2026-05-08 rotor-directionality
@@ -445,6 +475,8 @@ History log:
 
 (Entries get appended here as carry-overs close. Format: `<ID> | <title> | closed in <cycle-id> | resolution one-liner`.)
 
+- AVIATSIYA-2 | AC-47 low-pitch takeoff single-bounce | closed 2026-07-02 (registry-truth-sweep, CAMPAIGN_2026-07-02-greenlight-followthrough) | Unparked → Closed: the bounce was FIXED on master 2026-06-04 (`768d7717`, lift-margin-scaled ground-clearing impulse capped at 3.0 m/s in `src/systems/vehicle/airframe/Airframe.ts`; peak liftoff vy 4.51→0.19 with a still-climbs guarantee), guarded by `Airframe.groundRolling.test.ts` (fails on the old fixed `max(4.5, newFwd*0.12)` impulse). The parked carry-over row predated that fix. Cite `768d7717`, NOT `5251e391` — the latter was only the master-tip / same-timestamp SVYAZ-4 commit at the time the DIRECTIVES row prose was written. Owner liftoff-feel + cap-tuning walk is already tracked at [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) (AVIATSIYA-2 row).
+- KB-STARTUP-1 | Mode-start terrain surface bake production hardening | closed 2026-07-02 (registry-truth-sweep, CAMPAIGN_2026-07-02-greenlight-followthrough, fork Q20) | Superseded by the 2026-06-10 StampSpatialIndex fix (`778bf4d2`). The spike's finding was "the stall is terrain CPU bake, not Recast/WASM cache"; that exact terrain CPU bake was root-caused (per-sample all-stamps loop over ~1,364 A Shau stamps) and fixed directly — sync-cpu-heights 47.2s→68ms, worker surface bake 15.7s→95ms, terrain-config 63.4s→199ms, zero longtasks ≥300ms (numbers already in this file's history ~2026-06-10 entry). The spike branch's coarse "visual-margin source-delta cache" (whose Open Frontier + A Shau visual review was the last open acceptance criterion) was a WORKAROUND for the slow bake; because the bake was fixed directly, that approximation never ships, so the review is moot. The `task/mode-startup-terrain-spike` branch is absent from origin (verified) and obsolete — owner may delete any stale local copy. Memo: `docs/directives/kb-startup-1.md`.
 - AVIATSIYA-1 / DEFEKT-5 | Helicopter rotor + close-NPC + explosion human visual review pending | closed 2026-07-01 (bookkeeping reconciliation, doc-drift-remediation) | Stale — DIRECTIVES.md recorded both AVIATSIYA-1 and DEFEKT-5 `done` on 2026-05-08 (`projekt-143-visual-integrity-audit`) but this carry-over, opened earlier (cycle-2026-04-23-debug-cleanup) under the same two IDs, was never closed alongside it. The 2026-05-08 audit covered rotor directionality + naming only; "close-NPC" and "explosion" visual review were never separately walked. Closing the stale carry-over entry rather than letting it sit for a 27th cycle; the un-walked substance is preserved as a fresh row in [docs/PLAYTEST_PENDING.md](PLAYTEST_PENDING.md) instead of an indefinite carry-over.
 
 - worldbuilder-invulnerable-wiring | `PlayerHealthSystem.takeDamage` early-return when WorldBuilder `invulnerable` flag active | closed in cycle-2026-05-09-doc-decomposition-and-wiring | wired in `src/systems/player/PlayerHealthSystem.ts` behind `import.meta.env.DEV`; behavior test in `PlayerHealthSystem.test.ts`.

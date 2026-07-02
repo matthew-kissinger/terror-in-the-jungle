@@ -214,6 +214,7 @@ For perf-sensitive work, add `npm run validate:full` before push.
 3. **Don't write implementation-mirror tests.** Assert behavior, not how the code happens to spell it today.
 4. **Don't push directly to master unless you own the merge step.** Agents on tasks push to their own branches; the orchestrator merges.
 5. **Verify locally before pushing:** `npm run lint`, `npm run test:run`, `npm run build` all green.
+6. **Default-ON flips of new experiential surfaces need owner sign-off.** Ambient audio, map modes, post-processing grades, and similar player-facing experiential surfaces ship **default-OFF / opt-in**; a flip to default-ON requires explicit owner sign-off before shipping (owner decision U3, `docs/CAMPAIGN_2026-07-02-greenlight-followthrough.md`). The July 1 owner playtest rejected default ambient audio and the default 3D map precisely because they shipped on-by-default.
 
 ## Game-feel requires human playtest
 

@@ -1,8 +1,22 @@
 # KB-STARTUP-1 — Mode-start terrain surface bake
 
-Status: open / candidate branch (`task/mode-startup-terrain-spike`)
+Status: closed 2026-07-02 (superseded — registry-truth-sweep, fork Q20)
 Owning subsystem: terrain / engine init / perf harness
 Opened: 2026-05-13 mode-startup spike
+
+> **Superseded / closed 2026-07-02.** The spike's finding was "the stall is
+> terrain CPU bake, not Recast/WASM cache." That exact bake was root-caused and
+> fixed directly on master 2026-06-10 by the StampSpatialIndex work (`778bf4d2`):
+> the per-sample all-stamps loop over ~1,364 A Shau stamps was the cost, and a
+> uniform-grid stamp index cut sync-cpu-heights 47.2s→68ms and the worker
+> surface bake 15.7s→95ms (zero longtasks ≥300ms). The spike branch's coarse
+> "visual-margin source-delta cache" — whose Open Frontier + A Shau visual
+> review was the last open acceptance criterion below — was a *workaround* for
+> the slow bake; because the bake is now fast, that approximation never ships
+> and the review is moot. The `task/mode-startup-terrain-spike` branch is absent
+> from origin (verified) and obsolete. Carry-over moved to Closed in
+> [docs/CARRY_OVERS.md](../CARRY_OVERS.md); the original spike evidence below is
+> retained as history.
 
 ## Latest evidence
 
