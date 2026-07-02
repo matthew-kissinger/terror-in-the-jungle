@@ -6,6 +6,8 @@ import { AssetLoader } from '../../assets/AssetLoader';
 import { Logger } from '../../../utils/Logger';
 import { GPUBillboardVegetation, GPUVegetationConfig, BillboardLighting } from './BillboardBufferManager';
 import { VegetationTypeConfig } from '../../../config/vegetationTypes';
+import { NearFieldShadowProxies, type ProxyCandidateSource } from './NearFieldShadowProxies';
+import { areBillboardShadowProxiesEnabled } from '../../environment/atmosphere/ShadowTruthConfig';
 
 function shouldDisableVegetationNormalMapsForProof(): boolean {
   const globalScope = globalThis as { __KB_LOAD_DISABLE_VEGETATION_NORMALS__?: boolean };
@@ -50,6 +52,10 @@ export class GPUBillboardSystem {
   private chunkBounds: Map<string, THREE.Box2> = new Map();
   private scene: THREE.Scene;
   private assetLoader: AssetLoader;
+  /** Near-field vegetation shadow proxies — lazily built on first enabled frame. */
+  private shadowProxies: NearFieldShadowProxies | null = null;
+  /** Reused per-frame candidate-source list so the proxy scan is allocation-free. */
+  private readonly proxySources: ProxyCandidateSource[] = [];
 
   constructor(scene: THREE.Scene, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -171,6 +177,39 @@ export class GPUBillboardSystem {
     for (const vegetation of this.vegetationTypes.values()) {
       vegetation.update(camera, time, fog, lighting, playerWorldPosition);
     }
+
+    this.updateShadowProxies(playerWorldPosition);
+  }
+
+  /**
+   * Rebuild the near-field billboard shadow proxies around the player. Gated on
+   * the `billboardProxies` kill-switch (default ON; the orchestrator flips it OFF
+   * at close if the combat120 perf proof regresses). No player position → skip
+   * (proxies are a near-ring effect only). Lazily builds the proxy mesh so the
+   * cost is never paid when the flag stays OFF for the whole session.
+   */
+  private updateShadowProxies(playerWorldPosition?: THREE.Vector3 | null): void {
+    if (!areBillboardShadowProxiesEnabled() || !playerWorldPosition) {
+      this.shadowProxies?.clear();
+      return;
+    }
+    if (!this.shadowProxies) {
+      this.shadowProxies = new NearFieldShadowProxies(this.scene);
+    }
+
+    this.proxySources.length = 0;
+    for (const vegetation of this.vegetationTypes.values()) {
+      const count = vegetation.getHighWaterMark();
+      if (count === 0) continue;
+      this.proxySources.push({
+        positions: vegetation.getInstancePositions(),
+        scales: vegetation.getInstanceScales(),
+        count,
+        cardWidth: vegetation.getCardWidth(),
+        cardHeight: vegetation.getCardHeight(),
+      });
+    }
+    this.shadowProxies.rebuild(this.proxySources, playerWorldPosition);
   }
 
   getDebugInfo(): { [key: string]: number } {
@@ -318,5 +357,12 @@ export class GPUBillboardSystem {
     this.vegetationTypes.forEach(vegetation => vegetation.dispose());
     this.vegetationTypes.clear();
     this.chunkInstances.clear();
+    this.shadowProxies?.dispose();
+    this.shadowProxies = null;
+  }
+
+  /** Live near-field shadow-proxy caster count — read-only debug surface. */
+  getShadowProxyCount(): number {
+    return this.shadowProxies?.getLiveCount() ?? 0;
   }
 }
