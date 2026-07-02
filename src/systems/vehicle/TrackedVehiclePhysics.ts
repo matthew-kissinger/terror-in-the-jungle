@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { FixedStepRunner } from '../../utils/FixedStepRunner';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { slopeDriveFactor, conformOrHoldPose } from './vehiclePhysicsMath';
 
 /**
  * Fixed-step skid-steer chassis for M48-class tanks. The runtime stays
@@ -16,9 +17,6 @@ const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _worldUp = new THREE.Vector3(0, 1, 0);
 const _normal = new THREE.Vector3();
-const _yawAxis = new THREE.Vector3(0, 1, 0);
-const _yawQuat = new THREE.Quaternion();
-const _conformQuat = new THREE.Quaternion();
 const _cornerLocal = new THREE.Vector3();
 const _cornerWorld = new THREE.Vector3();
 const _euler = new THREE.Euler();
@@ -41,6 +39,10 @@ export interface TrackedVehiclePhysicsConfig {
   axleOffset: number;
   maxTrackSpeed: number;
   maxBrake: number;
+  /**
+   * Climbable-slope ceiling as a true surface angle in RADIANS. `getSlopeAt`
+   * returns a 0..1 deficit converted via `acos(1 - deficit)` at the consumer.
+   */
   maxClimbSlope: number;
   rollingCoef: number;
   airDragCoef: number;
@@ -50,6 +52,11 @@ export interface TrackedVehiclePhysicsConfig {
   slopeDriveFloor: number;
   slopeGravityScale: number;
   inputSmoothRate: number;
+  /** Time constants (s): track-to-chassis convergence, yaw-rate convergence. */
+  trackTau: number;
+  yawTau: number;
+  /** Tilt-conform time constant (s); heading is NOT smoothed. `0` = hard snap. */
+  conformTau: number;
 }
 
 export interface CornerSample {
@@ -95,7 +102,7 @@ const DEFAULT_PHYSICS: TrackedVehiclePhysicsConfig = {
   axleOffset: 0.55,
   maxTrackSpeed: 13,
   maxBrake: 240000,
-  maxClimbSlope: 0.72,
+  maxClimbSlope: 0.96, // rad (~55 deg) true surface angle — arcade climb, cliffs reject
   rollingCoef: 1800,
   airDragCoef: 8,
   velocityDamping: 0.8,
@@ -104,6 +111,9 @@ const DEFAULT_PHYSICS: TrackedVehiclePhysicsConfig = {
   slopeDriveFloor: 0.5,
   slopeGravityScale: 0.28,
   inputSmoothRate: 5.0,
+  trackTau: 0.6,
+  yawTau: 0.4,
+  conformTau: 0.2,
 };
 
 const SPEED_EPS = 1e-4;
@@ -126,6 +136,17 @@ export class TrackedVehiclePhysics {
   private previousState: InternalState;
   private rawControls: TrackedVehicleControls;
   private worldHalfExtent = 0;
+
+  /**
+   * Authoritative chassis heading (world-Y yaw, rad). Persisted so it is never
+   * re-extracted from the tilt-composed quaternion (that weathervanes a
+   * cross-slope hull — see `vehiclePhysicsMath`). Moved ONLY by the yaw step,
+   * `setQuaternion` / `resetToStable`, and the spawn seed.
+   */
+  private heading = 0;
+
+  /** Smoothed ground normal for the tilt conform (lerped, tau = `cfg.conformTau`). */
+  private readonly smoothedNormal = new THREE.Vector3(0, 1, 0);
 
   constructor(initialPosition: THREE.Vector3, config?: Partial<TrackedVehiclePhysicsConfig>) {
     this.cfg = { ...DEFAULT_PHYSICS, ...(config ?? {}) };
@@ -224,6 +245,9 @@ export class TrackedVehiclePhysics {
   setQuaternion(q: THREE.Quaternion): void {
     this.state.quaternion.copy(q).normalize();
     this.state.angularVelocity.set(0, 0, 0);
+    // Seed the scalar heading from the placement yaw (the one sanctioned extract).
+    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
+    this.heading = _euler.y;
     this.snapshotPrevious();
   }
 
@@ -231,6 +255,8 @@ export class TrackedVehiclePhysics {
     this.state.position.copy(position);
     this.state.velocity.set(0, 0, 0); this.state.angularVelocity.set(0, 0, 0);
     this.state.quaternion.identity();
+    this.heading = 0; // identity orientation -> zero world-Y yaw
+    this.smoothedNormal.set(0, 1, 0);
     this.state.leftTrackSpeed = this.state.rightTrackSpeed = 0;
     this.state.isGrounded = true;
     this.state.groundHeight = position.y - this.cfg.axleOffset;
@@ -342,7 +368,9 @@ export class TrackedVehiclePhysics {
     } else {
       _normal.copy(_worldUp);
     }
-    this.conformToGround(_normal);
+    // Spawn/teleport clamp: seed the smoothed normal + saturating dt = no lag.
+    this.smoothedNormal.copy(_normal);
+    this.conformToGround(Number.POSITIVE_INFINITY, _normal);
 
     // Lockstep the render buffer so the first rendered pose does not lerp up
     // from the stale (often below-surface) pre-conform pose.
@@ -409,8 +437,8 @@ export class TrackedVehiclePhysics {
     // Damp to keep the chassis from accumulating noise.
     this.applyDamping(deltaTime);
 
-    // Snap Y + conform pitch/roll to terrain.
-    this.conformToGround(sampledNormal);
+    // Snap Y + conform smoothed pitch/roll to terrain (heading stays exact).
+    this.conformToGround(deltaTime, sampledNormal);
 
     if (this.worldHalfExtent > 0) {
       this.enforceWorldBoundary();
@@ -527,32 +555,20 @@ export class TrackedVehiclePhysics {
     // Chassis-forward in world frame (model convention: local -Z forward).
     _forward.set(0, 0, -1).applyQuaternion(this.state.quaternion);
 
-    // Slope-stall scaling (same shape as GroundVehiclePhysics): drive
-    // contribution fades to zero at maxClimbSlope.
+    // Slope-stall: deficit→angle gate vs maxClimbSlope (rad) in slopeDriveFactor.
     let slopeFactor = 1;
     if (terrain && this.state.isGrounded) {
-      const slope = terrain.getSlopeAt(this.state.position.x, this.state.position.z);
-      if (slope > 0 && maxClimbSlope > 0) {
-        slopeFactor = slope >= maxClimbSlope
-          ? 0
-          : Math.max(
-              THREE.MathUtils.clamp(slopeDriveFloor, 0, 1),
-              THREE.MathUtils.clamp(1 - slope / maxClimbSlope, 0, 1),
-            );
-      }
+      const slopeDeficit = terrain.getSlopeAt(this.state.position.x, this.state.position.z);
+      slopeFactor = slopeDriveFactor(slopeDeficit, maxClimbSlope, slopeDriveFloor);
     }
 
     // Target chassis-frame velocity + yaw rate from differential-drive
-    // kinematics. When tracks are blown, both speeds are 0 so v_target =
-    // omega_target = 0.
+    // kinematics (blown tracks -> both speeds 0 -> targets 0). Slope-stall
+    // scales the drive component; drag + brake act on actual velocity.
     const lv = this.state.leftTrackSpeed * maxTrackSpeed;
     const rv = this.state.rightTrackSpeed * maxTrackSpeed;
-
-    // v_forward target (m/s) from per-track speeds. Slope-stall scales the
-    // drive component; rolling resistance + brake act on actual velocity.
     const vForwardTarget = (lv + rv) * 0.5 * (this.state.isGrounded ? slopeFactor : 0);
-    // omega_y target (rad/s); right faster than left = yaw right, which is
-    // negative world-Y yaw under +X-right, -Z-forward, +Y-up.
+    // omega_y target (rad/s); right faster than left = yaw right = negative world-Y.
     let omegaYTarget = 0;
     if (trackSeparation > 0) {
       omegaYTarget = (lv - rv) / trackSeparation;
@@ -573,13 +589,11 @@ export class TrackedVehiclePhysics {
     const targetVx = _forward.x * vForwardTarget;
     const targetVz = _forward.z * vForwardTarget;
 
-    // Drive contribution: force in the direction of the velocity error,
-    // magnitude proportional to mass / track-speed time constant.
-    const trackTau = 0.6; // s — track-to-chassis velocity convergence
+    // Drive contribution: force along the velocity error, magnitude ~
+    // mass / trackTau (track-to-chassis convergence, s). Grounded only.
     const dvx = targetVx - this.state.velocity.x;
     const dvz = targetVz - this.state.velocity.z;
-    // Drive only acts when grounded (idle gear / no traction in air).
-    const driveScale = this.state.isGrounded ? (mass / trackTau) : 0;
+    const driveScale = this.state.isGrounded ? (mass / this.cfg.trackTau) : 0;
     let fx = dvx * driveScale;
     let fz = dvz * driveScale;
 
@@ -625,22 +639,15 @@ export class TrackedVehiclePhysics {
     // Integrate position from velocity.
     this.state.position.addScaledVector(this.state.velocity, deltaTime);
 
-    // Angular velocity: critically-damped tracking toward omegaYTarget.
-    const yawTau = 0.4; // s
-    const yawBlend = Math.min(deltaTime / yawTau, 1.0);
+    // Angular velocity: critically-damped tracking toward omegaYTarget (yawTau, s).
+    const yawBlend = Math.min(deltaTime / this.cfg.yawTau, 1.0);
     this.state.angularVelocity.x = 0;
-    this.state.angularVelocity.y = THREE.MathUtils.lerp(
-      this.state.angularVelocity.y,
-      omegaYTarget,
-      yawBlend,
-    );
+    this.state.angularVelocity.y = THREE.MathUtils.lerp(this.state.angularVelocity.y, omegaYTarget, yawBlend);
     this.state.angularVelocity.z = 0;
 
-    // Integrate yaw about world Y.
+    // Accumulate the yaw step onto the scalar heading (conformToGround rebuilds).
     if (Math.abs(this.state.angularVelocity.y) > 1e-6) {
-      const angle = this.state.angularVelocity.y * deltaTime;
-      _yawQuat.setFromAxisAngle(_yawAxis, angle);
-      this.state.quaternion.premultiply(_yawQuat).normalize();
+      this.heading += this.state.angularVelocity.y * deltaTime;
     }
   }
 
@@ -666,23 +673,17 @@ export class TrackedVehiclePhysics {
     this.state.angularVelocity.multiplyScalar(Math.pow(this.cfg.angularDamping, deltaTime));
   }
 
-  // ---------- Ground conform (Y snap + pitch/roll from normal) ----------
-
-  private conformToGround(normal: THREE.Vector3): void {
-    if (!this.state.isGrounded) return;
-
-    const targetY = this.state.groundHeight + this.cfg.axleOffset;
-    this.state.position.y = targetY;
-    if (this.state.velocity.y < 0) this.state.velocity.y = 0;
-
-    // Yaw kept from world-Y rotation; pitch + roll slaved to the terrain
-    // normal so the hull tilts as it crosses ridges. Same pattern as
-    // GroundVehiclePhysics.conformToGround.
-    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
-    const yaw = _euler.y;
-    _yawQuat.setFromAxisAngle(_yawAxis, yaw);
-    _conformQuat.setFromUnitVectors(_worldUp, normal);
-    this.state.quaternion.multiplyQuaternions(_conformQuat, _yawQuat).normalize();
+  // ---------- Ground conform: Y snap + `tilt * Ry(heading)`, only tilt smooths ----------
+  // Heading comes from the persisted scalar (never re-extracted). See vehiclePhysicsMath.
+  private conformToGround(deltaTime: number, normal: THREE.Vector3): void {
+    if (this.state.isGrounded) {
+      this.state.position.y = this.state.groundHeight + this.cfg.axleOffset;
+      if (this.state.velocity.y < 0) this.state.velocity.y = 0;
+    }
+    conformOrHoldPose(
+      this.state.quaternion, this.state.isGrounded, this.heading, normal,
+      this.smoothedNormal, this.cfg.conformTau, deltaTime,
+    );
   }
 
   // ---------- World boundary ----------

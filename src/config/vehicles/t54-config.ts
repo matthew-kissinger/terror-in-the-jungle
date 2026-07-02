@@ -16,13 +16,17 @@ import type { TrackedVehiclePhysicsConfig } from '../../systems/vehicle/TrackedV
  *     Patton. We run the cap slightly low (13 m/s) for "slower but
  *     stronger" off-road feel, kept one step above the M48 (11 m/s).
  *   - Max climbable grade ~ 30° historically; the tracked-vehicle ground
- *     pressure lets us push the engine envelope to ~0.78 rad (~45°) before
+ *     pressure lets us push the engine envelope to ~0.96 rad (~55°) before
  *     drive force fades to zero, matching the M48 tuning rationale.
  *
- * Climb-authority tuning (2026-06-28 owner playtest) is kept in lockstep
- * with the M48 (see `m48-config.ts` for the full rationale): the same
- * `maxClimbSlope` / `slopeDriveFloor` / `slopeGravityScale` so both the US
- * and NVA armor crest jungle grades the same way.
+ * `maxClimbSlope` is a true surface ANGLE in radians; the runtime slope
+ * deficit is converted to an angle at the consumption site (see
+ * `m48-config.ts` for the full note).
+ *
+ * Climb-authority tuning (2026-06-28 owner playtest; 2026-07-02 retune) is
+ * kept in lockstep with the M48 (see `m48-config.ts` for the full rationale):
+ * the same `maxClimbSlope` / `slopeDriveFloor` / `slopeGravityScale` so both
+ * the US and NVA armor crest jungle grades the same way.
  *
  * Only fields that differ in intent from `TrackedVehiclePhysics` defaults
  * are named; the physics class merges over its own defaults so passing
@@ -33,7 +37,7 @@ export const T54_PHYSICS_CONFIG: Partial<TrackedVehiclePhysicsConfig> = {
   trackSeparation: 2.64,
   hullLength: 6.04,
   maxTrackSpeed: 13,
-  maxClimbSlope: 0.78,
+  maxClimbSlope: 0.96, // rad (~55 deg) — true surface angle, see m48-config note
   slopeDriveFloor: 0.62,
   slopeGravityScale: 0.2,
 };

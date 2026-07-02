@@ -73,16 +73,20 @@ function makeFlatTerrain(height = 0): ITerrainRuntime {
 /**
  * Mock terrain whose surface tilts uniformly along world-X.
  * dydx is rise/run along +X; the surface normal tilts away from +X by atan(dydx).
- * `slope` returned is the absolute slope angle in radians.
+ *
+ * `getSlopeAt` returns the REAL runtime contract: a 0..1 slope deficit
+ * (`1 - normal.y`), NOT an angle. HeightQueryCache.getSlopeAt returns exactly
+ * this, and GroundVehiclePhysics converts it to an angle (`acos(1 - deficit)`)
+ * at the consumption site. Keeping the mock honest exercises that conversion.
  */
 function makeSlopedTerrain(dydx: number): ITerrainRuntime {
-  const slope = Math.atan(Math.abs(dydx));
   // Normal: rotate (0,1,0) around Z by -atan(dydx). For dydx>0 (climbing +X) normal tilts toward -X.
   const n = new THREE.Vector3(-dydx, 1, 0).normalize();
+  const slopeDeficit = 1 - n.y; // matches HeightQueryCache: 1 - normal.y
   return {
     getHeightAt: (x: number, _z: number) => x * dydx,
     getEffectiveHeightAt: (x: number, _z: number) => x * dydx,
-    getSlopeAt: () => slope,
+    getSlopeAt: () => slopeDeficit,
     getNormalAt: (_x, _z, target) => {
       const v = target ?? new THREE.Vector3();
       return v.copy(n);
@@ -103,15 +107,16 @@ function makeSlopedTerrain(dydx: number): ITerrainRuntime {
 /**
  * Mock terrain whose surface rises along chassis-forward for the default
  * identity orientation (local/world -Z). risePerForwardMeter is rise/run as
- * the vehicle moves toward negative Z.
+ * the vehicle moves toward negative Z. `getSlopeAt` returns the runtime slope
+ * deficit (`1 - normal.y`), same as HeightQueryCache.
  */
 function makeForwardRampTerrain(risePerForwardMeter: number): ITerrainRuntime {
-  const slope = Math.atan(Math.abs(risePerForwardMeter));
   const n = new THREE.Vector3(0, 1, risePerForwardMeter).normalize();
+  const slopeDeficit = 1 - n.y;
   return {
     getHeightAt: (_x: number, z: number) => -z * risePerForwardMeter,
     getEffectiveHeightAt: (_x: number, z: number) => -z * risePerForwardMeter,
-    getSlopeAt: () => slope,
+    getSlopeAt: () => slopeDeficit,
     getNormalAt: (_x, _z, target) => {
       const v = target ?? new THREE.Vector3();
       return v.copy(n);
@@ -179,13 +184,14 @@ describe('GroundVehiclePhysics', () => {
     });
 
     it('wheels conform to slope (chassis tilts to match terrain normal)', () => {
-      // A surface rising 1m per 2m along +X (~26.6 deg slope, below default maxClimbSlope of 0.54 rad).
-      // dy/dx = 0.5 → slope ~0.4636 rad.
+      // A surface rising 1m per 2m along +X (~26.6 deg slope, below the jeep's
+      // maxClimbSlope of ~0.87 rad). dy/dx = 0.5 -> surface angle ~0.4636 rad.
       const sloped = makeSlopedTerrain(0.5);
       // Spawn just above the slope at x=0 so chassis settles onto it.
       const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
 
-      for (let i = 0; i < 120; i++) {
+      // Let the tilt conform settle (smoothed normal needs a few time constants).
+      for (let i = 0; i < 240; i++) {
         physics.update(DT, sloped);
       }
 
@@ -350,12 +356,12 @@ describe('GroundVehiclePhysics', () => {
   describe('Slope-stall', () => {
     it('forward drive force scales down on slopes above threshold', () => {
       // Compare achieved chassis-forward speed after a fixed throttle window
-      // on a gentle slope vs a near-vertical slope past maxClimbSlope.
+      // on a gentle slope vs a near-vertical wall past maxClimbSlope.
       // We measure the signed forward component (chassis local -Z) so that
       // gravity-induced downhill sliding (which is perpendicular to forward
       // at spawn) does NOT register as forward progress on the wall slope.
       const gentle = makeSlopedTerrain(0.05); // ~2.86 deg, well below maxClimbSlope
-      const wall = makeSlopedTerrain(2.0);    // ~63 deg, well above maxClimbSlope (0.54 rad ~31 deg)
+      const wall = makeSlopedTerrain(2.0);    // ~63 deg surface angle, above the jeep's ~0.87 rad (~50 deg) ceiling
 
       function forwardSpeedOn(terrain: ITerrainRuntime): number {
         const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
@@ -406,6 +412,155 @@ describe('GroundVehiclePhysics', () => {
       // mirror the exact axleOffset value).
       expect(state.position.y).toBeGreaterThan(0);
       expect(state.position.y).toBeLessThan(2.0);
+    });
+  });
+
+  // Heading-hold regression suite (vehicle-heading-hold-and-slope-truth).
+  // The prior conform re-extracted world-Y yaw from the tilt-composed
+  // quaternion every fixed step; YXZ yaw of (tilt * yaw) reads
+  // atan2(sin psi, cos psi * cos slope), so heading error was amplified by
+  // 1/cos(slope) each step and a cross-slope chassis weathervaned — even a
+  // parked one. These tests pin the observable: heading is held by an explicit
+  // scalar and only the yaw-integration step moves it.
+  describe('Heading hold on slopes', () => {
+    // ~25 deg cross-slope (tan 25 deg ~ 0.4663). The chassis is parked broadside
+    // to the fall line, the worst case for the weathervane defect.
+    function crossSlopeForward(physics: GroundVehiclePhysics): THREE.Vector3 {
+      return new THREE.Vector3(0, 0, -1).applyQuaternion(physics.getState().quaternion);
+    }
+
+    it('a parked vehicle on a 25-degree slope holds its heading for 600 steps', () => {
+      const sloped = makeSlopedTerrain(0.4663); // ~25 deg surface angle
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      // Point the chassis 40 deg off the fall line (broadside-ish to the slope)
+      // so any weathervane would swing it visibly. Engine off, zero throttle.
+      const placedYaw = (40 * Math.PI) / 180;
+      physics.setQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), placedYaw));
+
+      // Settle onto the slope, then read the reference heading.
+      for (let i = 0; i < 60; i++) physics.update(DT, sloped);
+      const headingRef = physics.getHeading();
+      const forwardRef = crossSlopeForward(physics).clone();
+
+      // Park for 600 more steps with no input.
+      for (let i = 0; i < 600; i++) physics.update(DT, sloped);
+
+      // Scalar heading is unchanged (no weathervane, no drift).
+      expect(Math.abs(physics.getHeading() - headingRef)).toBeLessThan(0.5);
+      // The rendered forward axis also holds — heading did not bleed out of the
+      // quaternion via the tilt composition.
+      const forwardNow = crossSlopeForward(physics);
+      // Compare only the horizontal pointing (x,z), which is what heading means.
+      const refXZ = new THREE.Vector2(forwardRef.x, forwardRef.z).normalize();
+      const nowXZ = new THREE.Vector2(forwardNow.x, forwardNow.z).normalize();
+      expect(refXZ.dot(nowXZ)).toBeGreaterThan(0.999);
+    });
+
+    it('full-throttle climb from a heading offset gains altitude without weathervaning away', () => {
+      // The ramp rises toward -Z (uphill = -Z). Spawn pointing ~5 deg off the
+      // uphill fall line and climb. The fix must keep the chassis pointing up
+      // the hill (heading holds) so it gains real elevation instead of swinging
+      // cross-slope and stalling.
+      const ramp = makeForwardRampTerrain(0.5); // ~26.6 deg forward grade
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      const offsetRad = 5 * Math.PI / 180;
+      physics.setQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), offsetRad));
+      physics.setEngineActive(true);
+
+      for (let i = 0; i < 30; i++) physics.update(DT, ramp);
+      const startHeading = physics.getHeading();
+      const start = physics.getState().position.clone();
+
+      physics.setControls({ throttle: 1.0, steerAngle: 0 });
+      for (let i = 0; i < 420; i++) physics.update(DT, ramp);
+
+      const state = physics.getState();
+      // Gained real elevation and made uphill (-Z) progress.
+      expect(state.position.y).toBeGreaterThan(start.y + 1);
+      expect(state.position.z).toBeLessThan(start.z - 2);
+      // Heading did NOT weathervane away — it holds the climb pointing (no
+      // steering input was applied, so heading must be essentially unchanged).
+      expect(Math.abs(physics.getHeading() - startHeading)).toBeLessThan(2);
+    });
+  });
+
+  // Conform smoothing (vehicle-heading-hold-and-slope-truth): the chassis tilt
+  // is lerped toward the sampled normal with a configurable time constant so the
+  // attitude reads smooth, not snappy. Heading stays exact — only tilt smooths.
+  describe('Conform smoothing', () => {
+    it('settles the chassis tilt toward the slope normal within ~3 time constants without oscillation', () => {
+      const tau = 0.2;
+      const stepsPerTau = Math.round(tau / DT); // fixed 60 Hz steps per tau
+      const sloped = makeSlopedTerrain(0.5); // ~26.6 deg
+      // Spawn resting on the surface so conform (not the fall) is what settles.
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 0.45, 0), { conformTau: tau });
+
+      const expectedNormal = new THREE.Vector3(-0.5, 1, 0).normalize();
+      const chassisUpAt = () =>
+        new THREE.Vector3(0, 1, 0).applyQuaternion(physics.getState().quaternion);
+
+      // One grounded step establishes the smoothing start; then sample the
+      // alignment (dot with the target normal) each step so we can assert
+      // monotone approach (no oscillation) then settled state.
+      physics.update(DT, sloped);
+      let prevDot = chassisUpAt().dot(expectedNormal);
+      let overshoots = 0;
+      const settleSteps = stepsPerTau * 3;
+      for (let i = 0; i < settleSteps; i++) {
+        physics.update(DT, sloped);
+        const dot = chassisUpAt().dot(expectedNormal);
+        // Alignment should improve (or hold) toward 1 — a drop signals ringing.
+        if (dot < prevDot - 1e-3) overshoots += 1;
+        prevDot = dot;
+      }
+
+      // Settled: chassis up aligns with the slope normal after ~3*tau.
+      expect(chassisUpAt().dot(expectedNormal)).toBeGreaterThan(0.98);
+      // Monotone approach — the smoothed conform does not overshoot/ring.
+      expect(overshoots).toBe(0);
+    });
+
+    it('hard-snaps (legacy behavior) when conformTau is zero', () => {
+      const sloped = makeSlopedTerrain(0.5);
+      // Spawn essentially resting on the surface so the chassis is grounded
+      // within a step or two, isolating the conform (not the fall).
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 0.45, 0), { conformTau: 0 });
+      const expectedNormal = new THREE.Vector3(-0.5, 1, 0).normalize();
+
+      // With smoothing disabled, the first few grounded steps already align the
+      // chassis with the slope normal (no exponential ramp).
+      for (let i = 0; i < 10; i++) physics.update(DT, sloped);
+      const chassisUp = new THREE.Vector3(0, 1, 0).applyQuaternion(physics.getState().quaternion);
+      expect(chassisUp.dot(expectedNormal)).toBeGreaterThan(0.98);
+    });
+  });
+
+  // Per-class slope-gate ceilings (vehicle-heading-hold-and-slope-truth): the
+  // runtime slope deficit (1 - normal.y) is converted to a true surface angle
+  // before comparing against the radian ceiling. A grade just under the ceiling
+  // is climbable; one just over it stalls.
+  describe('Per-class climb ceiling (deficit->angle conversion)', () => {
+    // The jeep ceiling is ~0.87 rad (~50 deg). Build grades that bracket it.
+    function forwardSpeedOnGrade(surfaceAngleRad: number): number {
+      const dydz = Math.tan(surfaceAngleRad); // forward ramp rise-per-meter
+      const ramp = makeForwardRampTerrain(dydz);
+      const physics = new GroundVehiclePhysics(new THREE.Vector3(0, 1.0, 0));
+      physics.setEngineActive(true);
+      for (let i = 0; i < 30; i++) physics.update(DT, ramp); // settle
+      physics.setControls({ throttle: 1.0, steerAngle: 0 });
+      for (let i = 0; i < 360; i++) physics.update(DT, ramp);
+      return physics.getForwardSpeed();
+    }
+
+    it('climbs a grade just below the jeep ceiling and stalls just above it', () => {
+      const below = forwardSpeedOnGrade(0.78); // ~45 deg, under ~50 deg ceiling
+      const above = forwardSpeedOnGrade(1.05);  // ~60 deg, over the ceiling
+
+      // Under the ceiling: still making forward headway.
+      expect(below).toBeGreaterThan(0.5);
+      // Over the ceiling: drive fades to zero, no forward progress.
+      expect(above).toBeLessThan(0.5);
+      expect(above).toBeLessThan(below);
     });
   });
 });
