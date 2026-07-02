@@ -3,8 +3,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { CombatantSystemDamage } from './CombatantSystemDamage';
+import { CombatantSystemDamage, PLAYER_SELF_EXPLOSION_SCALE } from './CombatantSystemDamage';
 import { CombatantState, Faction } from './types';
+import type { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { createTestCombatant } from '../../test-utils';
 import { KillAssistTracker } from './KillAssistTracker';
 import type { SquadManager } from './SquadManager';
@@ -376,6 +377,173 @@ describe('CombatantSystemDamage', () => {
       } finally {
         unsubscribe();
       }
+    });
+  });
+
+  describe('player explosion damage (owner decision F1: full symmetry)', () => {
+    // Minimal PlayerHealthSystem double: records applied damage and reports
+    // death when cumulative damage crosses the health pool. Spawn protection is
+    // modeled as swallowing the hit entirely (returns false, no damage), which
+    // is the real system's behavior.
+    function makePlayerHealth(opts: { health?: number; spawnProtected?: boolean } = {}) {
+      let health = opts.health ?? 150;
+      const takeDamage = vi.fn((amount: number) => {
+        if (opts.spawnProtected) return false;
+        health -= amount;
+        return health <= 0;
+      });
+      return {
+        health: () => health,
+        system: { takeDamage } as unknown as PlayerHealthSystem,
+        takeDamage,
+      };
+    }
+
+    function wirePlayer(health: ReturnType<typeof makePlayerHealth>, position: THREE.Vector3) {
+      damage.setPlayerFaction(Faction.US);
+      damage.setPlayerHealthSystem(health.system);
+      damage.setPlayerPositionSource(() => position);
+    }
+
+    it("scales the player's own frag by 0.75 with distance falloff", () => {
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(5, 0, 0)); // half-radius from a radius-10 blast
+      // Mirror the PRODUCTION call signature: GrenadeEffects passes the player's
+      // OWN faction (grenade.ownerFaction === US) as shooterFaction alongside the
+      // 'PLAYER' attribution. The self-hit must survive that friendly-alliance
+      // param — omitting it here would let the test pass while the feature is
+      // dead in production (the F1 regression the reviewer caught).
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER', 'grenade', Faction.US);
+
+      // NPC-equivalent at the same spot: 40 * (1 - 5/10) = 20. Own scale 0.75 → 15.
+      expect(health.takeDamage).toHaveBeenCalledTimes(1);
+      expect(health.takeDamage.mock.calls[0][0]).toBeCloseTo(20 * PLAYER_SELF_EXPLOSION_SCALE, 5);
+    });
+
+    it("hurts the player from an own frag even without an explicit shooterFaction (player mortar path)", () => {
+      // MortarRoundManager omits shooterFaction; the own-ordnance self-hit must
+      // still fire off the 'PLAYER' attribution alone.
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(5, 0, 0));
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER', 'mortar');
+
+      expect(health.takeDamage).toHaveBeenCalledTimes(1);
+      expect(health.takeDamage.mock.calls[0][0]).toBeCloseTo(20 * PLAYER_SELF_EXPLOSION_SCALE, 5);
+    });
+
+    it('applies enemy ordnance at full 1.0x (no self-scale)', () => {
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(5, 0, 0));
+      // NPC mortar: enemy faction shooter, no PLAYER attribution.
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'nva-mortar-1', 'mortar', Faction.NVA);
+
+      expect(health.takeDamage).toHaveBeenCalledTimes(1);
+      expect(health.takeDamage.mock.calls[0][0]).toBeCloseTo(20, 5); // full, unscaled
+    });
+
+    it('applies an enemy tank shell to the player at full 1.0x', () => {
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(0, 0, 0)); // dead center
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 9, 200, 'nva-tank-1', 'tank_cannon', Faction.NVA);
+
+      expect(health.takeDamage).toHaveBeenCalledTimes(1);
+      expect(health.takeDamage.mock.calls[0][0]).toBeCloseTo(200, 5);
+    });
+
+    it('does no damage to a player outside the blast radius', () => {
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(11, 0, 0)); // beyond radius 10
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER');
+
+      expect(health.takeDamage).not.toHaveBeenCalled();
+    });
+
+    it('spares the player from allied ordnance (friendly-fire exclusion)', () => {
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(0, 0, 0));
+      // Allied faction shell (ARVN is BLUFOR with the US player).
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 9, 200, 'arvn-tank-1', 'tank_cannon', Faction.ARVN);
+
+      expect(health.takeDamage).not.toHaveBeenCalled();
+    });
+
+    it('respects spawn protection (takeDamage swallows the hit)', () => {
+      const health = makePlayerHealth({ spawnProtected: true });
+      wirePlayer(health, new THREE.Vector3(0, 0, 0));
+      // Own frag with the production signature (shooterFaction === US): the blast
+      // must still reach takeDamage (where spawn protection lives) rather than be
+      // suppressed by the friendly-fire exclusion.
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 200, 'PLAYER', 'grenade', Faction.US);
+
+      // The blast still routes through takeDamage (that is where protection
+      // lives) but the player takes no health loss and does not die.
+      expect(health.takeDamage).toHaveBeenCalledTimes(1);
+      expect(health.health()).toBe(150);
+    });
+
+    it("emits 'player_killed' with source attribution when a blast is lethal", () => {
+      const events: Array<{ killerId: string; killerFaction: Faction }> = [];
+      const unsubscribe = GameEventBus.subscribe('player_killed', (e) => {
+        events.push({ killerId: e.killerId, killerFaction: e.killerFaction });
+      });
+      try {
+        const health = makePlayerHealth({ health: 50 });
+        wirePlayer(health, new THREE.Vector3(0, 0, 0));
+        // Point-blank enemy tank shell — well over 50 HP.
+        damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 9, 200, 'nva-tank-1', 'tank_cannon', Faction.NVA);
+        GameEventBus.flush();
+
+        expect(events).toHaveLength(1);
+        expect(events[0].killerId).toBe('nva-tank-1');
+        expect(events[0].killerFaction).toBe(Faction.NVA);
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it("emits 'player_killed' for a lethal danger-close OWN Arclight", () => {
+      const events: Array<{ killerId: string; killerFaction: Faction }> = [];
+      const unsubscribe = GameEventBus.subscribe('player_killed', (e) => {
+        events.push({ killerId: e.killerId, killerFaction: e.killerFaction });
+      });
+      try {
+        const health = makePlayerHealth({ health: 50 });
+        wirePlayer(health, new THREE.Vector3(0, 0, 0));
+        // Player-called strike at own feet: 200 * 0.75 = 150 > 50 HP. Mirror the
+        // PRODUCTION signature: AirSupportManager threads mission.requesterFaction
+        // (hard-set to US for player strikes) as shooterFaction. The danger-close
+        // own-Arclight must be lethal DESPITE isAlly(US, US) — this is the exact
+        // case the reviewer flagged as dead-on-arrival before the fix.
+        damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 30, 200, 'PLAYER', 'arclight', Faction.US);
+        GameEventBus.flush();
+
+        expect(events).toHaveLength(1);
+        expect(events[0].killerId).toBe('PLAYER');
+        expect(events[0].killerFaction).toBe(Faction.US); // player's own faction
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it('does no player damage for a no-damage blast (e.g. smoke deploy semantics)', () => {
+      // Smoke grenades never call applyExplosionDamage (GrenadeEffects.explodeSmoke
+      // spawns a cloud with no damage). At the damage-handler layer the equivalent
+      // no-damage contract is a zero maxDamage blast: the player is untouched.
+      const health = makePlayerHealth();
+      wirePlayer(health, new THREE.Vector3(0, 0, 0));
+      damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 0, 'PLAYER', 'smoke');
+
+      expect(health.takeDamage).not.toHaveBeenCalled();
+    });
+
+    it('does not touch the player when no health system is wired', () => {
+      // Explosion still processes NPCs/vehicles; player coupling is inert.
+      const target = createTestCombatant({ id: 'n1', faction: Faction.NVA, health: 100, position: new THREE.Vector3(2, 0, 0) });
+      combatants.set(target.id, target);
+      damage.setPlayerPositionSource(() => new THREE.Vector3(0, 0, 0));
+
+      expect(() => damage.applyExplosionDamage(new THREE.Vector3(0, 0, 0), 10, 40, 'PLAYER')).not.toThrow();
+      expect(target.health).toBeLessThan(100); // NPC damage still applies
     });
   });
 

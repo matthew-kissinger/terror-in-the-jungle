@@ -181,11 +181,10 @@ export class CombatantSystem implements GameSystem {
     );
 
     // Initialize extracted modules
-    this.damageHandler = new CombatantSystemDamage(
-      this.combatants,
-      this.squadManager,
-      this.spawnManager
-    );
+    this.damageHandler = new CombatantSystemDamage(this.combatants, this.squadManager, this.spawnManager);
+    // Hand the live `playerPosition` getter (refreshed from the camera each
+    // frame in update()) so explosion damage checks the player's current spot.
+    this.damageHandler.setPlayerPositionSource(() => this.playerPosition);
 
     this.updateHelpers = new CombatantSystemUpdate(
       this.combatants,
@@ -635,6 +634,7 @@ export class CombatantSystem implements GameSystem {
   setPlayerHealthSystem(playerHealthSystem: PlayerHealthSystem): void {
     this.playerHealthSystem = playerHealthSystem;
     this.combatantCombat.setPlayerHealthSystem(playerHealthSystem);
+    this.damageHandler.setPlayerHealthSystem(playerHealthSystem);
   }
 
   setZoneManager(zoneQuery: IZoneQuery): void {
