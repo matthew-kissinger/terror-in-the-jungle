@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { evaluateCoherenceGate } from './tod-coherence-gate';
-import type { FamilyCurve, FamilyKey, TodSample } from './tod-coherence-sweep-types';
+import type { AnchorProvenanceKind, FamilyCurve, FamilyKey, TodSample } from './tod-coherence-sweep-types';
 
 /**
  * Behavior proof for the TOD coherence gate (Phase 4 R1, L1). Drives the pure
@@ -40,6 +40,26 @@ function sample(
     luminance,
     notes,
   };
+}
+
+/**
+ * A sample carrying STRUCTURED anchor provenance (the fixture-truth path). Lets
+ * a test mark a family `degenerate` (an anchor that landed on the terrain
+ * foreground — UNMEASURED) at specific TODs, distinct from a clean `anchored`
+ * reading. `anchorKindForSample` prefers this over the legacy `notes` string.
+ */
+function sampleWithAnchors(
+  hour: number,
+  lum: Partial<Record<FamilyKey, number | null>>,
+  kinds: Partial<Record<'foliage' | 'npc' | 'glb', AnchorProvenanceKind>>
+): TodSample {
+  const base = sample(hour, lum);
+  const anchors: TodSample['anchors'] = {};
+  for (const fam of ['foliage', 'npc', 'glb'] as const) {
+    const kind = kinds[fam] ?? 'anchored';
+    anchors[fam] = { kind, instanceCount: kind === 'fallback' ? 0 : 10, screen: null, world: null, reason: '' };
+  }
+  return { ...base, anchors };
 }
 
 function curve(
@@ -140,6 +160,79 @@ describe('evaluateCoherenceGate', () => {
     expect(verdict.npcAnchored).toBe(false);
     expect(verdict.passed).toBe(false);
     expect(verdict.failures.some((f) => f.includes('npc'))).toBe(true);
+  });
+
+  it('fails LOUDLY (instrument broken) when foliage is UNMEASURED even though its terrain-vs-terrain corr looks coherent', () => {
+    // The 0.977-vs-0.810 artifact bug: a foliage anchor that landed on the
+    // terrain foreground reads corr ~0.98 (terrain-vs-terrain) and would have
+    // silently PASSED. With structured provenance marking foliage `degenerate`,
+    // the gate must fail with an UNMEASURED / instrument message and NOT let the
+    // fake coherence number pass.
+    const samples: TodSample[] = [
+      sampleWithAnchors(0, { terrain: 0.04, foliage: 0.041, npc: 0.05, glb: 0.042 }, { foliage: 'degenerate' }),
+      sampleWithAnchors(6, { terrain: 0.30, foliage: 0.30, npc: 0.31, glb: 0.30 }, { foliage: 'degenerate' }),
+      sampleWithAnchors(12, { terrain: 0.62, foliage: 0.62, npc: 0.60, glb: 0.61 }, { foliage: 'degenerate' }),
+      sampleWithAnchors(17, { terrain: 0.34, foliage: 0.34, npc: 0.35, glb: 0.34 }, { foliage: 'degenerate' }),
+    ];
+    const curves: FamilyCurve[] = [
+      curve('terrain', [0.04, 0.30, 0.62, 0.34], TOD_HOURS, 1.0, 1.0),
+      // Foliage corr ~0.98 in-band — a "coherent" number, but it is
+      // terrain-vs-terrain because the anchor was degenerate.
+      curve('foliage', [0.041, 0.30, 0.62, 0.34], TOD_HOURS, 0.99, 0.99),
+      curve('npc', [0.05, 0.31, 0.60, 0.35], TOD_HOURS, 0.96, 0.99),
+      curve('glb', [0.042, 0.30, 0.61, 0.34], TOD_HOURS, 0.98, 0.99),
+    ];
+    const verdict = evaluateCoherenceGate(curves, samples, TOD_HOURS);
+    expect(verdict.passed).toBe(false);
+    expect(verdict.familyMeasured.foliage).toBe(false);
+    // The failure names foliage as UNMEASURED / instrument-broken.
+    expect(verdict.failures.some((f) => f.includes('foliage') && f.includes('UNMEASURED'))).toBe(true);
+    // The measured check is recorded as `unmeasurable`, not `pass`.
+    const measuredCheck = verdict.checks.find((c) => c.id === 'foliage.measured');
+    expect(measuredCheck?.status).toBe('unmeasurable');
+    // The corr check is downgraded to `unmeasurable` so the fake 0.99 never
+    // masquerades as a coherence pass.
+    const corrCheck = verdict.checks.find((c) => c.id === 'foliage.correlation');
+    expect(corrCheck?.status).toBe('unmeasurable');
+  });
+
+  it('passes a fully-measured sweep where every hard family anchored genuinely', () => {
+    const samples: TodSample[] = [
+      sampleWithAnchors(0, { terrain: 0.04, foliage: 0.045, npc: 0.05, glb: 0.042 }, {}),
+      sampleWithAnchors(6, { terrain: 0.30, foliage: 0.28, npc: 0.31, glb: 0.30 }, {}),
+      sampleWithAnchors(12, { terrain: 0.62, foliage: 0.58, npc: 0.60, glb: 0.61 }, {}),
+      sampleWithAnchors(17, { terrain: 0.34, foliage: 0.33, npc: 0.35, glb: 0.34 }, {}),
+    ];
+    const curves: FamilyCurve[] = [
+      curve('terrain', [0.04, 0.30, 0.62, 0.34], TOD_HOURS, 1.0, 1.0),
+      curve('foliage', [0.045, 0.28, 0.58, 0.33], TOD_HOURS, 0.95, 0.99),
+      curve('npc', [0.05, 0.31, 0.60, 0.35], TOD_HOURS, 0.96, 0.99),
+      curve('glb', [0.042, 0.30, 0.61, 0.34], TOD_HOURS, 0.98, 0.99),
+    ];
+    const verdict = evaluateCoherenceGate(curves, samples, TOD_HOURS);
+    expect(verdict.passed).toBe(true);
+    expect(verdict.familyMeasured.foliage).toBe(true);
+    expect(verdict.familyMeasured.npc).toBe(true);
+  });
+
+  it('a single degenerate TOD poisons the whole family (measured only when clean at every TOD)', () => {
+    const samples: TodSample[] = [
+      sampleWithAnchors(0, { terrain: 0.04, foliage: 0.045, npc: 0.05, glb: 0.042 }, {}),
+      sampleWithAnchors(6, { terrain: 0.30, foliage: 0.28, npc: 0.31, glb: 0.30 }, {}),
+      // One degenerate npc TOD.
+      sampleWithAnchors(12, { terrain: 0.62, foliage: 0.58, npc: 0.60, glb: 0.61 }, { npc: 'degenerate' }),
+      sampleWithAnchors(17, { terrain: 0.34, foliage: 0.33, npc: 0.35, glb: 0.34 }, {}),
+    ];
+    const curves: FamilyCurve[] = [
+      curve('terrain', [0.04, 0.30, 0.62, 0.34], TOD_HOURS, 1.0, 1.0),
+      curve('foliage', [0.045, 0.28, 0.58, 0.33], TOD_HOURS, 0.95, 0.99),
+      curve('npc', [0.05, 0.31, 0.60, 0.35], TOD_HOURS, 0.96, 0.99),
+      curve('glb', [0.042, 0.30, 0.61, 0.34], TOD_HOURS, 0.98, 0.99),
+    ];
+    const verdict = evaluateCoherenceGate(curves, samples, TOD_HOURS);
+    expect(verdict.familyMeasured.npc).toBe(false);
+    expect(verdict.npcAnchored).toBe(false);
+    expect(verdict.passed).toBe(false);
   });
 
   it('fails when a swept TOD produced no terrain reading (a hole in the curve)', () => {

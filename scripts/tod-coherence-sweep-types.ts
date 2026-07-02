@@ -22,6 +22,31 @@ export interface Region {
   y1: number;
 }
 
+/**
+ * Per-family anchor provenance for one swept TOD. Distinguishes a GENUINE
+ * on-subject anchor from a degenerate one (an anchor that projected onto the
+ * terrain foreground / clamped to a screen edge) and from a fixed-box fallback.
+ * `degenerate` and `fallback` both mean the family measurement is UNMEASURED —
+ * the family reading is terrain-vs-terrain, not the subject material. This is the
+ * fix for the 0.977-PASS-vs-0.810-FAIL artifact contradiction: the old harness
+ * reported `foliage=anchored` even when the anchor box overlapped the terrain
+ * band and was clamped to the bottom screen edge (verified: gate/curves.json
+ * 2026-06-25 foliage anchored at y=0.971, inside the terrain band 0.82-0.98).
+ */
+export type AnchorProvenanceKind = 'anchored' | 'degenerate' | 'fallback';
+
+export interface AnchorProvenance {
+  kind: AnchorProvenanceKind;
+  /** On-screen instance candidates found for this family (0 => no live subject). */
+  instanceCount: number;
+  /** Screen-fraction anchor centre (null when no anchor projected). */
+  screen: { x: number; y: number } | null;
+  /** World-space anchor centre (null when no anchor projected). */
+  world: { x: number; y: number; z: number } | null;
+  /** Why the anchor is degenerate / fell back (empty for a genuine anchor). */
+  reason: string;
+}
+
 export interface TodSample {
   hour: number;
   forceTimeOfDay: number;
@@ -29,8 +54,14 @@ export interface TodSample {
   regions: Record<FamilyKey, Region>;
   /** Mean relative luminance per family; null where the region had no valid pixels. */
   luminance: Record<FamilyKey, number | null>;
-  /** Anchor provenance per family, e.g. `foliage=anchored npc=anchored glb=fallback`. */
+  /** Anchor provenance per family, e.g. `foliage=anchored npc=degenerate glb=fallback`. */
   notes: string;
+  /**
+   * Structured anchor provenance per anchored family (foliage/npc/glb). Absent
+   * on older curves.json; the gate treats a missing entry as `fallback`. This is
+   * the machine-readable form of `notes` used to mark a family UNMEASURED.
+   */
+  anchors?: Partial<Record<FamilyKey, AnchorProvenance>>;
 }
 
 export interface FamilyCurve {

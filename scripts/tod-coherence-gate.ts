@@ -20,7 +20,8 @@
  * not a magic-number hunt.
  */
 
-import type { FamilyCurve, FamilyKey, TodSample } from './tod-coherence-sweep-types';
+import type { AnchorProvenanceKind, FamilyCurve, FamilyKey, TodSample } from './tod-coherence-sweep-types';
+import { isUnmeasuredAnchor } from './tod-coherence-anchor';
 
 /**
  * Committed coherence tolerances. Source:
@@ -86,6 +87,14 @@ export interface GateVerdict {
   allTodsMeasurable: boolean;
   /** True when the npc family anchored on real pixels at every measured TOD. */
   npcAnchored: boolean;
+  /**
+   * Per anchored family: is the family GENUINELY MEASURED (anchored on real
+   * subject pixels at every measured TOD), or UNMEASURED (a degenerate anchor or
+   * a fixed-box fallback at one or more TODs — a terrain-vs-terrain reading)?
+   * A hard-gated family that is UNMEASURED means the instrument is broken for
+   * that family; its corr/rangeRatio numbers are not trustworthy.
+   */
+  familyMeasured: Partial<Record<FamilyKey, boolean>>;
   checks: GateCheck[];
   /** Short reasons the gate failed, empty when passed. */
   failures: string[];
@@ -96,17 +105,57 @@ function findCurve(curves: FamilyCurve[], family: FamilyKey): FamilyCurve | unde
 }
 
 /**
+ * Resolve the per-TOD anchor provenance kind for a family, preferring the
+ * structured `sample.anchors` entry and falling back to parsing the legacy
+ * `notes` string (`<family>=anchored|degenerate|fallback`). A missing entry is
+ * treated as `fallback` (UNMEASURED) — an older curves.json without provenance
+ * cannot prove it measured real pixels.
+ */
+function anchorKindForSample(sample: TodSample, family: FamilyKey): AnchorProvenanceKind {
+  const structured = sample.anchors?.[family]?.kind;
+  if (structured) return structured;
+  if (new RegExp(`\\b${family}=anchored\\b`).test(sample.notes)) return 'anchored';
+  if (new RegExp(`\\b${family}=degenerate\\b`).test(sample.notes)) return 'degenerate';
+  return 'fallback';
+}
+
+/**
+ * A family is GENUINELY MEASURED only when it anchored on real subject pixels at
+ * EVERY TOD that produced a luminance reading. A single degenerate/fallback TOD
+ * poisons the family's whole curve (its corr/rangeRatio mixes real cards with
+ * terrain foreground), so the whole family is treated as UNMEASURED. Families
+ * with no measured TOD at all are also UNMEASURED.
+ */
+function isFamilyMeasured(samples: TodSample[], family: FamilyKey): boolean {
+  const measured = samples.filter((s) => s.luminance[family] !== null);
+  return (
+    measured.length > 0 &&
+    measured.every((s) => !isUnmeasuredAnchor(anchorKindForSample(s, family)))
+  );
+}
+
+/**
  * Evaluate the committed coherence gate against a completed sweep's curves +
  * per-TOD samples. Pure: no IO, no clock, deterministic in its inputs.
  *
  * Hard failure modes (any one fails the gate):
- *   - any hard-gated family (foliage, npc) below MIN_CORRELATION;
- *   - any hard-gated family's range ratio outside [RANGE_RATIO_MIN, MAX];
+ *   - any hard-gated family (foliage, npc) UNMEASURED — a degenerate anchor
+ *     (projected onto the terrain foreground) or a fixed-box fallback at any TOD;
+ *     the instrument is broken for that family and its corr/rangeRatio numbers
+ *     are terrain-vs-terrain, NOT a coherence signal (the 0.977-vs-0.810
+ *     artifact contradiction root cause);
+ *   - any hard-gated family that IS measured but below MIN_CORRELATION;
+ *   - any hard-gated family that IS measured but range ratio outside
+ *     [RANGE_RATIO_MIN, MAX];
  *   - dawn terrain luminance above DAWN_TERRAIN_MAX_LUMINANCE;
- *   - any swept TOD with no measurable terrain luminance (curve has a hole);
- *   - the npc family unmeasurable / unanchored (fell back to the fixed box).
+ *   - any swept TOD with no measurable terrain luminance (curve has a hole).
  *
- * GLB checks are recorded but advisory (hard=false).
+ * A hard-gated family that is UNMEASURED fails the gate LOUDLY (an
+ * `<family>.measured` check with status `unmeasurable`) instead of silently
+ * passing a terrain-vs-terrain reading. The corr/rangeRatio checks for an
+ * UNMEASURED family are still recorded for evidence but are marked
+ * `unmeasurable` and do not themselves fail the gate (the `.measured` check owns
+ * the failure). GLB checks are recorded but advisory (hard=false).
  */
 export function evaluateCoherenceGate(
   curves: FamilyCurve[],
@@ -134,15 +183,46 @@ export function evaluateCoherenceGate(
   });
   if (!allTodsMeasurable) failures.push(`terrain unmeasurable at ${missingHours.length} TOD(s)`);
 
-  // --- Per-family correlation + range ratio. ---
+  // --- Per-family measured-status + correlation + range ratio. ---
+  const familyMeasured: Partial<Record<FamilyKey, boolean>> = {};
   for (const family of GATED_FAMILIES) {
     const hard = HARD_GATED_FAMILIES.includes(family);
     const curve = findCurve(curves, family);
     const corr = curve?.correlationVsTerrain ?? null;
     const ratio = curve?.rangeRatioVsTerrain ?? null;
 
+    // FIXTURE TRUTH: is this family anchored on real subject pixels at every
+    // measured TOD, or did an anchor project onto the terrain foreground / fall
+    // back to the fixed box (UNMEASURED — terrain-vs-terrain)? A hard-gated
+    // UNMEASURED family fails LOUDLY: the instrument is broken, not "coherent".
+    const measured = isFamilyMeasured(samples, family);
+    familyMeasured[family] = measured;
+    const degenTods = samples
+      .filter((s) => s.luminance[family] !== null && isUnmeasuredAnchor(anchorKindForSample(s, family)))
+      .map((s) => s.hour);
+    checks.push({
+      id: `${family}.measured`,
+      status: measured ? 'pass' : 'unmeasurable',
+      hard,
+      value: null,
+      bound: 'anchored on real pixels at every measured TOD',
+      detail: measured
+        ? `${family} anchored on real subject pixels at every measured TOD`
+        : `${family} UNMEASURED — anchor was degenerate/fallback (terrain-vs-terrain) at TOD(s) [${degenTods.join(', ') || 'none measured'}]`,
+    });
+    if (hard && !measured) {
+      failures.push(
+        `${family} UNMEASURED — anchor fell onto terrain / fixed box (instrument broken; corr/rangeRatio are terrain-vs-terrain)`
+      );
+    }
+
+    // Correlation / range-ratio: only a HARD failure when the family IS
+    // measured. For an UNMEASURED family we still record the numbers as evidence
+    // but mark them `unmeasurable` (they are terrain-vs-terrain) so they never
+    // masquerade as a real coherence pass — the `.measured` check owns the fail.
+    const corrPass = corr !== null && corr >= COHERENCE_TOLERANCES.MIN_CORRELATION;
     const corrStatus: CheckStatus =
-      corr === null ? 'unmeasurable' : corr >= COHERENCE_TOLERANCES.MIN_CORRELATION ? 'pass' : 'fail';
+      corr === null || !measured ? 'unmeasurable' : corrPass ? 'pass' : 'fail';
     checks.push({
       id: `${family}.correlation`,
       status: corrStatus,
@@ -152,20 +232,20 @@ export function evaluateCoherenceGate(
       detail:
         corr === null
           ? `${family} correlation unmeasurable (curve has < 2 shared points)`
-          : `${family} corr vs terrain = ${corr.toFixed(3)}`,
+          : !measured
+            ? `${family} corr vs terrain = ${corr.toFixed(3)} (UNMEASURED — terrain-vs-terrain, not a coherence signal)`
+            : `${family} corr vs terrain = ${corr.toFixed(3)}`,
     });
-    if (hard && corrStatus !== 'pass') {
+    if (hard && measured && corrStatus !== 'pass') {
       failures.push(
         `${family} correlation ${corr === null ? 'unmeasurable' : corr.toFixed(3)} (need >= ${COHERENCE_TOLERANCES.MIN_CORRELATION})`
       );
     }
 
+    const ratioInBand =
+      ratio !== null && ratio >= COHERENCE_TOLERANCES.RANGE_RATIO_MIN && ratio <= COHERENCE_TOLERANCES.RANGE_RATIO_MAX;
     const ratioStatus: CheckStatus =
-      ratio === null
-        ? 'unmeasurable'
-        : ratio >= COHERENCE_TOLERANCES.RANGE_RATIO_MIN && ratio <= COHERENCE_TOLERANCES.RANGE_RATIO_MAX
-          ? 'pass'
-          : 'fail';
+      ratio === null || !measured ? 'unmeasurable' : ratioInBand ? 'pass' : 'fail';
     checks.push({
       id: `${family}.rangeRatio`,
       status: ratioStatus,
@@ -175,9 +255,11 @@ export function evaluateCoherenceGate(
       detail:
         ratio === null
           ? `${family} range ratio unmeasurable (no terrain range or family curve)`
-          : `${family} range ratio vs terrain = ${ratio.toFixed(3)}`,
+          : !measured
+            ? `${family} range ratio vs terrain = ${ratio.toFixed(3)} (UNMEASURED — terrain-vs-terrain)`
+            : `${family} range ratio vs terrain = ${ratio.toFixed(3)}`,
     });
-    if (hard && ratioStatus !== 'pass') {
+    if (hard && measured && ratioStatus !== 'pass') {
       failures.push(
         `${family} range ratio ${ratio === null ? 'unmeasurable' : ratio.toFixed(3)} (need [${COHERENCE_TOLERANCES.RANGE_RATIO_MIN}, ${COHERENCE_TOLERANCES.RANGE_RATIO_MAX}])`
       );
@@ -213,12 +295,13 @@ export function evaluateCoherenceGate(
   }
 
   // --- NPC-anchored: the npc family must measure real pixels (not the fixed ---
-  // --- fallback box) at every measured TOD. The sample `notes` field records ---
-  // --- `npc=anchored` vs `npc=fallback`; the gate requires the former so the ---
-  // --- npc row is a real impostor reading, not terrain-vs-terrain. ---
+  // --- fallback box, and not a degenerate terrain-foreground anchor) at every ---
+  // --- measured TOD. Reuses the structured provenance helper so a degenerate ---
+  // --- anchor (projected onto terrain) counts as NOT anchored — the same ---
+  // --- unmeasured verdict as a fixed-box fallback. Retained for callers that ---
+  // --- read `npcAnchored`; it mirrors the `npc.measured` check above. ---
   const npcMeasured = samples.filter((s) => s.luminance.npc !== null);
-  const npcAnchored =
-    npcMeasured.length > 0 && npcMeasured.every((s) => /\bnpc=anchored\b/.test(s.notes));
+  const npcAnchored = isFamilyMeasured(samples, 'npc');
   checks.push({
     id: 'npc.anchored',
     status: npcAnchored ? 'pass' : 'fail',
@@ -227,10 +310,10 @@ export function evaluateCoherenceGate(
     bound: 'npc=anchored at every measured TOD',
     detail: npcAnchored
       ? `npc anchored on real impostor pixels at all ${npcMeasured.length} measured TODs`
-      : `npc fell back to the fixed box at one or more TODs (not real pixels)`,
+      : `npc fell back to the fixed box / a degenerate terrain anchor at one or more TODs (not real pixels)`,
   });
-  if (!npcAnchored) failures.push('npc not anchored on real pixels (fallback box used)');
+  if (!npcAnchored) failures.push('npc not anchored on real pixels (fallback / degenerate anchor)');
 
   const passed = checks.every((c) => !c.hard || c.status === 'pass');
-  return { passed, allTodsMeasurable, npcAnchored, checks, failures };
+  return { passed, allTodsMeasurable, npcAnchored, familyMeasured, checks, failures };
 }
