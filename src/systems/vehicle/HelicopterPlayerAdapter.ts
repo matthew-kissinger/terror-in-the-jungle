@@ -98,6 +98,10 @@ function createHelicopterUIContext(
   return {
     kind: 'helicopter',
     role,
+    // Only the door-gun gunship swaps stations; the transport and armed attack
+    // pilot each crew a single seat, so both map to `heli-transport` (identical
+    // legend + touch verbs — the FIRE / WPN buttons are capability-gated).
+    vehicleClass: role === 'gunship' ? 'heli-gunship' : 'heli-transport',
     hudVariant: 'flight',
     weaponCount: armed ? 2 : 0,
     // The live crew station. The gunship swaps pilot <-> door gun with `F`

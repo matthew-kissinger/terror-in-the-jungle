@@ -73,6 +73,8 @@ function createFixedWingUIContext(
   const context: VehicleUIContext = {
     kind: 'plane',
     role,
+    // AC-47 broadside battery = `plane-broadside` (RMB gun cam); else `plane` (RMB bomb).
+    vehicleClass: broadsideAvailable ? 'plane-broadside' : 'plane',
     hudVariant: 'flight',
     weaponCount,
     capabilities: {

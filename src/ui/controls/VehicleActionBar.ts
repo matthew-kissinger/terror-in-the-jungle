@@ -20,6 +20,7 @@
 import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
 import type { VehicleUIContext } from '../layout/types';
+import { deriveVehicleClass, vehicleHintEntry, type VehicleTouchVerbs } from '../hud/vehicleHintTable';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 
 interface VehicleActionCallbacks {
@@ -213,6 +214,10 @@ export class VehicleActionBar extends UIComponent {
     // Clear pressed state to prevent stuck visual on context change
     this.fireBtn.classList.remove(styles.pressed);
 
+    // Pull the class's touch-bar ACTION captions from the single declarative
+    // table so the button labels can't drift from the desktop legend / seat cues.
+    this.applyTouchVerbs(context);
+
     const capabilities = context?.capabilities;
     this.exitBtn.style.display = capabilities?.canExit ? 'flex' : 'none';
     this.fireBtn.style.display = capabilities?.canFirePrimary ? 'flex' : 'none';
@@ -287,21 +292,46 @@ export class VehicleActionBar extends UIComponent {
     return btn;
   }
 
+  /** The class's touch-bar ACTION captions, or null for the on-foot / cleared bar. */
+  private touchVerbs(context: VehicleUIContext | null): VehicleTouchVerbs | null {
+    if (!context) return null;
+    return vehicleHintEntry(deriveVehicleClass(context))?.touchVerbs ?? null;
+  }
+
+  /**
+   * Stamp the class's ACTION-button captions from the declarative table. The
+   * static verbs (EXIT / FIRE / SEAT / BOMB / WPN) are single-sourced so the
+   * touch bar can't drift from the legend; VIEW and STAB stay dynamic (VIEW is
+   * the airframe view-toggle label, STAB is the class's stabiliser base).
+   */
+  private applyTouchVerbs(context: VehicleUIContext | null): void {
+    const verbs = this.touchVerbs(context);
+    if (!verbs) return;
+    this.setButtonLabel(this.exitBtn, verbs.exit);
+    this.setButtonLabel(this.fireBtn, verbs.fire);
+    this.setButtonLabel(this.wpnBtn, verbs.weapon);
+    this.setButtonLabel(this.seatBtn, verbs.seat);
+    this.setButtonLabel(this.bombBtn, verbs.bomb);
+  }
+
+  private setButtonLabel(btn: HTMLDivElement, label: string): void {
+    btn.textContent = label;
+    btn.setAttribute('aria-label', label);
+  }
+
   /**
    * Whether the current craft can swap crew stations from the SEAT button: the
-   * two-seat tank (driver <-> gunner, flagged by `secondSeat`) or the armed
-   * door-gun gunship (pilot <-> door gun, keyed on the helicopter gunship role).
+   * two-seat tank (driver <-> gunner) or the armed door-gun gunship (pilot <->
+   * door gun). Reads the swap rule from the class table so the touch SEAT button
+   * and the legend's `F: swap seat` cue can never disagree.
    */
   private hasSeatSwap(context: VehicleUIContext | null): boolean {
     if (!context) return false;
-    if (context.secondSeat) return true;
-    return context.kind === 'helicopter' && context.role === 'gunship';
+    return vehicleHintEntry(deriveVehicleClass(context))?.seatRule.canSwapStations ?? false;
   }
 
   private applyStabilizerLabel(context: VehicleUIContext | null): void {
-    const label = context?.kind === 'plane'
-      ? context.role === 'gunship' ? 'ORBIT' : 'LEVEL'
-      : 'STAB';
+    const label = this.touchVerbs(context)?.stabilize ?? 'STAB';
     this.hoverBtn.textContent = label;
     this.hoverBtn.setAttribute('aria-label', label);
   }

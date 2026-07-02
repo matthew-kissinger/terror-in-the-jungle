@@ -36,6 +36,10 @@ function createWatercraftUIContext(): VehicleUIContext {
   return {
     kind: 'car',
     role: 'pilot',
+    // Watercraft reuses the ground legend/verbs (H3 boat-identity redesign is
+    // deferred), but reports the `boat` class so the table can diverge later
+    // without re-plumbing the adapter.
+    vehicleClass: 'boat',
     hudVariant: 'groundVehicle',
     weaponCount: 0,
     capabilities: {

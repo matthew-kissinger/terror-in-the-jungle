@@ -73,6 +73,7 @@ function createPilotUIContext(): VehicleUIContext {
   return {
     kind: 'car',
     role: 'pilot',
+    vehicleClass: 'tank',
     hudVariant: 'groundVehicle',
     weaponCount: 0,
     secondSeat: true, // two-seat M48: `F` swaps driver<->gunner (HUD cue + touch SEAT)
@@ -98,6 +99,7 @@ function createGunnerUIContext(zoomed: boolean): VehicleUIContext {
   return {
     kind: 'turret',
     role: 'gunner',
+    vehicleClass: 'tank', // two-seat tank gunner: `F` swaps to the driver (not a solo emplacement)
     hudVariant: 'turret',
     weaponCount: 1,
     sightMagnification: zoomed ? SIGHT_MAG_ZOOM : SIGHT_MAG_1X,

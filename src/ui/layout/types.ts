@@ -46,6 +46,30 @@ export type ActorMode = 'infantry' | 'helicopter' | 'plane' | 'car' | 'turret';
 export type GameplayOverlay = 'none' | 'map' | 'command' | 'pause' | 'settings';
 export type VehicleKind = Exclude<ActorMode, 'infantry'>;
 
+/**
+ * The concrete craft archetype a vehicle context describes. One discriminator
+ * that drives the declarative control-hint table (`src/ui/hud/vehicleHintTable`):
+ * desktop legend rows, seat cues, and touch-bar action verbs. Finer-grained than
+ * `kind` (which only distinguishes the HUD bucket) so a broadside gunship
+ * (`plane-broadside`) reads differently from a dropped-bomb strike plane
+ * (`plane`), and a boat's helm reads differently from a jeep's driver seat.
+ *
+ * Additive + optional so every context that predates the table still resolves
+ * through the legacy `kind`/`role` fallback; adapters set it from what they
+ * already know (asset/config), not from new plumbing.
+ */
+export type VehicleClass =
+  | 'jeep'
+  | 'truck'
+  | 'apc'
+  | 'tank'
+  | 'boat'
+  | 'emplacement'
+  | 'heli-transport'
+  | 'heli-gunship'
+  | 'plane'
+  | 'plane-broadside';
+
 export interface VehicleCapabilities {
   canExit: boolean;
   canFirePrimary: boolean;
@@ -110,6 +134,14 @@ export interface VehicleUIContext {
    * Additive + optional; omitted (falsy) on every craft without a bomb store.
    */
   bombsAvailable?: boolean;
+  /**
+   * The concrete craft archetype (see {@link VehicleClass}). Drives the
+   * declarative control-hint table's legend / seat-cue / touch-verb lookups.
+   * Each adapter sets it from what it already knows (asset id / flight config).
+   * Additive + optional so contexts that omit it fall back to the legacy
+   * `kind`/`role`-keyed resolution; the table never regresses a missing class.
+   */
+  vehicleClass?: VehicleClass;
 }
 
 /**

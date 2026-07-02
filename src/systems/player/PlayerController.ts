@@ -251,23 +251,23 @@ export class PlayerController implements GameSystem {
       onExplicitVehicleExit: () => void (this.handleExitVehicle() || this.handleEnterExitHelicopter()),
       onBoardNearestVehicle: () => this.handleBoardNearestVehicle(),
       onVehicleSeatSwap: () => this.handleVehicleSeatSwap(),
+      // Flight-assist + auto-hover share one intent (fixed-wing stabiliser vs heli
+      // auto-hover); inlined identically (no extra method — class is at budget).
       onToggleFlightAssist: () => {
-        if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
-          this.fixedWingAdapter?.toggleFlightAssist();
-        } else if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
-          this.helicopterAdapter?.toggleAutoHover();
-        }
+        const t = this.vehicleStateManager.getVehicleType();
+        if (t === 'fixed_wing') this.fixedWingAdapter?.toggleFlightAssist();
+        else if (t === 'helicopter') this.helicopterAdapter?.toggleAutoHover();
       },
       onToggleAutoHover: () => {
-        if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
-          this.fixedWingAdapter?.toggleFlightAssist();
-        } else if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
-          this.helicopterAdapter?.toggleAutoHover();
-        }
+        const t = this.vehicleStateManager.getVehicleType();
+        if (t === 'fixed_wing') this.fixedWingAdapter?.toggleFlightAssist();
+        else if (t === 'helicopter') this.helicopterAdapter?.toggleAutoHover();
       },
       onToggleAltitudeLock: () => this.vehicleStateManager.getVehicleType() === 'helicopter' && this.helicopterAdapter?.toggleAltitudeLock(),
       onToggleMouseControl: () => this.handleToggleMouseControl(),
       onFixedWingViewToggle: () => this.vehicleStateManager.getVehicleType() === 'fixed_wing' && this.fixedWingAdapter?.toggleBroadsideView(),
+      // Touch BOMB (deferred #488 leg): release to the piloted strike plane; grounded/empty gating is in the adapter.
+      onFixedWingBombRelease: () => this.vehicleStateManager.getVehicleType() === 'fixed_wing' && this.fixedWingAdapter?.releaseBombFromTouch(),
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
       onRallyPointPlace: () => this.handleRallyPointPlacement(),
