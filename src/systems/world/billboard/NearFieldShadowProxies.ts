@@ -25,7 +25,12 @@ import * as THREE from 'three';
 /** Max proxy instances live at once — bounds both the draw and the per-frame scan cost. */
 export const NEAR_FIELD_PROXY_CAPACITY = 96;
 
-/** Radius (metres) around the player within which a billboard gets a proxy caster. */
+/**
+ * Radius (metres) around the player within which a billboard gets a proxy caster.
+ * Sits inside the ortho shadow half-extent (70-100m by tier), so a ring-edge
+ * proxy's long dawn/dusk shadow can truncate at the frustum edge — expected,
+ * not a bug.
+ */
 export const NEAR_FIELD_PROXY_RADIUS = 68;
 
 const NEAR_FIELD_PROXY_RADIUS_SQ = NEAR_FIELD_PROXY_RADIUS * NEAR_FIELD_PROXY_RADIUS;
@@ -59,8 +64,9 @@ export class NearFieldShadowProxies {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    // Two unit quads crossed at 90deg → a "+" footprint. Built at unit size and
-    // scaled per instance to the candidate card dimensions.
+    // Two unit quads crossed at 90deg → a "+" footprint. Built at unit size,
+    // CENTER-anchored to match the billboard card (instancePosition.y is the
+    // card center), and scaled per instance to the candidate card dimensions.
     const geometry = NearFieldShadowProxies.buildCrossGeometry();
 
     // Depth-only: invisible in the beauty pass, no depth occlusion, still casts.
@@ -79,8 +85,9 @@ export class NearFieldShadowProxies {
   }
 
   private static buildCrossGeometry(): THREE.BufferGeometry {
-    // Unit plane centered on X, standing up in Y (base at y=0, top at y=1).
-    const planeA = new THREE.PlaneGeometry(1, 1).translate(0, 0.5, 0);
+    // Unit plane standing up in Y, CENTER-anchored (spans y=-0.5..+0.5) like the
+    // real billboard card, whose instance position is the quad center.
+    const planeA = new THREE.PlaneGeometry(1, 1);
     const planeB = planeA.clone().rotateY(Math.PI / 2);
     // Merge by concatenating — small, one-time; avoids a BufferGeometryUtils dep.
     const merged = new THREE.BufferGeometry();

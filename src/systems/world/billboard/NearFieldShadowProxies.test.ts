@@ -84,6 +84,19 @@ describe('NearFieldShadowProxies', () => {
     expect(proxies.getLiveCount()).toBeLessThanOrEqual(NEAR_FIELD_PROXY_CAPACITY);
   });
 
+  it('matches the vertical extent of the center-anchored card (shadow contact at the plant base)', () => {
+    // Card height 4 with its center planted at y=2 → the real billboard spans
+    // y=0..4. The proxy silhouette must span the same, not float half a card up.
+    proxies.rebuild([source([[5, 2, 5, 1, 1]], 2, 4)], new THREE.Vector3(0, 0, 0));
+    const mesh = scene.getObjectByName('near-field-shadow-proxies') as THREE.InstancedMesh;
+    const matrix = new THREE.Matrix4();
+    mesh.getMatrixAt(0, matrix);
+    mesh.geometry.computeBoundingBox();
+    const box = mesh.geometry.boundingBox!.clone().applyMatrix4(matrix);
+    expect(box.min.y).toBeCloseTo(0, 5);
+    expect(box.max.y).toBeCloseTo(4, 5);
+  });
+
   it('clears all proxies on demand (kill-switch OFF path)', () => {
     proxies.rebuild([source([[5, 0, 5, 1, 1]])], new THREE.Vector3(0, 0, 0));
     expect(proxies.getLiveCount()).toBe(1);
