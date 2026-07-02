@@ -30,6 +30,12 @@ Use these terms in follow-up briefs:
 
 ## 1. 3D deploy map uses color-only enemy/faction markers
 
+> **SUPERSEDED (2026-07-02).** The 3D orbital deploy map was removed outright
+> (owner decision U4, `task/orbital-map-prune`). This whole marker-parity item
+> is moot — the 2D deploy map is the shipping map surface. The
+> `OrbitalTopoMarkers` / `OrbitalTopoMapHost` code paths cited below no longer
+> exist; kept as historical playtest-intake record only.
+
 Owner note: the foreground/enemy side is marked only by colors, with no legend
 or in-air text, so the selected insertion point is discovered only after the
 right-side spawn list changes.
@@ -42,11 +48,11 @@ right-side spawn list changes.
 - The deploy screen already has a 2D legend panel at
   `src/ui/screens/DeployScreen.ts:794`, mounted from `:223`.
 - The new 3D map marker layer is visual-only: `OrbitalTopoMarkers` renders
-  instanced colored cylinders/pillars at
-  `src/ui/map/orbital/OrbitalTopoMarkers.ts:45`, `:52`, `:92`, and `:112`.
+  instanced colored cylinders/pillars (former path
+  `src/ui/map/orbital/OrbitalTopoMarkers.*` lines 45, 52, 92, 112 — deleted).
 - The 3D marker input does contain names/kinds/owners from
-  `buildMarkerInputs` in `src/ui/map/orbital/OrbitalTopoMapHost.ts:65`, so the
-  data exists; the 3D presentation layer is what is missing.
+  `buildMarkerInputs` in `src/ui/map/orbital/OrbitalTopoMapHost.*` line 65
+  (deleted), so the data exists; the 3D presentation layer is what is missing.
 
 ### Diagnosis
 
