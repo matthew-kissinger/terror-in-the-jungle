@@ -40,6 +40,15 @@
   transform: rotate(-0.5deg);
 }
 
+/* Shared fasteners/stamps now live in ScreenPrimitives (was fj-* in design/styles.ts). */
+.paperclip {
+  composes: paperclip from './ScreenPrimitives.module.css';
+}
+
+.stamp {
+  composes: stamp from './ScreenPrimitives.module.css';
+}
+
 .eyebrow {
   margin: 0 0 18px;
   color: var(--ink-faint);

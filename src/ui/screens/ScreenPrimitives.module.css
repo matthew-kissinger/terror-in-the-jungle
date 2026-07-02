@@ -328,6 +328,49 @@
   gap: var(--space-3);
 }
 
+/* ---- rubber stamp (migrated from design/styles.ts fj-stamp) ---- */
+.stamp {
+  font-family: var(--type-stamp);
+  letter-spacing: 0.12em;
+  color: var(--red);
+  border: 2.5px solid var(--red);
+  padding: 3px 10px;
+  border-radius: var(--r-sm);
+  display: inline-block;
+  opacity: 0.82;
+  mix-blend-mode: multiply;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 1px rgba(158, 59, 46, 0.25) inset;
+  -webkit-mask-image: radial-gradient(circle at 30% 30%, #000 70%, rgba(0, 0, 0, 0.6) 100%);
+  mask-image: radial-gradient(circle at 30% 30%, #000 70%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+/* ---- paperclip fastener (migrated from design/styles.ts fj-paperclip) ---- */
+.paperclip {
+  position: absolute;
+  top: -14px;
+  left: 22px;
+  width: 16px;
+  height: 42px;
+  border: 3px solid #6e6655;
+  border-radius: 10px;
+  border-bottom-color: #8a8170;
+  transform: rotate(-8deg);
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.paperclip::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 2px;
+  width: 8px;
+  height: 26px;
+  border: 3px solid #7a7160;
+  border-radius: 8px;
+  border-top: none;
+}
+
 @media (max-width: 640px) {
   .screenStage {
     padding: var(--space-3);
