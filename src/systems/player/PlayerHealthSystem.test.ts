@@ -34,6 +34,8 @@ describe('PlayerHealthSystem', () => {
       updateHealthDisplay: vi.fn(),
       setLowHealthEffect: vi.fn(),
       setSpawnProtection: vi.fn(),
+      updateBandageCount: vi.fn(),
+      flashHeal: vi.fn(),
       dispose: vi.fn()
     };
     (PlayerHealthUI as any).mockImplementation(function() { return mockUI; });
@@ -168,6 +170,64 @@ describe('PlayerHealthSystem', () => {
 
       expect(mockUI.setLowHealthEffect).toHaveBeenCalledWith(true);
       expect(mockEffects.startHeartbeat).toHaveBeenCalled();
+    });
+  });
+
+  describe('Healing (bandage active-heal)', () => {
+    it('restores health and returns the amount actually healed', () => {
+      system.takeDamage(60); // Health = 90
+      const restored = system.heal(50);
+
+      expect(restored).toBe(50);
+      expect(system.getHealth()).toBe(140);
+    });
+
+    it('clamps healing at max health and returns only the delta applied', () => {
+      system.takeDamage(20); // Health = 130
+      const restored = system.heal(50); // would be 180, clamps to 150
+
+      expect(restored).toBe(20);
+      expect(system.getHealth()).toBe(150);
+    });
+
+    it('is a no-op returning 0 when already at full health', () => {
+      const restored = system.heal(50);
+
+      expect(restored).toBe(0);
+      expect(system.getHealth()).toBe(150);
+    });
+
+    it('is a no-op returning 0 when dead', () => {
+      system.takeDamage(150); // Dead
+      expect(system.isDead()).toBe(true);
+
+      const restored = system.heal(50);
+      expect(restored).toBe(0);
+      expect(system.getHealth()).toBe(0);
+    });
+
+    it('does not restart the passive regen delay clock', () => {
+      system.takeDamage(80); // Health = 70, stamps lastDamageTime
+      vi.setSystemTime(Date.now() + 3000); // 3s into the 5s regen delay
+
+      // Healing mid-delay must NOT reset the clock: passive regen should still
+      // kick in at the original 5s mark, not 5s after the heal.
+      system.heal(20); // Health = 90
+
+      vi.setSystemTime(Date.now() + 2500); // now 5.5s since the damage
+      system.update(1.0); // 1s of regen at 20/s
+
+      expect(system.getHealth()).toBe(110); // 90 + 20 regen — clock was untouched
+    });
+
+    it('clears the low-health effect once a heal crosses the threshold', () => {
+      system.takeDamage(130); // Health = 20 (below LOW_HEALTH_THRESHOLD)
+      system.update(0.1); // Engage low-health effect
+      expect(mockUI.setLowHealthEffect).toHaveBeenLastCalledWith(true);
+
+      system.heal(50); // Health = 70, back above threshold
+      expect(mockUI.setLowHealthEffect).toHaveBeenLastCalledWith(false);
+      expect(mockEffects.stopHeartbeat).toHaveBeenCalled();
     });
   });
 

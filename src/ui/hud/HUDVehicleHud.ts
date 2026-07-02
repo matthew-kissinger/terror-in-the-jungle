@@ -133,8 +133,17 @@ export class HUDVehicleHud {
     this.fixedWingHUD.setMouseMode(controlMode);
   }
 
-  updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string): void {
+  updateFixedWingAmmo(
+    rounds: number,
+    capacity: number,
+    weaponName?: string,
+    bombs?: { count: number; capacity: number },
+  ): void {
     this.fixedWingHUD.setAmmo(rounds, capacity, weaponName);
+    // Bomb store readout rides the same per-frame ammo push (dropped-bomb
+    // airframes only); undefined leaves the bomb panel hidden for unarmed /
+    // gun-only airframes.
+    this.fixedWingHUD.setBombs(bombs);
   }
 
   setFixedWingSeatFireCue(armed: boolean, broadside: boolean): void {

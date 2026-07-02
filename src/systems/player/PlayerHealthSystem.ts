@@ -199,6 +199,38 @@ export class PlayerHealthSystem implements GameSystem {
   }
 
   /**
+   * Restore player health — the symmetric write-up to `takeDamage`. Used by the
+   * active-healing (bandage) path. Behaviour mirrors `takeDamage`'s discipline,
+   * inverted:
+   *
+   * - No-op (returns 0) when dead, when `amount <= 0`, or when already at max
+   *   health. Callers use the returned delta to decide whether a consumable was
+   *   actually spent (do not burn a bandage at full HP).
+   * - Clamps to `maxHealth`.
+   * - Deliberately does **NOT** touch `lastDamageTime`: healing is additive to
+   *   passive regen, not a damage event, so it must not restart the regen-delay
+   *   clock. Active heal and passive regen stack.
+   * - Re-evaluates the low-health effect so the heartbeat / red-pulse clears the
+   *   instant a heal crosses `LOW_HEALTH_THRESHOLD`.
+   *
+   * Returns the HP actually restored.
+   */
+  heal(amount: number): number {
+    if (this.playerState.isDead || amount <= 0) return 0;
+    if (this.playerState.health >= this.playerState.maxHealth) return 0;
+
+    const before = this.playerState.health;
+    this.playerState.health = Math.min(this.playerState.maxHealth, before + amount);
+    const restored = this.playerState.health - before;
+
+    Logger.debug('Combat', `Player healed ${Math.round(restored)}, health: ${Math.round(this.playerState.health)}`);
+
+    this.updateHealthDisplay();
+    this.updateLowHealthEffects();
+    return restored;
+  }
+
+  /**
    * Apply per-frame drowning damage, routed through `takeDamage` so spawn
    * protection + invulnerability + death handling stay consistent with combat
    * damage. Currently dormant: the swim / breath system was stripped with the
@@ -275,6 +307,20 @@ export class PlayerHealthSystem implements GameSystem {
 
   hasSpawnProtection(): boolean {
     return this.playerState.invulnerabilityTime > 0;
+  }
+
+  // Bandage HUD affordances (the pip lives next to the health pill in the same
+  // PlayerHealthUI). The count is owned by InventoryManager; the health system
+  // only forwards it to the shared health UI so both read as one element.
+
+  /** Update the bandage supply pip next to the health pill. */
+  updateBandageDisplay(count: number): void {
+    this.ui.updateBandageCount(count);
+  }
+
+  /** Brief green flash on the health pill confirming an applied bandage heal. */
+  flashHealFeedback(): void {
+    this.ui.flashHeal();
   }
 
   // System connections

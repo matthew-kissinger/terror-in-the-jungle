@@ -447,6 +447,38 @@ describe('VehicleActionBar', () => {
     expect((document.querySelector('[aria-label="SEAT"]') as HTMLDivElement).style.display).toBe('none');
   });
 
+  it('shows the BOMB button only while a bombed airframe has bombs and routes the tap', () => {
+    const onBombRelease = vi.fn();
+    bar.setCallbacks({ onBombRelease });
+    const bombedPlane = {
+      kind: 'plane' as const,
+      role: 'pilot',
+      hudVariant: 'flight' as const,
+      weaponCount: 1,
+      bombsAvailable: true,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: true,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    };
+    bar.setVehicleContext(bombedPlane);
+
+    const bombBtn = document.querySelector('[aria-label="BOMB"]') as HTMLDivElement;
+    expect(bombBtn.style.display).toBe('flex');
+    bombBtn.dispatchEvent(pointerEvent('pointerdown'));
+    expect(onBombRelease).toHaveBeenCalledTimes(1);
+
+    // Load spent: the button hides.
+    bar.setVehicleContext({ ...bombedPlane, bombsAvailable: false });
+    expect(bombBtn.style.display).toBe('none');
+  });
+
   it('dispose removes the component', () => {
     bar.dispose();
     expect(document.getElementById('vehicle-action-bar')).toBeNull();

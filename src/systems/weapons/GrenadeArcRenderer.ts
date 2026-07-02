@@ -378,6 +378,12 @@ export class GrenadeCooking {
     }
   }
 
+  /**
+   * Cosmetic side of an in-hand detonation: flash, boom, screen shake at the
+   * player's eye. The lethal self-damage + NPC blast + `player_killed` emission
+   * are owned by `GrenadeSystem.explodeInHand`, which runs immediately after
+   * `update` returns `true`.
+   */
   private explodeInHand(
     camera: THREE.Camera,
     explosionEffectsPool?: ExplosionEffectsPool,
@@ -386,7 +392,6 @@ export class GrenadeCooking {
   ): void {
     Logger.info('weapons', 'Grenade exploded in hand!');
 
-    // Apply damage to player (suicide)
     const explosionPos = camera.position.clone();
 
     // Trigger explosion effect at player position
@@ -402,9 +407,5 @@ export class GrenadeCooking {
     if (playerController) {
       playerController.applyExplosionShake(explosionPos, 1.0);
     }
-
-    // Damage player (simulate suicide) - this would need PlayerHealthSystem
-    // For now, just log it
-    Logger.info('weapons', ' Player killed by own grenade!');
   }
 }

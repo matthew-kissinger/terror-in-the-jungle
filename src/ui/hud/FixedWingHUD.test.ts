@@ -157,3 +157,52 @@ describe('FixedWingHUD — seat / fire cue + airborne-gate hint', () => {
     expect(airborneHintShown()).toBe(false);
   });
 });
+
+describe('FixedWingHUD — bomb store readout', () => {
+  let hud: FixedWingHUD;
+  let parent: HTMLElement;
+
+  beforeEach(() => {
+    parent = document.createElement('div');
+    document.body.appendChild(parent);
+    hud = new FixedWingHUD();
+    hud.mount(parent);
+  });
+
+  afterEach(() => {
+    hud.dispose();
+    document.body.removeChild(parent);
+  });
+
+  function bombPanel(): HTMLElement {
+    return hud.element.querySelector('[data-ref="bombPanel"]') as HTMLElement;
+  }
+  function bombValue(): HTMLElement {
+    return hud.element.querySelector('[data-ref="bombValue"]') as HTMLElement;
+  }
+
+  it('hides the bomb panel for airframes that carry no bombs', () => {
+    hud.setBombs(undefined);
+    expect(bombPanel().style.display).toBe('none');
+  });
+
+  it('shows the bomb count for a bombed airframe and counts down', () => {
+    hud.setBombs({ count: 4, capacity: 4 });
+    expect(bombPanel().style.display).not.toBe('none');
+    expect(bombValue().textContent).toBe('4');
+
+    hud.setBombs({ count: 2, capacity: 4 });
+    expect(bombValue().textContent).toBe('2');
+  });
+
+  it('lights LOW on the last bomb (or empty)', () => {
+    hud.setBombs({ count: 4, capacity: 4 });
+    expect(bombValue().classList.contains('ammoLow')).toBe(false);
+
+    hud.setBombs({ count: 1, capacity: 4 });
+    expect(bombValue().classList.contains('ammoLow')).toBe(true);
+
+    hud.setBombs({ count: 0, capacity: 4 });
+    expect(bombValue().classList.contains('ammoLow')).toBe(true);
+  });
+});

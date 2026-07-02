@@ -79,6 +79,7 @@ function createRefs() {
       setImpactEffectsPool: vi.fn(),
       setInventoryManager: vi.fn(),
       setPlayerController: vi.fn(),
+      setPlayerHealthSystem: vi.fn(),
       setTicketSystem: vi.fn(),
     },
     hudSystem: { getStatsTracker: vi.fn(() => ({ id: 'stats-tracker' })) },
@@ -101,7 +102,10 @@ function createRefs() {
       setInventoryManager: vi.fn(),
       setTicketSystem: vi.fn(),
     },
-    playerController: { isInAnyVehicle: vi.fn(() => false) },
+    playerController: {
+      isInAnyVehicle: vi.fn(() => false),
+      setPlayerHealthSystem: vi.fn(),
+    },
     playerHealthSystem: {
       resetForNewMatch: vi.fn(),
     },
@@ -180,6 +184,7 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.combatantSystem.combatantAI.setSmokeCloudSystem).toHaveBeenCalledWith(refs.smokeCloudSystem);
     expect(refs.combatantSystem.squadManager.setInfluenceMap).toHaveBeenCalledWith(refs.influenceMapSystem);
     expect(refs.flashbangScreenEffect.setPlayerController).toHaveBeenCalledWith(refs.playerController);
+    expect(refs.playerController.setPlayerHealthSystem).toHaveBeenCalledWith(refs.playerHealthSystem);
 
     expect(refs.ticketSystem.setZoneManager).toHaveBeenCalledWith(refs.zoneManager);
     expect(refs.zoneManager.setCombatantSystem).toHaveBeenCalledWith(refs.combatantSystem);
@@ -194,6 +199,7 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.grenadeSystem.setTicketSystem).toHaveBeenCalledWith(refs.ticketSystem);
     expect(refs.grenadeSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
     expect(refs.grenadeSystem.setPlayerController).toHaveBeenCalledWith(refs.playerController);
+    expect(refs.grenadeSystem.setPlayerHealthSystem).toHaveBeenCalledWith(refs.playerHealthSystem);
     expect(refs.grenadeSystem.setFlashbangEffect).toHaveBeenCalledWith(refs.flashbangScreenEffect);
     expect(refs.grenadeSystem.setImpactEffectsPool).toHaveBeenCalledWith(impactEffectsPool);
     expect(refs.grenadeSystem.setExplosionEffectsPool).toHaveBeenCalledWith(explosionEffectsPool);

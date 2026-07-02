@@ -347,8 +347,18 @@ export class CombatantCombat {
     // Faction of the shooter. Defaults to the player's faction (US). Aircraft
     // weapons pass their owning faction so friend-or-foe filtering inside
     // raycastCombatants (isAlly) excludes the shooter's own allies.
-    shooterFaction: Faction = Faction.US
+    shooterFaction: Faction = Faction.US,
+    // NPC crew-served attribution override (M2HB emplacement gunner). When set,
+    // the shot resolves against the SAME terrain-occluded hitscan path the
+    // player uses, but the kill is credited through the rifle death pipeline to
+    // this gunner (gunner.kills++, npc_killed, gunner's name in the feed) rather
+    // than the PLAYER proxy — so an NPC tripod kill never touches
+    // hudSystem.addKill / the player streak. Friend-foe uses gunner.faction, so
+    // an NVA gunner cannot hit its own allies. Mirrors the tank cannon's NPC
+    // attribution (838fe674).
+    npcAttacker?: Combatant
   ): CombatHitResult {
+    const effectiveFaction = npcAttacker ? npcAttacker.faction : shooterFaction;
     if (this.sandbagSystem) {
       const hitSandbag = this.sandbagSystem.checkRayIntersection(ray);
       if (hitSandbag) {
@@ -364,7 +374,7 @@ export class CombatantCombat {
     let hit: ReturnType<CombatantHitDetection['raycastCombatants']>;
     this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_HIT_DETECTION);
     try {
-      hit = this.hitDetection.raycastCombatants(ray, shooterFaction, allCombatants, { positionMode: 'visual' });
+      hit = this.hitDetection.raycastCombatants(ray, effectiveFaction, allCombatants, { positionMode: 'visual' });
     } finally {
       this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_HIT_DETECTION);
     }
@@ -417,15 +427,22 @@ export class CombatantCombat {
       // oriented from where the player actually stood when the shot resolved.
       this.beginPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_DAMAGE);
       try {
-        this._playerAttackerProxy.position.copy(this.playerPosition);
-        this.damage.applyDamage(hit.combatant, damage, this._playerAttackerProxy, undefined, hit.headshot);
+        if (npcAttacker) {
+          // NPC crew-served path: attribute to the real gunner so the rifle
+          // death pipeline credits gunner.kills + emits npc_killed. No player
+          // proxy, no HUD kill/streak/feed, no player_kill event below.
+          this.damage.applyDamage(hit.combatant, damage, npcAttacker, undefined, hit.headshot, allCombatants);
+        } else {
+          this._playerAttackerProxy.position.copy(this.playerPosition);
+          this.damage.applyDamage(hit.combatant, damage, this._playerAttackerProxy, undefined, hit.headshot);
+        }
       } finally {
         this.endPlayerShotPhase(telemetryEnabled, COMBAT_PLAYER_SHOT_DAMAGE);
       }
 
       const killed = targetHealth > 0 && hit.combatant.health <= 0;
 
-      if (killed && this.hudSystem) {
+      if (!npcAttacker && killed && this.hudSystem) {
         this.hudSystem.addKill(hit.headshot);
 
         // Add player kill to feed with weapon type
@@ -440,7 +457,7 @@ export class CombatantCombat {
         );
       }
 
-      if (killed) {
+      if (!npcAttacker && killed) {
         GameEventBus.emit('player_kill', {
           victimId: hit.combatant.id,
           victimFaction: hit.combatant.faction,

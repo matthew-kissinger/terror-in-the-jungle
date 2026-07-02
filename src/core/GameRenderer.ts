@@ -16,6 +16,7 @@ import {
   createWebGLRenderer,
   createWebGPURenderer,
   attachRendererDeviceLossHandler,
+  gpuTimingFlagEnabled,
   initializeCommonRenderer,
   inspectResolvedRendererBackend,
   isWebGPURenderer,
@@ -286,7 +287,11 @@ export class GameRenderer {
     const previousDisplay = previousRenderer.domElement.style.display;
 
     try {
-      const { renderer, capabilities } = await createWebGPURenderer(this.rendererBackendMode);
+      // Request WebGPU timestamp-query instrumentation only under the
+      // ?gpuTiming=1 opt-in so default sessions are untouched (P3 blind spot).
+      const { renderer, capabilities } = await createWebGPURenderer(this.rendererBackendMode, {
+        trackTimestamp: gpuTimingFlagEnabled(),
+      });
       this.applyCommonRendererSettings(renderer);
       renderer.domElement.style.display = previousDisplay;
       await initializeCommonRenderer(renderer);
@@ -477,6 +482,16 @@ export class GameRenderer {
    */
   setCrosshairRocketCueOffset(offsetPx: number): void {
     this.crosshairSystem.setRocketCueOffset(offsetPx);
+  }
+
+  /**
+   * Position the CCIP bomb pipper at a pixel offset from the crosshair centre,
+   * or hide it with `null`. Concrete passthrough (not fenced); pushed per-frame
+   * by the fixed-wing adapter from the projected bomb-impact solution, mirroring
+   * the rocket-cue seam.
+   */
+  setCrosshairBombCue(offset: { x: number; y: number } | null): void {
+    this.crosshairSystem.setBombCue(offset);
   }
 
   /**

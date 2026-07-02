@@ -83,7 +83,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // +5 LOC routing the radio smoke-marker cancel through the single slot-change
   // funnel + ground-vehicle suppression, plus abortRadioTargeting on death. R3
   // split target unchanged; orchestrator to note in docs/CARRY_OVERS.md.
-  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1227, methods: 111 },
+  // Snapshot raised 1227 → 1271 LOC / 111 → 113 methods (healing-mvp,
+  // cycle-2026-07-02-greenlight-followthrough): +2 methods (setPlayerHealthSystem +
+  // handleUseBandage) + the bandage-pip inventory-change sync — the documented
+  // input-glue integration point for the active-heal `H` action (design memo
+  // HEALING_AND_LOOTING_SCOPE §1.7). In-cycle ratchet re-base, no CARRY_OVERS row
+  // (sanctioned by the task brief). R3 split target unchanged.
+  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1271, methods: 113 },
   // Snapshot raised 995 → 1073 LOC (dropped-frame-perf-harness,
   // 2026-06-15/16): frame/presentation/dropped-frame telemetry export surfaces.
   'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files; +78 LOC for frame/presentation dropped-frame telemetry', loc: 1073, methods: 41 },
@@ -112,7 +118,15 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   'src/systems/navigation/NavmeshSystem.ts': { round: 'P3R5', reason: 'split into 3 files; +19 LOC: worker-offload tiled generation past the anchor window (navmesh-coverage-ashau); +25 LOC: time-sliced prebaked import wiring + load telemetry (ashau-load-freeze, 2026-06-10)', loc: 833, methods: 24 },
   'src/systems/strategy/WarSimulator.ts': { round: 'P3R5', reason: 'split into 2 files; +181 LOC dropped-frame war-state telemetry and stabilization probes', loc: 969, methods: 36 },
   'src/systems/combat/ai/AIStateEngage.ts': { round: 'P3R2', reason: 'cover-search extraction P4F2', loc: 1005, methods: 30 },
-  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +12 LOC: per-frame stepper hook for the shared NPC tank cannon, scaled-dt signature per combat-review (npc-tank-cannon-wiring, 2026-06-09)', loc: 1004, methods: 44 },
+  // Snapshot raised 1004 → 1072 (npc-m2hb-gunners, F5 activation, 2026-07-02):
+  // three thin forwarding setters onto the private engage handler
+  // (setEmplacementQuery / setEmplacementWeaponResolver / setNpcVehicleBoarding),
+  // the mounted emplacement-gunner route wiring (setEmplacementGunnerRoute +
+  // two fields), and the IN_VEHICLE emplacement-gunner branch. Mirrors the
+  // existing setTankGunnerRoute wiring; the route body itself lives in the new
+  // EmplacementAIGunnerRoute helper (not this file). In-cycle ratchet re-base
+  // sanctioned by the task brief; split target unchanged.
+  'src/systems/combat/CombatantAI.ts': { round: 'P3R2', reason: 'ai-timing-gate: hoist per-tick state callbacks + gate diagnostics off the hot path; +12 LOC: per-frame stepper hook for the shared NPC tank cannon (npc-tank-cannon-wiring); +68 LOC: NPC emplacement-gunner forwarding setters + mounted route wiring + IN_VEHICLE branch (npc-m2hb-gunners, 2026-07-02)', loc: 1072, methods: 44 },
   // Admitted 2026-06-09 (npc-tank-cannon-wiring review fix): the prod
   // composition point absorbed seated-weapon lifecycle (tank cannon + M2HB),
   // HUD panel hosts (m2hb-gun-experience), and the NPC tank-gunner wire +
@@ -186,7 +200,11 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // +9 LOC for the helicopter-mode F-key door-gun seat-swap binding +
   // `onHelicopterDoorGunToggle` callback decl. Within-cycle ratchet re-base; R3
   // split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
+  // Snapshot raised 819 → 827 (healing-mvp, cycle-2026-07-02-greenlight-followthrough):
+  // +8 LOC for the on-foot `KeyH` bandage bind + `onUseBandage` callback decl
+  // (design memo HEALING_AND_LOOTING_SCOPE §1.4). In-cycle ratchet re-base, no
+  // CARRY_OVERS row (sanctioned by the task brief); R3 split target unchanged.
+  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 827, methods: 44 },
   // Snapshot raised 752 → 757 LOC / 58 → 59 methods (helipad-spawn-truth,
   // 2026-06-28): +1 setter `setBoardableHelicopterPresence` that forwards the
   // boardable-helicopter presence provider to the spawn selector so helipad

@@ -104,6 +104,12 @@ export interface VehicleUIContext {
    * Additive + optional so contexts that never re-push on swap omit it.
    */
   seat?: string;
+  /**
+   * Dropped-bomb airframe (A-1 / F-4) still has bombs in the sortie load. Drives
+   * the touch BOMB button (release one bomb) and could gate a desktop cue.
+   * Additive + optional; omitted (falsy) on every craft without a bomb store.
+   */
+  bombsAvailable?: boolean;
 }
 
 /**

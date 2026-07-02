@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { VehicleManager } from '../../vehicle/VehicleManager';
 import type { M2HBEmplacementSystem } from './M2HBEmplacement';
 import type { Emplacement } from '../../vehicle/Emplacement';
+import type { CombatantSystem } from '../CombatantSystem';
 import {
   DEFAULT_FOV_HALF_ANGLE_RAD,
   INpcEmplacementQuery,
@@ -35,16 +36,20 @@ import {
  *     parented) tripods report world-correct aim — same composition as
  *     `M2HBEmplacement.computeBarrelForward` (B1 fix, 48406eb0).
  *
- * Production wiring:
- *   const adapter = createNpcM2HBAdapter(vehicleManager, m2hbSystem);
- *   aiStateEngage.setEmplacementQuery(adapter.query);
- *   aiStateEngage.setEmplacementWeaponResolver(adapter.resolveWeapon);
- *   aiStateEngage.setNpcVehicleBoarding(npcVehicleController);
- *
- * The bootstrap-level call is deferred to a follow-up — the M2HB system
- * isn't yet instantiated in `SystemInitializer` (no scenario spawns
- * tripods today). When the scenario wiring lands, the three setters
- * above complete the loop. Until then, the AI path stays dormant.
+ * Production wiring (live as of `npc-m2hb-gunners`, F5 activation):
+ *   `OperationalRuntimeComposer.wireM2HBEmplacementRuntime` builds the adapter
+ *   and forwards its surfaces onto the combatant AI via CombatantAI's
+ *   forwarding setters:
+ *     const adapter = createNpcM2HBAdapter(vehicleManager, m2hbSystem, combatantSystem);
+ *     combatantAI.setEmplacementQuery(adapter.query);
+ *     combatantAI.setEmplacementWeaponResolver(adapter.resolveWeapon);
+ *     combatantAI.setNpcVehicleBoarding(npcVehicleController);
+ *   plus the mounted-gunner route (aim / fire / dismount) whose context
+ *   provider hands the route this adapter's `fire`. `fire` resolves the
+ *   crewing gunner from the gunner-seat occupant so NPC shots are faction-
+ *   attributed to that combatant (see M2HBEmplacementSystem.tryFire) rather
+ *   than the player. `combatantSystem` is optional so the pre-wire tests can
+ *   still build the adapter with a two-arg call.
  */
 
 const _muzzleScratch = new THREE.Vector3();
@@ -87,11 +92,26 @@ export interface NpcM2HBAdapter {
 export function createNpcM2HBAdapter(
   vehicleManager: VehicleManager,
   m2hbSystem: M2HBEmplacementSystem,
+  combatantSystem?: CombatantSystem,
 ): NpcM2HBAdapter {
   function getEmplacement(vehicleId: string): Emplacement | null {
     const vehicle = vehicleManager.getVehicle(vehicleId);
     if (!vehicle || vehicle.category !== 'emplacement') return null;
     return vehicle as Emplacement;
+  }
+
+  /**
+   * Resolve the live combatant crewing the gunner seat of `vehicleId` so
+   * NPC fire is attributed to it. Returns undefined for the player
+   * (`getPilotId() === 'PLAYER'`) or when the seat is empty / the combatant
+   * lookup is unwired — the fire path then falls back to player attribution.
+   */
+  function resolveGunner(vehicleId: string) {
+    if (!combatantSystem) return undefined;
+    const emp = getEmplacement(vehicleId);
+    const occupantId = emp?.getPilotId();
+    if (!occupantId || occupantId === 'PLAYER') return undefined;
+    return combatantSystem.getCombatantById(occupantId);
   }
 
   /**
@@ -176,7 +196,7 @@ export function createNpcM2HBAdapter(
     return {
       tryFire(): boolean {
         if (!readBarrelPose(vehicleId, _muzzleScratch, _forwardScratch)) return false;
-        return m2hbSystem.tryFire(vehicleId, _muzzleScratch, _forwardScratch);
+        return m2hbSystem.tryFire(vehicleId, _muzzleScratch, _forwardScratch, resolveGunner(vehicleId));
       },
       isEmpty(): boolean {
         return weapon.isEmpty();
@@ -196,7 +216,7 @@ export function createNpcM2HBAdapter(
     query,
     resolveWeapon,
     fire(vehicleId: string, origin: THREE.Vector3, aimDir: THREE.Vector3): boolean {
-      return m2hbSystem.tryFire(vehicleId, origin, aimDir);
+      return m2hbSystem.tryFire(vehicleId, origin, aimDir, resolveGunner(vehicleId));
     },
   };
 }

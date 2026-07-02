@@ -14,7 +14,7 @@ const BREAK_OFF_DISTANCE = 100; // break off and climb at this distance
 const ROCKET_COUNT = 6;
 const ROCKET_INTERVAL = 0.3; // seconds between rockets
 const ROCKET_SPEED = 150; // m/s
-const ROCKET_FUSE = 10; // seconds (long fuse, relies on terrain impact)
+const ROCKET_FUSE = 10; // seconds backstop; rockets detonate on ground impact (A3)
 
 // Scratch vectors
 const _rocketPos = new THREE.Vector3();
@@ -80,7 +80,14 @@ export function updateRocketRun(
           // Slight downward angle toward ground
           _rocketVel.y = -20;
 
-          grenadeSystem.spawnProjectile(_rocketPos.clone(), _rocketVel.clone(), ROCKET_FUSE, 'rocket', shooterFaction);
+          grenadeSystem.spawnProjectile(
+            _rocketPos.clone(),
+            _rocketVel.clone(),
+            ROCKET_FUSE,
+            'rocket',
+            shooterFaction,
+            { detonateOnImpact: true },
+          );
         }
 
         audioManager?.play('rocketLaunch', aircraft.position, 0.6);

@@ -30,6 +30,15 @@ import {
   type ITankTurret,
 } from './ai/TankAIGunnerRoute'
 import type { TankBallisticSolver } from './projectiles/TankBallisticSolver'
+import {
+  EmplacementAIGunnerRoute,
+  type EmplacementGunnerContext,
+} from './ai/EmplacementAIGunnerRoute'
+import type {
+  INpcEmplacementQuery,
+  INpcEmplacementWeapon,
+  INpcVehicleBoarding,
+} from './ai/EmplacementSeekHelper'
 
 /**
  * Resolved per-tick context for the tank-gunner firing route. The
@@ -117,6 +126,15 @@ export class CombatantAI {
   private tankGunnerRoute: TankAIGunnerRoute | null = null
   private tankGunnerContextProvider:
     | ((combatant: Combatant) => TankGunnerContext | null)
+    | null = null
+
+  // NPC emplacement-gunner mounted route (npc-m2hb-gunners, F5 activation).
+  // Same shape as the tank route: a route object + a per-combatant context
+  // provider. Unwired (both null) leaves the IN_VEHICLE branch a no-op for
+  // emplacement crew, exactly as before this task.
+  private emplacementGunnerRoute: EmplacementAIGunnerRoute | null = null
+  private emplacementGunnerContextProvider:
+    | ((combatant: Combatant) => EmplacementGunnerContext | null)
     | null = null
 
   // Once-per-frame stepper (npc-tank-cannon-wiring): advances shared cannon flight from `beginFrame()`.
@@ -305,6 +323,41 @@ export class CombatantAI {
   ): void {
     this.tankGunnerRoute = route
     this.tankGunnerContextProvider = contextProvider
+  }
+
+  // ── NPC emplacement-gunner wiring (npc-m2hb-gunners) ──────────────────────
+  // Thin forwarders onto the private engage handler (which owns the seek /
+  // scoring / boarding machinery) + the mounted route. Exposed at the
+  // CombatantAI boundary so the operational composer wires the live M2HB
+  // adapter without reaching into a private field. Mirrors setTankGunnerRoute.
+  /** Forward the emplacement candidate query onto the engage handler. */
+  setEmplacementQuery(query: INpcEmplacementQuery | undefined): void {
+    this.engageHandler.setEmplacementQuery(query)
+  }
+  /** Forward the live-weapon resolver onto the engage handler. */
+  setEmplacementWeaponResolver(
+    resolver: ((vehicleId: string) => INpcEmplacementWeapon | null) | undefined,
+  ): void {
+    this.engageHandler.setEmplacementWeaponResolver(resolver)
+  }
+  /** Forward the boarding controller onto the engage handler. */
+  setNpcVehicleBoarding(boarding: INpcVehicleBoarding | undefined): void {
+    this.engageHandler.setNpcVehicleBoarding(boarding)
+  }
+  /**
+   * Wire the mounted emplacement-gunner route. The context provider is called
+   * per tick for IN_VEHICLE combatants; a non-null context (a gunner on a
+   * friendly emplacement) routes through `EmplacementAIGunnerRoute` (slew,
+   * cone-gated fire, belt/stale-cone dismount). The route shares the engage
+   * handler's `EmplacementMountTracker`. Unwired, mounted crew stay inert.
+   */
+  setEmplacementGunnerRoute(
+    contextProvider: (combatant: Combatant) => EmplacementGunnerContext | null,
+  ): void {
+    this.emplacementGunnerRoute = new EmplacementAIGunnerRoute(
+      this.engageHandler.getEmplacementMountTracker(),
+    )
+    this.emplacementGunnerContextProvider = contextProvider
   }
 
   /** Register / clear the once-per-frame stepper run at the top of `beginFrame()`. Receives the scaled frame dt. */
@@ -511,6 +564,21 @@ export class CombatantAI {
                 ctx.solver,
                 performance.now(),
               )
+            })
+          }
+        }
+        // Mounted emplacement-gunner route (npc-m2hb-gunners). Same
+        // acquisition pipeline as the rifle/tank paths; the route slews the
+        // barrel, gates fire on the field-of-fire cone, and dismounts on
+        // belt-empty / threat-out-of-cone > 5 s. The provider returns null
+        // for non-emplacement crew (incl. tank gunners handled above).
+        if (this.emplacementGunnerRoute && this.emplacementGunnerContextProvider) {
+          const empCtx = this.emplacementGunnerContextProvider(combatant)
+          if (empCtx) {
+            this.withAiMethodTiming('state.in_vehicle.emplacement_gunner', () => {
+              const target = this.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid)
+              combatant.target = target ?? null
+              this.emplacementGunnerRoute!.evaluate(combatant, empCtx, target, performance.now())
             })
           }
         }

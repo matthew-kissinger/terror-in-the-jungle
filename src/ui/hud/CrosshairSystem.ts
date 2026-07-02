@@ -74,6 +74,12 @@ export class CrosshairSystem extends UIComponent {
    * boresight pipper. Pushed per-frame by the attack-helicopter adapter.
    */
   private rocketCueOffset = this.signal(0);
+  /**
+   * CCIP bomb-pipper screen position as a pixel offset from the crosshair
+   * centre, or `null` to hide it. Pushed per-frame by the fixed-wing adapter
+   * from the projected bomb-impact solution.
+   */
+  private bombCueOffset = this.signal<{ x: number; y: number } | null>(null);
   private infantryEl: HTMLElement | null = null;
   private pipperEl: HTMLElement | null = null;
   private tankGunnerEl: HTMLElement | null = null;
@@ -92,6 +98,7 @@ export class CrosshairSystem extends UIComponent {
   private pipperGunEl: HTMLElement | null = null;
   private pipperRocketEl: HTMLElement | null = null;
   private rocketCueEl: HTMLElement | null = null;
+  private bombCueEl: HTMLElement | null = null;
   private pipperIconImgs: HTMLImageElement[] = [];
 
   protected build(): void {
@@ -176,6 +183,9 @@ export class CrosshairSystem extends UIComponent {
         <!-- Bright center pipper. -->
         <div class="${styles.fwPipper}"></div>
       </div>
+      <!-- CCIP bomb pipper: floats to the predicted bomb impact point. Driven
+           by the fixed-wing adapter (dropped-bomb airframes); hidden otherwise. -->
+      <div data-ref="bombCue" class="${styles.bombCue}" style="display:none"></div>
     `;
   }
 
@@ -302,6 +312,25 @@ export class CrosshairSystem extends UIComponent {
         cue.style.transform = transform;
       }
     });
+
+    // Effect: CCIP bomb pipper. Floats to the projected impact point (pixel
+    // offset from the crosshair centre) or hides when the adapter clears it
+    // (off-screen / grounded / not a bombed airframe). Only the transform +
+    // display are touched, so the per-frame push stays cheap.
+    this.effect(() => {
+      const offset = this.bombCueOffset.value;
+      const cue = this.bombCueEl;
+      if (!cue) return;
+      if (!offset) {
+        this.setDisplayIfChanged(cue, 'none');
+        return;
+      }
+      this.setDisplayIfChanged(cue, '');
+      const transform = `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) rotate(45deg)`;
+      if (cue.style.transform !== transform) {
+        cue.style.transform = transform;
+      }
+    });
   }
 
   protected onUnmount(): void {
@@ -323,6 +352,7 @@ export class CrosshairSystem extends UIComponent {
     this.pipperGunEl = null;
     this.pipperRocketEl = null;
     this.rocketCueEl = null;
+    this.bombCueEl = null;
     this.pipperIconImgs = [];
   }
 
@@ -399,6 +429,20 @@ export class CrosshairSystem extends UIComponent {
     return this.rocketCueOffset.value;
   }
 
+  /**
+   * Position the CCIP bomb pipper at a pixel offset from the crosshair centre,
+   * or hide it with `null`. Pushed per-frame by the fixed-wing adapter from the
+   * projected bomb-impact solution; a harmless no-op for any other actor (the
+   * pipper is hidden until an offset is set and cleared on dismount).
+   */
+  setBombCue(offset: { x: number; y: number } | null): void {
+    this.bombCueOffset.value = offset;
+  }
+
+  getBombCue(): { x: number; y: number } | null {
+    return this.bombCueOffset.value;
+  }
+
   private loadPipperIcons(): void {
     if (this.pipperIconsLoaded) return;
     this.pipperIconsLoaded = true;
@@ -429,6 +473,7 @@ export class CrosshairSystem extends UIComponent {
     this.pipperGunEl = this.$('[data-ref="pipperGun"]');
     this.pipperRocketEl = this.$('[data-ref="pipperRocket"]');
     this.rocketCueEl = this.$('[data-ref="rocketCue"]');
+    this.bombCueEl = this.$('[data-ref="bombCue"]');
     this.pipperIconImgs = Array.from(this.root.querySelectorAll<HTMLImageElement>('[data-icon]'));
   }
 

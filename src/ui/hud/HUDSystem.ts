@@ -696,8 +696,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateFixedWingMouseMode(controlMode);
   }
 
-  updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string): void {
-    this.elements.updateFixedWingAmmo(rounds, capacity, weaponName);
+  updateFixedWingAmmo(rounds: number, capacity: number, weaponName?: string, bombs?: { count: number; capacity: number }): void {
+    this.elements.updateFixedWingAmmo(rounds, capacity, weaponName, bombs);
   }
 
   /**

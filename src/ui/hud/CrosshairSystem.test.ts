@@ -359,6 +359,32 @@ describe('CrosshairSystem', () => {
     });
   });
 
+  describe('CCIP bomb pipper', () => {
+    function bombCueEl(): HTMLElement {
+      return crosshair.element.querySelector('[data-ref="bombCue"]') as HTMLElement;
+    }
+
+    it('is hidden by default', () => {
+      expect(bombCueEl().style.display).toBe('none');
+      expect(crosshair.getBombCue()).toBeNull();
+    });
+
+    it('floats the pipper to the pushed screen offset', () => {
+      crosshair.setBombCue({ x: 40, y: -30 });
+      expect(bombCueEl().style.display).not.toBe('none');
+      expect(bombCueEl().style.transform).toContain('40px');
+      expect(bombCueEl().style.transform).toContain('-30px');
+      expect(crosshair.getBombCue()).toEqual({ x: 40, y: -30 });
+    });
+
+    it('hides the pipper again when cleared with null', () => {
+      crosshair.setBombCue({ x: 10, y: 10 });
+      crosshair.setBombCue(null);
+      expect(bombCueEl().style.display).toBe('none');
+      expect(crosshair.getBombCue()).toBeNull();
+    });
+  });
+
   describe('visibility', () => {
     it('hideCrosshair and showCrosshair toggle the hidden state', () => {
       crosshair.hideCrosshair();

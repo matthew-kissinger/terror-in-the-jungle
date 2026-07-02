@@ -10,6 +10,7 @@
  * - FIRE (red) - vehicle weapon fire (attack/gunship only)
  * - WPN (green) - cycle cockpit weapons (attack/gunship only)
  * - VIEW (green) - context view toggle (AC-47 side/chase)
+ * - BOMB (red) - release one dropped bomb (A-1/F-4 with bombs remaining)
  * - SEAT (green) - swap crew station (tank driver<->gunner, gunship pilot<->door gun)
  * - MAP / CMD (green) - full map / squad command (touch parity with infantry action column)
  * - STAB (green) - toggle auto-hover stabilization
@@ -34,6 +35,7 @@ interface VehicleActionCallbacks {
   onHelicopterWeaponCycle?: (index: number) => void;
   onViewToggle?: () => void;
   onSeatSwap?: () => void;
+  onBombRelease?: () => void;
 }
 
 export class VehicleActionBar extends UIComponent {
@@ -42,6 +44,7 @@ export class VehicleActionBar extends UIComponent {
   private fireBtn!: HTMLDivElement;
   private wpnBtn!: HTMLDivElement;
   private viewBtn!: HTMLDivElement;
+  private bombBtn!: HTMLDivElement;
   private seatBtn!: HTMLDivElement;
   private mapBtn!: HTMLDivElement;
   private cmdBtn!: HTMLDivElement;
@@ -65,6 +68,10 @@ export class VehicleActionBar extends UIComponent {
     this.wpnBtn.style.display = 'none';
     this.viewBtn = this.createButton('VIEW', styles.vehicleBtn);
     this.viewBtn.style.display = 'none';
+    // BOMB releases one dropped bomb on the A-1 / F-4; shown only while the
+    // sortie still carries bombs (touch parity for the desktop RMB release).
+    this.bombBtn = this.createButton('BOMB', styles.vehicleFireBtn);
+    this.bombBtn.style.display = 'none';
     // SEAT swaps crew stations on craft that carry a second one (tank
     // driver<->gunner, gunship pilot<->door gun). Hidden by default; shown from
     // the context. Without it the door gun is unreachable on touch and the tank
@@ -81,6 +88,7 @@ export class VehicleActionBar extends UIComponent {
     this.fireBtn.dataset.action = 'fire';
     this.wpnBtn.dataset.action = 'weapon';
     this.viewBtn.dataset.action = 'view';
+    this.bombBtn.dataset.action = 'bomb';
     this.seatBtn.dataset.action = 'seat';
     this.mapBtn.dataset.action = 'map';
     this.cmdBtn.dataset.action = 'command';
@@ -91,6 +99,7 @@ export class VehicleActionBar extends UIComponent {
     this.root.appendChild(this.fireBtn);
     this.root.appendChild(this.wpnBtn);
     this.root.appendChild(this.viewBtn);
+    this.root.appendChild(this.bombBtn);
     this.root.appendChild(this.seatBtn);
     this.root.appendChild(this.mapBtn);
     this.root.appendChild(this.cmdBtn);
@@ -139,6 +148,12 @@ export class VehicleActionBar extends UIComponent {
       e.preventDefault();
       e.stopPropagation();
       this.callbacks.onViewToggle?.();
+    }, { passive: false });
+
+    this.listen(this.bombBtn, 'pointerdown', (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.callbacks.onBombRelease?.();
     }, { passive: false });
 
     this.listen(this.seatBtn, 'pointerdown', (e: PointerEvent) => {
@@ -204,6 +219,7 @@ export class VehicleActionBar extends UIComponent {
     this.wpnBtn.style.display = capabilities?.canCycleWeapons ? 'flex' : 'none';
     this.viewBtn.style.display = context?.viewToggle ? 'flex' : 'none';
     this.applyViewToggleLabel(context);
+    this.bombBtn.style.display = context?.bombsAvailable ? 'flex' : 'none';
     this.seatBtn.style.display = this.hasSeatSwap(context) ? 'flex' : 'none';
     this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
     this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
