@@ -10,13 +10,14 @@
  * P3d) presents `RADIO_STATIONS` as the always-available STATIONS category and
  * calls `RadioStationSystem.tuneTo(id)`.
  *
- * Asset note (cycle-2026-06-29-radio-stations-music): the three shipped tracks
+ * Asset note (cycle-2026-06-29-radio-stations-music): the two shipped tracks
  * are genuine **CC BY 4.0** music by Kevin MacLeod (incompetech.com), fetched
  * and re-encoded to Opus stereo ~80 kbps. Full attribution is in
  * `THIRD-PARTY-ASSETS.md` and `docs/asset-provenance/audio-2026-06/`. Swapping a
  * station for a different license-clean track needs no code change beyond this
  * file — keep the same `.ogg` path or update it here. The former "Green Static"
- * ambient-drone station was removed after the 2026-07-01 owner playtest; do not
+ * ambient-drone station was removed after the 2026-07-01 owner playtest (and its
+ * `station-ossuary-air.ogg` track deleted from the deploy artifact); do not
  * reintroduce static/noise-bed stations without explicit owner approval.
  */
 

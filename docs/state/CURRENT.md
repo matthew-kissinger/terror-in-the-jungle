@@ -69,8 +69,9 @@ The most recent shipped work, newest first:
   **Zero fence changes across all 9 PRs; full suite 7238 green.** Deferred to
   PLAYTEST_PENDING: the post default-on flip (after a MAIN-worktree combat120 p99
   neutrality proof) + all owner feel-walks. Pre-existing `check:tod-coherence`
-  foliage FAIL is master-state (P6 proved it is not a regression), tracked as a
-  carry-over.
+  foliage FAIL is master-state (P6 proved it is not a regression, corr 0.810 /
+  rangeRatio 2.735), tracked as the `tod-coherence-foliage-fail` carry-over in
+  [docs/CARRY_OVERS.md](../CARRY_OVERS.md) (non-blocking).
 - **2026-06-17 local / 2026-06-18 UTC — active-driver route recovery checkpoint**:
   The perf driver now cools down the route target id when a no-lock
   nearest-OPFOR `combat_approach_unavailable` path fails or when a
@@ -336,33 +337,22 @@ and
 
 ## Directive status (authoritative list in DIRECTIVES.md)
 
-[docs/DIRECTIVES.md](../DIRECTIVES.md) is the binary registry. Headline state
-as of this refresh:
+Per-ID directive status lives in exactly one place: the binary registry at
+[docs/DIRECTIVES.md](../DIRECTIVES.md) (open / code-complete / done / closed
+rows, owning subsystem, latest evidence, success criteria). Do NOT restate
+per-ID status words here — a second copy drifts (this section previously
+contradicted DIRECTIVES on DEFEKT-3, DEFEKT-6, AVIATSIYA-5 scope, SVYAZ-*,
+and UX-*). This file is the short narrative pointer only.
 
-- **DEFEKT-4** (NPC navmesh route quality) — closed 2026-05-18.
-- **VODA-1/2/3, VEKHIKL-1/2/3/4** — code-complete; VODA/VEKHIKL playtests are
-  deferred to [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
-- **DEFEKT-3** (combat AI p99 — synchronous cover search in
-  `AIStateEngage.initiateSquadSuppression`) — open. The `cover-grid-wiring`
-  task wired the existing O(1) `CoverSpatialGrid` into prod combat; the
-  combat120 p99 PASS is unverified. No perf baseline is currently tracked —
-  `perf-baselines.json` was removed, so `perf:compare` prints raw
-  latest-capture metrics without pass/fail gating; STABILIZAT-1 (open) would
-  re-establish a baseline via `perf:update-baseline`. See
-  [docs/state/perf-trust.md](perf-trust.md) for the measurement chain.
-- **KONVEYER-10/11** — closed; full slice-by-slice evidence in
-  [docs/directives/webgpu-migration-10.md](../directives/webgpu-migration-10.md) and
-  [docs/rearch/POST_WEBGPU_MIGRATION_2026-05-13.md](../rearch/POST_WEBGPU_MIGRATION_2026-05-13.md).
-- **AVIATSIYA-4, AVIATSIYA-7** — code-complete (playtest deferred) per the
-  2026-06-01 scope pass; **AVIATSIYA-5, AVIATSIYA-6** — open (partial): nose
-  cannon + live-fire + station-keep + NPC maneuver state machine done;
-  per-aircraft period weapons, lead/sway aids, and named maneuver routes
-  deferred.
-- **ECS hot path (Phase F)** — evaluation recorded **DEFER** (bitECS spike
-  1.0–1.09× vs OOP, off the prod path); combatants stay in `Map<string,Combatant>`.
-- **KB-STARTUP-1, KONVEYER-12, SOL-1, DEFEKT-1/2/6, STABILIZAT-1, SVYAZ-*,
-  UX-*, DIZAYN-3** — open; see DIRECTIVES rows and the per-id memos
-  under [docs/directives/](../directives/).
+- Binary directive registry: [docs/DIRECTIVES.md](../DIRECTIVES.md).
+- Per-ID verbose evidence memos: [docs/directives/](../directives/).
+- Unresolved multi-cycle items: [docs/CARRY_OVERS.md](../CARRY_OVERS.md).
+- Playtest-deferred walks: [docs/PLAYTEST_PENDING.md](../PLAYTEST_PENDING.md).
+- Measurement-chain / perf-baseline trust: [docs/state/perf-trust.md](perf-trust.md).
+
+Close-ritual note: when a directive changes status, update the DIRECTIVES.md
+row only; this pointer section does not need editing (the F7 owner decision
+demoted it to links-only precisely so it can never fall out of sync).
 
 ## What is real today
 
@@ -372,10 +362,16 @@ as of this refresh:
   hang (Chromium downloads 100% then stalls post-download) — `prod-smoke` stays
   enforced locally via `npm run validate` and post-deploy via
   `check:live-release`; restore those jobs to blocking once the install hang is
-  fixed (Playwright bump / browser cache). No perf baseline is currently
-  tracked (`perf-baselines.json` was removed); `perf:compare` prints raw
-  latest-capture metrics with no pass/fail gating, and the CI perf job is
-  advisory (`continue-on-error`). See [docs/state/perf-trust.md](perf-trust.md)
+  fixed (Playwright bump / browser cache). `perf-baselines.json` was RESTORED
+  2026-06-29 (`62778b27`, cycle-2026-06-29-cinematic-foundations) with
+  **placeholder** combat120 thresholds (p99 pass 38.41 / warn 43.42), so
+  `perf:compare` gates the latest capture against those thresholds again; the
+  CI perf job itself stays advisory (`continue-on-error`). The open gap is NOT
+  a missing file — it is **quiet-machine certification**: the placeholder
+  thresholds still need an authoritative combat120 capture from the MAIN
+  worktree (`perf:capture:combat120` + `perf:update-baseline -- combat120`) on
+  a genuinely idle machine to stamp the measured p99 and provenance (this is
+  the STABILIZAT-1 finish line). See [docs/state/perf-trust.md](perf-trust.md)
   for the measurement chain.
 - Playable combined-arms browser game, not just an engine shell.
 - Helicopters and three flyable fixed-wing aircraft (A-1, F-4, AC-47) are
