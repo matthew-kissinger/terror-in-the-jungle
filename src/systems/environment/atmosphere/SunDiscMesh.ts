@@ -11,10 +11,21 @@ import {
   mix,
   reference,
   smoothstep,
+  sqrt,
   uv,
   vec2,
   vec3,
 } from 'three/tsl';
+import {
+  isSunDiscV2Enabled,
+} from './SunDiscConfig';
+import {
+  SUN_DISC_HALO_OUTER_R,
+  SUN_DISC_HALO_STRENGTH,
+  SUN_DISC_LIMB_U,
+  limbDarkening,
+  scatterHalo,
+} from './SunDiscOptics';
 
 /**
  * HDR sun-disc overlay rendered per-fragment.
@@ -31,11 +42,25 @@ import {
  *   - Final color = additive amber body + white-hot core.
  *
  * `sunColor` here is pre-multiplied by the elevation-keyed HDR peak in
- * `update()` so the shader stays linear.
+ * `update()` so the shader stays linear. The backend `getSun` chromaticity is
+ * already elevation-reddened (warm amber at dawn, near-white at noon — see
+ * `HosekWilkieSkyBackend.computeTransmittance`), so the disc simply consumes it
+ * faithfully rather than inventing a second extinction authority.
  *
  * The plane stays anchored at
  * `cameraPos + sunDir * domeRadius * 0.99` (so it tracks the sky
  * direction), and depth testing lets hills/ridges occlude the body.
+ *
+ * Rebuild (`sun-disc-scorch-rebuild`, gated on {@link isSunDiscV2Enabled}):
+ *   - Limb darkening: `I(r)=1-u(1-sqrt(1-r^2))` dims the body toward its limb
+ *     like a real photosphere instead of a flat lobe (`SunDiscOptics`).
+ *   - Forward-scatter halo: a small additive ring just outside the body edge
+ *     (the dome owns the WIDE glow; this is the tight scatter only).
+ *   - Terrain-horizon occlusion: `update()` accepts a per-frame opacity scalar
+ *     (0..1) from a CPU horizon march (`SunDiscHorizonOcclusion`) so the body
+ *     fades behind ridgelines instead of shining through them. `1` = clear sky.
+ * With the flag OFF the body keeps the plain smoothstep edge, no halo, and full
+ * opacity (legacy look) — the documented kill-switch.
  */
 
 /** Visible plane size in world units against a 500-unit dome. */
@@ -51,6 +76,19 @@ const BODY_FEATHER = 0.38;
 const HOT_CORE_RADIUS = BODY_RADIUS * 0.86;
 const HOT_CORE_FEATHER = BODY_RADIUS * 1.04;
 const FALLBACK_TEXTURE_SIZE = 128;
+
+/**
+ * Rebuild optics metadata (`sun-disc-scorch-rebuild`) attached to both material
+ * userData so a parity test can assert the TSL and GLSL paths share the same
+ * limb/halo constants from {@link SunDiscOptics}.
+ */
+const SUN_DISC_OPTICS_METADATA = {
+  limbCoefficient: SUN_DISC_LIMB_U,
+  haloOuterRadius: SUN_DISC_HALO_OUTER_R,
+  haloStrength: SUN_DISC_HALO_STRENGTH,
+  extinctionAuthority: 'backend-getSun',
+  occlusion: 'cpu-terrain-horizon-march',
+} as const;
 
 /**
  * Band-limit for the plasma/filament/granule surface texture.
@@ -125,12 +163,20 @@ export function computeSunDiscSurfaceTerms(
 
 interface SunDiscUniforms {
   sunColor: { value: THREE.Color };
+  /** Terrain-horizon occlusion multiplier (0 hidden .. 1 clear sky). */
+  occlusion: { value: number };
+  /** V2 rebuild toggle (1 = limb-darkened + halo, 0 = legacy flat body). */
+  v2: { value: number };
 }
 
 interface SunDiscWebGlUniforms {
   [uniform: string]: THREE.IUniform;
   uBodyColor: THREE.IUniform<THREE.Color>;
   uCoreColor: THREE.IUniform<THREE.Color>;
+  /** Terrain-horizon occlusion multiplier (0 hidden .. 1 clear sky). */
+  uOcclusion: THREE.IUniform<number>;
+  /** V2 rebuild toggle (1 = limb-darkened + halo, 0 = legacy flat body). */
+  uV2: THREE.IUniform<number>;
 }
 
 type SunDiscRendererBackend = 'webgpu' | 'webgl' | 'webgpu-webgl-fallback' | 'unknown';
@@ -146,11 +192,30 @@ const WEBGL_SUN_VERTEX = /* glsl */ `
 const WEBGL_SUN_FRAGMENT = /* glsl */ `
   uniform vec3 uBodyColor;
   uniform vec3 uCoreColor;
+  uniform float uOcclusion;
+  uniform float uV2;
   varying vec2 vUv;
 
   float sunSmoothstep(float edge0, float edge1, float x) {
     float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
     return t * t * (3.0 - 2.0 * t);
+  }
+
+  // Limb darkening (shared with SunDiscOptics.limbDarkening / TSL path):
+  // I(r) = 1 - u(1 - sqrt(1 - r^2)); r normalized to the body edge.
+  float sunLimb(float rNorm) {
+    float rc = clamp(rNorm, 0.0, 1.0);
+    float mu = sqrt(max(0.0, 1.0 - rc * rc));
+    return 1.0 - ${SUN_DISC_LIMB_U.toFixed(4)} * (1.0 - mu);
+  }
+
+  // Forward-scatter halo (shared with SunDiscOptics.scatterHalo): tight ring
+  // just outside the body edge; the dome owns the wide glow.
+  float sunHalo(float rNorm) {
+    if (rNorm <= 1.0 || rNorm >= ${SUN_DISC_HALO_OUTER_R.toFixed(4)}) return 0.0;
+    float t = (rNorm - 1.0) / ${(SUN_DISC_HALO_OUTER_R - 1).toFixed(4)};
+    float falloff = (1.0 - t) * (1.0 - t);
+    return ${SUN_DISC_HALO_STRENGTH.toFixed(4)} * falloff;
   }
 
   void main() {
@@ -172,6 +237,11 @@ const WEBGL_SUN_FRAGMENT = /* glsl */ `
     float body = 1.0 - sunSmoothstep(${BODY_RADIUS.toFixed(6)}, ${BODY_FEATHER.toFixed(6)}, bodyR);
     float hotCore = 1.0 - sunSmoothstep(${HOT_CORE_RADIUS.toFixed(6)}, ${HOT_CORE_FEATHER.toFixed(6)}, coreR);
     float innerHeat = 1.0 - sunSmoothstep(${(BODY_RADIUS * 0.5).toFixed(6)}, ${HOT_CORE_FEATHER.toFixed(6)}, coreR);
+    // V2: dim the body toward its limb like a photosphere. Mix toward 1.0 when
+    // the flag is OFF so the legacy flat body is byte-preserved.
+    float limb = mix(1.0, sunLimb(r / ${BODY_RADIUS.toFixed(6)}), uV2);
+    body *= limb;
+    innerHeat *= limb;
     float edgeFire = clamp(body - hotCore * 0.20, 0.0, 1.0) * (0.84 + plasma * 0.62 + filament * 0.44 + granule * 0.30);
     float amberMass = clamp(edgeFire * 0.92 + body * 0.22, 0.0, 1.0);
     float alpha = clamp(max(amberMass * 0.92, max(hotCore * 0.98, innerHeat * 0.48)), 0.0, 1.0);
@@ -181,7 +251,13 @@ const WEBGL_SUN_FRAGMENT = /* glsl */ `
     vec3 hotColor = mix(vec3(1.0, 0.60, 0.080), uCoreColor, clamp(0.68 + coreTexture * 0.24 + hotCore * 0.18, 0.0, 1.0));
     vec3 emberVein = emberColor * clamp((1.0 - coreTexture) * hotCore * 0.24 + filament * edgeFire * 0.24, 0.0, 0.36);
     vec3 rgb = emberColor * amberMass * (0.92 + granule * 0.30) + hotColor * coreHeat + emberVein;
+    // V2: tight forward-scatter halo just outside the body edge (additive).
+    float halo = sunHalo(r / ${BODY_RADIUS.toFixed(6)}) * uV2;
+    rgb += emberColor * halo;
+    alpha = clamp(max(alpha, halo * 0.9), 0.0, 1.0);
     rgb = min(rgb, vec3(1.0, 0.972, 0.944));
+    // Terrain-horizon occlusion fade (1 = clear sky, 0 = fully behind a ridge).
+    alpha *= uOcclusion;
     gl_FragColor = vec4(rgb, alpha);
   }
 `;
@@ -204,14 +280,17 @@ function createFallbackSunTexture(): THREE.DataTexture {
       const r = Math.hypot(nx, ny);
       const bodyR = r + (plasma - 0.5) * 0.145 + (filament - 0.5) * 0.052;
       const coreR = r + (plasma - 0.5) * 0.038 + (granule - 0.5) * 0.012;
-      const body = 1 - smoothstepCpu(BODY_RADIUS, BODY_FEATHER, bodyR);
+      // V2 limb darkening + halo, shared with the TSL/GLSL paths via SunDiscOptics.
+      const limb = limbDarkening(r / BODY_RADIUS);
+      const halo = scatterHalo(r / BODY_RADIUS);
+      const body = (1 - smoothstepCpu(BODY_RADIUS, BODY_FEATHER, bodyR)) * limb;
       const hotCore = 1 - smoothstepCpu(HOT_CORE_RADIUS, HOT_CORE_FEATHER, coreR);
-      const innerHeat = 1 - smoothstepCpu(BODY_RADIUS * 0.5, HOT_CORE_FEATHER, coreR);
+      const innerHeat = (1 - smoothstepCpu(BODY_RADIUS * 0.5, HOT_CORE_FEATHER, coreR)) * limb;
       const edgeFire =
         Math.max(0, Math.min(1, body - hotCore * 0.20)) *
         (0.84 + plasma * 0.62 + filament * 0.44 + granule * 0.30);
       const amberMass = Math.max(0, Math.min(1, edgeFire * 0.92 + body * 0.22));
-      const alpha = Math.max(amberMass * 0.56, hotCore * 0.70, innerHeat * 0.40);
+      const alpha = Math.max(amberMass * 0.56, hotCore * 0.70, innerHeat * 0.40, halo * 0.5);
       const coreTexture = Math.max(0, Math.min(1, 0.56 + plasma * 0.24 + filament * 0.20 + granule * 0.24));
       const heat = Math.max(0, Math.min(1, hotCore * (0.82 + coreTexture * 0.42)));
       const emberVein = Math.max(0, Math.min(0.36, (1 - coreTexture) * hotCore * 0.24 + filament * edgeFire * 0.24));
@@ -222,8 +301,11 @@ function createFallbackSunTexture(): THREE.DataTexture {
       const hotG = 168 + coreTexture * 82;
       const hotB = 44 + coreTexture * 168;
       const i = (y * FALLBACK_TEXTURE_SIZE + x) * 4;
-      data[i] = Math.round(Math.min(255, amberR + (hotR - amberR) * heat));
-      data[i + 1] = Math.round(Math.min(255, amberG + (hotG - amberG) * heat + amberG * emberVein));
+      // Warm forward-scatter halo just outside the body edge, additive on the
+      // amber channels so the ring reads as scatter, not a second body.
+      const haloWarm = halo * 200;
+      data[i] = Math.round(Math.min(255, amberR + (hotR - amberR) * heat + haloWarm));
+      data[i + 1] = Math.round(Math.min(255, amberG + (hotG - amberG) * heat + amberG * emberVein + haloWarm * 0.45));
       data[i + 2] = Math.round(Math.min(255, amberB + (hotB - amberB) * heat + amberB * emberVein));
       data[i + 3] = Math.round(255 * Math.max(0, Math.min(1, alpha)));
     }
@@ -243,6 +325,8 @@ function createFallbackSunTexture(): THREE.DataTexture {
 function createSunDiscMaterial(): { material: MeshBasicNodeMaterial; uniforms: SunDiscUniforms } {
   const uniforms: SunDiscUniforms = {
     sunColor: { value: new THREE.Color(1, 1, 1) },
+    occlusion: { value: 1 },
+    v2: { value: 1 },
   };
   const fallbackTexture = createFallbackSunTexture();
   const material = new MeshBasicNodeMaterial({
@@ -296,12 +380,24 @@ function createSunDiscMaterial(): { material: MeshBasicNodeMaterial; uniforms: S
   const warpedCoreR = r
     .add(plasma.sub(float(0.5)).mul(float(0.038)) as any)
     .add(granule.sub(float(0.5)).mul(float(0.012)) as any) as any;
-  const body = (float(1.0) as any).sub(smoothstep(float(BODY_RADIUS), float(BODY_FEATHER), warpedBodyR) as any);
+  const occlusionNode = reference('value', 'float', uniforms.occlusion as any) as any;
+  const v2Node = reference('value', 'float', uniforms.v2 as any) as any;
+  // Limb darkening (shared with SunDiscOptics.limbDarkening / GLSL path):
+  // I(r) = 1 - u(1 - sqrt(1 - r^2)); r normalized to the body edge. Mixed toward
+  // 1.0 when the V2 flag is OFF so the legacy flat body is preserved.
+  const rNorm = clamp(r.div(float(BODY_RADIUS)) as any, 0.0, 1.0) as any;
+  const mu = sqrt(clamp((float(1.0) as any).sub(rNorm.mul(rNorm)) as any, 0.0, 1.0) as any) as any;
+  const limbRaw = (float(1.0) as any).sub(
+    (float(SUN_DISC_LIMB_U) as any).mul((float(1.0) as any).sub(mu)) as any,
+  ) as any;
+  const limb = mix(float(1.0) as any, limbRaw, v2Node) as any;
+  const rawBody = (float(1.0) as any).sub(smoothstep(float(BODY_RADIUS), float(BODY_FEATHER), warpedBodyR) as any);
+  const body = rawBody.mul(limb) as any;
   const hotCore = (float(1.0) as any).sub(smoothstep(float(HOT_CORE_RADIUS), float(HOT_CORE_FEATHER), warpedCoreR) as any);
   const sunColorNode = reference('value', 'color', uniforms.sunColor as any) as any;
-  const innerHeat = (float(1.0) as any).sub(
-    smoothstep(float(BODY_RADIUS * 0.5), float(HOT_CORE_FEATHER), warpedCoreR) as any,
-  );
+  const innerHeat = (float(1.0) as any)
+    .sub(smoothstep(float(BODY_RADIUS * 0.5), float(HOT_CORE_FEATHER), warpedCoreR) as any)
+    .mul(limb) as any;
   const rimHeat = clamp(
     body
       .sub(hotCore.mul(float(0.20)) as any)
@@ -362,15 +458,40 @@ function createSunDiscMaterial(): { material: MeshBasicNodeMaterial; uniforms: S
       0.36,
     ) as any,
   ) as any;
-  const rgb = amberBody
-    .mul(emberMass.mul(granule.mul(float(0.30)).add(float(0.92)) as any) as any)
-    .add(hotColor.mul(coreHeat) as any)
-    .add(emberVein) as any;
-  const opacity = clamp(
-    max(emberMass.mul(float(0.92)) as any, max(hotCore.mul(float(0.98)) as any, innerHeat.mul(float(0.48)) as any)),
+  // Forward-scatter halo (shared with SunDiscOptics.scatterHalo): a tight ring
+  // just outside the body edge (rNormFull in [1, HALO_OUTER_R]). The dome owns
+  // the WIDE glow, so this stays small. Gated on V2.
+  const rNormFull = r.div(float(BODY_RADIUS)) as any;
+  const haloT = clamp(
+    rNormFull.sub(float(1.0)).div(float(SUN_DISC_HALO_OUTER_R - 1)) as any,
     0.0,
     1.0,
   ) as any;
+  const haloInBand = smoothstep(float(1.0), float(1.001), rNormFull as any).mul(
+    (float(1.0) as any).sub(smoothstep(float(SUN_DISC_HALO_OUTER_R - 0.001), float(SUN_DISC_HALO_OUTER_R), rNormFull as any)) as any,
+  ) as any;
+  const haloFalloff = (float(1.0) as any).sub(haloT);
+  const halo = haloFalloff
+    .mul(haloFalloff)
+    .mul(float(SUN_DISC_HALO_STRENGTH))
+    .mul(haloInBand)
+    .mul(v2Node) as any;
+  const rgb = amberBody
+    .mul(emberMass.mul(granule.mul(float(0.30)).add(float(0.92)) as any) as any)
+    .add(hotColor.mul(coreHeat) as any)
+    .add(emberVein)
+    .add(emberTint.mul(halo) as any) as any;
+  const opacity = clamp(
+    max(
+      emberMass.mul(float(0.92)) as any,
+      max(
+        max(hotCore.mul(float(0.98)) as any, innerHeat.mul(float(0.48)) as any),
+        halo.mul(float(0.9)) as any,
+      ),
+    ),
+    0.0,
+    1.0,
+  ).mul(occlusionNode) as any;
   (material as any).colorNode = rgb;
   (material as any).opacityNode = opacity;
   (material as any).userData.sunDiscOwnership = {
@@ -385,6 +506,7 @@ function createSunDiscMaterial(): { material: MeshBasicNodeMaterial; uniforms: S
     hotCoreFeather: HOT_CORE_FEATHER,
     ownershipTuning: 'large-hot-core-fractured-amber-shell',
   };
+  (material as any).userData.sunDiscOptics = SUN_DISC_OPTICS_METADATA;
   return { material, uniforms };
 }
 
@@ -395,6 +517,8 @@ function createWebGlSunDiscMaterial(): {
   const uniforms: SunDiscWebGlUniforms = {
     uBodyColor: { value: new THREE.Color(1.0, 0.55, 0.12) },
     uCoreColor: { value: new THREE.Color(1.0, 0.74, 1.0) },
+    uOcclusion: { value: 1 },
+    uV2: { value: 1 },
   };
   const material = new THREE.ShaderMaterial({
     name: 'SunDiscWebGL',
@@ -419,6 +543,7 @@ function createWebGlSunDiscMaterial(): {
     hotCoreFeather: HOT_CORE_FEATHER,
     ownershipTuning: 'large-hot-core-fractured-amber-shell',
   };
+  material.userData.sunDiscOptics = SUN_DISC_OPTICS_METADATA;
   return { material, uniforms };
 }
 
@@ -495,11 +620,19 @@ export class SunDiscMesh {
    * billboards it to the camera. `sunColor` is pre-multiplied by an
    * elevation-keyed peak so the per-fragment shader can paint the hot
    * body in linear radiance without renderer tonemapping.
+   *
+   * `occlusion` (0..1, default 1) is the terrain-horizon fade from the CPU
+   * horizon march in `AtmosphereSystem`: 1 when the camera->sun ray is clear,
+   * fading to 0 as the sun sinks behind a sampled ridgeline so the body no
+   * longer shines through the silhouette. The below-horizon `y < 0` hide is
+   * still authoritative — occlusion only handles the terrain-blocked band while
+   * the sun is geometrically above the horizon.
    */
   update(
     cameraPos: THREE.Vector3,
     sunDirection: THREE.Vector3,
     sunColor: THREE.Color,
+    occlusion = 1,
   ): void {
     if (!this.enabled || sunDirection.y < 0) {
       this.mesh.visible = false;
@@ -521,6 +654,17 @@ export class SunDiscMesh {
       (HDR_PEAK_MULTIPLIER - HDR_FLOOR_MULTIPLIER) * (elev * elev);
     this.scratchColor.copy(sunColor).multiplyScalar(peakFactor);
     this.uniforms.sunColor.value.copy(this.scratchColor);
+
+    // Consume the rebuild flag + terrain-horizon fade. V2 OFF collapses to the
+    // legacy flat body (limb/halo mixed out) at full opacity; the horizon fade
+    // still applies (it is a placement truth, not a look choice).
+    const v2 = isSunDiscV2Enabled() ? 1 : 0;
+    const occ = Math.max(0, Math.min(1, occlusion));
+    this.uniforms.v2.value = v2;
+    this.uniforms.occlusion.value = occ;
+    this.webGlUniforms.uV2.value = v2;
+    this.webGlUniforms.uOcclusion.value = occ;
+
     this.webGlBodyColor
       .setRGB(1.0, 0.48, 0.08)
       .lerp(this.scratchColor, 0.18);

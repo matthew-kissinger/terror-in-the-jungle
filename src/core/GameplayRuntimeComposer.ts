@@ -102,6 +102,7 @@ interface GameplayRuntimeGroups {
     | 'atmosphereSystem'
     | 'audioManager'
     | 'combatantSystem'
+    | 'terrainSystem'
     | 'weatherSystem'
   >;
 }
@@ -175,6 +176,7 @@ export function createGameplayRuntimeGroups(
       atmosphereSystem: refs.atmosphereSystem,
       audioManager: refs.audioManager,
       combatantSystem: refs.combatantSystem,
+      terrainSystem: refs.terrainSystem,
       weatherSystem: refs.weatherSystem,
     },
   };
@@ -369,6 +371,12 @@ function wireEnvironmentRuntime(
     }
     if (camera) {
       runtime.atmosphereSystem.setShadowFollowTarget(camera);
+    }
+    // Bind terrain for the sun-disc horizon-occlusion march so the disc fades
+    // behind ridgelines instead of shining through them. Read-only height
+    // queries; optional (sandbox/tests run without it).
+    if (runtime.terrainSystem) {
+      runtime.atmosphereSystem.setTerrainRuntime(runtime.terrainSystem);
     }
     // Drive the ambient day/night crossfade from the sky's sun elevation.
     // Optional dependency: when atmosphere is absent (sandbox/tests) the

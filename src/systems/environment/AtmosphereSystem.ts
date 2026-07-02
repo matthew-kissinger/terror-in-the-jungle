@@ -3,10 +3,10 @@
 
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/SystemInterfaces';
+import type { ICloudRuntime, IGameRenderer, ISkyRuntime, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
-import { SunDiscMesh } from './atmosphere/SunDiscMesh';
+import { SunDiscUpdater } from './atmosphere/SunDiscUpdater';
 import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, lightingRigBindings, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
@@ -140,7 +140,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private scene?: THREE.Scene;
   private domeMesh: THREE.Mesh;
   /** SOL-1 visible hot-body owner; the TSL dome keeps sky glow/scatter only. */
-  private sunDisc: SunDiscMesh;
+  private sunDisc: SunDiscUpdater;
   private sunDiscMesh: THREE.Mesh;
   private currentScenario?: ScenarioAtmosphereKey;
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
@@ -190,7 +190,7 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.hosekBackend = new HosekWilkieSkyBackend();
     this.backend = this.hosekBackend;
     this.domeMesh = this.hosekBackend.getMesh();
-    this.sunDisc = new SunDiscMesh(SKY_DOME_RADIUS);
+    this.sunDisc = new SunDiscUpdater(SKY_DOME_RADIUS);
     this.sunDiscMesh = this.sunDisc.getMesh();
     // Mobile GPUs get a 4x-stretched sky-texture refresh cadence so the
     // per-fire compositing cost does not dominate the frame budget on the
@@ -438,6 +438,11 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.followTarget = target;
   }
 
+  /** Bind terrain so the sun disc fades behind ridgelines (read-only; optional). */
+  setTerrainRuntime(terrain: ITerrainRuntime | undefined): void {
+    this.sunDisc.setTerrainRuntime(terrain);
+  }
+
   /**
    * Forward weather-driven fog darkening (STORM dims the horizon tint).
    * Clamped to [0, 1]; the atmosphere system multiplies the sky-horizon
@@ -540,22 +545,19 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   }
 
   /**
-   * Per-frame sun-disc placement + intensity. The additive sprite sits
-   * just inside the sky dome at the current sun direction and pulls its
-   * chromaticity from the backend's `getSun` transmittance path (warm at
-   * dawn, white-hot at noon). The disc hides itself when the sun drops
-   * below the horizon. Kept separate from `applyToRenderer` so the
-   * fog/light path stays usable without a sun-disc scene attachment.
+   * Per-frame sun-disc placement + intensity. The additive sprite sits just
+   * inside the sky dome at the current sun direction and pulls chromaticity from
+   * the backend's `getSun` path (warm at dawn, white-hot at noon). It hides below
+   * the horizon and (via `SunDiscUpdater`) fades behind terrain ridgelines.
+   * Separate from `applyToRenderer` so the fog/light path stays usable standalone.
    */
   private updateSunDisc(): void {
-    // SOL-1 / SDS alignment: the additive sprite owns the visible hot body.
-    // The dome owns only atmospheric glow / horizon scatter so the scene does
-    // not render a double hard sun. WorldBuilder can still disable the sprite
-    // for explicit dev A/B comparison.
+    // SOL-1 / SDS alignment: the additive sprite owns the visible hot body; the
+    // dome owns only atmospheric glow / horizon scatter (no double hard sun).
+    // WorldBuilder can still disable the sprite for explicit dev A/B comparison.
     const wb = import.meta.env.DEV ? getWorldBuilderState() : undefined;
-    this.sunDisc.setEnabled(wb?.useAdditiveSunSprite !== false);
     this.backend.getSun(this.scratchSunColor);
-    this.sunDisc.update(this.cameraPosition, this.sunDirection, this.scratchSunColor);
+    this.sunDisc.update(wb?.useAdditiveSunSprite !== false, this.cameraPosition, this.sunDirection, this.scratchSunColor);
   }
 
   private applyFogColor(): void {
