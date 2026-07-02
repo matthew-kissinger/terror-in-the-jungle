@@ -356,7 +356,6 @@ describe('PlayerController', () => {
     it('routes the pause-menu tactical map action to the 2D full map', () => {
       const fullMapSystem = {
         toggleVisibility: vi.fn(),
-        toggleOrbital3D: vi.fn(),
       };
       playerController['fullMapSystem'] = fullMapSystem as any;
       playerController.setSettingsModal(mockSettingsModal);
@@ -366,7 +365,6 @@ describe('PlayerController', () => {
 
       expect(mockSettingsModal.hide).toHaveBeenCalledTimes(1);
       expect(fullMapSystem.toggleVisibility).toHaveBeenCalledTimes(1);
-      expect(fullMapSystem.toggleOrbital3D).not.toHaveBeenCalled();
     });
   });
 

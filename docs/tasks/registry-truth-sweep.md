@@ -35,8 +35,8 @@ and fix a handful of stale code comments (comment-only, zero runtime risk).
 
 - No fence changes (`src/types/SystemInterfaces.ts` untouched).
 - Do NOT touch `src/systems/combat/weapons/NpcM2HBAdapter.ts` (owned by
-  `task/npc-m2hb-gunners`) or anything under `src/ui/map/orbital` (owned by
-  `task/orbital-map-prune`).
+  `task/npc-m2hb-gunners`) or anything under the `src/ui/map/orbital/*` tree
+  (owned by `task/orbital-map-prune`, which deleted that tree).
 - No runtime behavior change. The two code edits are comment-only.
 
 ## Validation

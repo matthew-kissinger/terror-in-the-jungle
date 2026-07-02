@@ -31,22 +31,20 @@ reference overlays (`*-rivers.json`, `*-firebases.json`).
   and record source + license + conversion per the pipeline's "Processing
   Contract".
 
-### Orbital topo map — baked coarse DEMs
+### Orbital topo map — baked coarse DEMs (REMOVED)
 
-Files: `public/data/heightmaps/*-topo-*.f32` (+ `*.json` sidecars) — the coarse
-(96²) relief grids the 3D orbital topographic map CPU-displaces. Produced by
-`scripts/bake-topo-dem.ts`, which **downsamples** the existing committed
-`.f32` DEMs already in the repo (no fresh clip, no network):
+The 3D orbital topographic map was **removed after the 2026-07-01 owner playtest**
+(owner decision U4). Its baked coarse relief DEMs
+(`public/data/heightmaps/*-topo-96.f32` + `*.json` sidecars), the
+`scripts/bake-topo-dem.ts` bake script, and the `src/ui/map/orbital/` code were
+deleted in `task/orbital-map-prune` (git history is the resurrection path).
 
-- `a-shau-topo-*.f32` derives from the **NASADEM**-based A Shau `z14` clip
-  (`public/data/vietnam/big-map/a-shau-z14-9x9.f32`). NASADEM is a
-  **public-domain / CC0** US-government product (no copyright, no relicensing).
-  The A Shau source DEM is git-ignored (large binary), so this baked topo may be
-  absent in CI checkouts; the live map covers A Shau via the runtime heightmap.
-- `open_frontier-*-topo-*.f32`, `zone_control-*-topo-*.f32`, `tdm-*-topo-*.f32`
-  derive from the **procedurally generated** seed DEMs (original project work).
-- These generated `.f32`/`.json` carry **no SPDX header** (generated data); their
-  provenance is recorded here and in `docs/asset-provenance/orbital-topo-2026-06/`.
+The removed A Shau topo derived from the **NASADEM**-based A Shau `z14` clip
+(public-domain / CC0, US-government); the other three derived from the
+procedurally generated seed DEMs (original project work). Since none of these
+generated `.f32` files ship any longer, no third-party provenance attaches. The
+historical provenance record is kept for the record in
+`docs/asset-provenance/orbital-topo-2026-06/`.
 
 ## Fonts — third-party, SIL Open Font License 1.1
 

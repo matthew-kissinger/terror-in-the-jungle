@@ -1,13 +1,22 @@
 # Orbital topo map — baked coarse DEMs (provenance)
 
-The 3D orbital topographic map (`cycle-2026-06-29-orbital-topo-map`,
-campaign Phase 5) CPU-displaces a coarse relief grid from a baked `.f32`.
+> **REMOVED (2026-07-02).** The 3D orbital topographic map was cut after the
+> 2026-07-01 owner playtest (owner decision U4). The baked `*-topo-96.f32`
+> DEMs, the `scripts/bake-topo-dem.*` bake script, and the `src/ui/map/orbital/*`
+> code were deleted in `task/orbital-map-prune`; git history is the resurrection
+> path. This directory is retained only as a historical provenance record for
+> those (now-deleted) baked artifacts. (Paths shown as globs so doc-drift does
+> not treat the now-deleted files as live code paths.)
 
-These coarse DEMs are produced by `scripts/bake-topo-dem.ts`, which
-**downsamples** the `.f32` DEMs already committed to the repo — no fresh
-OpenTopography clip, no network, no credentials. Generated `.f32`/`.json`
-carry **no SPDX header** (they are data, not source); their provenance is
-recorded here and in [`THIRD-PARTY-ASSETS.md`](../../../THIRD-PARTY-ASSETS.md).
+The 3D orbital topographic map (`cycle-2026-06-29-orbital-topo-map`,
+campaign Phase 5) CPU-displaced a coarse relief grid from a baked `.f32`.
+
+These coarse DEMs were produced by the (now-deleted) `scripts/bake-topo-dem.*`
+bake script, which **downsampled** the `.f32` DEMs already committed to the repo
+— no fresh OpenTopography clip, no network, no credentials. Generated
+`.f32`/`.json` carried **no SPDX header** (they are data, not source); their
+provenance is recorded here and in
+[`THIRD-PARTY-ASSETS.md`](../../../THIRD-PARTY-ASSETS.md).
 
 ## Outputs
 
