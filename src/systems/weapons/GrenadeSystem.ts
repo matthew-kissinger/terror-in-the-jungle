@@ -4,8 +4,9 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { GrenadeType } from '../combat/types';
-import type { Faction } from '../combat/types';
+import { GrenadeType, Faction } from '../combat/types';
+import { GameEventBus } from '../../core/GameEventBus';
+import type { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -23,6 +24,14 @@ const _throwStartPos = new THREE.Vector3();
 const _throwDirection = new THREE.Vector3();
 const _throwForwardDir = new THREE.Vector3();
 const _throwVelocity = new THREE.Vector3();
+const _inHandPos = new THREE.Vector3();
+
+// An in-hand frag detonation is unsurvivable — the charge goes off against the
+// player's own body, so we bypass the danger-close 0.75x self-scale falloff
+// (owner decision F2, campaign manifest greenlight-followthrough) and apply a
+// guaranteed-lethal hit directly. Spawn protection still spares the player
+// (takeDamage returns false while invulnerable), which is the honest edge.
+const IN_HAND_LETHAL_DAMAGE = 9999;
 
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -35,6 +44,7 @@ export class GrenadeSystem implements GameSystem {
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
   private playerController?: IPlayerController;
+  private playerHealthSystem?: PlayerHealthSystem;
   private statsTracker?: PlayerStatsTracker;
 
   private grenades: Grenade[] = [];
@@ -118,7 +128,10 @@ export class GrenadeSystem implements GameSystem {
       }
     }
 
-    // Update cooking timer
+    // Update cooking timer. A `true` return means the fuse ran out with the
+    // grenade still in hand: GrenadeCooking has already fired the cosmetic
+    // blast (effect, audio, shake), so here we apply the real lethal
+    // self-damage + the NPC-facing explosion and end the aim.
     if (this.cooking.update(
       deltaTime,
       this.camera,
@@ -126,6 +139,7 @@ export class GrenadeSystem implements GameSystem {
       this.audioManager,
       this.playerController
     )) {
+      this.explodeInHand();
       this.cancelThrow();
     }
 
@@ -318,6 +332,49 @@ export class GrenadeSystem implements GameSystem {
     );
   }
 
+  /**
+   * Real lethal payload for a grenade whose fuse ran out in hand (owner
+   * decision F2). GrenadeCooking already played the cosmetic blast; here we:
+   *   1. kill the player directly (unsurvivable, no self-scale falloff), and
+   *   2. run the standard player-attributed explosion at the player's position
+   *      so nearby NPCs take blast damage exactly like a thrown frag.
+   * The direct kill runs first so the player is already dead when the standard
+   * explosion's own-ordnance self-hit branch fires — that branch short-circuits
+   * on a dead player and never emits a second `player_killed`.
+   */
+  private explodeInHand(): void {
+    const explosionPos = _inHandPos.copy(this.camera.position);
+
+    if (this.playerHealthSystem) {
+      const died = this.playerHealthSystem.takeDamage(
+        IN_HAND_LETHAL_DAMAGE,
+        explosionPos,
+        explosionPos
+      );
+      if (died) {
+        GameEventBus.emit('player_killed', {
+          killerId: 'own_grenade_cooked',
+          killerFaction: Faction.US,
+          position: explosionPos.clone(),
+        });
+        Logger.info('weapons', 'Player killed by cooked grenade in hand');
+      }
+    }
+
+    // Blast the surroundings like a normal player frag (attackerId 'PLAYER',
+    // no shooterFaction so nearby combatants of any side are hit — a frag has
+    // no IFF). The internal self-hit re-entry is a no-op now the player is dead.
+    if (this.combatantSystem) {
+      this.combatantSystem.applyExplosionDamage(
+        explosionPos,
+        this.DAMAGE_RADIUS,
+        this.MAX_DAMAGE,
+        'PLAYER',
+        'grenade'
+      );
+    }
+  }
+
   private getGroundHeight(x: number, z: number): number {
     if (this.terrainSystem) {
       return this.terrainSystem.getEffectiveHeightAt(x, z);
@@ -360,6 +417,10 @@ export class GrenadeSystem implements GameSystem {
 
   setPlayerController(playerController: IPlayerController): void {
     this.playerController = playerController;
+  }
+
+  setPlayerHealthSystem(playerHealthSystem: PlayerHealthSystem): void {
+    this.playerHealthSystem = playerHealthSystem;
   }
 
   setFlashbangEffect(flashbangEffect: IFlashbangScreenEffect): void {

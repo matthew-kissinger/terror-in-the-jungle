@@ -29,6 +29,7 @@ export class GrenadeMeter extends UIComponent {
         <div class="${styles.fill}" data-ref="fill"></div>
         <div class="${styles.text}" data-ref="text">30%</div>
       </div>
+      <div class="${styles.hint}" data-ref="hint">R: Cook</div>
       <div class="${styles.cooking}" data-ref="cooking">COOKING: 0.0s</div>
     `;
   }
@@ -74,6 +75,16 @@ export class GrenadeMeter extends UIComponent {
 
       // Pulse at max
       fill.classList.toggle(styles.fillMax, normalized >= 95);
+    });
+
+    // Effect: pin-pull hint. Shown while aiming until the pin is pulled; once
+    // the fuse is running the COOKING countdown carries the messaging.
+    this.effect(() => {
+      const ct = this.cookingTime.value;
+      const hintEl = this.$('[data-ref="hint"]');
+      if (!hintEl) return;
+      const cooking = ct !== undefined && ct > 0;
+      hintEl.classList.toggle(styles.hintHidden, cooking);
     });
 
     // Effect: cooking timer

@@ -70,6 +70,21 @@
   font-variant-numeric: tabular-nums;
 }
 
+.hint {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-secondary);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+  text-shadow: var(--shadow-text);
+}
+
+.hintHidden {
+  display: none;
+}
+
 .cooking {
   font-size: var(--font-size-xs);
   font-weight: var(--weight-bold);

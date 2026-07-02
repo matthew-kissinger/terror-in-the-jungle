@@ -96,6 +96,17 @@ export class PlayerCombatController {
   }
 
   reload(): void {
+    // R doubles as the grenade cook input: while a real frag is actively aimed
+    // (post-beginFire, pre-release), R pulls the pin and starts the fuse instead
+    // of reloading. The grenade slot has no magazine, so this steals nothing;
+    // any other state (or a non-grenade equipment action) falls through to the
+    // normal weapon reload. startCooking() self-guards on isAiming, so this is
+    // safe even if the aim ends between the check and the call.
+    if (this.deps.grenadeSystem?.isCurrentlyAiming()
+      && this.deps.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'grenade') {
+      this.deps.grenadeSystem.startCooking();
+      return;
+    }
     this.deps.firstPersonWeapon?.getWeaponInput()?.triggerReload();
   }
 

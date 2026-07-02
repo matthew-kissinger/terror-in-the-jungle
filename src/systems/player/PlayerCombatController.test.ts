@@ -22,14 +22,18 @@ describe('PlayerCombatController — flight-vehicle fire routing', () => {
   let controller: PlayerCombatController;
   let helicopterModel: { startFiring: ReturnType<typeof vi.fn>; stopFiring: ReturnType<typeof vi.fn> };
   let fixedWingModel: { startFiring: ReturnType<typeof vi.fn>; stopFiring: ReturnType<typeof vi.fn> };
-  let weaponInput: { triggerFireStart: ReturnType<typeof vi.fn>; triggerFireStop: ReturnType<typeof vi.fn> };
+  let weaponInput: {
+    triggerFireStart: ReturnType<typeof vi.fn>;
+    triggerFireStop: ReturnType<typeof vi.fn>;
+    triggerReload: ReturnType<typeof vi.fn>;
+  };
   const camera = new THREE.PerspectiveCamera();
 
   beforeEach(() => {
     controller = new PlayerCombatController();
     helicopterModel = { startFiring: vi.fn(), stopFiring: vi.fn() };
     fixedWingModel = { startFiring: vi.fn(), stopFiring: vi.fn() };
-    weaponInput = { triggerFireStart: vi.fn(), triggerFireStop: vi.fn() };
+    weaponInput = { triggerFireStart: vi.fn(), triggerFireStop: vi.fn(), triggerReload: vi.fn() };
     controller.configure({
       helicopterModel: helicopterModel as any,
       fixedWingModel: fixedWingModel as any,
@@ -72,6 +76,63 @@ describe('PlayerCombatController — flight-vehicle fire routing', () => {
 
     expect(fixedWingModel.startFiring).not.toHaveBeenCalled();
     expect(weaponInput.triggerFireStart).toHaveBeenCalledTimes(1);
+  });
+
+  describe('reload doubling as the grenade cook input', () => {
+    function makeGrenadeDeps(aiming: boolean, equipmentAction: 'grenade' | 'sandbag' = 'grenade') {
+      const grenadeSystem = {
+        isCurrentlyAiming: vi.fn(() => aiming),
+        startCooking: vi.fn(),
+      };
+      const inventoryManager = {
+        getEquipmentActionForSlot: vi.fn(() => equipmentAction),
+      };
+      return { grenadeSystem, inventoryManager };
+    }
+
+    it('pulls the pin instead of reloading when a real frag is actively aimed', () => {
+      const { grenadeSystem, inventoryManager } = makeGrenadeDeps(true);
+      controller.configure({
+        grenadeSystem: grenadeSystem as any,
+        inventoryManager: inventoryManager as any,
+      });
+
+      controller.reload();
+
+      expect(grenadeSystem.startCooking).toHaveBeenCalledTimes(1);
+      expect(weaponInput.triggerReload).not.toHaveBeenCalled();
+    });
+
+    it('reloads the weapon when no grenade is being aimed', () => {
+      const { grenadeSystem, inventoryManager } = makeGrenadeDeps(false);
+      controller.configure({
+        grenadeSystem: grenadeSystem as any,
+        inventoryManager: inventoryManager as any,
+      });
+
+      controller.reload();
+
+      expect(grenadeSystem.startCooking).not.toHaveBeenCalled();
+      expect(weaponInput.triggerReload).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads rather than cooking when the grenade slot holds a non-frag tool', () => {
+      const { grenadeSystem, inventoryManager } = makeGrenadeDeps(true, 'sandbag');
+      controller.configure({
+        grenadeSystem: grenadeSystem as any,
+        inventoryManager: inventoryManager as any,
+      });
+
+      controller.reload();
+
+      expect(grenadeSystem.startCooking).not.toHaveBeenCalled();
+      expect(weaponInput.triggerReload).toHaveBeenCalledTimes(1);
+    });
+
+    it('reloads normally when no grenade system is wired at all', () => {
+      controller.reload();
+      expect(weaponInput.triggerReload).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('routes LMB hold and release to the armed smoke-marker tool before weapons', () => {

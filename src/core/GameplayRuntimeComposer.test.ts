@@ -79,6 +79,7 @@ function createRefs() {
       setImpactEffectsPool: vi.fn(),
       setInventoryManager: vi.fn(),
       setPlayerController: vi.fn(),
+      setPlayerHealthSystem: vi.fn(),
       setTicketSystem: vi.fn(),
     },
     hudSystem: { getStatsTracker: vi.fn(() => ({ id: 'stats-tracker' })) },
@@ -186,6 +187,7 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.grenadeSystem.setTicketSystem).toHaveBeenCalledWith(refs.ticketSystem);
     expect(refs.grenadeSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
     expect(refs.grenadeSystem.setPlayerController).toHaveBeenCalledWith(refs.playerController);
+    expect(refs.grenadeSystem.setPlayerHealthSystem).toHaveBeenCalledWith(refs.playerHealthSystem);
     expect(refs.grenadeSystem.setFlashbangEffect).toHaveBeenCalledWith(refs.flashbangScreenEffect);
     expect(refs.grenadeSystem.setImpactEffectsPool).toHaveBeenCalledWith(impactEffectsPool);
     expect(refs.grenadeSystem.setExplosionEffectsPool).toHaveBeenCalledWith(explosionEffectsPool);
