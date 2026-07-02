@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { FixedStepRunner } from '../../utils/FixedStepRunner';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { slopeDriveFactor, conformOrHoldPose } from './vehiclePhysicsMath';
 
 /**
  * Hand-rolled ground-vehicle physics — fixed-step rigid-body sim mirroring
@@ -31,9 +32,6 @@ const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _worldUp = new THREE.Vector3(0, 1, 0);
 const _normal = new THREE.Vector3();
-const _yawAxis = new THREE.Vector3(0, 1, 0);
-const _yawQuat = new THREE.Quaternion();
-const _conformQuat = new THREE.Quaternion();
 const _wheelLocal = new THREE.Vector3();
 const _wheelWorld = new THREE.Vector3();
 const _euler = new THREE.Euler();
@@ -64,7 +62,12 @@ export interface GroundVehiclePhysicsConfig {
   wheelRadius: number;     // m
   maxSteer: number;        // rad
   maxBrake: number;        // N peak braking force
-  maxClimbSlope: number;   // rad, slope above which drive force fades to 0
+  /**
+   * Climbable-slope ceiling as a true surface angle in RADIANS. `getSlopeAt`
+   * returns a 0..1 deficit (`1 - normal.y`), NOT an angle; `integrateLinear`
+   * converts it (`acos(1 - deficit)`) before comparing against this ceiling.
+   */
+  maxClimbSlope: number;   // rad
   rollingCoef: number;     // linear rolling drag coefficient (N per m/s)
   airDragCoef: number;     // quadratic air drag (N per (m/s)^2)
   velocityDamping: number; // exponential damping base, e.g. 0.96
@@ -80,6 +83,11 @@ export interface GroundVehiclePhysicsConfig {
   slopeGravityScale: number;
   inputSmoothRate: number; // 1/s, per-second lerp rate toward raw input
   engineSpoolRate: number; // 1/s, engine RPM convergence rate
+  /**
+   * Time constant (s) for the chassis-tilt conform (exponential lerp toward the
+   * sampled normal). Heading is NOT smoothed. `0` restores the legacy hard snap.
+   */
+  conformTau: number;
   /** Low-speed full-authority cutoff (m/s). Steering authority = 1 below this. */
   steerLowSpeedCutoff: number;
   /** High-speed cutoff (m/s). Steering authority floored at 0.3 above this. */
@@ -116,7 +124,7 @@ const DEFAULT_PHYSICS: GroundVehiclePhysicsConfig = {
   wheelRadius: 0.39,
   maxSteer: 0.6,
   maxBrake: 18000,
-  maxClimbSlope: 0.74,
+  maxClimbSlope: 0.87, // rad (~50 deg) true surface angle — see interface doc
   rollingCoef: 85,
   airDragCoef: 1.6,
   velocityDamping: 0.9,
@@ -126,6 +134,7 @@ const DEFAULT_PHYSICS: GroundVehiclePhysicsConfig = {
   slopeGravityScale: 0.3,
   inputSmoothRate: 8.0,
   engineSpoolRate: 2.0,
+  conformTau: 0.2,
   steerLowSpeedCutoff: 5,
   steerHighSpeedCutoff: 25,
 };
@@ -145,6 +154,20 @@ export class GroundVehiclePhysics {
   private smoothedControls: GroundVehicleControls;
   private engineActive = false;
   private worldHalfExtent = 0;
+
+  /**
+   * Authoritative chassis heading (world-Y yaw, radians). Persisted explicitly
+   * instead of re-extracting it from the tilt-composed quaternion each step —
+   * `euler.y` of `tilt * yaw` reads `atan2(sin psi, cos psi * cos slope)`, which
+   * amplifies heading error by `1/cos(slope)` per step and weathervanes a
+   * cross-slope chassis (even a parked one). Moved ONLY by the yaw-integration
+   * step, `setQuaternion` / `resetToStable`, and the spawn seed; `conformToGround`
+   * rebuilds `Ry(heading)` from it.
+   */
+  private heading = 0;
+
+  /** Smoothed ground normal for the tilt conform (lerped, tau = `cfg.conformTau`). */
+  private readonly smoothedNormal = new THREE.Vector3(0, 1, 0);
 
   constructor(initialPosition: THREE.Vector3, config?: Partial<GroundVehiclePhysicsConfig>) {
     this.cfg = { ...DEFAULT_PHYSICS, ...(config ?? {}) };
@@ -218,6 +241,9 @@ export class GroundVehiclePhysics {
   setQuaternion(q: THREE.Quaternion): void {
     this.state.quaternion.copy(q).normalize();
     this.state.angularVelocity.set(0, 0, 0);
+    // Seed the scalar heading from the placement yaw (the one sanctioned extract).
+    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
+    this.heading = _euler.y;
     this.snapshotPrevious();
   }
 
@@ -305,6 +331,8 @@ export class GroundVehiclePhysics {
     this.state.velocity.set(0, 0, 0);
     this.state.angularVelocity.set(0, 0, 0);
     this.state.quaternion.identity();
+    this.heading = 0; // identity orientation -> zero world-Y yaw
+    this.smoothedNormal.set(0, 1, 0);
     this.state.engineRPM = 0;
     this.state.isGrounded = true;
     this.state.groundHeight = position.y - this.cfg.axleOffset;
@@ -348,8 +376,9 @@ export class GroundVehiclePhysics {
   }
 
   getHeading(): number {
-    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
-    let degrees = THREE.MathUtils.radToDeg(_euler.y);
+    // Read the persisted scalar heading, not a re-extraction from the tilted
+    // quaternion (which weathervanes on slopes — see the `heading` field doc).
+    let degrees = THREE.MathUtils.radToDeg(this.heading);
     degrees = ((degrees % 360) + 360) % 360;
     return degrees;
   }
@@ -399,8 +428,9 @@ export class GroundVehiclePhysics {
     // Damping for stability (mirrors HelicopterPhysics).
     this.applyDamping(deltaTime);
 
-    // Conform body to terrain (Y snap + pitch/roll from normal).
-    this.conformToGround(sampledNormal);
+    // Conform body to terrain (Y snap + smoothed pitch/roll from normal),
+    // rebuilding the quaternion from the persisted heading + smoothed tilt.
+    this.conformToGround(deltaTime, sampledNormal);
 
     if (this.worldHalfExtent > 0) {
       this.enforceWorldBoundary();
@@ -519,18 +549,12 @@ export class GroundVehiclePhysics {
     // Chassis-forward in world frame (model convention: local -Z forward).
     _forward.set(0, 0, -1).applyQuaternion(this.state.quaternion);
 
-    // Slope-stall scaling: drive force fades to zero at maxClimbSlope.
+    // Slope-stall scaling: `getSlopeAt` returns a 0..1 deficit (`1 - normal.y`),
+    // converted to a surface angle and gated against maxClimbSlope (radians).
     let slopeFactor = 1;
     if (terrain && this.state.isGrounded) {
-      const slope = terrain.getSlopeAt(this.state.position.x, this.state.position.z);
-      if (slope > 0 && maxClimbSlope > 0) {
-        slopeFactor = slope >= maxClimbSlope
-          ? 0
-          : Math.max(
-              THREE.MathUtils.clamp(slopeDriveFloor, 0, 1),
-              THREE.MathUtils.clamp(1 - slope / maxClimbSlope, 0, 1),
-            );
-      }
+      const slopeDeficit = terrain.getSlopeAt(this.state.position.x, this.state.position.z);
+      slopeFactor = slopeDriveFactor(slopeDeficit, maxClimbSlope, slopeDriveFloor);
     }
 
     // Drive force: torque -> linear force via gear and wheel radius.
@@ -631,10 +655,9 @@ export class GroundVehiclePhysics {
     this.state.angularVelocity.z = 0;
 
     if (Math.abs(omegaY) > 1e-5) {
-      const angle = omegaY * deltaTime;
-      _yawQuat.setFromAxisAngle(_yawAxis, angle);
-      // Yaw applied in world frame about world Y.
-      this.state.quaternion.premultiply(_yawQuat).normalize();
+      // Accumulate the yaw step onto the scalar heading; `conformToGround`
+      // rebuilds the quaternion from it (no premultiply here).
+      this.heading += omegaY * deltaTime;
     }
   }
 
@@ -645,26 +668,18 @@ export class GroundVehiclePhysics {
     this.state.angularVelocity.multiplyScalar(Math.pow(this.cfg.angularDamping, deltaTime));
   }
 
-  // ---------- Ground conform (Y clamp + pitch/roll from normal) ----------
+  // ---------- Ground conform (Y clamp + smoothed pitch/roll from normal) ----------
 
-  private conformToGround(normal: THREE.Vector3): void {
-    if (!this.state.isGrounded) return;
-
-    // Y snap to averaged wheel ground height + axle offset. The per-wheel
-    // height check in sampleTerrain already populated wheelSamples; we use
-    // the running average stored in state.groundHeight.
-    const targetY = this.state.groundHeight + this.cfg.axleOffset;
-    this.state.position.y = targetY;
-    // Kill vertical velocity that would push into the surface.
-    if (this.state.velocity.y < 0) this.state.velocity.y = 0;
-
-    // Compose conform: yaw kept (from world-Y rotation), pitch+roll set
-    // to align local Y with terrain normal.
-    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
-    const yaw = _euler.y;
-    _yawQuat.setFromAxisAngle(_yawAxis, yaw);
-    _conformQuat.setFromUnitVectors(_worldUp, normal);
-    this.state.quaternion.multiplyQuaternions(_conformQuat, _yawQuat).normalize();
+  private conformToGround(deltaTime: number, normal: THREE.Vector3): void {
+    // Rebuild `tilt * Ry(heading)` from the persisted heading (see conformOrHoldPose).
+    if (this.state.isGrounded) {
+      this.state.position.y = this.state.groundHeight + this.cfg.axleOffset;
+      if (this.state.velocity.y < 0) this.state.velocity.y = 0;
+    }
+    conformOrHoldPose(
+      this.state.quaternion, this.state.isGrounded, this.heading, normal,
+      this.smoothedNormal, this.cfg.conformTau, deltaTime,
+    );
   }
 
   // ---------- World boundary ----------

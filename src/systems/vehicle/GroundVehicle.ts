@@ -26,6 +26,11 @@ const DEFAULT_M151_SEATS: VehicleSeat[] = [
  * Exposed for tests and for follow-on vehicles that want to override individual
  * fields; the physics class merges over its own defaults so passing `undefined`
  * here yields the same simulation.
+ *
+ * NOTE: `maxClimbSlope` is a true surface ANGLE in radians. The runtime
+ * `ITerrainRuntime.getSlopeAt` returns a 0..1 deficit (`1 - normal.y`), and
+ * `GroundVehiclePhysics.integrateLinear` converts that deficit to an angle
+ * (`acos(1 - deficit)`) before comparing against this ceiling.
  */
 export const M151_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   mass: 1120,
@@ -38,7 +43,7 @@ export const M151_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   engineTorque: 520,
   gearRatio: 5.2,
   maxSteer: 0.58,
-  maxClimbSlope: 0.76,
+  maxClimbSlope: 0.87, // rad (~50 deg) — true surface angle, see header note
   rollingCoef: 85,
   velocityDamping: 0.95,
   angularDamping: 0.76,
@@ -70,7 +75,9 @@ const M35_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   engineTorque: 1800,
   gearRatio: 5.4,
   maxSteer: 0.46,
-  maxClimbSlope: 0.66,
+  // rad (~40 deg) — true surface angle; deficit->angle converted at the
+  // consumption site (see M151_PHYSICS_CONFIG header note).
+  maxClimbSlope: 0.70,
   rollingCoef: 260,
   airDragCoef: 4,
   velocityDamping: 0.87,
@@ -87,7 +94,9 @@ const APC_PHYSICS_CONFIG: Partial<GroundVehiclePhysicsConfig> = {
   engineTorque: 2100,
   gearRatio: 5.2,
   maxSteer: 0.42,
-  maxClimbSlope: 0.68,
+  // rad (~42 deg) — true surface angle; deficit->angle converted at the
+  // consumption site (see M151_PHYSICS_CONFIG header note).
+  maxClimbSlope: 0.73,
   rollingCoef: 420,
   airDragCoef: 5,
   velocityDamping: 0.87,

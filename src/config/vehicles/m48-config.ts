@@ -14,16 +14,22 @@ import type { TrackedVehiclePhysicsConfig } from '../../systems/vehicle/TrackedV
  *     off-road slope-stall scaling). We run the cap slightly low (11 m/s)
  *     so the chassis reads "slower but stronger" off-road.
  *   - Max climbable grade ~ 60% ≈ 31° historically, but tracked-vehicle
- *     ground pressure lets us push the engine envelope to ~0.78 rad
- *     (~45°) before drive force fades to zero. Sanity ceiling: stays well
- *     below the near-vertical walls (≳ 1.0 rad / 57°) the slope-stall path
- *     rejects, so the tank still cannot drive cliffs.
+ *     ground pressure lets us push the engine envelope to ~0.96 rad
+ *     (~55°) before drive force fades to zero. Sanity ceiling: stays below
+ *     the near-vertical cliff walls the slope-stall path rejects, so the
+ *     tank still cannot drive cliffs.
  *
- * Climb-authority tuning (2026-06-28 owner playtest — tanks bogged down
- * and slid on jungle hills they should crest). Restated here so the
- * config block documents the per-vehicle tuning the cycle brief calls out
- * and stays in lockstep with the T-54 (see `t54-config.ts`):
- *   - `maxClimbSlope` raised so steeper grades stay drivable.
+ * IMPORTANT: `maxClimbSlope` is a true surface ANGLE in radians. The runtime
+ * `ITerrainRuntime.getSlopeAt` returns a 0..1 deficit (`1 - normal.y`), and
+ * `TrackedVehiclePhysics.integrateLocomotion` converts that deficit to an
+ * angle (`acos(1 - deficit)`) before comparing against this ceiling.
+ *
+ * Climb-authority tuning (2026-06-28 owner playtest — tanks bogged down and
+ * slid on jungle hills they should crest; 2026-07-02 retune raised the ceiling
+ * to ~55° once the deficit→angle conversion made the old radian-vs-deficit
+ * comparison honest). Restated here so the config block documents the
+ * per-vehicle tuning and stays in lockstep with the T-54 (see `t54-config.ts`):
+ *   - `maxClimbSlope` set so steep grades stay drivable but real cliffs reject.
  *   - `slopeDriveFloor` raised so the tank keeps usable uphill power
  *     instead of fading to a crawl before the ceiling.
  *   - `slopeGravityScale` lowered so a stalled chassis slides back less.
@@ -37,7 +43,7 @@ export const M48_PHYSICS_CONFIG: Partial<TrackedVehiclePhysicsConfig> = {
   trackSeparation: 2.92,
   hullLength: 6.4,
   maxTrackSpeed: 11,
-  maxClimbSlope: 0.78,
+  maxClimbSlope: 0.96, // rad (~55 deg) — true surface angle, see header note
   slopeDriveFloor: 0.62,
   slopeGravityScale: 0.2,
 };
