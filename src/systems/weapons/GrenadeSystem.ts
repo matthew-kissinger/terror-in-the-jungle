@@ -434,7 +434,7 @@ export class GrenadeSystem implements GameSystem {
       this.statsTracker.addGrenadeThrow();
     }
 
-    Logger.info('weapons', `M79 grenade launched (fuse ${fuseTime.toFixed(1)}s)`);
+    Logger.info('weapons', `${killFeedWeaponType ?? 'M79'} projectile launched (fuse ${fuseTime.toFixed(1)}s)`);
   }
 
 }

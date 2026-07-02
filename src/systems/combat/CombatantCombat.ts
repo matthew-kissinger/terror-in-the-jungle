@@ -617,7 +617,6 @@ export class CombatantCombat {
 
   setPlayerHealthSystem(system: PlayerHealthSystem): void {
     this.playerHealthSystem = system;
-    this.damage.setPlayerHealthSystem(system);
   }
 
   setTicketSystem(system: TicketSystem): void {
