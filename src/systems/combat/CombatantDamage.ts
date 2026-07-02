@@ -3,7 +3,6 @@
 
 import * as THREE from 'three';
 import { Combatant, CombatantState, Squad, isBlufor, isPlayerTarget } from './types';
-import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
@@ -37,7 +36,6 @@ export interface DeathBookkeeping extends DeathBookkeepingHooks {
  * Includes death animations, effects, kill feed, squad updates, and ticket system.
  */
 export class CombatantDamage {
-  private playerHealthSystem?: PlayerHealthSystem;
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
   private hudSystem?: IHUDSystem;
@@ -50,10 +48,6 @@ export class CombatantDamage {
   private readonly scratchDeathDir = new THREE.Vector3();
   private readonly scratchBloodPos = new THREE.Vector3();
   private readonly scratchSplatterDir = new THREE.Vector3();
-
-  setPlayerHealthSystem(system: PlayerHealthSystem): void {
-    this.playerHealthSystem = system;
-  }
 
   setTicketSystem(system: TicketSystem): void {
     this.ticketSystem = system;
