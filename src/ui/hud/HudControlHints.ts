@@ -377,15 +377,20 @@ export class HudControlHints {
     // broadside battery fires on LMB once airborne and RMB is its gun camera.
     // Checked before the tank `pilot` branch since the fixed wing also reports
     // `role: 'pilot'` but with `kind: 'plane'`.
-    if (context.kind === 'plane' && (armed || context.viewToggle)) {
+    if (context.kind === 'plane' && (armed || context.viewToggle || context.bombsAvailable)) {
       return {
         label: 'PILOT',
         hasSecondSeat: false,
         armed,
-        // Only the broadside gunship (AC-47) has a gun camera on RMB; a plain
-        // strike plane (A-1 / F-4) has no RMB action, so gate the note on the
-        // view toggle to mirror the `broadsideView` gate one line below.
-        note: context.viewToggle ? 'RMB: broadside gun cam' : undefined,
+        // RMB is airframe-specific: the AC-47 broadside gunship uses it for the
+        // gun camera; the A-1 / F-4 use it to drop a bomb. The two are mutually
+        // exclusive (a broadside airframe carries no bombs), so the note reads
+        // the one that applies. A plain gun-only plane has no RMB action.
+        note: context.viewToggle
+          ? 'RMB: broadside gun cam'
+          : context.bombsAvailable
+            ? 'RMB: Drop bomb'
+            : undefined,
         // A viewToggle is present only on broadside-capable airframes (AC-47) —
         // gate the dynamic `V` legend row on it so other planes don't show it.
         broadsideView: !!context.viewToggle,

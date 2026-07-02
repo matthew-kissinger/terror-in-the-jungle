@@ -111,6 +111,11 @@ export class FixedWingHUD extends UIComponent {
   private ammoCapacity = this.signal(0);
   private weaponName = this.signal('GUN');
 
+  // Bomb store (dropped-bomb airframes only). `bombCapacity === 0` hides the
+  // panel; LOW lights when one bomb (or none) remains, mirroring the gun LOW cue.
+  private bombCount = this.signal(0);
+  private bombCapacity = this.signal(0);
+
   // Seat / fire cue + airborne-gate hint
   private armed = this.signal(false);
   private broadside = this.signal(false);
@@ -169,6 +174,10 @@ export class FixedWingHUD extends UIComponent {
       <div data-ref="ammoPanel" class="${styles.panel} ${styles.ammoSection}">
         <div data-ref="ammoValue" class="${styles.ammoValue}">0</div>
         <div data-ref="weaponLabel" class="${styles.dataLabel}">GUN</div>
+      </div>
+      <div data-ref="bombPanel" class="${styles.panel} ${styles.ammoSection}" style="display:none">
+        <div data-ref="bombValue" class="${styles.ammoValue}">0</div>
+        <div class="${styles.dataLabel}">BOMBS</div>
       </div>
       <div data-ref="seatPanel" class="${styles.panel} ${styles.seatSection}">
         <div class="${styles.seatLabel}">PILOT</div>
@@ -349,6 +358,21 @@ export class FixedWingHUD extends UIComponent {
       this.text('[data-ref="weaponLabel"]', this.weaponName.value);
     });
 
+    // Effect: bomb store counter. The whole panel hides for airframes that
+    // carry no bombs (capacity 0); LOW lights on the last bomb (or empty),
+    // mirroring the gun LOW cue.
+    this.effect(() => {
+      const count = this.bombCount.value;
+      const capacity = this.bombCapacity.value;
+      const panel = this.$('[data-ref="bombPanel"]');
+      const value = this.$('[data-ref="bombValue"]');
+      if (panel) panel.style.display = capacity > 0 ? '' : 'none';
+      if (value) {
+        value.textContent = String(Math.max(0, Math.round(count)));
+        value.classList.toggle(styles.ammoLow, capacity > 0 && count <= 1);
+      }
+    });
+
     // Effect: seat / fire cue. The pilot seat label is always shown while flying;
     // the LMB-fire cue lights only on armed airframes, and the RMB broadside
     // gun-cam note only on the AC-47 (broadside battery).
@@ -407,6 +431,16 @@ export class FixedWingHUD extends UIComponent {
     if (weaponName !== undefined && weaponName !== '') {
       this.weaponName.value = weaponName;
     }
+  }
+
+  /**
+   * Update the bomb store readout. `undefined` (or capacity 0) hides the bomb
+   * panel — only dropped-bomb airframes (A-1 / F-4) push a bomb load; the
+   * AC-47 and gun-only craft leave it hidden.
+   */
+  setBombs(bombs?: { count: number; capacity: number }): void {
+    this.bombCount.value = bombs?.count ?? 0;
+    this.bombCapacity.value = bombs?.capacity ?? 0;
   }
 
   /**

@@ -143,18 +143,19 @@ export class GrenadeSystem implements GameSystem {
       grenade.fuseTime -= deltaTime;
 
       if (grenade.fuseTime <= 0) {
-        this.explodeGrenade(grenade);
-        this.spawner.removeGrenade(grenade);
-        
-        const last = this.grenades.length - 1;
-        if (i !== last) {
-          this.grenades[i] = this.grenades[last];
-        }
-        this.grenades.pop();
+        this.detonateAndRemove(i);
         continue;
       }
 
       this.physics.updateGrenade(grenade, deltaTime, (x, z) => this.getGroundHeight(x, z));
+
+      // Impact ordnance (rockets, dropped bombs) detonates on first ground
+      // contact instead of bouncing/rolling out the fuse. The long fuse stays a
+      // backstop; thrown/cooked grenades and the M79 leave detonateOnImpact
+      // unset and keep the legacy bounce-and-roll fuse behaviour.
+      if (grenade.detonateOnImpact && grenade.hasImpacted) {
+        this.detonateAndRemove(i);
+      }
     }
   }
 
@@ -307,6 +308,19 @@ export class GrenadeSystem implements GameSystem {
     this.arcRenderer.showArc(false);
   }
 
+  /** Explode the grenade at index `i` and swap-and-pop it from the active list. */
+  private detonateAndRemove(i: number): void {
+    const grenade = this.grenades[i];
+    this.explodeGrenade(grenade);
+    this.spawner.removeGrenade(grenade);
+
+    const last = this.grenades.length - 1;
+    if (i !== last) {
+      this.grenades[i] = this.grenades[last];
+    }
+    this.grenades.pop();
+  }
+
   private explodeGrenade(grenade: Grenade): void {
     this.effects.explodeGrenade(
       grenade,
@@ -409,10 +423,14 @@ export class GrenadeSystem implements GameSystem {
 
   /**
    * Spawn a grenade projectile with a given position and velocity.
-   * Used by the M79 grenade launcher and air-support rocket runs - no
-   * cooking/aiming flow, just physics + fuse. `ownerFaction`, when supplied,
-   * makes the impact respect IFF (friendlies in the blast are spared); omitting
-   * it keeps the legacy damage-everyone behaviour for player ordnance.
+   * Used by the M79 grenade launcher, air-support rocket runs, and dropped
+   * bombs - no cooking/aiming flow, just physics + fuse. `ownerFaction`, when
+   * supplied, makes the impact respect IFF (friendlies in the blast are
+   * spared); omitting it keeps the legacy damage-everyone behaviour for player
+   * ordnance. The `options` bag adds impact ordnance behaviour without changing
+   * the existing thrown-grenade / M79 call sites:
+   *   - `detonateOnImpact` explodes on first ground contact (long fuse backstop);
+   *   - `blastRadius` / `blastDamage` override the legacy 15 m / 150 frag blast.
    */
   spawnProjectile(
     position: THREE.Vector3,
@@ -420,10 +438,14 @@ export class GrenadeSystem implements GameSystem {
     fuseTime: number,
     killFeedWeaponType?: string,
     ownerFaction?: Faction,
+    options?: { detonateOnImpact?: boolean; blastRadius?: number; blastDamage?: number },
   ): void {
     const grenade = this.spawner.spawnGrenade(position, velocity, fuseTime, this.nextGrenadeId++, GrenadeType.FRAG);
     if (killFeedWeaponType) grenade.killFeedWeaponType = killFeedWeaponType;
     if (ownerFaction !== undefined) grenade.ownerFaction = ownerFaction;
+    if (options?.detonateOnImpact) grenade.detonateOnImpact = true;
+    if (options?.blastRadius !== undefined) grenade.blastRadius = options.blastRadius;
+    if (options?.blastDamage !== undefined) grenade.blastDamage = options.blastDamage;
     this.grenades.push(grenade);
 
     if (this.audioManager) {

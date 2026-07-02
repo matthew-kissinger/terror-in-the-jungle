@@ -140,6 +140,62 @@ export function getFixedWingWeaponConfig(configKey: string | null): FixedWingWea
 }
 
 /**
+ * Per-airframe secondary ordnance (dropped bombs). Attack aircraft carry a
+ * finite per-sortie bomb load released with RMB; the AC-47 carries none (it is
+ * a pure broadside gunship). Bombs fall under gravity with the aircraft's
+ * inherited velocity and detonate on ground impact via the shared
+ * GrenadeSystem projectile primitive.
+ *
+ * Blast is tuned between the player mortar (20 m / 200) and the Arclight bomb
+ * (14 m / 160): a 16 m / 180 crater is heavier than a hand frag (15 m / 150)
+ * without out-classing the called-in strikes. No runway rearm (A5): the load
+ * depletes over the sortie, matching the guns.
+ */
+export interface FixedWingBombConfig {
+  /** HUD-facing ordnance name. */
+  readonly name: string;
+  /** Bombs carried per sortie (no rearm). */
+  readonly count: number;
+  /** Explosion radius per bomb (metres). */
+  readonly blastRadius: number;
+  /** Peak blast damage at the crater centre. */
+  readonly blastDamage: number;
+}
+
+const A1_BOMBS: FixedWingBombConfig = {
+  name: 'BOMBS',
+  count: 4,
+  blastRadius: 16,
+  blastDamage: 180,
+};
+
+const F4_BOMBS: FixedWingBombConfig = {
+  name: 'BOMBS',
+  count: 6,
+  blastRadius: 16,
+  blastDamage: 180,
+};
+
+/**
+ * Per-config-key bomb table. Only airframes present here carry bombs; the AC-47
+ * is deliberately absent (pure broadside gunship — its RMB is the gunner cam).
+ */
+const FIXED_WING_BOMBS: Record<string, FixedWingBombConfig> = {
+  A1_SKYRAIDER: A1_BOMBS,
+  F4_PHANTOM: F4_BOMBS,
+};
+
+/**
+ * Resolve the bomb config for an aircraft config key, or `null` when the
+ * airframe carries no bombs (AC-47, unknown keys). Callers gate RMB release and
+ * the CCIP pipper on a non-null result.
+ */
+export function getFixedWingBombConfig(configKey: string | null): FixedWingBombConfig | null {
+  if (!configKey) return null;
+  return FIXED_WING_BOMBS[configKey] ?? null;
+}
+
+/**
  * Left-side broadside gunner view tuning for the AC-47 (fixedwing-camera-fit).
  * The forward chase cam cannot aim guns that fire 90° to the left, so the AC-47
  * gets a toggled gunner view that looks down the broadside fire axis. The camera

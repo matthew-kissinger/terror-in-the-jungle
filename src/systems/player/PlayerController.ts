@@ -1012,7 +1012,7 @@ export class PlayerController implements GameSystem {
     this.helicopterAdapter = new HelicopterPlayerAdapter(dependencies.helicopterModel);
     this.vehicleStateManager.registerAdapter(this.helicopterAdapter);
     if (dependencies.fixedWingModel) {
-      this.fixedWingAdapter = new FixedWingPlayerAdapter(dependencies.fixedWingModel);
+      this.fixedWingAdapter = new FixedWingPlayerAdapter(dependencies.fixedWingModel, { grenadeSystem: this.grenadeSystem, terrainSystem: this.terrainSystem, gameRenderer: this.gameRenderer, camera: this.camera });
       this.vehicleStateManager.registerAdapter(this.fixedWingAdapter);
     }
 
@@ -1168,7 +1168,7 @@ export class PlayerController implements GameSystem {
     this.cameraController.setFixedWingModel(fixedWingModel);
     this.configureCombatController({ fixedWingModel });
     this.configureVehicleController({ fixedWingModel });
-    this.fixedWingAdapter = new FixedWingPlayerAdapter(fixedWingModel);
+    this.fixedWingAdapter = new FixedWingPlayerAdapter(fixedWingModel, { grenadeSystem: this.grenadeSystem, terrainSystem: this.terrainSystem, gameRenderer: this.gameRenderer, camera: this.camera });
     this.vehicleStateManager.registerAdapter(this.fixedWingAdapter);
   }
   setAirSupportManager(airSupportManager: AirSupportManager): void {

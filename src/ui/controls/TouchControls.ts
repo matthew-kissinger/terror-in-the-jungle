@@ -64,6 +64,8 @@ interface TouchControlCallbacks {
   onVehicleFireStop?: () => void;
   onHelicopterWeaponSwitch?: (index: number) => void;
   onFixedWingViewToggle?: () => void;
+  /** Release one bomb for the touch BOMB button (A-1 / F-4 dropped bombs). */
+  onFixedWingBombRelease?: () => void;
 }
 
 export class TouchControls {
@@ -198,6 +200,7 @@ export class TouchControls {
       onHelicopterWeaponCycle: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
       onViewToggle: () => callbacks.onFixedWingViewToggle?.(),
       onSeatSwap: () => callbacks.onSeatSwap?.(),
+      onBombRelease: () => callbacks.onFixedWingBombRelease?.(),
     });
   }
 

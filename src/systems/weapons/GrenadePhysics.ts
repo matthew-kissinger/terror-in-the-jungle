@@ -23,6 +23,22 @@ export interface Grenade {
    * damage-everyone behaviour of player-thrown grenades.
    */
   ownerFaction?: Faction;
+  /**
+   * Detonate on first ground contact instead of only when the fuse expires.
+   * Used by impact ordnance (rockets, dropped bombs); thrown/cooked grenades
+   * and the M79 leave it unset and keep the bounce-and-roll fuse behaviour.
+   */
+  detonateOnImpact?: boolean;
+  /** Per-projectile blast radius override (metres). Legacy default when unset. */
+  blastRadius?: number;
+  /** Per-projectile peak blast damage override. Legacy default when unset. */
+  blastDamage?: number;
+  /**
+   * Set by the physics step on the frame the grenade first touches the ground.
+   * Impact ordnance reads this to detonate immediately; the flag latches once so
+   * a rolling/bouncing grenade does not re-signal every frame.
+   */
+  hasImpacted?: boolean;
 }
 
 type GroundHeightFn = (x: number, z: number) => number;
@@ -66,6 +82,11 @@ export class GrenadePhysics {
 
     if (nextPosition.y <= groundHeight) {
       nextPosition.y = groundHeight;
+
+      // Latch the first ground contact so impact ordnance can detonate now
+      // rather than only when the fuse expires. Thrown/cooked grenades and the
+      // M79 ignore this flag, so they still bounce and roll unchanged.
+      grenade.hasImpacted = true;
 
       // Determine surface type based on height (simple heuristic)
       // Water level is around 0-1m, rocks might be on slopes

@@ -480,6 +480,16 @@ export class GameRenderer {
   }
 
   /**
+   * Position the CCIP bomb pipper at a pixel offset from the crosshair centre,
+   * or hide it with `null`. Concrete passthrough (not fenced); pushed per-frame
+   * by the fixed-wing adapter from the projected bomb-impact solution, mirroring
+   * the rocket-cue seam.
+   */
+  setCrosshairBombCue(offset: { x: number; y: number } | null): void {
+    this.crosshairSystem.setBombCue(offset);
+  }
+
+  /**
    * Light the active gunsight's edge tick for the arc/traverse stop the barrel
    * is pinned against (or clear it with `null`). Concrete passthrough, not on the
    * fenced `IGameRenderer` — the emplacement-MG and helicopter door-gun adapters

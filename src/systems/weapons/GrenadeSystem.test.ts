@@ -343,6 +343,97 @@ describe('GrenadeSystem', () => {
     });
   });
 
+  describe('Impact ordnance (spawnProjectile detonateOnImpact)', () => {
+    it('detonates on first ground contact instead of bouncing/rolling out the fuse', () => {
+      // Spawn just above the ground (getGroundHeight returns 0) heading down.
+      grenadeSystem.spawnProjectile(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, -30, 0),
+        20, // long backstop fuse
+        'bomb',
+        undefined,
+        { detonateOnImpact: true },
+      );
+      expect((grenadeSystem as any).grenades.length).toBe(1);
+
+      // One small step should put it into the ground and detonate it immediately,
+      // long before the 20s fuse expires.
+      grenadeSystem.update(0.1);
+
+      expect((grenadeSystem as any).grenades.length).toBe(0);
+      expect(mockExplosionEffectsPool.spawn).toHaveBeenCalled();
+    });
+
+    it('uses the per-projectile blast radius/damage override at the crater', () => {
+      grenadeSystem.spawnProjectile(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, -30, 0),
+        20,
+        'bomb',
+        undefined,
+        { detonateOnImpact: true, blastRadius: 16, blastDamage: 180 },
+      );
+      grenadeSystem.update(0.1);
+
+      expect(mockCombatantSystem.applyExplosionDamage).toHaveBeenCalled();
+      const call = mockCombatantSystem.applyExplosionDamage.mock.calls.at(-1);
+      // applyExplosionDamage(center, radius, maxDamage, attackerId, weaponType, faction)
+      expect(call[1]).toBe(16);
+      expect(call[2]).toBe(180);
+      expect(call[4]).toBe('bomb');
+    });
+
+    it('spares allies via ownerFaction on the impact blast (IFF)', () => {
+      grenadeSystem.spawnProjectile(
+        new THREE.Vector3(0, 1, 0),
+        new THREE.Vector3(0, -30, 0),
+        20,
+        'bomb',
+        'US' as any,
+        { detonateOnImpact: true, blastRadius: 16, blastDamage: 180 },
+      );
+      grenadeSystem.update(0.1);
+
+      const call = mockCombatantSystem.applyExplosionDamage.mock.calls.at(-1);
+      expect(call[5]).toBe('US');
+    });
+
+    it('thrown grenades keep the legacy fuse-only blast (no impact detonation, 15/150)', () => {
+      grenadeSystem.startAiming();
+      grenadeSystem.throwGrenade();
+      const grenade = (grenadeSystem as any).grenades[0];
+
+      // A thrown grenade bounces/rolls and does NOT detonate on contact — it
+      // survives until the fuse expires.
+      grenadeSystem.update(0.2);
+      expect((grenadeSystem as any).grenades.length).toBe(1);
+
+      // Run the fuse out; the legacy 15/150 blast fires (no per-projectile override).
+      grenadeSystem.update(grenade.fuseTime + 0.1);
+      const call = mockCombatantSystem.applyExplosionDamage.mock.calls.at(-1);
+      expect(call[1]).toBe(15);
+      expect(call[2]).toBe(150);
+    });
+
+    it('M79 projectiles (no options) keep fuse-only legacy behavior', () => {
+      // High lob that does not reach the ground within the step; must survive to fuse.
+      grenadeSystem.spawnProjectile(
+        new THREE.Vector3(0, 40, 0),
+        new THREE.Vector3(0, 5, 0),
+        1.0,
+        'M79',
+      );
+      grenadeSystem.update(0.2);
+      expect((grenadeSystem as any).grenades.length).toBe(1);
+
+      grenadeSystem.update(1.0); // fuse expires
+      expect((grenadeSystem as any).grenades.length).toBe(0);
+      const call = mockCombatantSystem.applyExplosionDamage.mock.calls.at(-1);
+      expect(call[1]).toBe(15);
+      expect(call[2]).toBe(150);
+    });
+  });
+
   describe('Utility methods', () => {
     it('should show/hide grenade in hand', () => {
       // This mainly tests that it doesn't crash as it calls sub-component

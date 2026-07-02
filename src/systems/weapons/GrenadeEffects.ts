@@ -106,6 +106,11 @@ export class GrenadeEffects {
     // KB-EFFECTS records step-level user timings in dev/perf builds so grenade
     // spikes can be attributed before remediation changes the behavior.
     const measureBase = beginGrenadeEffectMeasure('frag');
+    // Per-projectile blast override (dropped bombs use a bigger blast); the
+    // legacy 15 m / 150 frag values stand when a projectile leaves them unset,
+    // so thrown grenades / M79 / rockets keep their current blast.
+    const blastRadius = grenade.blastRadius ?? this.DAMAGE_RADIUS;
+    const blastDamage = grenade.blastDamage ?? this.MAX_DAMAGE;
     try {
       // Main explosion effect - big flash, smoke, fire, shockwave
       measureGrenadeEffectStep(measureBase, 'frag.explosionPool', () => {
@@ -140,8 +145,8 @@ export class GrenadeEffects {
         if (combatantSystem) {
           combatantSystem.applyExplosionDamage(
             grenade.position,
-            this.DAMAGE_RADIUS,
-            this.MAX_DAMAGE,
+            blastRadius,
+            blastDamage,
             'PLAYER',
             grenade.killFeedWeaponType ?? 'grenade',
             grenade.ownerFaction
@@ -152,14 +157,14 @@ export class GrenadeEffects {
       // Apply enhanced camera shake from explosion
       measureGrenadeEffectStep(measureBase, 'frag.cameraShake', () => {
         if (playerController) {
-          playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
+          playerController.applyExplosionShake(grenade.position, blastRadius);
         }
       });
 
       measureGrenadeEffectStep(measureBase, 'frag.event', () => {
         GameEventBus.emit('explosion', {
           position: grenade.position,
-          radius: this.DAMAGE_RADIUS,
+          radius: blastRadius,
           source: 'frag_grenade',
         });
       });
