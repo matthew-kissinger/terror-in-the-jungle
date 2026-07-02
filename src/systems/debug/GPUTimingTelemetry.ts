@@ -43,9 +43,15 @@ export interface GPUTelemetry {
 // Minimal structural view of the WebGPU render path we depend on. The concrete
 // types live in `three/webgpu`; we only touch this narrow surface so the
 // WebGL2 fallback keeps working when those members are absent.
+//
+// r185: `trackTimestamp` is a property of the BACKEND (Backend base class
+// constructor), not the Renderer — the renderer only forwards the constructor
+// parameter. The backend additionally self-gates it against the device's
+// `timestamp-query` feature during init, so post-init `backend.trackTimestamp`
+// is the single truth for "armed AND supported".
 type TimestampCapableRenderer = THREE.WebGLRenderer & {
   isWebGPURenderer?: boolean
-  trackTimestamp?: boolean
+  backend?: { trackTimestamp?: boolean }
   hasInitialized?: () => boolean
   hasFeature?: (name: string) => boolean
   resolveTimestampsAsync?: (type?: string) => Promise<number | undefined>
@@ -53,8 +59,6 @@ type TimestampCapableRenderer = THREE.WebGLRenderer & {
     render: THREE.WebGLRenderer['info']['render'] & { timestamp?: number }
   }
 }
-
-const WEBGPU_TIMESTAMP_FEATURE = 'timestamp-query'
 
 export class GPUTimingTelemetry {
   private gpuTimerExt: any = null
@@ -89,29 +93,25 @@ export class GPUTimingTelemetry {
   }
 
   private initWebGPUTiming(renderer: TimestampCapableRenderer): void {
+    if (renderer.hasInitialized?.() === false) {
+      this.markUnsupported('webgpu', 'renderer not initialized when GPU timing armed')
+      return
+    }
+
     // `trackTimestamp` must have been requested at construction (?gpuTiming=1
-    // wires it in RendererBackend). Without it the query pool is never built.
-    if (renderer.trackTimestamp !== true) {
-      this.markUnsupported('webgpu', 'trackTimestamp not enabled at renderer construction')
+    // wires it in RendererBackend). r185 stores it on the BACKEND, which also
+    // ANDs it against the device's `timestamp-query` feature during init — so
+    // a single post-init backend check covers both "armed" and "supported".
+    if (renderer.backend?.trackTimestamp !== true) {
+      this.markUnsupported(
+        'webgpu',
+        'timestamp tracking not armed (needs trackTimestamp at construction + device timestamp-query support)'
+      )
       return
     }
 
-    // `hasFeature` throws if called before init; the backend also self-gates
-    // trackTimestamp on device support, so probe defensively.
-    let deviceSupportsFeature = false
-    try {
-      if (renderer.hasInitialized?.() === false) {
-        this.markUnsupported('webgpu', 'renderer not initialized when GPU timing armed')
-        return
-      }
-      deviceSupportsFeature = renderer.hasFeature?.(WEBGPU_TIMESTAMP_FEATURE) === true
-    } catch (error) {
-      this.markUnsupported('webgpu', `hasFeature(timestamp-query) threw: ${toMessage(error)}`)
-      return
-    }
-
-    if (!deviceSupportsFeature || typeof renderer.resolveTimestampsAsync !== 'function') {
-      this.markUnsupported('webgpu', 'device does not expose the timestamp-query feature')
+    if (typeof renderer.resolveTimestampsAsync !== 'function') {
+      this.markUnsupported('webgpu', 'renderer lacks resolveTimestampsAsync')
       return
     }
 

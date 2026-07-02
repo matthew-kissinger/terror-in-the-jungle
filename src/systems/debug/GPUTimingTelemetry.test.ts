@@ -32,7 +32,12 @@ function makeInfo(overrides: { timestamp?: number } = {}) {
   };
 }
 
-/** Minimal WebGPU-shaped renderer stub. */
+/**
+ * Minimal WebGPU-shaped renderer stub, matching the r185 surface: the renderer
+ * itself carries NO `trackTimestamp` property — it lives on the BACKEND, which
+ * self-gates it against the device's `timestamp-query` feature at init
+ * (`backend.trackTimestamp = armed && hasFeature('timestamp-query')`).
+ */
 function makeWebGPURenderer(opts: {
   trackTimestamp?: boolean;
   hasFeature?: boolean;
@@ -42,7 +47,9 @@ function makeWebGPURenderer(opts: {
 }) {
   return {
     isWebGPURenderer: true,
-    trackTimestamp: opts.trackTimestamp ?? true,
+    backend: {
+      trackTimestamp: (opts.trackTimestamp ?? true) && (opts.hasFeature ?? true),
+    },
     hasInitialized: () => opts.hasInitialized ?? true,
     hasFeature: (name: string) => name === 'timestamp-query' && (opts.hasFeature ?? true),
     resolveTimestampsAsync: vi.fn(async () => opts.resolveValue),
