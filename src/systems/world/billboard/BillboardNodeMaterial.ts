@@ -37,6 +37,7 @@ import {
   SUN_CARD_FADE_HI,
   SUN_CARD_FADE_LO,
 } from '../../environment/SunElevationGate';
+import { todImpostorMappingBindings } from '../../environment/TodImpostorMapping';
 
 /**
  * Wrapped-Lambert terminator softening for the unlit families (memo §2c,
@@ -359,9 +360,16 @@ export function createBillboardNodeMaterial(
   const vegetationAlpha = mix(texColor.a, hardenedAlpha, nearAlphaBlend) as TslNode;
   const finalAlpha = vegetationAlpha.mul(fadeFactor);
   const gammaAdjust = tslReference('float', uniforms.gammaAdjust);
-  const colorTint = tslReference('color', uniforms.colorTint);
-  const vegetationSaturation = tslReference('float', uniforms.vegetationSaturation);
-  const vegetationExposure = tslReference('float', uniforms.vegetationExposure);
+  // Per-family TOD grade (`tod-impostor-dynamic-mapping`): fold the shared foliage
+  // mapping multipliers into the construction-time tint/saturation/exposure. The
+  // bindings are IDENTITY (1×/white) at midday and when the kill-switch is OFF, so
+  // the noon look is unchanged; the dawn/dusk/night grade rides in below.
+  const mapTint = tslReference('color', todImpostorMappingBindings.foliage.tint);
+  const mapSaturationMul = tslReference('float', todImpostorMappingBindings.foliage.saturationMul);
+  const mapExposureMul = tslReference('float', todImpostorMappingBindings.foliage.exposureMul);
+  const colorTint = (tslReference('color', uniforms.colorTint) as TslNode).mul(mapTint);
+  const vegetationSaturation = (tslReference('float', uniforms.vegetationSaturation) as TslNode).mul(mapSaturationMul);
+  const vegetationExposure = (tslReference('float', uniforms.vegetationExposure) as TslNode).mul(mapExposureMul);
   const nearLightBoostDistance = tslReference('float', uniforms.nearLightBoostDistance);
   const nearLightBoost = tslFloat(1).add(
     tslFloat(0.08).mul(tslFloat(1).sub(smoothstep(tslFloat(0), nearLightBoostDistance, cameraDistance))),

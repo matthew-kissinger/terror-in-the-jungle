@@ -30,6 +30,7 @@ import {
 } from 'three/tsl';
 import type { StaticImpostorArchetype } from '../../../config/staticImpostorArchetypes';
 import { lightingRigBindings } from '../../environment/LightingRig';
+import { todImpostorMappingBindings } from '../../environment/TodImpostorMapping';
 import {
   HUMID_JUNGLE_VEGETATION_EXPOSURE,
   HUMID_JUNGLE_VEGETATION_TINT,
@@ -229,8 +230,12 @@ export function createStaticImpostorNodeMaterial(
   const litColor = createStaticImpostorLightingNode(baseColor, normal, archetype);
   const cameraDistance = length(cameraPosition.sub(instancePosition));
   const worldY = instancePosition.y.add(positionGeometry.y.mul(instanceScale.y));
+  // Per-family TOD grade: fold the static-impostor exposure multiplier into the
+  // foliage-card exposure (identity at midday / kill-switch OFF). Tint + saturation
+  // are folded inside `createStaticImpostorFoliageColorNode`.
+  const mapExposureMul = tslReference('float', todImpostorMappingBindings.staticImpostor.exposureMul);
   const exposure = archetype.lightingProfile === 'foliage-card'
-    ? tslReference('float', uniforms.foliageExposure)
+    ? (tslReference('float', uniforms.foliageExposure) as TslNode).mul(mapExposureMul)
     : tslFloat(1);
   const foggedColor = createStaticImpostorFogNode(
     litColor.mul(exposure),
@@ -384,13 +389,19 @@ function createStaticImpostorFoliageColorNode(
   baseColor: TslNode,
   uniforms: StaticImpostorMaterialUniforms,
 ): TslNode {
+  // Per-family TOD grade: multiply the shared static-impostor tint over the
+  // humid-jungle base tint, and the saturation multiplier into the foliage
+  // saturation. Both bindings are identity (white / 1) at midday and when the
+  // kill-switch is OFF, so the construction-time look is unchanged.
+  const mapTint = tslReference('color', todImpostorMappingBindings.staticImpostor.tint);
+  const mapSaturationMul = tslReference('float', todImpostorMappingBindings.staticImpostor.saturationMul);
   const tint = tslVec3(
     tslFloat(HUMID_JUNGLE_VEGETATION_TINT.r),
     tslFloat(HUMID_JUNGLE_VEGETATION_TINT.g),
     tslFloat(HUMID_JUNGLE_VEGETATION_TINT.b),
-  );
+  ).mul(mapTint);
   const colorGamma = tslReference('float', uniforms.foliageColorGamma);
-  const saturation = tslReference('float', uniforms.foliageSaturation);
+  const saturation = (tslReference('float', uniforms.foliageSaturation) as TslNode).mul(mapSaturationMul);
   const tinted = pow(baseColor.mul(tint), tslVec3(colorGamma)) as TslNode;
   const luma = tinted.r.mul(STATIC_IMPOSTOR_LUMA.x)
     .add(tinted.g.mul(STATIC_IMPOSTOR_LUMA.y))
@@ -407,12 +418,18 @@ function createStaticImpostorFoliageLightingNode(baseColor: TslNode, normal: Tsl
   const rigExposure = tslReference('float', lightingRigBindings.exposure);
   const rigSunElevationSin = tslReference('float', lightingRigBindings.sunElevationSin);
 
-  // Vegetation hero impostors are baked from real GLBs, not hand-authored flat
-  // foliage cards. Use source-like clamped direct light against the transformed
-  // capture normal; the billboard wrap term over-lifts backfaces and recreates
-  // the pale LOD snap this path is meant to avoid.
+  // Wrapped-Lambert UNIFICATION (`tod-impostor-dynamic-mapping`): the static hero
+  // impostor now uses the SAME wrapped-Lambert direct term the billboard foliage
+  // card + NPC sprite use (RIG_WRAP), so a hero tree and its impostor card shade
+  // alike across the LOD snap instead of diverging (plain-Lambert impostor vs
+  // wrapped-Lambert billboard). Wrap softens the terminator identically for all
+  // three card families; the shared low-sun fade + the per-family TOD grade
+  // (exposure/tint above) keep the hero card from blooming pale at grazing sun,
+  // which is why the previous clamped-Lambert guard is no longer needed.
   const cardNormal = normal;
-  const diffuse = tslMax(cardNormal.dot(rigSunDir), tslFloat(0));
+  const wrap = tslFloat(RIG_WRAP);
+  const nl = tslMax(cardNormal.dot(rigSunDir), wrap.negate());
+  const diffuse = nl.add(wrap).div(tslFloat(1).add(wrap));
   const hemiWeight = tslFloat(0.5).add(
     cardNormal.y.mul(tslFloat(RIG_HEMI_UP_SKY_WEIGHT - 0.5)),
   );

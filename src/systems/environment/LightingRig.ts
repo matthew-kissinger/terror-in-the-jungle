@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { applyRigPresetTrim, type RigPresetTrim } from './LightingRigPresetTrim';
 import { sunElevationGate } from './SunElevationGate';
+import { updateTodImpostorMapping } from './TodImpostorMapping';
 
 /**
  * Unified lighting rig — Phase 0 prototype (cycle `cycle-2026-06-09-lighting-rig-spike`,
@@ -397,6 +398,14 @@ export function deriveLightingRigState(
   // and the single rig fog color the billboard buffer reads on the rig path.
   lightingRigBindings.sunElevationSin.value = out.sunDirection.y;
   lightingRigBindings.fogColor.value.copy(out.fogColor);
+
+  // Per-family TOD impostor grade (`tod-impostor-dynamic-mapping`): evaluate the
+  // per-family artistic curves from this frame's sun elevation and mirror them
+  // into the shared mapping bindings the three card materials read. Layers ON TOP
+  // of the physical sun-elevation gate above — identity at high sun, so the midday
+  // look is unchanged; the visible grade is at dawn/dusk/night. Rides the single
+  // rig update point so no new per-frame seam / allocation is introduced.
+  updateTodImpostorMapping(out.sunElevation);
 
   return out;
 }

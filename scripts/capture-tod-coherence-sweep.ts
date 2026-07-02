@@ -232,6 +232,37 @@ const NPC_FIXTURE_FORWARD_DISTANCE = Math.round(
 /** Lift above local terrain so the teleported sprite's centre is in frame. */
 const NPC_FIXTURE_GROUND_LIFT = 1.6;
 
+/**
+ * FOLIAGE fixture anchor (gate mode) — the instrument-gap fix
+ * (`tod-impostor-dynamic-mapping`). Symmetric to the NPC fixture above: at the
+ * A Shau XZ-origin pose the sweep measured ZERO on-screen billboard cards
+ * (`foliage n=0`, wave L1 PR #490), so the foliage row could only ever fall back
+ * to the fixed box (terrain-vs-terrain, UNMEASURED). The billboard scatter is
+ * streamed and the fixture point can be sparsely vegetated in a headless capture,
+ * so — exactly as `teleportNpcIntoFixture` teleports a live combatant onto a
+ * deterministic in-frame point — this teleports a deterministic CLUSTER of live
+ * billboard `instancePosition` entries onto a fixture point along the view ray,
+ * near the look-at ground distance so the cards project clear of the terrain
+ * foreground band (screen centre, not the bottom edge). Capture-surface mutation
+ * of the instance buffer only — NO gameplay change; the engine RAF is stopped and
+ * the buffer is restored implicitly on the next stream tick after capture.
+ *
+ * The cluster is placed a small lateral offset from the NPC fixture point so both
+ * subjects frame cleanly without overlapping. Distance == the same look-at ground
+ * distance the NPC uses; the card centre lift is a card half-height so the anchor
+ * sits on the lit card body, matching the foliage anchor's own quarter-height lift
+ * in `resolveAnchorRegions`.
+ */
+const FOLIAGE_FIXTURE_FORWARD_DISTANCE = NPC_FIXTURE_FORWARD_DISTANCE;
+/** Lateral offset (m) of the foliage cluster from the view ray so it clears the NPC. */
+const FOLIAGE_FIXTURE_LATERAL_OFFSET = 22;
+/** Number of live billboard cards teleported into the cluster (deterministic). */
+const FOLIAGE_FIXTURE_CLUSTER_SIZE = 24;
+/** In-cluster jitter radius (m) so the teleported cards read as a tuft, not a line. */
+const FOLIAGE_FIXTURE_CLUSTER_RADIUS = 4;
+/** Lift (m) above local terrain for a teleported card centre. */
+const FOLIAGE_FIXTURE_GROUND_LIFT = 2.2;
+
 const PORT = 9184;
 const VIEWPORT = { width: 1920, height: 1080 };
 const STARTUP_TIMEOUT_MS = 90_000;
@@ -995,6 +1026,119 @@ async function teleportNpcIntoFixture(page: Page, pose: Pose): Promise<boolean> 
   );
 }
 
+/**
+ * Teleport a deterministic cluster of live billboard foliage cards onto a fixture
+ * point in frame (gate mode), so the foliage row reads REAL card pixels instead
+ * of falling back to the fixed box (the n=0 instrument gap). Symmetric to
+ * `teleportNpcIntoFixture`. Capture-surface mutation of the `instancePosition`
+ * buffer only; the RAF is stopped so the buffer stays put through the snap.
+ * Returns true if a foliage cluster was placed (false when no live billboard mesh
+ * with instances is in the scene — logged, foliage then falls back honestly).
+ */
+async function teleportFoliageIntoFixture(page: Page, pose: Pose): Promise<boolean> {
+  return page.evaluate(
+    ({ camPos, lookAt, forward, lateral, clusterSize, clusterRadius, lift }: {
+      camPos: [number, number, number];
+      lookAt: [number, number, number];
+      forward: number;
+      lateral: number;
+      clusterSize: number;
+      clusterRadius: number;
+      lift: number;
+    }) => {
+      const engine = (window as { __engine?: {
+        renderer?: { scene?: { traverse?: (cb: (o: unknown) => void) => void } };
+        systemManager?: { terrainSystem?: { getHeightAt?: (x: number, z: number) => number } };
+      } }).__engine;
+      const scene = engine?.renderer?.scene;
+      if (!scene?.traverse) return false;
+
+      // Fixture point: the same look-at ground distance the NPC uses, offset
+      // laterally (perpendicular to the view ray in XZ) so the cluster clears the
+      // NPC sprite. Grounded at terrain height + a card-centre lift.
+      const fx = lookAt[0] - camPos[0];
+      const fz = lookAt[2] - camPos[2];
+      const flen = Math.hypot(fx, fz) || 1;
+      const dirX = fx / flen;
+      const dirZ = fz / flen;
+      // Perpendicular (right) vector in XZ.
+      const rightX = dirZ;
+      const rightZ = -dirX;
+      const cx = camPos[0] + dirX * forward + rightX * lateral;
+      const cz = camPos[2] + dirZ * forward + rightZ * lateral;
+      const terrain = engine?.systemManager?.terrainSystem;
+      const gy = terrain?.getHeightAt?.(cx, cz);
+      const groundY = Number.isFinite(gy) ? Number(gy) : (camPos[1] - forward);
+
+      // Find the billboard mesh with the most live instances (a `vegetationExposure`
+      // uniform marks a billboard `MeshBasicNodeMaterial`). Deterministic: pick the
+      // one whose FIRST instance world position sorts smallest, to break ties.
+      const materialArray = (m: unknown): unknown[] => (Array.isArray(m) ? m : m ? [m] : []);
+      const hasUniform = (m: unknown, key: string): boolean => {
+        const u = (m as { uniforms?: Record<string, unknown> } | undefined)?.uniforms;
+        return Boolean(u && Object.prototype.hasOwnProperty.call(u, key));
+      };
+      type PosAttr = {
+        count: number;
+        getX: (i: number) => number; getY: (i: number) => number; getZ: (i: number) => number;
+        setXYZ: (i: number, x: number, y: number, z: number) => void;
+        needsUpdate: boolean;
+        addUpdateRange?: (start: number, count: number) => void;
+        clearUpdateRanges?: () => void;
+        itemSize?: number;
+      };
+      type BestFoliage = { attr: PosAttr; live: number; key: number };
+      const candidates: BestFoliage[] = [];
+      scene.traverse?.((object: unknown) => {
+        const obj = object as {
+          isMesh?: boolean; visible?: boolean; material?: unknown;
+          geometry?: { instanceCount?: number; attributes?: { instancePosition?: PosAttr } };
+        };
+        if (!obj?.isMesh || obj.visible === false) return;
+        const isFoliage = materialArray(obj.material).some((m) => hasUniform(m, 'vegetationExposure'));
+        if (!isFoliage) return;
+        const attr = obj.geometry?.attributes?.instancePosition;
+        if (!attr || attr.count <= 0) return;
+        const live = Math.max(0, Math.min(attr.count, Number(obj.geometry?.instanceCount ?? attr.count)));
+        if (live <= 0) return;
+        const key = attr.getX(0) * 1e6 + attr.getZ(0);
+        candidates.push({ attr, live, key });
+      });
+      // Deterministic pick: most live instances, ties broken by the stable key.
+      candidates.sort((a, b) => (a.live !== b.live ? b.live - a.live : a.key - b.key));
+      const best: BestFoliage | undefined = candidates[0];
+      if (!best) return false;
+
+      const { attr, live } = best;
+      const n = Math.max(1, Math.min(clusterSize, live));
+      // Deterministic in-cluster spread: a fixed golden-angle spiral so the cards
+      // read as a tuft (pure function of the index — identical every run).
+      const GOLDEN = 2.399963229728653;
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0 : i / (n - 1);
+        const r = clusterRadius * Math.sqrt(t);
+        const a = i * GOLDEN;
+        const ox = Math.cos(a) * r;
+        const oz = Math.sin(a) * r;
+        attr.setXYZ(i, cx + ox, groundY + lift, cz + oz);
+      }
+      if (typeof attr.clearUpdateRanges === 'function') attr.clearUpdateRanges();
+      if (typeof attr.addUpdateRange === 'function') attr.addUpdateRange(0, n * (attr.itemSize ?? 3));
+      attr.needsUpdate = true;
+      return true;
+    },
+    {
+      camPos: pose.position,
+      lookAt: pose.lookAt,
+      forward: FOLIAGE_FIXTURE_FORWARD_DISTANCE,
+      lateral: FOLIAGE_FIXTURE_LATERAL_OFFSET,
+      clusterSize: FOLIAGE_FIXTURE_CLUSTER_SIZE,
+      clusterRadius: FOLIAGE_FIXTURE_CLUSTER_RADIUS,
+      lift: FOLIAGE_FIXTURE_GROUND_LIFT,
+    }
+  );
+}
+
 // ----- Sweep -----
 
 async function captureTod(
@@ -1022,12 +1166,16 @@ async function captureTod(
   const pose = await buildFixturePose(page);
   await poseAndRender(page, pose);
 
-  // Gate mode: place an NPC impostor in frame, then re-render so its instance
-  // matrix is current before we project the anchor and snap.
+  // Gate mode: place an NPC impostor AND a foliage cluster in frame, then
+  // re-render so both instance buffers are current before we project the anchors
+  // and snap. The foliage cluster closes the n=0 instrument gap (wave L1) so the
+  // foliage row finally measures real card pixels instead of the fixed box.
   if (options.gate) {
-    const placed = await teleportNpcIntoFixture(page, pose);
-    if (placed) await poseAndRender(page, pose);
-    else logStep(`TOD ${hour}h: no live combatant to teleport into the fixture (npc will fall back)`);
+    const npcPlaced = await teleportNpcIntoFixture(page, pose);
+    if (!npcPlaced) logStep(`TOD ${hour}h: no live combatant to teleport into the fixture (npc will fall back)`);
+    const foliagePlaced = await teleportFoliageIntoFixture(page, pose);
+    if (!foliagePlaced) logStep(`TOD ${hour}h: no live billboard cards to teleport into the fixture (foliage will fall back)`);
+    if (npcPlaced || foliagePlaced) await poseAndRender(page, pose);
   }
 
   const { regions: anchorRegions, provenance } = await resolveAnchorRegions(page, pose);
