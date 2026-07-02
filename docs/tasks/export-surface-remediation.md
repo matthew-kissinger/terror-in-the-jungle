@@ -1,6 +1,19 @@
 <!-- 80 LOC cap per framework recovery Pass 2 R1.2. Briefs over 100 LOC trigger cycle-validate warning. -->
 # export-surface-remediation
 
+> **STATUS (2026-07-02, manifest F8):** Round 1 shipped **PARTIAL** — PR #470
+> covered `src/systems/combat/**` only, narrower than this brief's
+> `src/systems/**` scope. Residual dead export surface at HEAD is ~119 flagged
+> files (`knip --reporter json`: 0 unused files / 73 unused exports / 156 unused
+> exported types). Per owner decision **F8** in
+> `docs/CAMPAIGN_2026-07-02-greenlight-followthrough.md`, the remaining Round 1
+> work (rest of `src/systems/**`) **and Round 2** are **DEFERRED behind the new
+> knip-count ratchet gate** (`npm run check:export-ratchet`,
+> `scripts/check-export-surface-ratchet.ts` + `scripts/export-surface-ratchet.json`)
+> instead of being swept now. The ratchet freezes the surface as a one-way
+> ratchet: no new dead exports may be added; the sweep can resume any time and
+> lower the snapshot. Do not re-open the full sweep without owner direction.
+
 Standalone code-quality hygiene pass (no existing DIRECTIVES.md row —
 verified 2026-06-30, DEFEKT-2 is the doc/artifact drift gate and is
 unrelated; do not cite it). `npm run deadcode` (knip) currently reports 90
