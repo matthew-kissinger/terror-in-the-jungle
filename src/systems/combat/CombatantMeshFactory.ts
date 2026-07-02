@@ -24,6 +24,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { lightingRigBindings } from '../environment/LightingRig';
+import { todImpostorMappingBindings } from '../environment/TodImpostorMapping';
 import {
   RIG_HEMI_UP_SKY_WEIGHT,
   RIG_LOW_SUN_FADE_FLOOR,
@@ -211,6 +212,21 @@ function createNpcImpostorColorNode(
   const readabilityLift = readabilityColor.mul(tslFloat(0.18).add(tslFloat(0.12).mul(combatState)));
   npcColor = tslMix(npcColor, tslMin(npcColor.add(readabilityLift), tslVec3(1, 1, 1)), readabilityStrength);
 
+  // --- Per-family TOD grade (`tod-impostor-dynamic-mapping`) ------------------
+  // Fold the shared npc mapping tint + saturation into the color-managed albedo
+  // (exposure is folded into the rig exposure below). The bindings are IDENTITY
+  // (white / 1) at midday and when the kill-switch is OFF, so the noon look is
+  // unchanged. The npc curve dims + desaturates HARDER at dusk/night than foliage
+  // — the corr-0.717 / rangeRatio-3.934 low-sun overshoot fix (wave L1 PR #490):
+  // the sprite's up-biased card normal over-catches the low warm sun, so the
+  // graded albedo pulls the npc luminance curve back onto terrain's.
+  const npcMapTint = tslReference('color', todImpostorMappingBindings.npc.tint);
+  const npcMapSaturationMul = tslReference('float', todImpostorMappingBindings.npc.saturationMul);
+  const npcMapExposureMul = tslReference('float', todImpostorMappingBindings.npc.exposureMul);
+  npcColor = npcColor.mul(npcMapTint);
+  const npcMapLuma = dot(npcColor, tslVec3(0.2126, 0.7152, 0.0722));
+  npcColor = tslMix(tslVec3(npcMapLuma), npcColor, npcMapSaturationMul);
+
   // --- Unified-rig lighting — the ONLY path (`legacy-path-deletion`) ---------
   // Wrapped-Lambert against the SAME uncompressed rig terms terrain + foliage
   // consume, so the NPC impostor tracks them by construction. This is the
@@ -246,8 +262,11 @@ function createNpcImpostorColorNode(
   const rigDirectSun = rigSun.mul(rigDiff).mul(rigLowSunFade);
   // Ambient joins the light sum inside the albedo multiply (hue-preserving
   // night light, consistent with terrain's PBR ambient) — see the matching
-  // note in BillboardNodeMaterial.createBillboardRigLightingNode.
-  npcColor = npcColor.mul(rigHemi.add(rigDirectSun).add(rigAmbient)).mul(rigExposure);
+  // note in BillboardNodeMaterial.createBillboardRigLightingNode. The per-family
+  // TOD exposure multiplier folds into the single rig exposure (identity at
+  // midday / kill-switch OFF).
+  const gradedExposure = (rigExposure as TslNode).mul(npcMapExposureMul);
+  npcColor = npcColor.mul(rigHemi.add(rigDirectSun).add(rigAmbient)).mul(gradedExposure);
 
   const cameraDistance = tslCameraPosition.sub(tslPositionWorld).length();
   const expFog = tslFloat(1).sub(exp(npcFogDensity.negate().mul(tslMax(tslFloat(0), cameraDistance.sub(npcFogStartDistance)))));

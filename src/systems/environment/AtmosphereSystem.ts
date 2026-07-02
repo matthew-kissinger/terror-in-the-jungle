@@ -10,6 +10,7 @@ import { SunDiscUpdater } from './atmosphere/SunDiscUpdater';
 import type { ShadowCameraFit } from './atmosphere/ShadowCameraFit';
 import { ShadowCameraController } from './atmosphere/ShadowCameraController';
 import { publishShadowTruthConfig } from './atmosphere/ShadowTruthConfig';
+import { publishTodImpostorMappingConfig } from './TodImpostorMapping';
 import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, lightingRigBindings, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
@@ -210,6 +211,10 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // Mirror the rig runtime flag onto window so a headless capture harness can
     // flip the Phase 0 prototype on for the A/B sweep. No-op outside a browser.
     publishLightingRigConfig();
+    // Mirror the per-family TOD impostor-mapping kill-switch onto window so a
+    // headless capture / dev console can freeze the grade at identity. No-op
+    // outside a browser.
+    publishTodImpostorMappingConfig();
     // Mirror the shadow-truth kill-switches (camera/bias + billboard proxies)
     // onto window for A/B + orchestrator perf-flip. No-op outside a browser.
     publishShadowTruthConfig();
