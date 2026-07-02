@@ -17,9 +17,27 @@ import type { IVehicle } from '../vehicle/IVehicle';
 import { Tank, type TankDamageType } from '../vehicle/Tank';
 import type { AudioManager } from '../audio/AudioManager';
 import type { PlayerStatsTracker } from '../player/PlayerStatsTracker';
+import type { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
+
+/**
+ * Multiplier applied to explosion damage that reaches the player from the
+ * player's OWN ordnance (thrown frags, the M79, player-called air support —
+ * everything that arrives with `attackerId === 'PLAYER'`). Enemy ordnance
+ * (NPC mortar, tank cannon) lands at full 1.0x.
+ *
+ * Owner decision F1 (campaign manifest
+ * docs/CAMPAIGN_2026-07-02-greenlight-followthrough.md): "Full symmetry: enemy
+ * ordnance 1.0x, own ordnance 0.75x scale, spawn protection respected,
+ * player_killed emitted." The 0.75 self-scale keeps a danger-close own-frag
+ * survivable at the blast edge while a point-blank own Arclight is lethal.
+ */
+export const PLAYER_SELF_EXPLOSION_SCALE = 0.75;
+
+/** Live-position accessor so blast checks read the player's current position. */
+export type PlayerPositionSource = () => THREE.Vector3 | undefined;
 
 // Player-attributed explosions surface the same crosshair hit/kill feedback as
 // direct fire. Kills always punch through (discrete); non-kill hits are
@@ -57,6 +75,8 @@ export class CombatantSystemDamage {
   private lastPlayerHitFeedbackAt = 0;
   private playerFaction: Faction = Faction.US;
   private playerStatsTracker?: PlayerStatsTracker;
+  private playerHealthSystem?: PlayerHealthSystem;
+  private playerPositionSource?: PlayerPositionSource;
 
   constructor(
     private combatants: Map<string, Combatant>,
@@ -87,6 +107,20 @@ export class CombatantSystemDamage {
 
   setPlayerStatsTracker(tracker: PlayerStatsTracker): void {
     this.playerStatsTracker = tracker;
+  }
+
+  setPlayerHealthSystem(playerHealthSystem: PlayerHealthSystem): void {
+    this.playerHealthSystem = playerHealthSystem;
+  }
+
+  /**
+   * Live accessor for the player's current world position. CombatantSystem
+   * refreshes its `playerPosition` vector from the camera every frame; passing
+   * the getter (rather than a snapshot) keeps blast checks against the current
+   * position without per-call copies.
+   */
+  setPlayerPositionSource(source: PlayerPositionSource | null): void {
+    this.playerPositionSource = source ?? undefined;
   }
 
   setVehicleDamageQuery(query: VehicleExplosionDamageQuery | null): void {
@@ -287,6 +321,68 @@ export class CombatantSystemDamage {
     }
 
     this.applyExplosionDamageToVehicles(center, radius, maxDamage, weaponType, shooterFaction);
+    this.applyExplosionDamageToPlayer(center, radius, maxDamage, attackerId, weaponType, shooterFaction);
+  }
+
+  /**
+   * Symmetric player explosion damage (owner decision F1). The blast reaches the
+   * player through the SAME distance-falloff curve as NPCs, scaled by
+   * {@link PLAYER_SELF_EXPLOSION_SCALE} when the player caused it
+   * (`attackerId === 'PLAYER'`) and 1.0x for enemy ordnance. Routing through
+   * `PlayerHealthSystem.takeDamage` engages damage indicators, camera shake,
+   * spawn protection, and death handling. A lethal blast emits the typed
+   * `player_killed` event with best-effort source attribution.
+   */
+  private applyExplosionDamageToPlayer(
+    center: THREE.Vector3,
+    radius: number,
+    maxDamage: number,
+    attackerId: string | undefined,
+    weaponType: string,
+    shooterFaction?: Faction,
+  ): void {
+    const playerHealthSystem = this.playerHealthSystem;
+    if (!playerHealthSystem || radius <= 0 || maxDamage <= 0) return;
+
+    // Friendly-fire exclusion mirrors the NPC/vehicle paths: ordnance that
+    // supplies a shooter faction allied with the player never hits the player.
+    // Player-thrown frags / own air support omit shooterFaction, so the player
+    // can still catch their own blast (that is the 0.75x self-damage case).
+    if (shooterFaction !== undefined && isAlly(this.playerFaction, shooterFaction)) return;
+
+    const playerPosition = this.playerPositionSource?.();
+    if (!playerPosition) return;
+
+    const distanceSq = playerPosition.distanceToSquared(center);
+    if (distanceSq > radius * radius) return;
+
+    const distance = Math.sqrt(distanceSq);
+    const scale = attackerId === 'PLAYER' ? PLAYER_SELF_EXPLOSION_SCALE : 1.0;
+    const damage = maxDamage * (1.0 - distance / radius) * scale;
+    if (damage <= 0) return;
+
+    // takeDamage returns true only when this blast dropped the player to 0 HP
+    // (and short-circuits on spawn protection / already-dead, returning false).
+    const playerDied = playerHealthSystem.takeDamage(damage, center, playerPosition);
+    if (!playerDied) return;
+
+    const killerFaction = shooterFaction ?? this.resolveExplosionKillerFaction(attackerId);
+    GameEventBus.emit('player_killed', {
+      killerId: attackerId ?? 'unknown',
+      killerFaction,
+      position: playerPosition.clone(),
+    });
+    Logger.info('Combat', `Player killed by ${weaponType} explosion (${damage.toFixed(0)} damage)`);
+  }
+
+  /** Best-effort killer faction for a lethal blast when no shooterFaction was supplied. */
+  private resolveExplosionKillerFaction(attackerId: string | undefined): Faction {
+    if (attackerId && attackerId !== 'PLAYER') {
+      const attacker = this.combatants.get(attackerId);
+      if (attacker) return attacker.faction;
+    }
+    // Player-caused (own ordnance) or unresolved: attribute to the player's faction.
+    return this.playerFaction;
   }
 
   /**
