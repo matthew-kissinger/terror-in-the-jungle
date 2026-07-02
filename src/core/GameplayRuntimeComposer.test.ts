@@ -94,7 +94,9 @@ function createRefs() {
       setInventoryManager: vi.fn(),
       setTicketSystem: vi.fn(),
     },
-    playerController: {},
+    playerController: {
+      setPlayerHealthSystem: vi.fn(),
+    },
     playerHealthSystem: {
       resetForNewMatch: vi.fn(),
     },
@@ -173,6 +175,7 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.combatantSystem.combatantAI.setSmokeCloudSystem).toHaveBeenCalledWith(refs.smokeCloudSystem);
     expect(refs.combatantSystem.squadManager.setInfluenceMap).toHaveBeenCalledWith(refs.influenceMapSystem);
     expect(refs.flashbangScreenEffect.setPlayerController).toHaveBeenCalledWith(refs.playerController);
+    expect(refs.playerController.setPlayerHealthSystem).toHaveBeenCalledWith(refs.playerHealthSystem);
 
     expect(refs.ticketSystem.setZoneManager).toHaveBeenCalledWith(refs.zoneManager);
     expect(refs.zoneManager.setCombatantSystem).toHaveBeenCalledWith(refs.combatantSystem);

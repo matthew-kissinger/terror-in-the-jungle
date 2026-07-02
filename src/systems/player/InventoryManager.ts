@@ -31,7 +31,15 @@ interface InventoryState {
   maxMortarRounds: number;
   sandbags: number;
   maxSandbags: number;
+  bandages: number;
+  maxBandages: number;
 }
+
+// ── Bandage (active-healing) constants ──
+// Loadout-independent: every kit carries the same field-dressing count. Unlike
+// grenades/sandbags/mortars, bandages are NOT gated on the equipped loadout —
+// they are a universal survival consumable (owner decision F3, healing MVP).
+const MAX_BANDAGES = 3;
 
 export interface InventorySlotDefinition {
   slot: WeaponSlot;
@@ -61,6 +69,8 @@ export class InventoryManager implements GameSystem {
   private maxMortarRounds = 3;
   private sandbags = 5;
   private maxSandbags = 5;
+  private bandages = MAX_BANDAGES;
+  private readonly maxBandages = MAX_BANDAGES;
 
   private activeLoadout: PlayerLoadout | null = null;
   private slotDefinitions: InventorySlotDefinition[] = LEGACY_SLOT_DEFINITIONS.map(def => ({ ...def }));
@@ -280,6 +290,21 @@ export class InventoryManager implements GameSystem {
     return this.sandbags;
   }
 
+  // ── Bandages (active healing) ──
+  // Loadout-independent survival consumable. `useBandage` only decrements the
+  // count (returns false when empty); whether a heal actually applied — and so
+  // whether the bandage should be spent — is decided by the caller via
+  // PlayerHealthSystem.heal(). The count / availability read through getState().
+  // Refill is loadout-independent and happens in reset() on respawn / restart.
+
+  useBandage(): boolean {
+    if (this.bandages <= 0) return false;
+    this.bandages--;
+    Logger.info('inventory', `Bandage used. Remaining: ${this.bandages}`);
+    this.notifyInventoryChange();
+    return true;
+  }
+
   reset(): void {
     if (this.activeLoadout === null) {
       this.grenades = this.maxGrenades;
@@ -290,6 +315,10 @@ export class InventoryManager implements GameSystem {
       this.mortarRounds = this.activeLoadout.equipment === LoadoutEquipment.MORTAR_KIT ? this.maxMortarRounds : 0;
       this.sandbags = this.activeLoadout.equipment === LoadoutEquipment.SANDBAG_KIT ? this.maxSandbags : 0;
     }
+
+    // Bandages are loadout-independent — every respawn / match restart restocks
+    // them to full, hooking the same reset path that restores grenades.
+    this.bandages = this.maxBandages;
 
     this.switchToSlot(this.getPreferredInitialSlot(), true);
     Logger.info('inventory', 'Inventory reset');
@@ -304,7 +333,9 @@ export class InventoryManager implements GameSystem {
       mortarRounds: this.mortarRounds,
       maxMortarRounds: this.maxMortarRounds,
       sandbags: this.sandbags,
-      maxSandbags: this.maxSandbags
+      maxSandbags: this.maxSandbags,
+      bandages: this.bandages,
+      maxBandages: this.maxBandages
     };
   }
 

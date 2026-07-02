@@ -55,6 +55,8 @@ export interface InputCallbacks {
   onFixedWingViewToggle?: () => void;
   onAirSupportMenu?: () => void;
   onMenuOpen?: () => void;
+  /** Use a bandage (active heal). On-foot only; `H` in a heli is altitude-lock. */
+  onUseBandage?: () => void;
 }
 
 export class PlayerInput {
@@ -586,6 +588,12 @@ export class PlayerInput {
     // Air support menu with T key (when not in a flight vehicle and not in sandbag mode)
     if (!this.isInFlightVehicle() && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyT') {
       this.callbacks.onAirSupportMenu?.();
+    }
+
+    // Bandage (active heal), H, on-foot only. In a heli, H is altitude-lock (owned
+    // by the helicopter block above and excluded by this !isInFlightVehicle gate).
+    if (!this.isInFlightVehicle() && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyH') {
+      this.callbacks.onUseBandage?.();
     }
 
     // Rally point placement with V key (when not in a flight vehicle)

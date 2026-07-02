@@ -97,6 +97,7 @@ const CONTEXT_BINDS: Record<ControlHintContext, ContextLegend> = {
     title: 'ON FOOT',
     hints: [
       { keys: 'F', action: 'Board vehicle' },
+      { keys: 'H', action: 'Bandage' },
       { keys: 'T', action: 'Air support radio' },
       { keys: 'Z', action: 'Squad commands' },
       { keys: 'Shift+1-5', action: 'Quick commands' },

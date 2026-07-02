@@ -237,6 +237,8 @@ function wireCombatRuntime(
   runtime.combatantSystem.influenceMap = runtime.influenceMapSystem;
   runtime.combatantSystem.sandbagSystem = runtime.sandbagSystem;
   runtime.flashbangScreenEffect.setPlayerController(runtime.playerController);
+  // Bandage (active-heal) `H` action routes through the player's health write.
+  runtime.playerController.setPlayerHealthSystem(runtime.playerHealthSystem);
   setSmokeCloudSystem(runtime.smokeCloudSystem);
 }
 

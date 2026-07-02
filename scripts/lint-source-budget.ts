@@ -83,7 +83,13 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // +5 LOC routing the radio smoke-marker cancel through the single slot-change
   // funnel + ground-vehicle suppression, plus abortRadioTargeting on death. R3
   // split target unchanged; orchestrator to note in docs/CARRY_OVERS.md.
-  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1227, methods: 111 },
+  // Snapshot raised 1227 → 1271 LOC / 111 → 113 methods (healing-mvp,
+  // cycle-2026-07-02-greenlight-followthrough): +2 methods (setPlayerHealthSystem +
+  // handleUseBandage) + the bandage-pip inventory-change sync — the documented
+  // input-glue integration point for the active-heal `H` action (design memo
+  // HEALING_AND_LOOTING_SCOPE §1.7). In-cycle ratchet re-base, no CARRY_OVERS row
+  // (sanctioned by the task brief). R3 split target unchanged.
+  'src/systems/player/PlayerController.ts': { round: 'P3R3', reason: 'split into 5 files', loc: 1271, methods: 113 },
   // Snapshot raised 995 → 1073 LOC (dropped-frame-perf-harness,
   // 2026-06-15/16): frame/presentation/dropped-frame telemetry export surfaces.
   'src/systems/debug/PerformanceTelemetry.ts': { round: 'P3R5', reason: 'split into 4 files; +78 LOC for frame/presentation dropped-frame telemetry', loc: 1073, methods: 41 },
@@ -194,7 +200,11 @@ const GRANDFATHER: Record<string, GrandfatherEntry> = {
   // +9 LOC for the helicopter-mode F-key door-gun seat-swap binding +
   // `onHelicopterDoorGunToggle` callback decl. Within-cycle ratchet re-base; R3
   // split target unchanged. See docs/CARRY_OVERS.md.
-  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 819, methods: 44 },
+  // Snapshot raised 819 → 827 (healing-mvp, cycle-2026-07-02-greenlight-followthrough):
+  // +8 LOC for the on-foot `KeyH` bandage bind + `onUseBandage` callback decl
+  // (design memo HEALING_AND_LOOTING_SCOPE §1.4). In-cycle ratchet re-base, no
+  // CARRY_OVERS row (sanctioned by the task brief); R3 split target unchanged.
+  'src/systems/player/PlayerInput.ts': { round: 'P3R3', reason: 'split alongside PlayerController in R3', loc: 827, methods: 44 },
   // Snapshot raised 752 → 757 LOC / 58 → 59 methods (helipad-spawn-truth,
   // 2026-06-28): +1 setter `setBoardableHelicopterPresence` that forwards the
   // boardable-helicopter presence provider to the spawn selector so helipad
