@@ -88,6 +88,22 @@ const WEBGPU_LIMIT_NAMES = [
   'maxComputeWorkgroupsPerDimension',
 ] as const;
 
+/**
+ * Reads the `?gpuTiming=1` opt-in flag. Single source of truth shared by
+ * {@link createWebGPURenderer} (to request the WebGPU `timestamp-query`
+ * feature via `trackTimestamp`) and `GPUTimingTelemetry` (to arm the
+ * per-frame measurement path). Default sessions never pay the cost.
+ */
+export function gpuTimingFlagEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('gpuTiming') === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function resolveRendererBackendMode(): RendererBackendMode {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
@@ -160,12 +176,18 @@ export function createInitialRendererCapabilities(
 
 export async function createWebGPURenderer(
   requestedMode: Extract<RendererBackendMode, 'webgpu' | 'webgpu-force-webgl' | 'webgpu-strict'>,
+  options: { trackTimestamp?: boolean } = {},
 ): Promise<{ renderer: CommonRenderer; capabilities: RendererBackendCapabilities }> {
   const webgpuModule = await import('three/webgpu');
   const renderer = new webgpuModule.WebGPURenderer({
     antialias: true,
     powerPreference: 'high-performance',
     forceWebGL: requestedMode === 'webgpu-force-webgl',
+    // Opt-in only (?gpuTiming=1). `trackTimestamp` arms the WebGPU
+    // `timestamp-query` pass timing; the backend self-gates it on device
+    // feature support at init (see GPUTimingTelemetry for the resolve path).
+    // Default sessions pass `false` and are byte-for-byte unchanged.
+    ...(options.trackTimestamp ? { trackTimestamp: true } : {}),
   }) as unknown as CommonRenderer;
 
   const adapter = await collectNavigatorWebGPUCapabilities();
