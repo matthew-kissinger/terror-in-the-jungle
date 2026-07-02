@@ -45,6 +45,21 @@ export class SmokeMarkerPrompt {
 
   show(assetLabel: string): void {
     this.asset.textContent = assetLabel.toUpperCase();
+    this.action.textContent = 'SMOKE MARKER ARMED';
+    this.hint.textContent = 'Hold LMB to throw / Esc cancel';
+    this.root.dataset.visible = 'true';
+    this.root.setAttribute('aria-hidden', 'false');
+  }
+
+  /**
+   * Marker is airborne / settling — the throw has left the player's hand but the
+   * smoke has not registered yet. Keeps a pending-mission cue on screen through
+   * the 1-3 s of canister flight so the HUD does not go blank until settle.
+   */
+  showMarkerOut(assetLabel: string): void {
+    this.asset.textContent = assetLabel.toUpperCase();
+    this.action.textContent = 'MARKER OUT';
+    this.hint.textContent = 'Waiting for smoke…';
     this.root.dataset.visible = 'true';
     this.root.setAttribute('aria-hidden', 'false');
   }

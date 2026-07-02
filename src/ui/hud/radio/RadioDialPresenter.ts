@@ -80,10 +80,6 @@ export class RadioDialPresenter {
     this.controller.setSquadAvailable(available);
   }
 
-  setHasSmokeMark(available: boolean): void {
-    this.controller.setHasSmokeMark(available);
-  }
-
   /**
    * Open the dial at the category level, showing the input-appropriate view.
    * Cooldowns are already pushed via `setCooldowns` before this; the seed only

@@ -246,6 +246,7 @@ describe('PlayerController', () => {
       issueQuickCommand: vi.fn(),
       handleCancel: vi.fn(() => false),
       cancelSmokeMarkerThrow: vi.fn(() => false),
+      abortRadioTargeting: vi.fn(),
     };
 
     mockSettingsModal = {
@@ -307,15 +308,36 @@ describe('PlayerController', () => {
       expect(mockCommandInputManager.toggleRadioMenu).toHaveBeenCalledTimes(1);
     });
 
-    it('cancels an armed smoke marker when the player swaps weapon slots', () => {
+    it('cancels an armed smoke marker from the touch weapon bar callback', () => {
       playerController.setCommandInputManager(mockCommandInputManager);
       playerController.setInventoryManager(mockInventoryManager);
 
       const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
       callbacks.onWeaponSlotChange(WeaponSlot.PRIMARY);
 
-      expect(mockCommandInputManager.cancelSmokeMarkerThrow).toHaveBeenCalledTimes(1);
+      expect(mockCommandInputManager.cancelSmokeMarkerThrow).toHaveBeenCalled();
       expect(mockInventoryManager.setCurrentSlot).toHaveBeenCalledWith(WeaponSlot.PRIMARY);
+    });
+
+    it('cancels an armed smoke marker on any real slot change (number keys / pill / bar)', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+      playerController.setInventoryManager(mockInventoryManager);
+
+      // Every real slot change (number-key keydown, weapon pill, weapon bar,
+      // gamepad grenade switch) routes through InventoryManager.onSlotChange ->
+      // handleWeaponSlotChange, so the cancel fires there regardless of path.
+      const slotChangeCallback = (mockInventoryManager.onSlotChange as any).mock.calls[0][0];
+      slotChangeCallback(WeaponSlot.SMG);
+
+      expect(mockCommandInputManager.cancelSmokeMarkerThrow).toHaveBeenCalled();
+    });
+
+    it('aborts radio targeting when the player loses controls (death / respawn)', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+
+      playerController.disableControls();
+
+      expect(mockCommandInputManager.abortRadioTargeting).toHaveBeenCalledTimes(1);
     });
 
     it('lets command input consume escape before pointer unlock logic runs', () => {
@@ -679,6 +701,34 @@ describe('PlayerController', () => {
       playerController.enterHelicopter('heli-1', helicopterPos);
 
       expect(mockFirstPersonWeapon.setVehicleEquipmentSuppressed).toHaveBeenCalledWith(true);
+    });
+
+    it('cancels an armed smoke marker when infantry actions are suppressed by a ground vehicle', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+      const session = playerController['vehicleStateManager'];
+      // Ground vehicle: seated, but not a helicopter / fixed-wing.
+      vi.spyOn(session, 'isInVehicle').mockReturnValue(true);
+
+      playerController['syncInfantryEquipmentForVehicleState']();
+
+      expect(mockCommandInputManager.cancelSmokeMarkerThrow).toHaveBeenCalled();
+
+      // Idempotent per-frame: the cancel keeps returning false once nothing is
+      // armed, so re-running does not churn (no throw, no double-abort of a live
+      // designation).
+      mockCommandInputManager.cancelSmokeMarkerThrow.mockClear();
+      playerController['syncInfantryEquipmentForVehicleState']();
+      expect(mockCommandInputManager.cancelSmokeMarkerThrow).toHaveBeenCalled();
+    });
+
+    it('does NOT cancel an armed smoke marker in a helicopter (in-cockpit toss is kept)', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+      playerController.enterHelicopter('heli-1', new THREE.Vector3(200, 50, 200));
+      mockCommandInputManager.cancelSmokeMarkerThrow.mockClear();
+
+      playerController['syncInfantryEquipmentForVehicleState']();
+
+      expect(mockCommandInputManager.cancelSmokeMarkerThrow).not.toHaveBeenCalled();
     });
 
     it('should show helicopter HUD on enter', () => {

@@ -587,6 +587,8 @@ export class PlayerController implements GameSystem {
       this.grenadeSystem?.showGrenadeInHand(false);
       this.sandbagSystem?.showPlacementPreview(false);
       this.hudSystem?.hideGrenadePowerMeter();
+      // Ground vehicles self-cancel an armed radio smoke marker (heli/fixed-wing keep it).
+      if (this.shouldSuppressInfantryActions()) this.commandInputManager?.cancelSmokeMarkerThrow();
       return;
     }
 
@@ -605,6 +607,8 @@ export class PlayerController implements GameSystem {
   }
 
   private handleWeaponSlotChange(slot: WeaponSlot): void {
+    // Single funnel for every real slot change (keys/pill/bar/gamepad/vehicle-exit).
+    this.commandInputManager?.cancelSmokeMarkerThrow();
     if (this.firstPersonWeapon) {
       this.firstPersonWeapon.setWeaponVisibility(false);
     }
@@ -711,7 +715,8 @@ export class PlayerController implements GameSystem {
     this.playerState.isRunning = false;
     this.input.unlockPointer();
 
-    // Ensure no high-frequency auxiliary-weapon loops remain active while dead/respawning.
+    // Ensure no aux-weapon loops (or an armed smoke marker / strike designation) survive death.
+    this.commandInputManager?.abortRadioTargeting();
     if (this.grenadeSystem?.isCurrentlyAiming()) {
       this.grenadeSystem.cancelThrow();
     }

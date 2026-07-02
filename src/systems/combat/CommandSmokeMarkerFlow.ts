@@ -8,7 +8,6 @@ import { SmokeMarkerPrompt } from '../../ui/hud/SmokeMarkerPrompt';
 
 interface CommandSmokeMarkerFlowConfig {
   beginStrikeOnSmoke: (assetId: AirSupportRadioAssetId, mark: TargetMark) => void;
-  setSmokeMarkAvailable: (available: boolean) => void;
   consumeActiveSmokeMark: () => void;
   emitVisibility: () => void;
 }
@@ -17,6 +16,7 @@ export class CommandSmokeMarkerFlow {
   private readonly prompt = new SmokeMarkerPrompt();
   private readonly unsubscribeTargetMarkSet: () => void;
   private pendingAssetId: AirSupportRadioAssetId | null = null;
+  private pendingAssetLabel = '';
   private consumeSmokeOnStrikeCommit = false;
 
   constructor(private readonly config: CommandSmokeMarkerFlowConfig) {
@@ -42,20 +42,42 @@ export class CommandSmokeMarkerFlow {
 
   clearPending(): void {
     this.pendingAssetId = null;
+    this.pendingAssetLabel = '';
   }
 
   clearPendingForTopLevelRadio(): void {
     this.clearPending();
   }
 
+  /**
+   * Hard reset on player death: drop any pending marker mission AND hide the
+   * prompt. Covers the airborne "MARKER OUT" window where the canister is still
+   * settling — cancelling the in-hand throw is a no-op then, so a pending strike
+   * would otherwise fire from beyond the grave once the smoke registers.
+   */
+  forceClearPending(): void {
+    this.clearPending();
+    this.consumeSmokeOnStrikeCommit = false;
+    this.prompt.hide();
+  }
+
   armThrow(assetId: AirSupportRadioAssetId, assetLabel: string): void {
     this.pendingAssetId = assetId;
+    this.pendingAssetLabel = assetLabel;
     this.prompt.show(assetLabel);
   }
 
   handleThrowModeEnd(reason: SmokeMarkerThrowModeEndReason): void {
-    this.prompt.hide();
-    if (reason === 'cancelled') this.clearPending();
+    // On release, hold a "MARKER OUT — waiting for smoke" cue through the 1-3 s
+    // of canister flight so the pending mission stays on screen until the smoke
+    // registers (target_mark_set) and the designation banner takes over. A
+    // cancel just clears everything.
+    if (reason === 'thrown' && this.pendingAssetId) {
+      this.prompt.showMarkerOut(this.pendingAssetLabel);
+    } else {
+      this.prompt.hide();
+      if (reason === 'cancelled') this.clearPending();
+    }
     this.config.emitVisibility();
   }
 
@@ -70,15 +92,16 @@ export class CommandSmokeMarkerFlow {
   handleStrikeCommitted(): void {
     if (this.consumeSmokeOnStrikeCommit) {
       this.config.consumeActiveSmokeMark();
-      this.config.setSmokeMarkAvailable(false);
     }
     this.consumeSmokeOnStrikeCommit = false;
   }
 
   private handleTargetMarkSet(mark: TargetMark): void {
-    this.config.setSmokeMarkAvailable(true);
     if (mark.kind !== 'smoke-marker' || !this.pendingAssetId) return;
 
+    // The marker landed: drop the MARKER OUT cue and hand off to the strike
+    // designation banner.
+    this.prompt.hide();
     const assetId = this.pendingAssetId;
     this.clearPending();
     this.config.beginStrikeOnSmoke(assetId, mark);

@@ -132,11 +132,6 @@ export class RadioDialController {
     this.emitChange();
   }
 
-  setHasSmokeMark(_available: boolean): void {
-    // Kept for presenter compatibility; fire support now always starts with a
-    // fresh smoke marker, so active-smoke gating is no longer rendered here.
-  }
-
   isOptionEnabled(option: RadioOption): boolean {
     if (option.kind === 'squad') return this.squadAvailable;
     if (option.kind === 'fire-support') return isRadioOptionReady(option, this.cooldowns);

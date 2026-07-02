@@ -31,19 +31,7 @@ export interface AirSupportRadioAsset {
   dangerCloseRadius?: number;
 }
 
-export interface AirSupportTargetMarkingOption {
-  id: AirSupportTargetMarking;
-  label: string;
-  shortLabel: string;
-}
-
 export type AirSupportRadioCooldowns = Partial<Record<AirSupportRadioAssetId, number>>;
-
-export const AIR_SUPPORT_TARGET_MARKINGS: AirSupportTargetMarkingOption[] = [
-  { id: 'smoke', label: 'Smoke Mark', shortLabel: 'Smoke' },
-  { id: 'willie_pete', label: 'Willie Pete', shortLabel: 'WP' },
-  { id: 'position_only', label: 'Position Only', shortLabel: 'Grid' },
-];
 
 export const AIR_SUPPORT_RADIO_ASSETS: AirSupportRadioAsset[] = [
   {
@@ -141,8 +129,4 @@ export function getCooldownRemaining(
 ): number {
   const value = cooldowns[assetId] ?? 0;
   return Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-export function countReadyAssets(cooldowns: AirSupportRadioCooldowns): number {
-  return AIR_SUPPORT_RADIO_ASSETS.filter((asset) => getCooldownRemaining(cooldowns, asset.id) <= 0).length;
 }
