@@ -255,9 +255,10 @@ export class CombatantAI {
     this.engageHandler.setCoverGridQuery(this.coverGridProvider)
 
     // Wire C1 utility-AI prototype. Factions opt in via
-    // FACTION_COMBAT_TUNING[faction].useUtilityAI — currently only VC.
-    // Leaving the probe unwired keeps fire-and-fade disabled for all
-    // factions regardless of the flag (graceful no-op).
+    // FACTION_COMBAT_TUNING[faction].useUtilityAI — all four factions
+    // (VC/NVA/US/ARVN) now opt in. Leaving the probe unwired keeps
+    // fire-and-fade disabled for all factions regardless of the flag
+    // (graceful no-op).
     this.engageHandler.setUtilityScorer(new UtilityScorer(DEFAULT_UTILITY_ACTIONS))
     this.engageHandler.setCoverBearingProbe((origin, bearingRad, radius) => {
       // Cheap directional cover check: ask AICoverSystem for the best cover

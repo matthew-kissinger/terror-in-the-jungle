@@ -98,8 +98,10 @@ export const fireAndFadeAction: UtilityAction = {
 // large enough and under committed engagement. Scored here so the scorer
 // has a real alternative to weigh fire-and-fade against. Apply returns the
 // coordinateSuppression intent; callers may route this to the existing
-// AIStateEngage.initiateSquadSuppression or AIFlankingSystem. Not wired to
-// NVA behavior yet (NVA has useUtilityAI=false in FactionCombatTuning).
+// AIStateEngage.initiateSquadSuppression or AIFlankingSystem. This action is
+// a scaffold: it is scored but its apply() intent is not yet routed to NVA
+// squad behavior (all four factions have useUtilityAI=true in
+// FactionCombatTuning, so the flag no longer gates this).
 
 const COORD_SUPPRESSION_MIN_SQUAD = 3
 const COORD_SUPPRESSION_WEIGHT = 0.5
