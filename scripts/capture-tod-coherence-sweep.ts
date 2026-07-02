@@ -120,8 +120,9 @@ import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import sharp from 'sharp';
 import { startServer, stopServer, type ServerHandle } from './preview-server';
-import type { CurvesFile, FamilyCurve, FamilyKey, Region, TodSample } from './tod-coherence-sweep-types';
+import type { AnchorProvenance, CurvesFile, FamilyCurve, FamilyKey, Region, TodSample } from './tod-coherence-sweep-types';
 import { evaluateCoherenceGate, type GateVerdict } from './tod-coherence-gate';
+import { evaluateAnchor } from './tod-coherence-anchor';
 
 // ----- Scenario fixture -----
 
@@ -217,12 +218,17 @@ const MEDIAN_ANCHOR_CANDIDATES = 9;
  * range (renders as a billboard sprite, the family the rig migrated).
  *
  * Geometry: the fixture camera sits ~95m above local terrain looking down the
- * valley at a -16 deg pitch with a 75 deg vertical FOV, so visible ground starts
- * ~70m out (the bottom frustum edge) and the look-at-ground point is ~330m out.
- * 120m horizontal sits comfortably in the lower-mid band where terrain + foliage
- * also read — the impostor lands in frame, not clipped by the bottom edge.
+ * valley at a -16 deg pitch, so the camera->look-at ground point is
+ * ~cameraHeight / tan(16deg) ~= 95 / 0.287 ~= 331m out — that ground point
+ * projects near screen CENTRE (screen-y ~0.5). The prior 120m placement measured
+ * screen-y 0.877 (verified 2026-07-02) — INSIDE the terrain foreground sample
+ * band (y0 0.82), so the npc anchor read terrain, not the impostor, and the gate
+ * correctly marked npc UNMEASURED. Placing the impostor at the look-at ground
+ * distance frames it near screen centre, clear of the terrain foreground band.
  */
-const NPC_FIXTURE_FORWARD_DISTANCE = 120;
+const NPC_FIXTURE_FORWARD_DISTANCE = Math.round(
+  SCENARIO.cameraHeight / Math.tan((-SCENARIO.pitchDeg * Math.PI) / 180)
+);
 /** Lift above local terrain so the teleported sprite's centre is in frame. */
 const NPC_FIXTURE_GROUND_LIFT = 1.6;
 
@@ -582,9 +588,16 @@ async function snap(page: Page, outFile: string): Promise<Buffer | null> {
  * null for families with no on-screen instance (the caller falls back to the
  * fixed box and records `fallback` in the sample notes).
  */
-async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Record<FamilyKey, Region>>> {
+interface ResolvedAnchors {
+  /** Refined sample box per family whose anchor was GENUINE (`anchored`). */
+  regions: Partial<Record<FamilyKey, Region>>;
+  /** Provenance per anchored family — records degenerate/fallback + evidence. */
+  provenance: Partial<Record<FamilyKey, AnchorProvenance>>;
+}
+
+async function resolveAnchorRegions(page: Page, pose: Pose): Promise<ResolvedAnchors> {
   const projected = await page.evaluate(
-    ({ camPos, instCap, nCandidates }: { camPos: [number, number, number]; instCap: number; nCandidates: number }) => {
+    ({ camPos, instCap, nCandidates, preferAboveScreenY }: { camPos: [number, number, number]; instCap: number; nCandidates: number; preferAboveScreenY: number }) => {
       const w = window as unknown as { __engine?: { renderer?: { camera?: unknown; scene?: unknown }; systemManager?: { vehicleManager?: unknown } } };
       const engine = w.__engine;
       const camera = engine?.renderer?.camera as unknown as {
@@ -593,7 +606,10 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
         matrixWorldInverse?: { elements: number[] };
       } | undefined;
       const scene = engine?.renderer?.scene as unknown as { traverse?: (cb: (o: unknown) => void) => void } | undefined;
-      if (!camera?.projectionMatrix || !camera.matrixWorldInverse) return { foliage: null, npc: null, glb: null };
+      type Anchor = { screen: { x: number; y: number }; world: { x: number; y: number; z: number }; count: number } | null;
+      if (!camera?.projectionMatrix || !camera.matrixWorldInverse) {
+        return { foliage: null as Anchor, npc: null as Anchor, glb: null as Anchor };
+      }
 
       // Multiply a world point by viewProjection (column-major 4x4 in `elements`)
       // to NDC, then map to screen fractions. y is flipped (NDC up -> screen up).
@@ -622,10 +638,16 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
       // a small near cluster is robust to one shadowed outlier card (the PR #379
       // corr-0.874 instrument-variance miss) and is a pure function of the
       // scene's world positions, so two identical renders anchor identically.
+      // Returns the deterministic median anchor: its SCREEN position, its WORLD
+      // position (median of the same chosen candidates), and the on-screen
+      // candidate COUNT. The count + world/screen position are logged into the
+      // sample provenance so a degenerate anchor (e.g. the foliage median
+      // landing on the bottom-edge terrain foreground) is visible + auditable in
+      // curves.json (the fixture-truth fix). `count === 0` => fall back.
       const medianAnchor = (
         entries: Array<{ x: number; y: number; z: number }>,
         nCandidates: number
-      ): { x: number; y: number } | null => {
+      ): { screen: { x: number; y: number }; world: { x: number; y: number; z: number }; count: number } | null => {
         const onScreen: Array<{ sx: number; sy: number; dist: number; wx: number; wy: number; wz: number }> = [];
         for (const e of entries) {
           const s = toScreen(e.x, e.y, e.z);
@@ -643,13 +665,31 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
           : a.wz !== b.wz ? a.wz - b.wz
           : a.wy - b.wy
         );
-        const chosen = onScreen.slice(0, Math.max(1, Math.min(nCandidates, onScreen.length)));
+        // FIXTURE TRUTH: prefer candidates that project ABOVE the terrain
+        // foreground band (screen-y < preferAboveScreenY). The nearest cards sit
+        // right under the down-pitched camera and project to the extreme bottom
+        // edge — that is exactly how the 2026-06-25 foliage anchor landed on the
+        // terrain foreground (y=0.971). Anchoring on the nearest cards in the
+        // preferred band frames a genuine mid-frame cluster. If NONE project
+        // above the band, keep the nearest overall so the downstream classifier
+        // marks the family degenerate (UNMEASURED) rather than silently passing.
+        const preferred = onScreen.filter((c) => c.sy < preferAboveScreenY);
+        const pool = preferred.length > 0 ? preferred : onScreen;
+        const chosen = pool.slice(0, Math.max(1, Math.min(nCandidates, pool.length)));
         const median = (vals: number[]): number => {
           const sorted = [...vals].sort((a, b) => a - b);
           const mid = sorted.length >> 1;
           return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
         };
-        return { x: median(chosen.map((c) => c.sx)), y: median(chosen.map((c) => c.sy)) };
+        return {
+          screen: { x: median(chosen.map((c) => c.sx)), y: median(chosen.map((c) => c.sy)) },
+          world: {
+            x: median(chosen.map((c) => c.wx)),
+            y: median(chosen.map((c) => c.wy)),
+            z: median(chosen.map((c) => c.wz)),
+          },
+          count: onScreen.length,
+        };
       };
 
       const hasUniform = (material: unknown, key: string): boolean => {
@@ -752,21 +792,49 @@ async function resolveAnchorRegions(page: Page, pose: Pose): Promise<Partial<Rec
         glb: medianAnchor(glbPoints, nCandidates),
       };
     },
-    { camPos: pose.position, instCap: ANCHOR_INSTANCE_SCAN_CAP, nCandidates: MEDIAN_ANCHOR_CANDIDATES }
+    {
+      camPos: pose.position,
+      instCap: ANCHOR_INSTANCE_SCAN_CAP,
+      nCandidates: MEDIAN_ANCHOR_CANDIDATES,
+      // Prefer anchors above the terrain foreground band so foliage/npc do not
+      // silently land on the ground the terrain family already samples.
+      preferAboveScreenY: FAMILY_FALLBACK_REGIONS.terrain.y0,
+    }
   );
 
-  const out: Partial<Record<FamilyKey, Region>> = {};
+  const regions: Partial<Record<FamilyKey, Region>> = {};
+  const provenance: Partial<Record<FamilyKey, AnchorProvenance>> = {};
   for (const fam of ANCHORED_FAMILIES) {
     const pt = projected[fam];
-    if (!pt) continue;
-    out[fam] = {
-      x0: Math.max(0, pt.x - ANCHOR_BOX_HALF_FRAC),
-      x1: Math.min(1, pt.x + ANCHOR_BOX_HALF_FRAC),
-      y0: Math.max(0, pt.y - ANCHOR_BOX_HALF_FRAC),
-      y1: Math.min(1, pt.y + ANCHOR_BOX_HALF_FRAC),
+    const box: Region | null = pt
+      ? {
+          x0: Math.max(0, pt.screen.x - ANCHOR_BOX_HALF_FRAC),
+          x1: Math.min(1, pt.screen.x + ANCHOR_BOX_HALF_FRAC),
+          y0: Math.max(0, pt.screen.y - ANCHOR_BOX_HALF_FRAC),
+          y1: Math.min(1, pt.screen.y + ANCHOR_BOX_HALF_FRAC),
+        }
+      : null;
+    // Classify the anchor (pure): genuine on-subject, degenerate (projected onto
+    // the terrain foreground / edge-clamped), or fallback (no instance). ONLY a
+    // genuine anchor becomes the sample region; a degenerate anchor is discarded
+    // (it would read terrain) and the family falls back to the fixed box with a
+    // `degenerate` provenance so the gate marks it UNMEASURED, never a silent
+    // terrain-vs-terrain pass.
+    const evaluation = evaluateAnchor({
+      box,
+      instanceCount: pt?.count ?? 0,
+      terrainBand: FAMILY_FALLBACK_REGIONS.terrain,
+    });
+    provenance[fam] = {
+      kind: evaluation.kind,
+      instanceCount: pt?.count ?? 0,
+      screen: pt ? { x: pt.screen.x, y: pt.screen.y } : null,
+      world: pt ? { x: pt.world.x, y: pt.world.y, z: pt.world.z } : null,
+      reason: evaluation.reason,
     };
+    if (evaluation.kind === 'anchored' && box) regions[fam] = box;
   }
-  return out;
+  return { regions, provenance };
 }
 
 // ----- Pixel sampling -----
@@ -962,7 +1030,7 @@ async function captureTod(
     else logStep(`TOD ${hour}h: no live combatant to teleport into the fixture (npc will fall back)`);
   }
 
-  const anchorRegions = await resolveAnchorRegions(page, pose);
+  const { regions: anchorRegions, provenance } = await resolveAnchorRegions(page, pose);
   const regions: Record<FamilyKey, Region> = {
     terrain: FAMILY_FALLBACK_REGIONS.terrain,
     foliage: anchorRegions.foliage ?? FAMILY_FALLBACK_REGIONS.foliage,
@@ -981,8 +1049,20 @@ async function captureTod(
     }
   }
 
+  // Provenance note: `<fam>=anchored|degenerate|fallback`. A `degenerate` /
+  // `fallback` family read the fixed box (terrain-vs-terrain) — UNMEASURED. Log
+  // the anchor world/screen position + instance count so a degenerate anchor is
+  // auditable straight from the log + curves.json (fixture-truth requirement).
   const anchoredNote = ANCHORED_FAMILIES
-    .map((f) => `${f}=${anchorRegions[f] ? 'anchored' : 'fallback'}`)
+    .map((f) => {
+      const p = provenance[f];
+      if (!p) return `${f}=fallback`;
+      const at = p.screen
+        ? ` @screen(${p.screen.x.toFixed(3)},${p.screen.y.toFixed(3)}) world(${p.world?.x.toFixed(1)},${p.world?.y.toFixed(1)},${p.world?.z.toFixed(1)}) n=${p.instanceCount}`
+        : ` n=${p.instanceCount}`;
+      const why = p.kind === 'anchored' ? '' : ` [${p.reason}]`;
+      return `${f}=${p.kind}${at}${why}`;
+    })
     .join(' ');
   return {
     hour,
@@ -991,6 +1071,7 @@ async function captureTod(
     regions,
     luminance,
     notes: buffer ? anchoredNote : 'snap failed',
+    anchors: provenance,
   };
 }
 
