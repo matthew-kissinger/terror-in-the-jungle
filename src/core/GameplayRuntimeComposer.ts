@@ -74,6 +74,7 @@ interface GameplayRuntimeGroups {
     | 'inventoryManager'
     | 'mortarSystem'
     | 'playerController'
+    | 'playerHealthSystem'
     | 'sandbagSystem'
     | 'ticketSystem'
   >;
@@ -147,6 +148,7 @@ export function createGameplayRuntimeGroups(
       inventoryManager: refs.inventoryManager,
       mortarSystem: refs.mortarSystem,
       playerController: refs.playerController,
+      playerHealthSystem: refs.playerHealthSystem,
       sandbagSystem: refs.sandbagSystem,
       ticketSystem: refs.ticketSystem,
     },
@@ -266,6 +268,7 @@ function wireWeaponRuntime(runtime: GameplayRuntimeGroups['weaponRuntime']): voi
   runtime.grenadeSystem.setTicketSystem(runtime.ticketSystem);
   runtime.grenadeSystem.setAudioManager(runtime.audioManager);
   runtime.grenadeSystem.setPlayerController(runtime.playerController);
+  runtime.grenadeSystem.setPlayerHealthSystem(runtime.playerHealthSystem);
   runtime.grenadeSystem.setFlashbangEffect(runtime.flashbangScreenEffect);
 
   runtime.mortarSystem.setCombatantSystem(runtime.combatantSystem);

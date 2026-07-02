@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { GrenadeSystem } from './GrenadeSystem';
 import { GrenadeType } from '../combat/types';
+import { GameEventBus } from '../../core/GameEventBus';
 
 // Mock Logger
 vi.mock('../../utils/Logger', () => ({
@@ -47,8 +48,13 @@ describe('GrenadeSystem', () => {
   let mockCombatantSystem: any;
   let mockExplosionEffectsPool: any;
   let mockPlayerController: any;
+  let mockHealthSystem: any;
 
   beforeEach(() => {
+    // Drain cross-file event-bus residue so player_killed subscribers below
+    // only see this test's emissions.
+    GameEventBus.flush();
+    GameEventBus.clear();
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera();
     camera.position.set(0, 10, 0);
@@ -108,10 +114,19 @@ describe('GrenadeSystem', () => {
       applyExplosionShake: vi.fn(),
     };
     grenadeSystem.setPlayerController(mockPlayerController as any);
+
+    // takeDamage returns true (player died) by default so the in-hand kill path
+    // is exercised; individual tests override the return where needed.
+    mockHealthSystem = {
+      takeDamage: vi.fn().mockReturnValue(true),
+    };
+    grenadeSystem.setPlayerHealthSystem(mockHealthSystem as any);
   });
 
   afterEach(() => {
     grenadeSystem.dispose();
+    GameEventBus.flush();
+    GameEventBus.clear();
     vi.clearAllMocks();
   });
 
@@ -269,29 +284,117 @@ describe('GrenadeSystem', () => {
       expect(grenadeSystem.getAimingState().cookingTime).toBe(1.5);
     });
 
-    it('should explode in hand if cooked too long', () => {
+    it('should explode in hand with the full blast feedback if cooked too long', () => {
       grenadeSystem.startAiming();
       grenadeSystem.startCooking();
-      
+
       // Default FUSE_TIME is 3.5
       grenadeSystem.update(3.6);
-      
+
       expect(grenadeSystem.isCurrentlyAiming()).toBe(false);
       expect(mockExplosionEffectsPool.spawn).toHaveBeenCalled();
       expect(mockAudioManager.playExplosionAt).toHaveBeenCalled();
       expect(mockPlayerController.applyExplosionShake).toHaveBeenCalled();
     });
 
+    it('kills the player when the fuse expires in hand', () => {
+      grenadeSystem.startAiming();
+      grenadeSystem.startCooking();
+
+      grenadeSystem.update(3.6);
+
+      // A single lethal self-hit routed through the health system.
+      expect(mockHealthSystem.takeDamage).toHaveBeenCalledTimes(1);
+      const [amount] = mockHealthSystem.takeDamage.mock.calls[0];
+      expect(amount).toBeGreaterThanOrEqual(150); // above max health => unsurvivable
+    });
+
+    it("emits player_killed sourced to 'own_grenade_cooked' on an in-hand blast", () => {
+      const events: Array<{ killerId: string; killerFaction: unknown }> = [];
+      const unsubscribe = GameEventBus.subscribe('player_killed', (e) => {
+        events.push({ killerId: e.killerId, killerFaction: e.killerFaction });
+      });
+      try {
+        grenadeSystem.startAiming();
+        grenadeSystem.startCooking();
+        grenadeSystem.update(3.6);
+        GameEventBus.flush();
+
+        expect(events).toHaveLength(1);
+        expect(events[0].killerId).toBe('own_grenade_cooked');
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it('does not emit player_killed when spawn protection survives the in-hand blast', () => {
+      // takeDamage returns false when the player is invulnerable / already dead.
+      mockHealthSystem.takeDamage.mockReturnValue(false);
+      const events: unknown[] = [];
+      const unsubscribe = GameEventBus.subscribe('player_killed', (e) => events.push(e));
+      try {
+        grenadeSystem.startAiming();
+        grenadeSystem.startCooking();
+        grenadeSystem.update(3.6);
+        GameEventBus.flush();
+
+        expect(events).toHaveLength(0);
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it('blasts nearby combatants from the in-hand explosion like a thrown frag', () => {
+      grenadeSystem.startAiming();
+      grenadeSystem.startCooking();
+
+      grenadeSystem.update(3.6);
+
+      expect(mockCombatantSystem.applyExplosionDamage).toHaveBeenCalledTimes(1);
+      const [center, radius, maxDamage, attackerId] =
+        mockCombatantSystem.applyExplosionDamage.mock.calls[0];
+      expect(center).toBeInstanceOf(THREE.Vector3);
+      expect(radius).toBeGreaterThan(0);
+      expect(maxDamage).toBeGreaterThan(0);
+      expect(attackerId).toBe('PLAYER');
+    });
+
+    it('does not self-damage the player when merely throwing a cooked grenade', () => {
+      grenadeSystem.startAiming();
+      grenadeSystem.startCooking();
+      grenadeSystem.update(1.0);
+
+      grenadeSystem.throwGrenade();
+
+      // A thrown cooked grenade leaves the hand — the in-hand kill path must not run.
+      expect(mockHealthSystem.takeDamage).not.toHaveBeenCalled();
+    });
+
     it('should reduce fuse time of thrown grenade if cooked', () => {
       grenadeSystem.startAiming();
       grenadeSystem.startCooking();
       grenadeSystem.update(1.0);
-      
+
       grenadeSystem.throwGrenade();
-      
+
       const grenade = (grenadeSystem as any).grenades[0];
       // Original fuse is 3.5, cooked for 1s, remaining should be 2.5
       expect(grenade.fuseTime).toBeCloseTo(2.5);
+    });
+
+    it('a cooked throw detonates earlier than an uncooked throw by the cooked duration', () => {
+      grenadeSystem.startAiming();
+      grenadeSystem.throwGrenade();
+      const uncookedFuse = (grenadeSystem as any).grenades[0].fuseTime;
+      (grenadeSystem as any).grenades.length = 0;
+
+      grenadeSystem.startAiming();
+      grenadeSystem.startCooking();
+      grenadeSystem.update(1.2);
+      grenadeSystem.throwGrenade();
+      const cookedFuse = (grenadeSystem as any).grenades[0].fuseTime;
+
+      expect(uncookedFuse - cookedFuse).toBeCloseTo(1.2);
     });
   });
 
