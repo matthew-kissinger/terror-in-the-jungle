@@ -1,7 +1,7 @@
 {
   "_comment": "One-way ratchet snapshot for the knip export surface (manifest F8, 2026-07-02). Counts are derived from `knip --reporter json --no-config-hints` (see scripts/check-export-surface-ratchet.ts). flaggedFiles = distinct files with any knip issue; unusedFiles = whole modules knip reports as unused; unusedExports = unused exported values; unusedExportedTypes = unused exported types. The gate FAILS if any count GROWS past this snapshot and prints one-way-ratchet update guidance when a count SHRINKS. To lock in a shrink, re-run `npm run check:export-ratchet -- --print` and lower the relevant number here. Measured against the tree at task/audio-brief-and-export-ratchet (base e886c7a1).",
-  "flaggedFiles": 121,
+  "flaggedFiles": 117,
   "unusedFiles": 0,
-  "unusedExports": 73,
+  "unusedExports": 66,
   "unusedExportedTypes": 156
 }

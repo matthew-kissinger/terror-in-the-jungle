@@ -34,7 +34,7 @@ export const ShadowTruthConfig = {
 };
 
 /** Window key the runtime flags are mirrored onto for headless-capture A/B toggling. */
-export const SHADOW_TRUTH_GLOBAL_KEY = '__shadowTruth';
+const SHADOW_TRUTH_GLOBAL_KEY = '__shadowTruth';
 
 /**
  * Publish the runtime flag object onto `window` (idempotent). Called once from

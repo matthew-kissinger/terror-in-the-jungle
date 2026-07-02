@@ -83,7 +83,7 @@ export const NIGHT_ELEVATION_RAD = -0.05;
  * only per-family tuning; the day endpoint is identity for all families so the
  * midday look is shared and preserved.
  */
-export interface TodImpostorFamilyCurve {
+interface TodImpostorFamilyCurve {
   /** Exposure multiplier at full night (< 1 dims the card as the sun sets). */
   nightExposureMul: number;
   /** Saturation multiplier at full night (< 1 desaturates toward a muted dusk). */
@@ -178,7 +178,7 @@ export const TodImpostorMappingConfig = {
 };
 
 /** Window key the config is mirrored onto for headless toggling. */
-export const TOD_IMPOSTOR_MAPPING_GLOBAL_KEY = '__todImpostorMapping';
+const TOD_IMPOSTOR_MAPPING_GLOBAL_KEY = '__todImpostorMapping';
 
 /** True when the per-family TOD grade is applied. Read each frame by the update. */
 export function isTodImpostorMappingEnabled(): boolean {
@@ -203,7 +203,7 @@ export function publishTodImpostorMappingConfig(): void {
  * place each frame; the node graph picks the new values up on the next render
  * without a recompile. `enabled` is a float (0/1) so a TSL branch can read it.
  */
-export interface TodImpostorFamilyBinding {
+interface TodImpostorFamilyBinding {
   /** Exposure multiplier (1 at midday / when disabled). */
   exposureMul: { value: number };
   /** Saturation multiplier (1 at midday / when disabled). */
@@ -212,7 +212,7 @@ export interface TodImpostorFamilyBinding {
   tint: { value: THREE.Color };
 }
 
-export interface TodImpostorMappingBindings {
+interface TodImpostorMappingBindings {
   /** 1 when the mapping is active, 0 when the kill-switch is OFF. */
   enabled: { value: number };
   foliage: TodImpostorFamilyBinding;

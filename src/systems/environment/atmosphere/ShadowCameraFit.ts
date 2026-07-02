@@ -44,26 +44,26 @@ export const SHADOW_FIT_MAX_DEPTH_MULTIPLE = 2.4;
  * Kept tiny and negative per three.js convention (pull the caster slightly
  * toward the light to hide self-shadow acne without visible peter-panning).
  */
-export const SHADOW_FIT_BASE_BIAS = -0.00015;
+const SHADOW_FIT_BASE_BIAS = -0.00015;
 
 /**
  * Additional bias added as the sun approaches the horizon. At grazing angles a
  * texel spans much more world depth, so a larger constant offset is needed to
  * clear acne. Scaled by `(1 - elevationSin)` so it vanishes at zenith.
  */
-export const SHADOW_FIT_GRAZE_BIAS = -0.0006;
+const SHADOW_FIT_GRAZE_BIAS = -0.0006;
 
 /**
  * `normalBias` pushes the sample point along the surface normal, which is the
  * right lever for acne on sloped ground under a low sun. Scaled up modestly for
  * lower-resolution shadow maps (a 512 texel covers more world than a 2048 texel).
  */
-export const SHADOW_FIT_BASE_NORMAL_BIAS = 0.6;
+const SHADOW_FIT_BASE_NORMAL_BIAS = 0.6;
 
 /** Reference shadow-map size the normalBias scale is calibrated against. */
-export const SHADOW_FIT_REFERENCE_MAP_SIZE = 2048;
+const SHADOW_FIT_REFERENCE_MAP_SIZE = 2048;
 
-export interface ShadowCameraFitParams {
+interface ShadowCameraFitParams {
   /**
    * Horizontal half-extent (metres) of the ground footprint the map must cover.
    * This is the existing ±70/100m ortho half-size and stays the ortho box width.

@@ -57,7 +57,7 @@ export const SUN_GATE_FULL_RAD = 0.1;
  * a fast L1 test can exercise, and so the CPU mirror matches the shader
  * `smoothstep` exactly.
  */
-export function sunGateSmoothstep(edge0: number, edge1: number, x: number): number {
+function sunGateSmoothstep(edge0: number, edge1: number, x: number): number {
   if (edge0 === edge1) return x < edge0 ? 0 : 1;
   const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);

@@ -6,7 +6,7 @@ import { Logger } from '../../../utils/Logger';
 import { computeShadowCameraFit, type ShadowCameraFit } from './ShadowCameraFit';
 import { isShadowCameraTruthEnabled } from './ShadowTruthConfig';
 
-export interface ShadowPlacement {
+interface ShadowPlacement {
   /**
    * Sun-direction-scaled offset from the follow target to the light
    * (`direction * lightDistance`). Its Y may be clamped up (see `clampMinY`).
