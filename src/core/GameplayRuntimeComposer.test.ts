@@ -26,6 +26,7 @@ function createRefs() {
     atmosphereSystem: {
       setRenderer: vi.fn(),
       setShadowFollowTarget: vi.fn(),
+      setTerrainRuntime: vi.fn(),
     },
     audioManager: { setSkyRuntime: vi.fn() },
     combatantSystem: {
@@ -260,5 +261,7 @@ describe('GameplayRuntimeComposer', () => {
 
     expect(refs.atmosphereSystem.setRenderer).toHaveBeenCalledWith(renderer);
     expect(refs.atmosphereSystem.setShadowFollowTarget).toHaveBeenCalledWith(camera);
+    // Terrain is bound so the sun disc can fade behind ridgelines.
+    expect(refs.atmosphereSystem.setTerrainRuntime).toHaveBeenCalledWith(refs.terrainSystem);
   });
 });

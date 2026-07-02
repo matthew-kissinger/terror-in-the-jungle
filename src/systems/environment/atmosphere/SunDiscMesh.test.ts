@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2025-2026 Matthew Kissinger
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import {
   SunDiscMesh,
@@ -9,6 +9,12 @@ import {
   SUN_DISC_SINE_FREQ,
   computeSunDiscSurfaceTerms,
 } from './SunDiscMesh';
+import { SunDiscConfig } from './SunDiscConfig';
+import {
+  SUN_DISC_LIMB_U,
+  SUN_DISC_HALO_OUTER_R,
+  SUN_DISC_HALO_STRENGTH,
+} from './SunDiscOptics';
 
 /**
  * Behaviour contract for the additive HDR sun-disc sprite. We assert what
@@ -282,5 +288,133 @@ describe('SunDiscMesh', () => {
     // Disable mid-frame → sprite hides immediately (no one-frame leak).
     disc.setEnabled(false);
     expect(disc.getMesh().visible).toBe(false);
+  });
+
+  // --- Rebuild (sun-disc-scorch-rebuild): optics parity + terrain occlusion ---
+  //
+  // The rebuild adds limb darkening, a tight forward-scatter halo, an
+  // elevation-keyed extinction consume (via the backend sun color), and a CPU
+  // terrain-horizon occlusion fade. These assert the caller-observable contract:
+  // the fallback body reads limb-darkened, the horizon occlusion multiplier
+  // reaches the alpha channel, and both material paths advertise the shared
+  // optics constants so TSL (WebGPU) and GLSL (WebGL2) stay in visual parity.
+  describe('rebuild optics + occlusion', () => {
+    afterEach(() => {
+      // Tests below flip the kill-switch; always restore the default-ON state.
+      SunDiscConfig.v2 = true;
+    });
+
+    it('renders a limb-darkened body: the fallback core is brighter than its edge', () => {
+      const disc = new SunDiscMesh(DOME_RADIUS);
+      const material = disc.getMaterial() as THREE.Material & {
+        userData: { sunDiscFallbackTexture?: THREE.DataTexture };
+      };
+      const texture = material.userData.sunDiscFallbackTexture!;
+      const size = texture.image.width as number;
+      const data = texture.image.data as Uint8Array;
+      const sampleLuma = (px: number, py: number): number => {
+        const i = (py * size + px) * 4;
+        return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      };
+      const center = Math.floor(size / 2);
+      // A point ~85% of the way to the body limb (body radius ~0.285 in centered
+      // UV -> ~0.285 * size pixels from center).
+      const limbOffset = Math.round(0.24 * size);
+      const centerLuma = sampleLuma(center, center);
+      const limbLuma = sampleLuma(center + limbOffset, center);
+      // Limb darkening: the body dims toward its edge like a photosphere.
+      expect(centerLuma).toBeGreaterThan(limbLuma);
+      disc.dispose();
+    });
+
+    it('advertises the shared optics constants on BOTH material paths (TSL/GLSL parity)', () => {
+      const disc = new SunDiscMesh(DOME_RADIUS);
+      type OpticsMeta = {
+        userData: {
+          sunDiscOptics?: {
+            limbCoefficient?: number;
+            haloOuterRadius?: number;
+            haloStrength?: number;
+            extinctionAuthority?: string;
+            occlusion?: string;
+          };
+        };
+      };
+      // Default (WebGPU/TSL) material.
+      const tsl = (disc.getMaterial() as THREE.Material & OpticsMeta).userData.sunDiscOptics;
+      // Explicit WebGL2/GLSL fallback material.
+      disc.setRendererBackend('webgl');
+      const glsl = (disc.getMaterial() as THREE.Material & OpticsMeta).userData.sunDiscOptics;
+
+      for (const optics of [tsl, glsl]) {
+        expect(optics?.limbCoefficient).toBe(SUN_DISC_LIMB_U);
+        expect(optics?.haloOuterRadius).toBe(SUN_DISC_HALO_OUTER_R);
+        expect(optics?.haloStrength).toBe(SUN_DISC_HALO_STRENGTH);
+        // Extinction/color comes from the existing backend sun, not a second authority.
+        expect(optics?.extinctionAuthority).toBe('backend-getSun');
+        expect(optics?.occlusion).toBe('cpu-terrain-horizon-march');
+      }
+      disc.dispose();
+    });
+
+    it('drives the terrain-horizon occlusion multiplier onto the disc opacity uniform', () => {
+      const disc = new SunDiscMesh(DOME_RADIUS);
+      const camera = new THREE.Vector3(0, 100, 0);
+      const sun = new THREE.Vector3(0.4, 0.6, 0.3).normalize();
+      const sunColor = new THREE.Color(1, 0.8, 0.5);
+
+      // Clear sky (occlusion = 1): full opacity uniform, sprite visible.
+      disc.update(camera, sun, sunColor, 1);
+      disc.setRendererBackend('webgl');
+      const webglMat = disc.getMaterial() as THREE.ShaderMaterial;
+      expect(webglMat.uniforms.uOcclusion.value).toBe(1);
+      expect(disc.getMesh().visible).toBe(true);
+
+      // Fully behind a ridge (occlusion = 0): opacity uniform collapses to 0.
+      disc.update(camera, sun, sunColor, 0);
+      expect(webglMat.uniforms.uOcclusion.value).toBe(0);
+      // The sprite is still "visible" (above the geometric horizon) but the
+      // shader paints it transparent — occlusion is an alpha fade, not a hide.
+      expect(disc.getMesh().visible).toBe(true);
+
+      // Partial band: passes through faithfully.
+      disc.update(camera, sun, sunColor, 0.4);
+      expect(webglMat.uniforms.uOcclusion.value).toBeCloseTo(0.4, 6);
+      disc.dispose();
+    });
+
+    it('flips the V2 toggle uniform when the kill-switch flips (legacy fallback preserved)', () => {
+      const disc = new SunDiscMesh(DOME_RADIUS);
+      const camera = new THREE.Vector3(0, 0, 0);
+      const sun = new THREE.Vector3(0.3, 0.9, 0.3).normalize();
+      const sunColor = new THREE.Color(1, 1, 1);
+      disc.setRendererBackend('webgl');
+      const webglMat = disc.getMaterial() as THREE.ShaderMaterial;
+
+      SunDiscConfig.v2 = true;
+      disc.update(camera, sun, sunColor);
+      expect(webglMat.uniforms.uV2.value).toBe(1);
+
+      SunDiscConfig.v2 = false;
+      disc.update(camera, sun, sunColor);
+      expect(webglMat.uniforms.uV2.value).toBe(0);
+      disc.dispose();
+    });
+
+    it('consumes the elevation-keyed backend sun color faithfully (warm dawn -> warm disc)', () => {
+      const disc = new SunDiscMesh(DOME_RADIUS);
+      const camera = new THREE.Vector3(0, 0, 0);
+      const lowSun = new THREE.Vector3(0.9, 0.08, 0.3).normalize();
+      // Backend getSun is elevation-reddened at dawn: warm amber chromaticity.
+      const dawnColor = new THREE.Color(1.0, 0.5, 0.2);
+      disc.setRendererBackend('webgl');
+      const webglMat = disc.getMaterial() as THREE.ShaderMaterial;
+
+      disc.update(camera, lowSun, dawnColor);
+      // The body color the shader receives stays red-dominant (warm), not neutral.
+      const body = webglMat.uniforms.uBodyColor.value as THREE.Color;
+      expect(body.r).toBeGreaterThan(body.b);
+      disc.dispose();
+    });
   });
 });

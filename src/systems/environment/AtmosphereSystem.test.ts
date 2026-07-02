@@ -685,6 +685,49 @@ describe('AtmosphereSystem (ICloudRuntime contract)', () => {
     expect(secondSunPosition.distanceTo(secondCamera)).toBeGreaterThan(400);
   });
 
+  it('fades the sun disc behind a blocking ridge but leaves it clear over a valley', () => {
+    // WebGL2-backend renderer so the disc uses the readable ShaderMaterial
+    // (uOcclusion is a plain uniform there — the TSL path is asserted separately).
+    const renderer = makeRendererStub() as IGameRenderer & {
+      getRendererBackendCapabilities?: () => { resolvedBackend?: string };
+    };
+    renderer.getRendererBackendCapabilities = () => ({ resolvedBackend: 'webgl' });
+
+    const system = new AtmosphereSystem();
+    const scene = new THREE.Scene();
+    system.attachScene(scene);
+    system.setRenderer(renderer);
+    // The A Shau preset carries a genuinely low (~10 degrees) sun, so a ridge
+    // along its azimuth can subtend a larger blocking angle than the sun's own
+    // elevation — the case that used to shine through the silhouette.
+    system.applyScenarioPreset('ashau');
+
+    const sunBody = scene.children.find((c) => c.name === 'SunDiscSprite') as THREE.Mesh;
+    const readOcclusion = (): number =>
+      ((sunBody.material as THREE.ShaderMaterial).uniforms.uOcclusion.value as number);
+
+    // Tall terrain everywhere -> the low sun is behind the ridge -> disc fades out.
+    system.setTerrainRuntime({
+      getHeightAt: () => 5000,
+      isTerrainReady: () => true,
+    } as unknown as Parameters<AtmosphereSystem['setTerrainRuntime']>[0]);
+    system.syncDomePosition(new THREE.Vector3(0, 100, 0));
+    expect(readOcclusion()).toBe(0);
+
+    // Valley floor far below the camera -> nothing blocks -> disc stays clear.
+    system.setTerrainRuntime({
+      getHeightAt: () => -500,
+      isTerrainReady: () => true,
+    } as unknown as Parameters<AtmosphereSystem['setTerrainRuntime']>[0]);
+    system.syncDomePosition(new THREE.Vector3(0, 100, 0));
+    expect(readOcclusion()).toBe(1);
+
+    // No terrain bound -> never occludes (sandbox / pre-terrain frames).
+    system.setTerrainRuntime(undefined);
+    system.syncDomePosition(new THREE.Vector3(0, 100, 0));
+    expect(readOcclusion()).toBe(1);
+  });
+
   /**
    * Cross-scenario coverage regression (`cloud-audit-and-polish`). The
    * pre-audit defaults left four of five scenarios invisibly-clouded
