@@ -7,6 +7,9 @@ import type { ICloudRuntime, IGameRenderer, ISkyRuntime, ITerrainRuntime } from 
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
 import { SunDiscUpdater } from './atmosphere/SunDiscUpdater';
+import type { ShadowCameraFit } from './atmosphere/ShadowCameraFit';
+import { ShadowCameraController } from './atmosphere/ShadowCameraController';
+import { publishShadowTruthConfig } from './atmosphere/ShadowTruthConfig';
 import { createLightingRigState, createRigSceneLightRadiance, deriveLightingRigState, isLightingRigEnabled, lightingRigBindings, publishLightingRigConfig, rigSceneLightRadiance } from './LightingRig';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
@@ -185,6 +188,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   /** The rig's projection into the four scene-light colors; copied into the
    * renderer lights when the flag is ON so GLB + terrain PBR track the curve. */
   private readonly rigSceneLights = createRigSceneLightRadiance();
+  /** Elevation-aware shadow-camera fit (shadow-single-map-truth); composed helper
+   * so this file stays under the 700-LOC ceiling. Driven from `applyToRenderer`. */
+  private readonly shadowCamera = new ShadowCameraController();
 
   constructor() {
     this.hosekBackend = new HosekWilkieSkyBackend();
@@ -204,6 +210,9 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // Mirror the rig runtime flag onto window so a headless capture harness can
     // flip the Phase 0 prototype on for the A/B sweep. No-op outside a browser.
     publishLightingRigConfig();
+    // Mirror the shadow-truth kill-switches (camera/bias + billboard proxies)
+    // onto window for A/B + orchestrator perf-flip. No-op outside a browser.
+    publishShadowTruthConfig();
   }
 
   async init(): Promise<void> {
@@ -482,43 +491,22 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     // moonlight direction/color instead of clamping the sub-horizon sun into
     // an above-ground light that makes terrain read red or wrongly backlit.
     if (renderer.moonLight) {
-      // Start with a sun-direction-scaled offset. Clamp Y so the light
-      // stays above a minimum altitude even if the atmosphere model dips
-      // the sun to/below the horizon — a degenerate near-horizontal
-      // shadow frustum eats precision and can blank out shadows.
-      this.scratchSunPosition
-        .copy(lighting.directLightDirection)
-        .multiplyScalar(SUN_LIGHT_DISTANCE);
-      if (lighting.sunAboveHorizon && this.scratchSunPosition.y < MIN_SUN_Y) {
-        this.scratchSunPosition.y = MIN_SUN_Y;
-      }
-
-      // Recenter the shadow frustum on the follow target so shadows stay
-      // sharp near the player regardless of sun angle. Preserve the target's
-      // altitude too: A Shau terrain can sit hundreds of meters above world
-      // origin, and pinning the target to Y=0 makes low sun lights aim through
-      // the wrong elevation plane.
-      if (this.followTarget) {
-        const t = this.followTarget.position;
-        renderer.moonLight.position.set(
-          this.scratchSunPosition.x + t.x,
-          this.scratchSunPosition.y + t.y,
-          this.scratchSunPosition.z + t.z
-        );
-        renderer.moonLight.target.position.set(t.x, t.y, t.z);
-      } else {
-        renderer.moonLight.position.copy(this.scratchSunPosition);
-        renderer.moonLight.target.position.set(0, 0, 0);
-      }
-      renderer.moonLight.target.updateMatrixWorld();
+      // Place the light on the follow origin + fit the shadow camera. The
+      // MIN_SUN_Y clamp keeps the light above a minimum altitude; the follow
+      // recenter keeps shadows sharp near the player; the elevation-aware fit
+      // (shadow-single-map-truth) sizes near/far/bias so the ground under the
+      // player is inside the frustum instead of clipped by the legacy far=300.
+      this.shadowCamera.placeAndFit(renderer.moonLight, {
+        offset: this.scratchSunPosition
+          .copy(lighting.directLightDirection)
+          .multiplyScalar(SUN_LIGHT_DISTANCE),
+        clampMinY: lighting.sunAboveHorizon ? MIN_SUN_Y : undefined,
+        followTarget: this.followTarget,
+        lightDistance: SUN_LIGHT_DISTANCE,
+        devLog: import.meta.env.DEV,
+      });
 
       renderer.moonLight.color.copy(rigOn ? this.rigSceneLights.sunColor : lighting.directLightColor);
-
-      // Matrix world must be updated manually; setupLighting() no longer
-      // freezeTransform()s this light but without an explicit update here
-      // the shadow-map machinery would read a stale world matrix on the
-      // very next render pass.
-      renderer.moonLight.updateMatrixWorld();
     }
 
     // Hemisphere sky + ground colors drive the indirect bounce fill. The
@@ -533,6 +521,12 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (renderer.ambientLight) {
       renderer.ambientLight.color.copy(rigOn ? this.rigSceneLights.ambientColor : lighting.ambientColor);
     }
+  }
+
+  /** Last applied shadow-camera fit (null when `cameraTruth` is OFF) — read-only
+   * debug surface for the owner walk to verify the effective frustum. */
+  getShadowCameraFit(): Readonly<ShadowCameraFit> | null {
+    return this.shadowCamera.getFit();
   }
 
   private trackAtmosphereTiming(name: string, updateFn: () => void): void {

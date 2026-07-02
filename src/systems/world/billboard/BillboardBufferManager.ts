@@ -33,6 +33,9 @@ export class GPUBillboardVegetation {
   private rotationAttribute: THREE.InstancedBufferAttribute;
 
   private maxInstances: number;
+  /** Billboard card world size (metres) — read by near-field shadow proxies. */
+  private readonly cardWidth: number;
+  private readonly cardHeight: number;
   private highWaterMark = 0;
   private liveCount = 0;
   private freeSlots: Set<number> = new Set();
@@ -52,6 +55,8 @@ export class GPUBillboardVegetation {
   constructor(scene: THREE.Scene, config: GPUVegetationConfig) {
     this.scene = scene;
     this.maxInstances = config.maxInstances;
+    this.cardWidth = config.width;
+    this.cardHeight = config.height;
     const alphaCrop = config.imposterAtlas?.alphaCrop ?? { minU: 0, minV: 0, maxU: 1, maxV: 1 };
 
     // Create plane geometry for billboard
@@ -226,6 +231,12 @@ export class GPUBillboardVegetation {
     return this.positions;
   }
 
+  /** Packed per-instance `[scaleX, scaleY, ...]` — near-field shadow proxies read
+   * this to skip freed slots (scale 0) and size each proxy to the live instance. */
+  getInstanceScales(): Float32Array {
+    return this.scales;
+  }
+
   // Reset all instances (for full cleanup)
   reset(): void {
     const previousHighWaterMark = this.highWaterMark;
@@ -327,6 +338,15 @@ export class GPUBillboardVegetation {
 
   getHighWaterMark(): number {
     return this.highWaterMark;
+  }
+
+  /** Billboard card world width/height (metres) — near-field shadow-proxy sizing. */
+  getCardWidth(): number {
+    return this.cardWidth;
+  }
+
+  getCardHeight(): number {
+    return this.cardHeight;
   }
 
   getFreeSlotCount(): number {
