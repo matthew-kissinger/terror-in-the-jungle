@@ -42,7 +42,8 @@ lowest-risk, drift-preventing pieces:
   but out of scope-risk for a byte-identical pass).
 - Any file owned by a sibling task: `HudControlHints.ts`, `VehicleActionBar.ts`,
   `SmokeMarkerPrompt.ts`, `GrenadeMeter.ts`, `AirSupportRadioMenu.ts`,
-  `FixedWingHUD.ts`, anything under `src/ui/map/orbital/`.
+  `FixedWingHUD.ts`, anything under the orbital map directory (deleted in the
+  same wave by task/orbital-map-prune, PR #477).
 
 ## Validation
 
