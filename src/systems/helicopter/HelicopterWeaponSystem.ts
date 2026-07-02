@@ -534,8 +534,17 @@ export class HelicopterWeaponSystem {
     const speed = weapon.config.projectileSpeed ?? 150;
     _rocketVel.copy(_forward).multiplyScalar(speed);
 
-    // Spawn projectile via GrenadeSystem (handles physics, collision, explosion)
-    this.grenadeSystem.spawnProjectile(_mountWorld, _rocketVel, 10.0, 'helicopter_rocket');
+    // Spawn projectile via GrenadeSystem (handles physics + explosion). The
+    // rocket detonates on first ground impact (A3); the 10 s fuse is only a
+    // backstop for a shot that never touches down.
+    this.grenadeSystem.spawnProjectile(
+      _mountWorld,
+      _rocketVel,
+      10.0,
+      'helicopter_rocket',
+      undefined,
+      { detonateOnImpact: true },
+    );
 
     // Audio
     if (this.audioManager) {

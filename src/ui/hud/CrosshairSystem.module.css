@@ -632,3 +632,33 @@
   box-shadow: 0 0 5px rgba(231, 217, 186, 0.7);
   z-index: 2;
 }
+
+/* --- CCIP bomb pipper (dropped bombs) --- */
+/* A diamond marking the continuously-computed bomb impact point. Unlike the
+   fixed reticles above, it floats to an arbitrary screen position — the adapter
+   projects the predicted impact to the screen and pushes a pixel offset from the
+   crosshair centre each frame. Anchored at the container centre (which sits at
+   screen centre) and translated by that offset. Hidden by default. */
+.bombCue {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border: 2px solid rgba(231, 217, 186, 0.9);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: var(--z-crosshair);
+}
+
+.bombCue::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  transform: translate(-50%, -50%);
+  background: rgba(231, 217, 186, 0.95);
+}

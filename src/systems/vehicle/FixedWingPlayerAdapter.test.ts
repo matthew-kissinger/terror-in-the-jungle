@@ -291,8 +291,13 @@ describe('FixedWingPlayerAdapter', () => {
 
       adapter.onEnter(ctx);
       // Rounds + capacity seed the readout; the per-airframe weapon name rides
-      // along as the third arg.
-      expect(ctx.hudSystem!.updateFixedWingAmmo).toHaveBeenCalledWith(600, 600, expect.any(String));
+      // along as the third arg, and the A-1's dropped-bomb load as the fourth.
+      expect(ctx.hudSystem!.updateFixedWingAmmo).toHaveBeenCalledWith(
+        600,
+        600,
+        expect.any(String),
+        expect.objectContaining({ count: expect.any(Number), capacity: expect.any(Number) }),
+      );
     });
 
     it('decrements the ammo readout as the trigger burns rounds (real fire path)', () => {

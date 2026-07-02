@@ -294,11 +294,13 @@ describe('HelicopterWeaponSystem', () => {
       ws.update(0.5, HELI_ID, pos, quat, false, false);
       expect(gs.spawnProjectile).toHaveBeenCalledTimes(1);
 
-      const [spawnPos, spawnVel, fuse] = (gs.spawnProjectile as any).mock.calls[0];
+      const [spawnPos, spawnVel, fuse, , , options] = (gs.spawnProjectile as any).mock.calls[0];
       expect(spawnPos).toBeInstanceOf(THREE.Vector3);
       expect(spawnVel).toBeInstanceOf(THREE.Vector3);
       expect(spawnVel.length()).toBeCloseTo(150, 0);
+      // 10 s fuse is now only a backstop; the rocket detonates on ground impact (A3).
       expect(fuse).toBe(10.0);
+      expect(options?.detonateOnImpact).toBe(true);
     });
 
     it('should consume rocket ammo', () => {

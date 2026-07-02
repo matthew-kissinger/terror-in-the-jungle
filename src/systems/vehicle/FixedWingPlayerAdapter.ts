@@ -5,9 +5,17 @@ import * as THREE from 'three';
 import type { FixedWingModel } from './FixedWingModel';
 import { createIdleFixedWingPilotIntent } from './FixedWingControlLaw';
 import type { FixedWingPilotIntent, FixedWingPilotMode } from './FixedWingControlLaw';
-import { getFixedWingCameraFit } from './FixedWingArmament';
+import { getFixedWingBombConfig, getFixedWingCameraFit } from './FixedWingArmament';
+import {
+  createBombRuntime,
+  FixedWingBombController,
+  type BombAirframe,
+  type BombOutputs,
+  type BombRuntimeDeps,
+} from './FixedWingBombing';
 import { FIXED_WING_CONFIGS } from './FixedWingConfigs';
 import { buildOrbitAnchorFromHeading } from './FixedWingOperations';
+import { Faction } from '../combat/types';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type {
@@ -38,7 +46,7 @@ import {
  * a fence change.
  */
 type FixedWingAmmoHud = {
-  updateFixedWingAmmo?(rounds: number, capacity: number, weaponName?: string): void;
+  updateFixedWingAmmo?(rounds: number, capacity: number, weaponName?: string, bombs?: { count: number; capacity: number }): void;
 };
 
 // ── Fixed-wing control tuning ──
@@ -49,8 +57,10 @@ const FW_MOUSE_RECENTER_RATE = 1.8;
 const FW_ASSIST_MOUSE_RECENTER_RATE = 3.2;
 const FW_ORBIT_HOLD_ALTITUDE_HYSTERESIS_M = 60;
 const FW_ORBIT_HOLD_MIN_DROPOUT_ALTITUDE_M = 20;
-// DOM MouseEvent.button code for the right mouse button. RMB toggles the AC-47
-// broadside gunner view (rising edge), reusing the tank-sight RMB pattern.
+// DOM MouseEvent.button code for the right mouse button. On the AC-47 (broadside
+// battery) RMB toggles the gunner cam; on the A-1 / F-4 (dropped bombs, no
+// broadside) the same button releases a bomb — the airframes are mutually
+// exclusive, so one button code serves both (rising edge).
 const FW_BROADSIDE_TOGGLE_BUTTON = 2;
 
 function createFixedWingUIContext(
@@ -58,6 +68,7 @@ function createFixedWingUIContext(
   weaponCount: number,
   broadsideAvailable: boolean,
   broadsideActive: boolean,
+  bombsAvailable: boolean,
 ): VehicleUIContext {
   const context: VehicleUIContext = {
     kind: 'plane',
@@ -84,6 +95,9 @@ function createFixedWingUIContext(
       active: broadsideActive,
       ariaLabel: broadsideActive ? 'Switch to chase view' : 'Switch to broadside view',
     };
+  }
+  if (bombsAvailable) {
+    context.bombsAvailable = true;
   }
   return context;
 }
@@ -119,8 +133,18 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   private activeAircraftId: string | null = null;
   private activeConfigKey: string | null = null;
 
-  constructor(fixedWingModel: FixedWingModel) {
+  // Dropped-bomb ordnance (A-1 / F-4). The store is built per board from the
+  // airframe bomb config; RMB releases a bomb (rising edge) on airframes that
+  // carry bombs and have no broadside view. Null between sorties.
+  private readonly bombing?: BombRuntimeDeps;
+  private bombController: FixedWingBombController | null = null;
+  private bombAirframe: BombAirframe | null = null;
+  private bombOutputs: BombOutputs | null = null;
+  private prevBombReleaseDown = false;
+
+  constructor(fixedWingModel: FixedWingModel, bombing?: BombRuntimeDeps) {
     this.fixedWingModel = fixedWingModel;
+    this.bombing = bombing;
   }
 
   onEnter(ctx: VehicleTransitionContext): void {
@@ -141,6 +165,12 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.broadsideViewActive = false;
     this.prevBroadsideToggleDown = false;
     this.broadsideToggleRequested = false;
+
+    // Per-sortie bomb store from the airframe config (null for AC-47 / gun-only
+    // craft — no bombs, no pipper, RMB stays the gun cam) + the controller runtime.
+    this.bombController = new FixedWingBombController(getFixedWingBombConfig(this.activeConfigKey));
+    this.buildBombRuntime(ctx.vehicleId, ctx.hudSystem as IHUDSystem | undefined);
+    this.prevBombReleaseDown = false;
 
     seatPlayer(ctx, 'fixedwing.enter');
 
@@ -204,8 +234,14 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.hideFixedWingMouseIndicator?.();
     hudSystem?.setVehicleContext?.(null);
 
-    // Restore the infantry crosshair the player left on foot.
+    // Restore the infantry crosshair; drop the CCIP bomb pipper so it never
+    // leaks onto the infantry crosshair.
     setInfantryCrosshair(ctx.gameRenderer);
+    this.bombing?.gameRenderer?.setCrosshairBombCue?.(null);
+    this.bombController = null;
+    this.bombAirframe = null;
+    this.bombOutputs = null;
+    this.prevBombReleaseDown = false;
 
     // Release the trigger before tearing down so the cannon can't latch firing
     // across an exit.
@@ -229,6 +265,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     if (!this.activeAircraftId) return;
 
     this.updateBroadsideView(ctx);
+    this.updateBombing(ctx); // RMB release + CCIP pipper (no-op on the AC-47)
 
     let mouseMovement: { x: number; y: number } | undefined;
     const touchFlight = isTouchFlightMode(ctx.input);
@@ -283,6 +320,37 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     }
   }
 
+  /**
+   * Bomb release + CCIP pipper for the A-1 / F-4. RMB rising edge releases one
+   * bomb (airborne-gated, load-limited); the pipper marks where the next bomb
+   * lands. A no-op on airframes without bombs, so the AC-47 RMB stays the
+   * broadside cam handled above (the two airframes are mutually exclusive).
+   */
+  private updateBombing(ctx: VehicleUpdateContext): void {
+    const controller = this.bombController;
+    if (!controller?.hasBombs() || !this.bombAirframe || !this.bombOutputs) return;
+
+    const down = typeof ctx.input.isMouseButtonPressed === 'function'
+      ? ctx.input.isMouseButtonPressed(FW_BROADSIDE_TOGGLE_BUTTON)
+      : false;
+    if (down && !this.prevBombReleaseDown) {
+      controller.tryRelease(this.bombAirframe, Faction.US, this.bombOutputs);
+    }
+    this.prevBombReleaseDown = down;
+    controller.updateCue(this.bombAirframe, this.bombOutputs);
+  }
+
+  /** Build the live pose view + runtime sinks the bomb controller drives (once per board). */
+  private buildBombRuntime(aircraftId: string, hudSystem: IHUDSystem | undefined): void {
+    const runtime = createBombRuntime(this.fixedWingModel, this.bombing ?? {}, aircraftId, {
+      flashAirborneHint: () =>
+        (hudSystem as { flashFixedWingAirborneHint?(): void } | undefined)?.flashFixedWingAirborneHint?.(),
+      onReleased: () => this.pushVehicleContext(hudSystem),
+    });
+    this.bombAirframe = runtime.airframe;
+    this.bombOutputs = runtime.outputs;
+  }
+
   /** True when the AC-47 broadside gunner view is engaged. */
   isBroadsideViewActive(): boolean {
     return this.broadsideViewActive;
@@ -310,6 +378,10 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.broadsideViewActive = false;
     this.prevBroadsideToggleDown = false;
     this.broadsideToggleRequested = false;
+    this.bombController = null;
+    this.bombAirframe = null;
+    this.bombOutputs = null;
+    this.prevBombReleaseDown = false;
   }
 
   // ── Fire control ──
@@ -507,22 +579,36 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   private pushAmmo(hudSystem: IHUDSystem | undefined, aircraftId: string): void {
     const sink = hudSystem as (IHUDSystem & FixedWingAmmoHud) | undefined;
     if (!sink?.updateFixedWingAmmo) return;
+    // Bomb store rides the same push (dropped-bomb airframes only; undefined hides it).
+    const bombs = this.bombController?.hasBombs()
+      ? { count: this.bombController.getRemaining(), capacity: this.bombController.getCapacity() }
+      : undefined;
     sink.updateFixedWingAmmo(
       this.fixedWingModel.getWeaponAmmo(aircraftId),
       this.fixedWingModel.getWeaponAmmoCapacity(aircraftId),
       this.fixedWingModel.getWeaponName(aircraftId),
+      bombs,
     );
   }
 
   private pushVehicleContext(hudSystem: IHUDSystem | undefined): void {
     if (!hudSystem || !this.activeAircraftId) return;
     const config = this.activeConfigKey ? FIXED_WING_CONFIGS[this.activeConfigKey] : null;
+    const bombsAvailable = (this.bombController?.getRemaining() ?? 0) > 0;
     hudSystem.setVehicleContext?.(createFixedWingUIContext(
       config?.role ?? 'pilot',
       this.fixedWingModel.getWeaponCount(this.activeAircraftId),
       this.hasBroadsideView(),
       this.broadsideViewActive,
+      bombsAvailable,
     ));
+  }
+
+  /** Touch BOMB button entry point (desktop uses RMB via `updateBombing`). */
+  releaseBombFromTouch(): void {
+    if (this.bombController && this.bombAirframe && this.bombOutputs) {
+      this.bombController.tryRelease(this.bombAirframe, Faction.US, this.bombOutputs);
+    }
   }
 
   private hasBroadsideView(): boolean {

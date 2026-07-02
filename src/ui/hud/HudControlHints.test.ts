@@ -303,10 +303,16 @@ describe('HudControlHints — seat / fire cues', () => {
     capabilities: caps({ canFirePrimary: true }),
     viewToggle: { inactiveLabel: 'SIDE', activeLabel: 'CHASE', active: false },
   };
-  // A strike plane (A-1 / F-4): armed, no broadside view toggle.
+  // A strike plane (A-1 / F-4): armed, no broadside view toggle, no bombs left.
   const strikePlane: VehicleUIContext = {
     kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
     capabilities: caps({ canFirePrimary: true }),
+  };
+  // A strike plane still carrying bombs: RMB drops a bomb.
+  const bombedPlane: VehicleUIContext = {
+    kind: 'plane', role: 'pilot', hudVariant: 'flight', weaponCount: 1,
+    capabilities: caps({ canFirePrimary: true }),
+    bombsAvailable: true,
   };
 
   beforeEach(() => {
@@ -392,8 +398,8 @@ describe('HudControlHints — seat / fire cues', () => {
   });
 
   it('shows a strike plane (A-1 / F-4) pilot the fire cue but no broadside gun-cam note', () => {
-    // Only the AC-47 broadside gunship responds to RMB; a plain strike plane has
-    // no RMB action, so the gun-cam note must not appear.
+    // Only the AC-47 broadside gunship gets the gun-cam note; a bomb-empty strike
+    // plane has no RMB action, so neither the gun-cam nor the bomb note appears.
     hints.setSeatHint(HudControlHints.seatHintFromContext(strikePlane));
 
     const text = seatText(host);
@@ -401,6 +407,19 @@ describe('HudControlHints — seat / fire cues', () => {
     expect(text).toContain('LMB: fire');
     expect(text.toLowerCase()).not.toContain('broadside');
     expect(text.toLowerCase()).not.toContain('gun cam');
+    expect(text.toLowerCase()).not.toContain('drop bomb');
+  });
+
+  it('shows a bombed strike plane the RMB drop-bomb cue (not the broadside gun cam)', () => {
+    // The A-1 / F-4 carry bombs; RMB drops one. The cue must teach that without
+    // the AC-47's broadside gun-cam note (the airframes are mutually exclusive).
+    hints.setSeatHint(HudControlHints.seatHintFromContext(bombedPlane));
+
+    const text = seatText(host);
+    expect(text).toContain('PILOT');
+    expect(text).toContain('LMB: fire');
+    expect(text.toLowerCase()).toContain('drop bomb');
+    expect(text.toLowerCase()).not.toContain('broadside');
   });
 
   it('relabels the gunship seat to DOOR GUN with a back-to-pilot cue after a door-gun swap', () => {

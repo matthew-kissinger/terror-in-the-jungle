@@ -105,6 +105,16 @@ describe('RocketRunMission', () => {
     }
   });
 
+  it('launches rockets that detonate on ground impact (A3), not fuse-only', () => {
+    const { grenadeSystem } = runRun({ faction: Faction.US });
+    const calls = grenadeSystem.spawnProjectile.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // spawnProjectile(position, velocity, fuseTime, weaponType, ownerFaction, options)
+    for (const call of calls) {
+      expect(call[5]?.detonateOnImpact).toBe(true);
+    }
+  });
+
   it('fires its rockets down-range along the approach direction', () => {
     // Approach along +X so the dominant velocity component should be +X.
     const { grenadeSystem } = runRun({ approach: new THREE.Vector3(1, 0, 0) });
