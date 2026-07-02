@@ -12,6 +12,10 @@ import type { M151ScenarioMode } from '../systems/vehicle/M151JeepSpawn';
 import { resolveGroundPlacement } from '../systems/terrain/TerrainPlacementAuthority';
 import { Tank } from '../systems/vehicle/Tank';
 import { GroundVehicle } from '../systems/vehicle/GroundVehicle';
+import { Emplacement } from '../systems/vehicle/Emplacement';
+import { createNpcM2HBAdapter } from '../systems/combat/weapons/NpcM2HBAdapter';
+import type { Combatant } from '../systems/combat/types';
+import type { EmplacementGunnerContext } from '../systems/combat/ai/EmplacementAIGunnerRoute';
 
 type OperationalRuntimeRefs = Pick<
   SystemKeyToType,
@@ -314,6 +318,12 @@ function wireM2HBEmplacementRuntime(
   m2hb.setCombatantSystem(runtime.combatantSystem);
   m2hb.setAudioManager(runtime.audioManager);
 
+  // NPC-gunner activation (npc-m2hb-gunners, F5): build the live M2HB adapter
+  // and forward its seek/scoring/fire surfaces onto the combatant AI. This is
+  // the production composition point the adapter's docstring referenced; the
+  // AI-order/seek layer already existed but had zero prod callers.
+  wireNpcM2HBGunner(runtime);
+
   if (!scene) return;
 
   const spawnedModes = new Set<M2HBScenarioMode>();
@@ -344,6 +354,52 @@ function wireM2HBEmplacementRuntime(
       }
     }, 0);
   });
+}
+
+/**
+ * Wire the NPC emplacement-gunner loop (npc-m2hb-gunners, F5). Builds the
+ * live M2HB adapter and forwards its surfaces onto the combatant AI:
+ *   - query + weapon resolver + boarding controller feed the seek/board scan
+ *     (an NPC diverts to mount a free friendly tripod with a threat in cone);
+ *   - the mounted-gunner route provider hands the AI the emplacement-aim /
+ *     adapter-fire / dismount context for a combatant seated on the gunner
+ *     seat so it actually slews + fires the .50 and dismounts when the belt
+ *     runs dry or the threat leaves the cone.
+ */
+function wireNpcM2HBGunner(runtime: OperationalRuntimeGroups['vehicleRuntime']): void {
+  const m2hb = runtime.m2hbEmplacementSystem;
+  if (!m2hb) return;
+  const combatantSystem = runtime.combatantSystem;
+  const combatantAI = combatantSystem?.combatantAI;
+  const vehicleManager = runtime.vehicleManager;
+  const boarding = runtime.npcVehicleController;
+  if (!combatantAI || !vehicleManager || !boarding) return;
+
+  const adapter = createNpcM2HBAdapter(vehicleManager, m2hb, combatantSystem);
+  combatantAI.setEmplacementQuery(adapter.query);
+  combatantAI.setEmplacementWeaponResolver(adapter.resolveWeapon);
+  combatantAI.setNpcVehicleBoarding(boarding);
+
+  // Mounted-gunner context provider: resolve the emplacement the combatant
+  // crews and confirm it sits on the gunner seat. Returns null for anyone not
+  // gunning a friendly emplacement (riders, passengers, tank crew).
+  combatantAI.setEmplacementGunnerRoute((combatant: Combatant): EmplacementGunnerContext | null => {
+    const vehicle = vehicleManager.getEmplacementByOccupant(combatant.id);
+    if (!(vehicle instanceof Emplacement)) return null;
+    if (vehicle.getPilotId() !== combatant.id) return null; // gunner seat only
+    const weapon = adapter.resolveWeapon(vehicle.vehicleId);
+    if (!weapon) return null;
+    const vehicleId = vehicle.vehicleId;
+    return {
+      vehicleId,
+      emplacement: vehicle,
+      weapon,
+      fire: (origin, aimDir) => adapter.fire(vehicleId, origin, aimDir),
+      orderDismount: () => boarding.orderDismount(combatant.id),
+    };
+  });
+
+  Logger.info('combat', 'NPC M2HB emplacement-gunner route wired (npc-m2hb-gunners)');
 }
 
 // Maps GameMode -> the M48 scenario-spawn key. Same shape + same

@@ -3,6 +3,7 @@
 
 import * as THREE from 'three'
 import { Combatant, Faction, isAlly } from '../types'
+import { Logger } from '../../../utils/Logger'
 import {
   UtilityAction,
   UtilityContext,
@@ -296,17 +297,23 @@ export class EmplacementMountTracker {
 // ── Context-builder ───────────────────────────────────────────────────────
 
 /**
+ * One-time-per-id guard for the missing-weapon-binding soft-fail so a
+ * mis-registered emplacement logs once rather than spamming the combat tick.
+ */
+const _loggedMissingBinding = new Set<string>()
+
+/**
  * Convenience builder used by AIStateEngage (and tests) to populate
  * `UtilityContext.nearbyEmplacement`. Returns the scorer fields or null
  * when no in-range candidate exists.
  *
- * `weaponResolver` is now REQUIRED: the synthetic-cone fallback that
- * shipped while the real M2HB weapon was authored in parallel has been
- * removed. The live `M2HBEmplacementSystem` (master 0732beaa) exposes the
- * barrel-pose cone via the per-vehicle weapon binding, and an emplacement
- * the resolver doesn't recognise is a wiring bug, not silently-OK input —
- * the builder throws so the misconfiguration surfaces in dev/test rather
- * than the unit silently failing to score above zero.
+ * `weaponResolver` supplies the live barrel-pose cone via the per-vehicle
+ * M2HB binding. A candidate the query returned but the resolver doesn't
+ * recognise is a wiring bug (vehicle registered in VehicleManager without a
+ * corresponding M2HB binding). Rather than hard-throw on the combat hot path
+ * — which would crash the whole tick over one mis-registered tripod — we log
+ * the id once and skip it (return null), so the unit falls back to the normal
+ * engage ladder and the rest of the frame is unaffected.
  *
  * Production callers obtain the resolver from the M2HB adapter
  * (`NpcM2HBAdapter` in `src/systems/combat/weapons/`); tests pass a
@@ -323,15 +330,19 @@ export function buildEmplacementContext(
   if (!candidate) return null
   const weapon = weaponResolver(candidate.vehicleId)
   if (!weapon) {
-    // Hard fail: a candidate the query returned but the resolver doesn't
-    // know about is a wiring contract violation (vehicle registered in
-    // VehicleManager without a corresponding M2HB binding). Throwing here
-    // forces the misconfiguration to surface immediately instead of
-    // silently degrading to "never mounts".
-    throw new Error(
-      `EmplacementSeekHelper: no weapon binding for emplacement '${candidate.vehicleId}' (resolver returned undefined). ` +
-      `Check that NpcM2HBAdapter / M2HBEmplacementSystem registered the binding when the vehicle was spawned.`
-    )
+    // Soft fail: log once per offending id and skip (treat as no candidate).
+    // A crashing throw here would take down the combat tick for every NPC
+    // over a single mis-registered emplacement — the seek path degrades to
+    // "never mounts that tripod" instead, which is recoverable.
+    if (!_loggedMissingBinding.has(candidate.vehicleId)) {
+      _loggedMissingBinding.add(candidate.vehicleId)
+      Logger.warn(
+        'combat',
+        `EmplacementSeekHelper: no weapon binding for emplacement '${candidate.vehicleId}' (resolver returned undefined); ` +
+        `skipping it. Check that NpcM2HBAdapter / M2HBEmplacementSystem registered the binding when the vehicle was spawned.`
+      )
+    }
+    return null
   }
   const cone = weapon.getFieldOfFireCone()
   return {

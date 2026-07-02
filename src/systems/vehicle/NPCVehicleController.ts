@@ -236,6 +236,20 @@ export class NPCVehicleController {
 
     const combatants = this.combatantProvider();
     for (const combatant of combatants.values()) {
+      // Death seat-release: a combatant killed while seated has state==DEAD but
+      // still holds its vehicleId, so it never re-enters the IN_VEHICLE branch
+      // below and its seat would stay occupied forever — blocking the next NPC
+      // (EmplacementSeekHelper gates on hasFreeSeats) and the player. Release
+      // the seat and clear the vehicle fields. General across seat roles, so
+      // tank gunner / passenger seats benefit too, not just emplacements.
+      if (combatant.state === CombatantState.DEAD && combatant.vehicleId) {
+        const seated = this.vehicleManager.getVehicle(combatant.vehicleId);
+        seated?.exitVehicle(combatant.id);
+        combatant.vehicleId = undefined;
+        combatant.vehicleSeatIndex = undefined;
+        continue;
+      }
+
       if (combatant.state !== CombatantState.IN_VEHICLE) continue;
       if (!combatant.vehicleId) continue;
 

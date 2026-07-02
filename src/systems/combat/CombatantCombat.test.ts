@@ -22,6 +22,7 @@ import {
 } from './ai/CombatFireRaycastBudget';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
+import { GameEventBus } from '../../core/GameEventBus';
 
 const mockTracerPool: TracerPool = { spawn: vi.fn() } as any;
 const mockMuzzleFlashSystem: MuzzleFlashSystem = { spawnNPC: vi.fn() } as any;
@@ -715,6 +716,71 @@ describe('CombatantCombat', () => {
       expect(result.killed).toBe(true);
       expect(target.state).toBe(CombatantState.DEAD);
       expect(result.damage).toBe(100);
+    });
+  });
+
+  // NPC crew-served attribution (npc-m2hb-gunners): an NPC M2HB gunner shot
+  // routes through handlePlayerShot with an npcAttacker override. The kill must
+  // credit the gunner (rifle death pipeline) and never the player.
+  describe('handlePlayerShot - NPC emplacement-gunner attribution', () => {
+    it('an NPC-gunner kill credits the gunner and never the player HUD / streak / player_kill', () => {
+      const gunner = createMockCombatant('gunner-1', Faction.NVA, 100);
+      gunner.kills = 0;
+      const target = createMockCombatant('target-1', Faction.US, 10);
+      const allCombatants = new Map<string, Combatant>([['target-1', target]]);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+
+      const raycast = vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(10, 0, 0),
+        distance: 10,
+        headshot: false,
+      });
+
+      // Drain any events queued by earlier tests so this subscriber only sees
+      // events from this shot (the bus is a flush-batched singleton).
+      GameEventBus.clear();
+      const playerKill = vi.fn();
+      const npcKilled = vi.fn();
+      const offPlayer = GameEventBus.subscribe('player_kill', playerKill);
+      const offNpc = GameEventBus.subscribe('npc_killed', npcKilled);
+      try {
+        const result = combatantCombat.handlePlayerShot(
+          ray,
+          () => 100,
+          allCombatants,
+          'rifle',
+          Faction.US, // ignored when npcAttacker is present
+          gunner,
+        );
+        GameEventBus.flush();
+
+        expect(result.killed).toBe(true);
+        // Friend-foe filtered on the gunner's faction, not the player's US.
+        expect(raycast.mock.calls[0][1]).toBe(Faction.NVA);
+        // Kill credited to the gunner via the rifle death pipeline.
+        expect(gunner.kills).toBe(1);
+        // The rifle death pipeline emits npc_killed crediting the gunner.
+        expect(npcKilled).toHaveBeenCalledTimes(1);
+        expect(npcKilled.mock.calls[0][0].killerId).toBe('gunner-1');
+        // Player kill accounting untouched.
+        expect(mockHUDSystem.addKill).not.toHaveBeenCalled();
+        expect(playerKill).not.toHaveBeenCalled();
+      } finally {
+        offPlayer();
+        offNpc();
+        GameEventBus.clear();
+      }
+    });
+
+    it('an NPC-gunner shot filters friend-foe by the gunner faction (cannot hit its own allies)', () => {
+      const gunner = createMockCombatant('gunner-nva', Faction.NVA, 100);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const raycast = vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue(null);
+
+      combatantCombat.handlePlayerShot(ray, () => 50, new Map(), 'rifle', Faction.US, gunner);
+
+      expect(raycast.mock.calls[0][1]).toBe(Faction.NVA);
     });
   });
 

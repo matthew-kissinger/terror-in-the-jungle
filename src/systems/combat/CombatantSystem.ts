@@ -521,9 +521,9 @@ export class CombatantSystem implements GameSystem {
     // Shooter faction for friend-or-foe filtering. Defaults to the player's
     // faction (US). Aircraft weapons pass their owning faction so friendly
     // combatants are never hit.
-    shooterFaction: Faction = Faction.US,
+    shooterFaction: Faction = Faction.US, npcAttacker?: Combatant,
   ): CombatHitResult {
-    return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants, weaponType, shooterFaction);
+    return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants, weaponType, shooterFaction, npcAttacker);
   }
 
   resolvePlayerAimPoint(ray: THREE.Ray): CombatHitResult {
