@@ -84,6 +84,14 @@ function createRefs() {
     hudSystem: { getStatsTracker: vi.fn(() => ({ id: 'stats-tracker' })) },
     influenceMapSystem: {},
     inventoryManager: {},
+    lootResupplySystem: {
+      setPlayerController: vi.fn(),
+      setSeatedPredicate: vi.fn(),
+      setInventoryManager: vi.fn(),
+      setFirstPersonWeapon: vi.fn(),
+      setHUDSystem: vi.fn(),
+      setTerrain: vi.fn(),
+    },
     minimapSystem: {},
     mortarSystem: {
       setAudioManager: vi.fn(),
@@ -93,7 +101,7 @@ function createRefs() {
       setInventoryManager: vi.fn(),
       setTicketSystem: vi.fn(),
     },
-    playerController: {},
+    playerController: { isInAnyVehicle: vi.fn(() => false) },
     playerHealthSystem: {
       resetForNewMatch: vi.fn(),
     },
@@ -213,6 +221,11 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.ammoSupplySystem.setZoneManager).toHaveBeenCalledWith(refs.zoneManager);
     expect(refs.ammoSupplySystem.setInventoryManager).toHaveBeenCalledWith(refs.inventoryManager);
     expect(refs.ammoSupplySystem.setFirstPersonWeapon).toHaveBeenCalledWith(refs.firstPersonWeapon);
+    expect(refs.lootResupplySystem.setPlayerController).toHaveBeenCalledWith(refs.playerController);
+    expect(refs.lootResupplySystem.setInventoryManager).toHaveBeenCalledWith(refs.inventoryManager);
+    expect(refs.lootResupplySystem.setFirstPersonWeapon).toHaveBeenCalledWith(refs.firstPersonWeapon);
+    expect(refs.lootResupplySystem.setHUDSystem).toHaveBeenCalledWith(refs.hudSystem);
+    expect(refs.lootResupplySystem.setTerrain).toHaveBeenCalledWith(refs.terrainSystem);
 
     getRestartCallback()?.();
     expect(refs.playerRespawnManager.cancelPendingRespawn).toHaveBeenCalledTimes(1);

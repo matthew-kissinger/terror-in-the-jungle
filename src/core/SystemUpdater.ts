@@ -228,6 +228,7 @@ export class SystemUpdater {
       if (refs.mortarSystem) refs.mortarSystem.update(deltaTime);
       if (refs.sandbagSystem) refs.sandbagSystem.update(deltaTime);
       if (refs.ammoSupplySystem) refs.ammoSupplySystem.update(deltaTime);
+      if (refs.lootResupplySystem) refs.lootResupplySystem.update(deltaTime);
       performanceTelemetry.endSystem('Weapons');
     });
 

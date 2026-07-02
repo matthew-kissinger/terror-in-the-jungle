@@ -95,6 +95,7 @@ export const SYSTEM_UPDATE_SCHEDULE: readonly SystemUpdatePhaseDefinition[] = [
       { key: 'mortarSystem', mode: 'direct-update' },
       { key: 'sandbagSystem', mode: 'direct-update' },
       { key: 'ammoSupplySystem', mode: 'direct-update' },
+      { key: 'lootResupplySystem', mode: 'direct-update' },
     ],
   },
   {
