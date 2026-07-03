@@ -214,7 +214,7 @@
     "@gltf-transform/extensions": "^4.4.0",
     "@types/node": "^26.0.1",
     "@types/three": "^0.184.1",
-    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
     "@typescript-eslint/parser": "^8.58.0",
     "bitecs": "^0.4.0",
     "cross-env": "^7.0.3",
