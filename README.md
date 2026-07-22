@@ -12,6 +12,13 @@
 
 [▶ Play the live build](https://terror-in-the-jungle.pages.dev/) · [Vision](docs/ROADMAP.md) · [Current state](docs/state/CURRENT.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](#contributing)
 
+**At a glance:**
+
+- ~314k lines of TypeScript game/engine source · 5,900+ tests across 396 files
+- Architected for ~3,000 combatants via materialization tiers (live-fire combat verified at 120 NPCs)
+- Real USGS DEM terrain of the A Shau Valley across a 21 km map
+- WebGPU-first rendering (Three.js r184 + TSL) with automatic WebGL2 fallback
+
 ---
 
 ## The idea
