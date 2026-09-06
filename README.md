@@ -1,5 +1,7 @@
 # Terror in the Jungle
 
+> **Rebuild in progress:** This repository contains the original Terror in the Jungle. I am developing a separate implementation around first-person squad command and sector battles. [Try the current WebGPU playtest](https://vietnam-war-sim.pages.dev/) (work in progress; source private). The original source and playable build below remain available.
+
 [![CI](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/ci.yml)
 [![Deploy](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/deploy.yml/badge.svg?branch=master)](https://github.com/matthew-kissinger/terror-in-the-jungle/actions/workflows/deploy.yml)
 [![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
