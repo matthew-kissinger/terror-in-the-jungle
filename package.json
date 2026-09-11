@@ -249,7 +249,7 @@
     "@game-field-kits/three-model-optimizer": "*",
     "@game-field-kits/vegetation-library": "*",
     "@preact/signals-core": "^1.14.1",
-    "@recast-navigation/core": "^0.43.0",
+    "@recast-navigation/core": "^0.43.1",
     "@recast-navigation/generators": "^0.43.0",
     "@recast-navigation/three": "^0.43.0",
     "three": "^0.185.0",
